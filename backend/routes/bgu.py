@@ -22,10 +22,25 @@ def _user_id():
 
 @bgu.get("/status")
 def connection_status():
-    """Check if sessions are still valid."""
-    # If we just connected this session, trust _login_status over cookie check
-    moodle_ok = (_login_status["moodle"] == "connected") or bgu_scraper.is_session_valid("moodle")
-    portal_ok = (_login_status["portal"] == "connected") or bgu_scraper.is_session_valid("portal")
+    """Check if sessions are still valid. Checks in-memory state, Supabase cookies, then live session."""
+    def _is_connected(site: str) -> bool:
+        # 1. In-memory (current server session)
+        if _login_status[site] == "connected":
+            return True
+        # 2. Supabase bgu_sessions table (persists across restarts)
+        try:
+            from services.supabase_client import get_client
+            result = get_client().table("bgu_sessions").select("site").eq("site", site).execute()
+            if result.data:
+                _login_status[site] = "connected"
+                return True
+        except Exception:
+            pass
+        # 3. Live cookie validation (slowest, last resort)
+        return bgu_scraper.is_session_valid(site)
+
+    moodle_ok = _is_connected("moodle")
+    portal_ok = _is_connected("portal")
     return jsonify({
         "moodle": moodle_ok,
         "portal": portal_ok,

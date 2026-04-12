@@ -41,10 +41,11 @@ def _save_cookies_to_store(site: str, cookies: list):
     if IS_SERVER:
         try:
             from services.supabase_client import get_client
+            from datetime import datetime as _dt
             get_client().table("bgu_sessions").upsert({
                 "site": site,
                 "cookies": json.dumps(cookies),
-                "updated_at": "now()",
+                "updated_at": _dt.utcnow().isoformat(),
             }, on_conflict="site").execute()
             print(f"[BGU] Cookies saved to Supabase for {site}")
         except Exception as e:

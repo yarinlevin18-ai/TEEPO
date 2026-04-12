@@ -107,17 +107,17 @@ export default function StudyBuddyPage() {
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
-      <div className="bg-white border-b border-surface-200 px-6 py-4 flex items-center gap-4">
+      <div className="border-b border-white/5 bg-[#0f1117]/80 backdrop-blur-sm px-6 py-4 flex items-center gap-4">
         {/* Agent switcher */}
         <div className="flex gap-2">
           {(Object.entries(AGENT_CONFIG) as [AgentType, typeof AGENT_CONFIG[AgentType]][]).map(([key, cfg]) => (
             <button
               key={key}
               onClick={() => switchAgent(key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 activeAgent === key
-                  ? 'bg-primary-50 text-primary-700 border border-primary-200'
-                  : 'text-slate-500 hover:bg-surface-100'
+                  ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/25'
+                  : 'text-ink-muted hover:text-ink hover:bg-white/5'
               }`}
             >
               <cfg.icon size={16} />
@@ -127,13 +127,13 @@ export default function StudyBuddyPage() {
         </div>
 
         <div className="mr-auto flex items-center gap-3">
-          <span className={`flex items-center gap-1.5 text-xs ${connected ? 'text-green-500' : 'text-slate-400'}`}>
-            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-slate-300'}`} />
+          <span className={`flex items-center gap-1.5 text-xs ${connected ? 'text-green-400' : 'text-ink-muted'}`}>
+            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-white/20'}`} />
             {connected ? 'מחובר' : 'מתחבר...'}
           </span>
           <button
             onClick={clearChat}
-            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+            className="p-2 text-ink-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
             title="נקה שיחה"
           >
             <Trash2 size={16} />
@@ -153,20 +153,24 @@ export default function StudyBuddyPage() {
             >
               {/* Avatar */}
               <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                msg.role === 'user' ? 'bg-primary-500' : 'bg-slate-100'
+                msg.role === 'user'
+                  ? 'bg-gradient-to-br from-indigo-500 to-violet-500'
+                  : 'bg-white/5 border border-white/8'
               }`}>
                 {msg.role === 'user'
                   ? <User size={16} className="text-white" />
-                  : <config.icon size={16} className="text-slate-500" />
+                  : <config.icon size={16} className="text-ink-muted" />
                 }
               </div>
 
               {/* Bubble */}
               <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === 'user'
-                  ? 'bg-primary-500 text-white rounded-tl-sm'
-                  : 'bg-white border border-surface-200 text-slate-800 rounded-tr-sm shadow-sm'
-              }`}>
+                  ? 'text-white rounded-tl-sm'
+                  : 'glass-sm text-ink rounded-tr-sm'
+              }`}
+              style={msg.role === 'user' ? { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' } : undefined}
+              >
                 {msg.content}
               </div>
             </motion.div>
@@ -176,10 +180,10 @@ export default function StudyBuddyPage() {
         {/* Typing indicator */}
         {isTyping && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-              <config.icon size={16} className="text-slate-500" />
+            <div className="w-8 h-8 rounded-full bg-white/5 border border-white/8 flex items-center justify-center">
+              <config.icon size={16} className="text-ink-muted" />
             </div>
-            <div className="bg-white border border-surface-200 rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm flex gap-1 items-center">
+            <div className="glass-sm rounded-2xl rounded-tr-sm px-4 py-3 flex gap-1 items-center">
               <div className="typing-dot" />
               <div className="typing-dot" />
               <div className="typing-dot" />
@@ -191,7 +195,7 @@ export default function StudyBuddyPage() {
       </div>
 
       {/* Input */}
-      <div className="bg-white border-t border-surface-200 p-4">
+      <div className="border-t border-white/5 bg-[#0f1117]/80 backdrop-blur-sm p-4">
         <div className="flex gap-3 max-w-4xl mx-auto">
           <textarea
             value={input}
@@ -199,18 +203,18 @@ export default function StudyBuddyPage() {
             onKeyDown={handleKey}
             placeholder={config.placeholder}
             rows={1}
-            className="flex-1 border border-surface-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400 transition max-h-32"
+            className="input-dark flex-1 resize-none max-h-32"
             style={{ direction: 'rtl' }}
           />
           <button
             onClick={sendMessage}
             disabled={!input.trim() || !connected}
-            className="px-4 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            className="btn-gradient px-4 py-3 rounded-xl text-white disabled:opacity-40 disabled:cursor-not-allowed transition-opacity hover:opacity-90 flex-shrink-0"
           >
             <Send size={18} />
           </button>
         </div>
-        <p className="text-center text-xs text-slate-400 mt-2">Enter לשליחה · Shift+Enter לשורה חדשה</p>
+        <p className="text-center text-xs text-ink-muted mt-2">Enter לשליחה · Shift+Enter לשורה חדשה</p>
       </div>
     </div>
   )

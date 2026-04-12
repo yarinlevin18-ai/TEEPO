@@ -57,27 +57,27 @@ export default function AssignmentsPage() {
     }
   }
 
-  const priorityColors = {
-    high: 'bg-red-100 text-red-600 border-red-200',
-    medium: 'bg-amber-100 text-amber-600 border-amber-200',
-    low: 'bg-green-100 text-green-600 border-green-200',
-  }
   const priorityLabels = { high: 'דחוף', medium: 'בינוני', low: 'נמוך' }
-  const statusColors = {
-    todo: 'bg-slate-100 text-slate-600',
-    in_progress: 'bg-blue-100 text-blue-600',
-    submitted: 'bg-green-100 text-green-600',
-    graded: 'bg-purple-100 text-purple-600',
+  const priorityBadgeColors: Record<string, string> = {
+    high: 'bg-red-500/10 text-red-400 border border-red-500/20',
+    medium: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+    low: 'bg-green-500/10 text-green-400 border border-green-500/20',
   }
-  const statusLabels = { todo: 'לא התחלתי', in_progress: 'בתהליך', submitted: 'הוגש', graded: 'נבדק' }
+  const statusColors: Record<string, string> = {
+    todo: 'bg-white/5 text-ink-muted',
+    in_progress: 'bg-blue-500/10 text-blue-400',
+    submitted: 'bg-green-500/10 text-green-400',
+    graded: 'bg-violet-500/10 text-violet-400',
+  }
+  const statusLabels: Record<string, string> = { todo: 'לא התחלתי', in_progress: 'בתהליך', submitted: 'הוגש', graded: 'נבדק' }
 
   return (
     <div className="p-8 max-w-3xl mx-auto space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-800">מטלות</h1>
+        <h1 className="text-2xl font-bold text-ink">מטלות</h1>
         <button
           onClick={() => setShowAdd((p) => !p)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-xl text-sm font-medium hover:bg-primary-600 transition-colors"
+          className="btn-gradient flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-opacity hover:opacity-90"
         >
           <Plus size={16} /> מטלה חדשה
         </button>
@@ -90,43 +90,43 @@ export default function AssignmentsPage() {
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
-            className="bg-white rounded-2xl border border-surface-200 shadow-sm p-6 space-y-4"
+            className="glass rounded-2xl p-6 space-y-4"
           >
-            <h2 className="font-semibold text-slate-800">מטלה חדשה + פירוק AI</h2>
+            <h2 className="font-semibold text-ink">מטלה חדשה + פירוק AI</h2>
             <div className="space-y-3">
               <input
                 type="text"
                 placeholder="שם המטלה *"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                className="input-dark w-full"
               />
               <textarea
                 placeholder="תיאור המטלה (אופציונלי)"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={2}
-                className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-300"
+                className="input-dark w-full resize-none"
               />
               <input
                 type="date"
                 value={form.deadline}
                 onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                className="input-dark w-full"
               />
             </div>
             <div className="flex gap-3">
               <button
                 onClick={breakdownAssignment}
                 disabled={!form.title || breaking}
-                className="flex items-center gap-2 px-5 py-2.5 bg-primary-500 text-white rounded-xl text-sm font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors"
+                className="btn-gradient flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-90"
               >
                 {breaking ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                 {breaking ? 'מפרק...' : 'פרק למשימות עם AI'}
               </button>
               <button
                 onClick={() => setShowAdd(false)}
-                className="px-4 py-2.5 border border-surface-200 rounded-xl text-sm text-slate-600 hover:bg-surface-100 transition-colors"
+                className="px-4 py-2.5 border border-white/8 rounded-xl text-sm text-ink-muted hover:text-ink hover:border-white/10 transition-colors"
               >
                 ביטול
               </button>
@@ -138,28 +138,33 @@ export default function AssignmentsPage() {
       {/* List */}
       {loading ? (
         <div className="space-y-3">
-          {[1, 2].map((i) => <div key={i} className="h-20 bg-white rounded-2xl border border-surface-200 animate-pulse" />)}
+          {[1, 2].map((i) => <div key={i} className="h-20 shimmer rounded-2xl" />)}
         </div>
       ) : assignments.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-surface-200 p-12 text-center">
-          <FileText size={36} className="text-slate-200 mx-auto mb-3" />
-          <p className="text-slate-400">אין מטלות עדיין</p>
-          <button onClick={() => setShowAdd(true)} className="mt-3 text-sm text-primary-500 hover:underline">
+        <div className="glass rounded-2xl p-12 text-center">
+          <FileText size={36} className="text-white/10 mx-auto mb-3" />
+          <p className="text-ink-muted">אין מטלות עדיין</p>
+          <button onClick={() => setShowAdd(true)} className="mt-3 text-sm text-indigo-400 hover:text-indigo-300 hover:underline transition-colors">
             הוסף מטלה ראשונה
           </button>
         </div>
       ) : (
         <div className="space-y-3">
           {assignments.map((a) => (
-            <div key={a.id} className="bg-white rounded-2xl border border-surface-200 shadow-sm overflow-hidden">
+            <div
+              key={a.id}
+              className={`glass rounded-2xl overflow-hidden ${
+                a.priority === 'high' ? 'priority-high' : a.priority === 'low' ? 'priority-low' : 'priority-medium'
+              }`}
+            >
               <button
                 onClick={() => setExpanded(expanded === a.id ? null : a.id)}
-                className="w-full p-5 flex items-center gap-4 text-right hover:bg-surface-50 transition-colors"
+                className="w-full p-5 flex items-center gap-4 text-right hover:bg-white/[0.03] transition-colors"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-slate-800 text-sm">{a.title}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full border ${priorityColors[a.priority] || priorityColors.medium}`}>
+                    <p className="font-semibold text-ink text-sm">{a.title}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${priorityBadgeColors[a.priority] || priorityBadgeColors.medium}`}>
                       {priorityLabels[a.priority] || a.priority}
                     </span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[a.status] || statusColors.todo}`}>
@@ -167,20 +172,20 @@ export default function AssignmentsPage() {
                     </span>
                   </div>
                   {a.deadline && (
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-ink-muted mt-1">
                       הגשה: {format(new Date(a.deadline), 'd בMMM yyyy', { locale: he })}
                     </p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
                   {a.assignment_tasks && (
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-ink-muted">
                       {a.assignment_tasks.filter((t) => t.is_completed).length}/{a.assignment_tasks.length} ✓
                     </span>
                   )}
                   <ChevronDown
                     size={16}
-                    className={`text-slate-400 transition-transform ${expanded === a.id ? 'rotate-180' : ''}`}
+                    className={`text-ink-muted transition-transform ${expanded === a.id ? 'rotate-180' : ''}`}
                   />
                 </div>
               </button>
@@ -191,22 +196,22 @@ export default function AssignmentsPage() {
                     initial={{ height: 0 }}
                     animate={{ height: 'auto' }}
                     exit={{ height: 0 }}
-                    className="overflow-hidden border-t border-surface-100"
+                    className="overflow-hidden border-t border-white/5"
                   >
                     <div className="p-4 space-y-2">
                       {a.assignment_tasks.map((task, i) => (
-                        <div key={task.id} className="flex items-start gap-3 p-3 bg-surface-50 rounded-xl">
-                          <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 text-xs flex items-center justify-center flex-shrink-0 font-medium">
+                        <div key={task.id} className="flex items-start gap-3 p-3 bg-white/[0.03] rounded-xl border border-white/5">
+                          <span className="w-6 h-6 rounded-full bg-indigo-500/15 text-indigo-400 text-xs flex items-center justify-center flex-shrink-0 font-medium">
                             {i + 1}
                           </span>
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-slate-700">{task.title}</p>
+                            <p className="text-sm font-medium text-ink">{task.title}</p>
                             {task.description && (
-                              <p className="text-xs text-slate-400 mt-0.5">{task.description}</p>
+                              <p className="text-xs text-ink-muted mt-0.5">{task.description}</p>
                             )}
                           </div>
                           {task.estimated_hours && (
-                            <span className="text-xs text-slate-400 flex-shrink-0">{task.estimated_hours}ש׳</span>
+                            <span className="text-xs text-ink-muted flex-shrink-0">{task.estimated_hours}ש׳</span>
                           )}
                         </div>
                       ))}

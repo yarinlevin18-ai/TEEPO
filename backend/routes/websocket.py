@@ -3,6 +3,7 @@ from flask_socketio import SocketIO, emit, join_room
 from orchestrator_wrapper import get_orchestrator
 from services import supabase_client as db
 import uuid
+from datetime import datetime
 
 # Conversation history per socket session
 _sessions: dict = {}
@@ -92,7 +93,7 @@ def register_socket_events(socketio: SocketIO):
             if conv_id:
                 db.update_conversation(conv_id, {
                     "messages": messages,
-                    "last_message_at": "now()",
+                    "last_message_at": datetime.utcnow().isoformat(),
                 })
             else:
                 conv_id = str(uuid.uuid4())

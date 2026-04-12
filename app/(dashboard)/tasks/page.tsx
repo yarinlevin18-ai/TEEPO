@@ -59,7 +59,7 @@ export default function TasksPage() {
 
   return (
     <div className="p-8 max-w-2xl mx-auto space-y-6 animate-fade-in">
-      <h1 className="text-2xl font-bold text-slate-800">משימות</h1>
+      <h1 className="text-2xl font-bold text-ink">משימות</h1>
 
       {/* Date strip */}
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -67,10 +67,10 @@ export default function TasksPage() {
           <button
             key={d.date}
             onClick={() => setSelectedDate(d.date)}
-            className={`flex flex-col items-center min-w-[52px] py-2 px-3 rounded-xl transition-colors ${
+            className={`flex flex-col items-center min-w-[52px] py-2 px-3 rounded-xl transition-all ${
               d.date === selectedDate
-                ? 'bg-primary-500 text-white shadow-md'
-                : 'bg-white border border-surface-200 text-slate-600 hover:border-primary-300'
+                ? 'btn-gradient text-white shadow-lg shadow-indigo-500/20'
+                : 'glass text-ink-muted hover:text-ink hover:border-white/10'
             }`}
           >
             <span className="text-xs">{d.label}</span>
@@ -81,37 +81,40 @@ export default function TasksPage() {
 
       {/* Progress */}
       {tasks.length > 0 && (
-        <div className="bg-white rounded-2xl border border-surface-200 p-4 flex items-center gap-4">
+        <div className="glass rounded-2xl p-4 flex items-center gap-4">
           <div className="flex-1">
-            <div className="flex justify-between text-xs text-slate-500 mb-1.5">
+            <div className="flex justify-between text-xs text-ink-muted mb-1.5">
               <span>התקדמות יומית</span>
               <span>{completed}/{tasks.length}</span>
             </div>
-            <div className="h-2 bg-surface-200 rounded-full">
+            <div className="h-2 bg-white/5 rounded-full">
               <div
-                className="h-2 bg-primary-500 rounded-full transition-all"
-                style={{ width: `${tasks.length ? (completed / tasks.length) * 100 : 0}%` }}
+                className="h-2 rounded-full transition-all"
+                style={{
+                  width: `${tasks.length ? (completed / tasks.length) * 100 : 0}%`,
+                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                }}
               />
             </div>
           </div>
-          <span className="text-2xl font-bold text-primary-500">
+          <span className="text-2xl font-bold gradient-text">
             {tasks.length ? Math.round((completed / tasks.length) * 100) : 0}%
           </span>
         </div>
       )}
 
       {/* Task list */}
-      <div className="bg-white rounded-2xl border border-surface-200 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-surface-100">
+      <div className="glass rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-white/5">
           <div className="flex items-center gap-2">
-            <Calendar size={16} className="text-primary-500" />
-            <span className="font-semibold text-slate-700 text-sm">
+            <Calendar size={16} className="text-indigo-400" />
+            <span className="font-semibold text-ink text-sm">
               {format(new Date(selectedDate), 'EEEE, d בMMM', { locale: he })}
             </span>
           </div>
           <button
             onClick={() => setAddingTask(true)}
-            className="flex items-center gap-1.5 text-xs text-primary-500 hover:text-primary-600 font-medium"
+            className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
           >
             <Plus size={14} /> משימה חדשה
           </button>
@@ -124,7 +127,7 @@ export default function TasksPage() {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="border-b border-surface-100 overflow-hidden"
+              className="border-b border-white/5 overflow-hidden"
             >
               <div className="p-4 flex gap-3">
                 <input
@@ -134,12 +137,12 @@ export default function TasksPage() {
                   onChange={(e) => setNewTitle(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') addTask(); if (e.key === 'Escape') setAddingTask(false) }}
                   placeholder="שם המשימה..."
-                  className="flex-1 text-sm border border-surface-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-300"
+                  className="input-dark flex-1 text-sm"
                 />
-                <button onClick={addTask} className="px-3 py-2 bg-primary-500 text-white rounded-lg text-sm hover:bg-primary-600">
+                <button onClick={addTask} className="btn-gradient px-3 py-2 rounded-lg text-sm text-white font-medium">
                   הוסף
                 </button>
-                <button onClick={() => setAddingTask(false)} className="px-3 py-2 text-slate-400 hover:text-slate-600 text-sm">
+                <button onClick={() => setAddingTask(false)} className="px-3 py-2 text-ink-muted hover:text-ink text-sm transition-colors">
                   ביטול
                 </button>
               </div>
@@ -150,15 +153,15 @@ export default function TasksPage() {
         {/* Tasks */}
         {loading ? (
           <div className="p-6 space-y-3">
-            {[1, 2, 3].map((i) => <div key={i} className="h-10 bg-surface-100 rounded-lg animate-pulse" />)}
+            {[1, 2, 3].map((i) => <div key={i} className="h-10 shimmer rounded-lg" />)}
           </div>
         ) : tasks.length === 0 ? (
           <div className="p-10 text-center">
-            <CheckSquare size={32} className="text-slate-200 mx-auto mb-3" />
-            <p className="text-slate-400 text-sm">אין משימות ליום זה</p>
+            <CheckSquare size={32} className="text-white/10 mx-auto mb-3" />
+            <p className="text-ink-muted text-sm">אין משימות ליום זה</p>
             <button
               onClick={() => setAddingTask(true)}
-              className="mt-3 text-sm text-primary-500 hover:underline"
+              className="mt-3 text-sm text-indigo-400 hover:text-indigo-300 hover:underline transition-colors"
             >
               הוסף משימה ראשונה
             </button>
@@ -172,24 +175,24 @@ export default function TasksPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex items-center gap-3 p-4 border-b border-surface-50 last:border-0 group hover:bg-surface-50 transition-colors"
+                className="flex items-center gap-3 p-4 border-b border-white/5 last:border-0 group hover:bg-white/[0.03] transition-colors"
               >
                 <button
                   onClick={() => toggleTask(task.id, !task.is_completed)}
                   className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                     task.is_completed
-                      ? 'bg-green-500 border-green-500'
-                      : 'border-slate-300 hover:border-primary-400'
+                      ? 'border-indigo-500 bg-indigo-500'
+                      : 'border-white/20 hover:border-indigo-400'
                   }`}
                 >
                   {task.is_completed && <CheckSquare size={11} className="text-white" />}
                 </button>
-                <span className={`flex-1 text-sm ${task.is_completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                <span className={`flex-1 text-sm ${task.is_completed ? 'line-through text-ink-muted' : 'text-ink'}`}>
                   {task.title}
                 </span>
                 <button
                   onClick={() => deleteTask(task.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-400 transition-all"
+                  className="opacity-0 group-hover:opacity-100 p-1.5 text-ink-muted hover:text-red-400 transition-all"
                 >
                   <Trash2 size={14} />
                 </button>
