@@ -15,12 +15,12 @@ from routes.websocket import register_socket_events
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET_KEY
 
-# Allow Next.js frontend (dev: 3000, prod: Vercel domain)
-CORS(app, origins=["http://localhost:3000", "https://*.vercel.app"], supports_credentials=True)
+# Allow all origins — this is a personal app, no sensitive public data
+CORS(app, origins="*", supports_credentials=False)
 
 socketio = SocketIO(
     app,
-    cors_allowed_origins=["http://localhost:3000", "https://*.vercel.app"],
+    cors_allowed_origins="*",
     async_mode="threading",
     logger=FLASK_ENV == "development",
     engineio_logger=False,
