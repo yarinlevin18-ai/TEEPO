@@ -42,4 +42,4 @@ def health():
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     print(f"🚀 מפעיל שרת לימודים על פורט {port}...")
-    socketio.run(app, host="0.0.0.0", port=port, debug=FLASK_ENV == "development")
+    socketio.run(app, host="0.0.0.0", port=port, debug=FLASK_ENV == "development", allow_unsafe_werkzeug=True)
