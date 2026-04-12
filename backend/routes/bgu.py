@@ -99,6 +99,24 @@ def poll_login(site: str):
 #  Sync                                                                #
 # ------------------------------------------------------------------ #
 
+@bgu.post("/cookies")
+def receive_cookies():
+    """Receive cookies from the Chrome extension and store them."""
+    body = request.get_json() or {}
+    site = body.get("site", "")
+    cookies = body.get("cookies", [])
+
+    if site not in ("moodle", "portal") or not cookies:
+        return jsonify({"status": "error", "message": "נתונים חסרים"}), 400
+
+    try:
+        bgu_scraper._save_cookies_to_store(site, cookies)
+        _login_status[site] = "connected"
+        return jsonify({"status": "success", "message": f"{len(cookies)} cookies נשמרו עבור {site}"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @bgu.post("/sync")
 def sync_all():
     """Sync all BGU data into the app."""

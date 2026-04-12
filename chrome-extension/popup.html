@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      width: 320px;
+      background: #f8fafc;
+      color: #1e293b;
+      direction: rtl;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-icon { font-size: 24px; }
+    .header h1 { font-size: 15px; font-weight: 700; }
+    .header p { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+
+    .body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      border: 1.5px solid #e2e8f0;
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+    }
+    .card-icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .card-icon.green { background: #dcfce7; }
+    .card-icon.purple { background: #ede9fe; }
+    .card-info { flex: 1; }
+    .card-name { font-weight: 600; font-size: 13px; }
+    .card-desc { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .card-status {
+      font-size: 11px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #cbd5e1;
+      display: inline-block;
+    }
+    .dot.connected { background: #22c55e; }
+
+    .btn {
+      width: calc(100% - 28px);
+      margin: 0 14px 12px;
+      padding: 9px;
+      border-radius: 8px;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .btn-primary { background: #6366f1; color: white; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-primary:disabled { background: #a5b4fc; cursor: not-allowed; }
+    .btn-success { background: #22c55e; color: white; cursor: default; }
+
+    .divider { height: 1px; background: #f1f5f9; }
+
+    .settings { padding: 12px 14px; }
+    .settings label { font-size: 11px; color: #64748b; display: block; margin-bottom: 5px; }
+    .settings input {
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: 7px;
+      border: 1.5px solid #e2e8f0;
+      font-size: 12px;
+      direction: ltr;
+      outline: none;
+      font-family: monospace;
+    }
+    .settings input:focus { border-color: #6366f1; }
+    .settings-save {
+      margin-top: 8px;
+      padding: 6px 14px;
+      background: #f1f5f9;
+      border: none;
+      border-radius: 7px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .settings-save:hover { background: #e2e8f0; }
+
+    .toast {
+      margin: 0 14px 14px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      display: none;
+    }
+    .toast.success { background: #dcfce7; color: #166534; display: block; }
+    .toast.error { background: #fee2e2; color: #991b1b; display: block; }
+    .toast.loading { background: #eff6ff; color: #1e40af; display: block; }
+
+    .open-app {
+      padding: 14px;
+      border-top: 1px solid #f1f5f9;
+    }
+    .open-app a {
+      display: block;
+      text-align: center;
+      padding: 9px;
+      background: #f8fafc;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      color: #6366f1;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .open-app a:hover { background: #ede9fe; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-icon">🎓</div>
+    <div>
+      <h1>BGU Study Organizer</h1>
+      <p>סנכרן את חשבון BGU שלך</p>
+    </div>
+  </div>
+
+  <div class="body">
+    <!-- Moodle card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon green">📚</div>
+        <div class="card-info">
+          <div class="card-name">Moodle</div>
+          <div class="card-desc">קורסים, מטלות, מצגות</div>
+        </div>
+        <div class="card-status" id="moodle-status">
+          <span class="dot" id="moodle-dot"></span>
+          <span id="moodle-status-text">לא מחובר</span>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="moodle-btn" onclick="syncSite('moodle')">
+        שלח Session ל-App
+      </button>
+    </div>
+
+    <!-- Portal card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon purple">📅</div>
+        <div class="card-info">
+          <div class="card-name">פורטל הסטודנט</div>
+          <div class="card-desc">לוח שעות, ציונים</div>
+        </div>
+        <div class="card-status" id="portal-status">
+          <span class="dot" id="portal-dot"></span>
+          <span id="portal-status-text">לא מחובר</span>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="portal-btn" onclick="syncSite('portal')">
+        שלח Session ל-App
+      </button>
+    </div>
+
+    <!-- Toast message -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Settings -->
+    <div class="card">
+      <div class="settings">
+        <label>כתובת השרת</label>
+        <input type="text" id="backend-url" placeholder="https://your-app.onrender.com" />
+        <button class="settings-save" onclick="saveUrl()">שמור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Open app -->
+  <div class="open-app">
+    <a id="app-link" href="#" target="_blank">פתח את האפליקציה ↗</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
