@@ -1,55 +1,62 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, Wifi, WifiOff, RefreshCw,
-  CheckCircle, Loader2, BookOpen, Calendar, FileText,
+  CheckCircle, Loader2, BookOpen, Calendar, Eye, EyeOff,
 } from 'lucide-react'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
-type SiteStatus = { connected: boolean; login_status: string }
 type Status = { moodle: boolean; portal: boolean; login_status: Record<string, string> }
 
 export default function BGUConnectPage() {
   const [status, setStatus] = useState<Status>({ moodle: false, portal: false, login_status: {} })
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const [syncing, setSyncing] = useState(false)
-  const [syncResult, setSyncResult] = useState<string>('')
+  const [syncResult, setSyncResult] = useState('')
+  const [serverMode, setServerMode] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchStatus = async () => {
     try {
       const res = await fetch(`${BACKEND}/api/bgu/status`)
-      const data = await res.json()
-      setStatus(data)
+      setStatus(await res.json())
     } catch {}
   }
 
   useEffect(() => {
     fetchStatus()
     const interval = setInterval(fetchStatus, 5000)
+    // Detect server vs local mode
+    fetch(`${BACKEND}/api/bgu/mode`)
+      .then(r => r.json())
+      .then(d => setServerMode(d.server_mode))
+      .catch(() => {})
     return () => clearInterval(interval)
   }, [])
 
-  const connect = async (site: 'moodle' | 'portal') => {
-    setLoading((p) => ({ ...p, [site]: true }))
+  const connect = async (site: 'moodle' | 'portal', creds?: { username: string; password: string }) => {
+    setLoading(p => ({ ...p, [site]: true }))
     try {
-      await fetch(`${BACKEND}/api/bgu/connect/${site}`, { method: 'POST' })
+      await fetch(`${BACKEND}/api/bgu/connect/${site}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(creds || {}),
+      })
 
-      // Poll until connected or failed
       pollRef.current = setInterval(async () => {
         const res = await fetch(`${BACKEND}/api/bgu/connect/${site}/poll`)
         const data = await res.json()
         if (data.connected || data.status === 'failed') {
           clearInterval(pollRef.current!)
-          setLoading((p) => ({ ...p, [site]: false }))
+          setLoading(p => ({ ...p, [site]: false }))
           fetchStatus()
         }
       }, 2000)
     } catch {
-      setLoading((p) => ({ ...p, [site]: false }))
+      setLoading(p => ({ ...p, [site]: false }))
     }
   }
 
@@ -85,35 +92,50 @@ export default function BGUConnectPage() {
       {/* How it works */}
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 text-sm text-blue-700 space-y-1">
         <p className="font-semibold">איך זה עובד?</p>
-        <p>1. לחץ "התחבר" — ייפתח דפדפן Chrome</p>
-        <p>2. התחבר עם פרטי הסטודנט שלך כרגיל</p>
-        <p>3. הדפדפן ייסגר אוטומטית וה-session נשמר</p>
-        <p>4. לחץ "סנכרן הכל" — הקורסים והמטלות יופיעו באפליקציה</p>
+        {serverMode ? (
+          <>
+            <p>1. הזן את פרטי הכניסה שלך ל-BGU</p>
+            <p>2. הפרטים משמשים רק לכניסה חד-פעמית — לא נשמרים</p>
+            <p>3. ה-session נשמר בצורה מאובטחת</p>
+            <p>4. לחץ "סנכרן הכל" לייבוא קורסים ומטלות</p>
+          </>
+        ) : (
+          <>
+            <p>1. לחץ "התחבר" — ייפתח חלון Chrome נפרד</p>
+            <p>2. התחבר עם פרטי הסטודנט שלך כרגיל</p>
+            <p>3. החלון ייסגר אוטומטית וה-session נשמר</p>
+            <p>4. לחץ "סנכרן הכל" — הקורסים והמטלות יופיעו באפליקציה</p>
+          </>
+        )}
       </div>
 
       {/* Site cards */}
       <div className="grid gap-4">
         <SiteCard
+          site="moodle"
           name="Moodle"
           description="קורסים, מצגות, מטלות, הגשות"
           url="moodle.bgu.ac.il"
           connected={status.moodle}
           loginStatus={loginStatus('moodle')}
           loading={!!loading['moodle']}
-          onConnect={() => connect('moodle')}
+          onConnect={(creds) => connect('moodle', creds)}
           icon={BookOpen}
           color="green"
+          serverMode={serverMode}
         />
         <SiteCard
+          site="portal"
           name="פורטל הסטודנט"
           description="לוח שעות, רישום לקורסים, ציונים"
           url="my.bgu.ac.il"
           connected={status.portal}
           loginStatus={loginStatus('portal')}
           loading={!!loading['portal']}
-          onConnect={() => connect('portal')}
+          onConnect={(creds) => connect('portal', creds)}
           icon={Calendar}
           color="purple"
+          serverMode={serverMode}
         />
       </div>
 
@@ -151,17 +173,19 @@ export default function BGUConnectPage() {
 }
 
 function SiteCard({
-  name, description, url, connected, loginStatus, loading,
-  onConnect, icon: Icon, color,
+  site, name, description, url, connected, loginStatus, loading,
+  onConnect, icon: Icon, color, serverMode,
 }: {
-  name: string; description: string; url: string
+  site: string; name: string; description: string; url: string
   connected: boolean; loginStatus: string; loading: boolean
-  onConnect: () => void; icon: React.ElementType; color: string
+  onConnect: (creds?: { username: string; password: string }) => void
+  icon: React.ElementType; color: string; serverMode: boolean
 }) {
-  const colorMap: Record<string, string> = {
-    green: 'bg-green-50 text-green-600 border-green-200',
-    purple: 'bg-purple-50 text-purple-600 border-purple-200',
-  }
+  const [showForm, setShowForm] = useState(false)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
+
   const iconBg: Record<string, string> = {
     green: 'bg-green-100 text-green-600',
     purple: 'bg-purple-100 text-purple-600',
@@ -170,18 +194,30 @@ function SiteCard({
   const statusLabel: Record<string, string> = {
     idle: '',
     opening: 'פותח דפדפן Chrome...',
-    waiting_for_login: '⏳ התחבר בדפדפן שנפתח — ממתין (עד 5 דקות)...',
+    waiting_for_login: '⏳ ממתין לכניסה...',
     connected: 'מחובר',
     failed: 'ההתחברות נכשלה — נסה שוב',
   }
 
+  const handleConnect = () => {
+    if (serverMode) {
+      if (!showForm) { setShowForm(true); return }
+      if (!username || !password) return
+      onConnect({ username, password })
+      setPassword('')
+      setShowForm(false)
+    } else {
+      onConnect()
+    }
+  }
+
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm p-5 ${connected ? 'border-green-300' : 'border-surface-200'}`}>
-      <div className="flex items-center gap-4">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${iconBg[color]}`}>
+    <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${connected ? 'border-green-300' : 'border-surface-200'}`}>
+      <div className="flex items-center gap-4 p-5">
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg[color]}`}>
           <Icon size={22} />
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="font-semibold text-slate-800">{name}</p>
             {connected
@@ -199,9 +235,9 @@ function SiteCard({
           )}
         </div>
         <button
-          onClick={onConnect}
+          onClick={handleConnect}
           disabled={loading || connected}
-          className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors flex-shrink-0 ${
             connected
               ? 'bg-surface-100 text-slate-400 cursor-default'
               : 'bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50'
@@ -210,6 +246,63 @@ function SiteCard({
           {loading ? <Loader2 size={14} className="animate-spin" /> : connected ? 'מחובר ✓' : 'התחבר'}
         </button>
       </div>
+
+      {/* Credentials form (server mode only) */}
+      <AnimatePresence>
+        {showForm && !connected && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="border-t border-surface-100 overflow-hidden"
+          >
+            <div className="p-5 space-y-3">
+              <p className="text-xs text-slate-500">פרטי הכניסה ל-BGU (שם משתמש + סיסמה)</p>
+              <input
+                type="text"
+                placeholder="שם משתמש (מ.א. / אימייל BGU)"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-surface-200 text-sm focus:outline-none focus:border-primary-400"
+                dir="ltr"
+              />
+              <div className="relative">
+                <input
+                  type={showPass ? 'text' : 'password'}
+                  placeholder="סיסמה"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-surface-200 text-sm focus:outline-none focus:border-primary-400 pr-10"
+                  dir="ltr"
+                  onKeyDown={e => e.key === 'Enter' && handleConnect()}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(p => !p)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                >
+                  {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleConnect}
+                  disabled={!username || !password || loading}
+                  className="flex-1 py-2 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 disabled:opacity-50 transition-colors"
+                >
+                  {loading ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'כניסה'}
+                </button>
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="px-4 py-2 rounded-lg text-sm text-slate-500 hover:bg-surface-100 transition-colors"
+                >
+                  ביטול
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

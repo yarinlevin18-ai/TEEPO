@@ -40,26 +40,49 @@ def connection_status():
 @bgu.post("/connect/<site>")
 def connect_site(site: str):
     """
-    Opens a browser window for the user to log in.
-    Runs in background thread so the API returns immediately.
+    SERVER mode: accepts {username, password} and logs in headlessly.
+    LOCAL mode:  opens a visible Chrome window for manual login.
     """
     if site not in ("moodle", "portal"):
         return jsonify({"error": "אתר לא ידוע"}), 400
 
+    body = request.get_json() or {}
+    username = body.get("username", "")
+    password = body.get("password", "")
+
     _login_status[site] = "opening"
 
-    def _do_login():
-        _login_status[site] = "waiting_for_login"
-        result = bgu_scraper.open_browser_for_login(site)
-        _login_status[site] = "connected" if result["status"] == "success" else "failed"
+    if bgu_scraper.IS_SERVER:
+        # Cloud: headless login with credentials
+        if not username or not password:
+            _login_status[site] = "failed"
+            return jsonify({"error": "נדרשים שם משתמש וסיסמה"}), 400
 
-    thread = threading.Thread(target=_do_login, daemon=True)
-    thread.start()
+        def _do_headless():
+            _login_status[site] = "waiting_for_login"
+            result = bgu_scraper.login_headless(site, username, password)
+            _login_status[site] = "connected" if result["status"] == "success" else "failed"
 
-    return jsonify({
-        "status": "opening_browser",
-        "message": f"פותח דפדפן לכניסה ל-{site}. אנא התחבר בדפדפן שנפתח."
-    })
+        thread = threading.Thread(target=_do_headless, daemon=True)
+        thread.start()
+        return jsonify({"status": "logging_in", "message": "מתחבר עם הפרטים..."})
+
+    else:
+        # Local: open visible browser window
+        def _do_login():
+            _login_status[site] = "waiting_for_login"
+            result = bgu_scraper.open_browser_for_login(site)
+            _login_status[site] = "connected" if result["status"] == "success" else "failed"
+
+        thread = threading.Thread(target=_do_login, daemon=True)
+        thread.start()
+        return jsonify({"status": "opening_browser", "message": "פותח דפדפן Chrome..."})
+
+
+@bgu.get("/mode")
+def get_mode():
+    """Tell the frontend whether we're in server or local mode."""
+    return jsonify({"server_mode": bgu_scraper.IS_SERVER})
 
 
 @bgu.get("/connect/<site>/poll")
