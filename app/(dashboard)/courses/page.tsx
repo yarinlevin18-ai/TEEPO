@@ -401,21 +401,21 @@ function CourseCard({
                 <select
                   value={localYear}
                   onChange={(e) => setLocalYear(e.target.value)}
-                  className="flex-1 text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-accent-500"
+                  className="flex-1 text-xs bg-[#1e2330] border border-white/10 rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-accent-500"
                 >
-                  <option value="">שנה...</option>
+                  <option value="" className="bg-[#1e2330] text-gray-300">שנה...</option>
                   {yearOptions.map((y) => (
-                    <option key={y} value={y}>{y}</option>
+                    <option key={y} value={y} className="bg-[#1e2330] text-gray-300">{y}</option>
                   ))}
                 </select>
                 <select
                   value={localSem}
                   onChange={(e) => setLocalSem(e.target.value as SemesterLabel | '')}
-                  className="flex-1 text-xs bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-accent-500"
+                  className="flex-1 text-xs bg-[#1e2330] border border-white/10 rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-accent-500"
                 >
-                  <option value="">סמסטר...</option>
+                  <option value="" className="bg-[#1e2330] text-gray-300">סמסטר...</option>
                   {SEMESTER_OPTIONS.map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
+                    <option key={s.value} value={s.value} className="bg-[#1e2330] text-gray-300">{s.label}</option>
                   ))}
                 </select>
               </div>
