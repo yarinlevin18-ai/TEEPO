@@ -34,18 +34,22 @@ async function init() {
     document.getElementById('app-link').href = res.appUrl || appUrl
   })
 
-  // Check backend status
+  // Check backend status (with wake-up awareness)
   checkStatus(url)
 }
 
 async function checkStatus(backendUrl) {
   try {
-    const res = await fetch(`${backendUrl}/api/bgu/status`, { signal: AbortSignal.timeout(5000) })
+    // Give Render 25s to wake up on first check
+    const res = await fetch(`${backendUrl}/api/bgu/status`, { signal: AbortSignal.timeout(25000) })
     const data = await res.json()
     updateStatusUI('moodle', data.moodle)
     updateStatusUI('portal', data.portal)
-  } catch {
-    // Backend unreachable — still allow sending cookies
+  } catch (e) {
+    // If timeout, show a gentle hint
+    if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+      showToast('השרת מתעורר... נסה שוב בעוד 30 שניות', 'loading')
+    }
   }
 }
 
@@ -75,13 +79,11 @@ async function getCookiesForDomains(domains) {
     const cookies = await chrome.cookies.getAll({ domain })
     all.push(...cookies)
   }
-  // Also grab parent domain cookies
   return all
 }
 
 async function syncSite(site) {
   const btn = document.getElementById(`${site}-btn`)
-  const toast = document.getElementById('toast')
 
   btn.disabled = true
   btn.textContent = 'שולח...'
@@ -99,24 +101,39 @@ async function syncSite(site) {
       return
     }
 
-    // Send cookies to backend
+    // Update toast to indicate possible wake-up delay
+    showToast(`נמצאו ${cookies.length} cookies. שולח לשרת...`, 'loading')
+
+    // Give Render 45s to wake up + process (free tier cold start can take 30-40s)
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      showToast('השרת מתעורר מתרדמה... זה עלול לקחת עד 40 שניות בפעם הראשונה', 'loading')
+    }, 8000)
+
     const res = await fetch(`${backendUrl}/api/bgu/cookies`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ site, cookies }),
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(60000), // 60s to handle Render cold start
     })
+    clearTimeout(timer)
 
     const data = await res.json()
 
     if (data.status === 'success') {
       showToast(`✓ ${site === 'moodle' ? 'Moodle' : 'פורטל'} מחובר! ${cookies.length} cookies הועברו.`, 'success')
       updateStatusUI(site, true)
+      // Re-check status from server to confirm
+      setTimeout(() => checkStatus(backendUrl), 1500)
     } else {
       showToast(`שגיאה: ${data.message || 'לא הצלחנו לשמור את ה-session'}`, 'error')
     }
   } catch (err) {
-    showToast(`שגיאה: ${err.message}. וודא שהשרת פועל.`, 'error')
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+      showToast('פסק זמן — השרת לא הגיב. נסה שוב בעוד דקה.', 'error')
+    } else {
+      showToast(`שגיאה: ${err.message}`, 'error')
+    }
   } finally {
     btn.disabled = false
     btn.textContent = 'שלח Session ל-App'
