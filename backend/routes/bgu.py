@@ -321,6 +321,10 @@ def get_degree_settings():
         result = get_client().table("degree_settings").select("*").eq("user_id", user_id).execute()
         settings = result.data[0] if result.data else None
 
+        # If no settings configured, return null — don't make up numbers
+        if not settings:
+            return jsonify({"status": "success", "settings": None, "credits": None})
+
         # Get total credits earned from grades
         grades_result = get_client().table("student_grades").select("credits, grade").eq("user_id", user_id).execute()
         completed_credits = 0
@@ -334,18 +338,19 @@ def get_degree_settings():
                     except (ValueError, TypeError):
                         pass
 
-        total_required = float(settings["total_credits_required"]) if settings else 160
+        total_required = float(settings["total_credits_required"])
         remaining = max(0, total_required - completed_credits)
 
         # Calculate recommended credits per semester
-        current_year = 2026
-        current_month = 4
-        if settings and settings.get("expected_end_year"):
+        from datetime import datetime as _dt
+        now = _dt.now()
+        if settings.get("expected_end_year"):
             end_year = settings["expected_end_year"]
-            # Estimate remaining semesters
-            remaining_semesters = max(1, (end_year - current_year) * 2 + (1 if current_month <= 7 else 0))
+            remaining_semesters = max(1, (end_year - now.year) * 2 + (1 if now.month <= 7 else 0))
+        elif settings.get("total_semesters"):
+            remaining_semesters = max(1, settings["total_semesters"])
         else:
-            remaining_semesters = settings.get("total_semesters", 6) if settings else 6
+            remaining_semesters = 1
 
         recommended_per_semester = round(remaining / max(1, remaining_semesters), 1) if remaining > 0 else 0
 

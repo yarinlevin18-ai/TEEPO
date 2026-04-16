@@ -145,11 +145,14 @@ export default function DashboardPage() {
           // Always try grades (they're persisted in DB even if not currently connected)
           const [gradesRes, degreeRes] = await Promise.all([
             api.bgu.grades().catch(() => ({ grades: [], average: null })),
-            api.bgu.degree().catch(() => ({ credits: null })),
+            api.bgu.degree().catch(() => ({ credits: null, settings: null })),
           ])
           setGrades(gradesRes?.grades || [])
           setGradesAvg(gradesRes?.average ?? null)
-          if (degreeRes?.credits) setCredits(degreeRes.credits)
+          // Only show credits if user configured degree settings
+          if (degreeRes?.settings && degreeRes?.credits) {
+            setCredits(degreeRes.credits)
+          }
         } catch {
           setBguConnected(false)
         }
@@ -284,7 +287,7 @@ export default function DashboardPage() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="grid grid-cols-2 lg:grid-cols-5 gap-3"
+        className={`grid grid-cols-2 ${credits ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}
       >
         <StatCard
           icon={<BookOpen size={18} />}
@@ -322,15 +325,17 @@ export default function DashboardPage() {
           sub={grades.length > 0 ? `${grades.length} קורסים` : 'לא זמין'}
           subColor="#64748b"
         />
-        <StatCard
-          icon={<GraduationCap size={18} />}
-          iconColor="#a78bfa"
-          iconBg="rgba(167,139,250,0.15)"
-          label="נק״ז"
-          value={credits ? `${credits.completed}/${credits.required}` : '—'}
-          sub={credits ? `${credits.recommended_per_semester} מומלץ/סמסטר` : 'הגדר תואר'}
-          subColor="#a78bfa"
-        />
+        {credits && (
+          <StatCard
+            icon={<GraduationCap size={18} />}
+            iconColor="#a78bfa"
+            iconBg="rgba(167,139,250,0.15)"
+            label="נק״ז"
+            value={`${credits.completed}/${credits.required}`}
+            sub={`${credits.recommended_per_semester} מומלץ/סמסטר`}
+            subColor="#a78bfa"
+          />
+        )}
       </motion.div>
 
       {/* ── Calendar Strip ── */}
@@ -518,8 +523,8 @@ export default function DashboardPage() {
             <AssignmentsSection assignments={pendingAssignments} courses={courses} loading={loading} />
           </motion.div>
 
-          {/* Credits Progress */}
-          {credits && (
+          {/* Credits Progress — only when user configured degree settings */}
+          {credits ? (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(167,139,250,0.15)' }}>
@@ -528,6 +533,10 @@ export default function DashboardPage() {
                 <h2 className="font-semibold text-ink">התקדמות תואר</h2>
               </div>
               <CreditsSection credits={credits} />
+            </motion.div>
+          ) : (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
+              <DegreeSetupPrompt />
             </motion.div>
           )}
 
@@ -984,6 +993,105 @@ function GradesSection({ grades, bguConnected, avgGrade, loading }: {
             </div>
           ))
         })()}
+      </div>
+    </div>
+  )
+}
+
+// ── Degree Setup Prompt ─────────────────────────────────────
+
+function DegreeSetupPrompt() {
+  const [open, setOpen] = useState(false)
+  const [totalCredits, setTotalCredits] = useState('')
+  const [endYear, setEndYear] = useState('')
+  const [degreeName, setDegreeName] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    if (!totalCredits) return
+    setSaving(true)
+    try {
+      await api.bgu.saveDegree({
+        total_credits_required: parseFloat(totalCredits),
+        expected_end_year: endYear ? parseInt(endYear) : undefined,
+        degree_name: degreeName || undefined,
+        start_year: new Date().getFullYear(),
+      })
+      window.location.reload()
+    } catch {
+      setSaving(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="glass p-5 text-center">
+        <GraduationCap size={24} className="mx-auto mb-2" style={{ color: '#a78bfa' }} />
+        <p className="text-ink-muted text-sm mb-1">הגדר את פרטי התואר שלך</p>
+        <p className="text-ink-subtle text-xs mb-3">כדי לעקוב אחרי נק״ז והתקדמות</p>
+        <button
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+          style={{ background: 'rgba(167,139,250,0.15)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.25)' }}
+        >
+          <GraduationCap size={14} /> הגדר תואר
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="glass p-5 space-y-3">
+      <div className="flex items-center gap-2 mb-1">
+        <GraduationCap size={16} style={{ color: '#a78bfa' }} />
+        <h3 className="text-sm font-semibold text-ink">הגדרות תואר</h3>
+      </div>
+      <div>
+        <label className="text-xs text-ink-muted mb-1 block">שם התואר</label>
+        <input
+          value={degreeName}
+          onChange={e => setDegreeName(e.target.value)}
+          placeholder="לדוגמה: מדעי המדינה"
+          className="w-full px-3 py-2 rounded-lg text-sm text-ink bg-white/5 border border-white/10 focus:border-accent-400 focus:outline-none transition-colors"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-ink-muted mb-1 block">סה״כ נק״ז לתואר</label>
+          <input
+            type="number"
+            value={totalCredits}
+            onChange={e => setTotalCredits(e.target.value)}
+            placeholder="למשל 120"
+            className="w-full px-3 py-2 rounded-lg text-sm text-ink bg-white/5 border border-white/10 focus:border-accent-400 focus:outline-none transition-colors"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-ink-muted mb-1 block">שנת סיום צפויה</label>
+          <input
+            type="number"
+            value={endYear}
+            onChange={e => setEndYear(e.target.value)}
+            placeholder="למשל 2028"
+            className="w-full px-3 py-2 rounded-lg text-sm text-ink bg-white/5 border border-white/10 focus:border-accent-400 focus:outline-none transition-colors"
+          />
+        </div>
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button
+          onClick={handleSave}
+          disabled={!totalCredits || saving}
+          className="flex-1 px-3 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-40"
+          style={{ background: 'rgba(167,139,250,0.2)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.3)' }}
+        >
+          {saving ? 'שומר...' : 'שמור'}
+        </button>
+        <button
+          onClick={() => setOpen(false)}
+          className="px-3 py-2 rounded-xl text-sm text-ink-muted hover:text-ink transition-colors"
+        >
+          ביטול
+        </button>
       </div>
     </div>
   )
