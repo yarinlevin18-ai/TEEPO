@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   GraduationCap, Wifi, WifiOff, RefreshCw,
-  CheckCircle, Loader2, BookOpen, Calendar, Eye, EyeOff,
+  CheckCircle, Loader2, BookOpen, Calendar,
 } from 'lucide-react'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
@@ -93,10 +93,9 @@ export default function BGUConnectPage() {
         <p className="font-semibold gradient-text">איך זה עובד?</p>
         {serverMode ? (
           <>
-            <p className="text-ink-muted">1. הזן את פרטי הכניסה שלך ל-BGU</p>
-            <p className="text-ink-muted">2. הפרטים משמשים רק לכניסה חד-פעמית — לא נשמרים</p>
-            <p className="text-ink-muted">3. ה-session נשמר בצורה מאובטחת</p>
-            <p className="text-ink-muted">4. לחץ "סנכרן הכל" לייבוא קורסים ומטלות</p>
+            <p className="text-ink-muted">1. לחץ "התחבר" — הכניסה מתבצעת אוטומטית בשרת</p>
+            <p className="text-ink-muted">2. ה-session נשמר בצורה מאובטחת ומתחדש אוטומטית</p>
+            <p className="text-ink-muted">3. לחץ "סנכרן הכל" לייבוא קורסים ומטלות</p>
           </>
         ) : (
           <>
@@ -160,27 +159,16 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
   onConnect: (creds?: { username: string; password: string }) => void
   icon: React.ElementType; color: string; serverMode: boolean
 }) {
-  const [showForm, setShowForm] = useState(false)
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPass, setShowPass] = useState(false)
-
   const statusLabel: Record<string, string> = {
-    opening: 'פותח דפדפן Chrome...',
-    waiting_for_login: '⏳ ממתין לכניסה...',
+    opening: 'פותח דפדפן...',
+    waiting_for_login: '⏳ מתחבר...',
     connected: 'מחובר',
     failed: 'ההתחברות נכשלה — נסה שוב',
   }
 
   const handleConnect = () => {
-    if (serverMode) {
-      if (!showForm) { setShowForm(true); return }
-      if (!username || !password) return
-      onConnect({ username, password })
-      setPassword(''); setShowForm(false)
-    } else {
-      onConnect()
-    }
+    // No form needed — backend uses BGU_USERNAME/BGU_PASSWORD env vars
+    onConnect()
   }
 
   return (
@@ -234,63 +222,6 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
         </button>
       </div>
 
-      {/* Credentials form */}
-      <AnimatePresence>
-        {showForm && !connected && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="p-5 space-y-3 border-t border-white/5">
-              <p className="text-xs text-ink-muted">פרטי הכניסה ל-BGU</p>
-              <input
-                type="text"
-                placeholder="שם משתמש (מ.א. / אימייל BGU)"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                className="input-dark"
-                dir="ltr"
-              />
-              <div className="relative">
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  placeholder="סיסמה"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="input-dark pr-10"
-                  dir="ltr"
-                  onKeyDown={e => e.key === 'Enter' && handleConnect()}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass(p => !p)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
-                >
-                  {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleConnect}
-                  disabled={!username || !password || loading}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium btn-gradient disabled:opacity-50"
-                >
-                  {loading ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'כניסה'}
-                </button>
-                <button
-                  onClick={() => setShowForm(false)}
-                  className="px-4 py-2 rounded-xl text-sm text-ink-muted transition-colors"
-                  style={{ background: 'rgba(255,255,255,0.05)' }}
-                >
-                  ביטול
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }

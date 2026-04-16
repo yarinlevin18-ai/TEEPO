@@ -11,6 +11,10 @@ FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-secret-change-in-productio
 FLASK_ENV = os.getenv("FLASK_ENV", "development")
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 
+# Optional: pre-set BGU credentials so no login form is needed
+BGU_USERNAME = os.getenv("BGU_USERNAME", "")
+BGU_PASSWORD = os.getenv("BGU_PASSWORD", "")
+
 # Path to the existing orchestrator agents
 ORCHESTRATOR_PATH = os.getenv(
     "ORCHESTRATOR_PATH",

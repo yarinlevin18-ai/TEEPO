@@ -5,6 +5,7 @@ import threading
 from flask import Blueprint, request, jsonify
 from services import bgu_scraper
 from orchestrator_wrapper import get_orchestrator
+from config import BGU_USERNAME, BGU_PASSWORD
 
 bgu = Blueprint("bgu", __name__, url_prefix="/api/bgu")
 
@@ -62,8 +63,9 @@ def connect_site(site: str):
         return jsonify({"error": "אתר לא ידוע"}), 400
 
     body = request.get_json() or {}
-    username = body.get("username", "")
-    password = body.get("password", "")
+    # Use body credentials first, fall back to env vars (so no form is needed)
+    username = body.get("username") or BGU_USERNAME
+    password = body.get("password") or BGU_PASSWORD
 
     _login_status[site] = "opening"
 
@@ -71,7 +73,7 @@ def connect_site(site: str):
         # Cloud: headless login with credentials
         if not username or not password:
             _login_status[site] = "failed"
-            return jsonify({"error": "נדרשים שם משתמש וסיסמה"}), 400
+            return jsonify({"error": "נדרשים שם משתמש וסיסמה — הגדר BGU_USERNAME/BGU_PASSWORD ב-Render"}), 400
 
         def _do_headless():
             _login_status[site] = "waiting_for_login"
