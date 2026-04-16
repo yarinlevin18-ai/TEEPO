@@ -1,12 +1,25 @@
 /**
  * API Client - תקשורת עם שרת ה-Flask Backend
  */
+import { supabase } from './supabase'
+
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.access_token) {
+    return { Authorization: `Bearer ${session.access_token}` }
+  }
+  return {}
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const authHeaders = await getAuthHeaders()
+
   const res = await fetch(`${BACKEND}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
       ...options.headers,
     },
     ...options,

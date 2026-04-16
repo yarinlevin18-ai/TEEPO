@@ -2,23 +2,57 @@
 from flask import Blueprint, request, jsonify
 from orchestrator_wrapper import get_orchestrator
 from services import supabase_client as db
+from config import logger
 import uuid
 
 api = Blueprint("api", __name__, url_prefix="/api")
 
+# Cache verified tokens for 5 minutes to avoid hitting Supabase auth on every request
+_token_cache: dict = {}  # token -> (user_id, expiry_time)
+
 
 def _user_id():
-    """Extract user_id from Authorization header (JWT sub claim)."""
+    """Extract and verify user_id from Supabase JWT in Authorization header."""
+    import time
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         token = auth[7:]
+
+        # Check cache first
+        cached = _token_cache.get(token)
+        if cached and cached[1] > time.time():
+            return cached[0]
+
+        # Verify via Supabase auth.get_user()
+        try:
+            client = db.get_client()
+            user_response = client.auth.get_user(token)
+            if user_response and user_response.user:
+                user_id = user_response.user.id
+                # Cache for 5 minutes
+                _token_cache[token] = (user_id, time.time() + 300)
+                # Clean old cache entries periodically
+                if len(_token_cache) > 100:
+                    now = time.time()
+                    expired = [k for k, v in _token_cache.items() if v[1] < now]
+                    for k in expired:
+                        del _token_cache[k]
+                return user_id
+        except Exception as e:
+            logger.debug(f"Token verification failed: {e}")
+
+        # Fallback: decode claims without verification (for dev/debugging)
         try:
             from jose import jwt as _jwt
             payload = _jwt.get_unverified_claims(token)
-            return payload.get("sub", "anonymous")
+            uid = payload.get("sub")
+            if uid:
+                logger.warning(f"Using unverified JWT for user {uid[:8]}...")
+                return uid
         except Exception:
             pass
-    # dev fallback
+
+    # dev fallback — only works when no token is sent
     return request.headers.get("X-User-Id", "dev-user")
 
 

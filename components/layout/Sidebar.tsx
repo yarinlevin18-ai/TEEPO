@@ -5,8 +5,9 @@ import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, CheckSquare,
-  FileText, MessageCircle, GraduationCap, Wifi, Plus,
+  FileText, MessageCircle, GraduationCap, Wifi, Plus, LogOut,
 } from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
 
 const NAV = [
   { href: '/dashboard',       icon: LayoutDashboard, label: 'לוח בקרה' },
@@ -20,6 +21,7 @@ const NAV = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const { user, signOut } = useAuth()
 
   return (
     <aside
@@ -93,8 +95,22 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="px-5 py-5 border-t border-white/5">
+      {/* User & Footer */}
+      <div className="px-4 py-4 border-t border-white/5 space-y-3">
+        {user && (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-ink-muted truncate" dir="ltr">{user.email}</p>
+            </div>
+            <button
+              onClick={() => signOut()}
+              className="p-1.5 rounded-lg hover:bg-white/5 text-ink-subtle hover:text-red-400 transition-colors"
+              title="התנתק"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        )}
         <p className="text-xs text-center gradient-text font-medium">
           מופעל על ידי Claude AI
         </p>

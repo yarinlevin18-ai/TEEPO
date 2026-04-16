@@ -49,7 +49,7 @@ export default function LandingPage() {
           <span className="font-bold text-ink text-lg">מערכת לימודים</span>
         </div>
         <Link
-          href="/dashboard"
+          href="/auth"
           className="text-sm text-ink-muted hover:text-ink transition-colors flex items-center gap-1"
         >
           <span>כניסה לאפליקציה</span>
@@ -85,7 +85,7 @@ export default function LandingPage() {
 
           {/* CTA */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/dashboard">
+            <Link href="/auth">
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}

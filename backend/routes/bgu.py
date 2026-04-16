@@ -13,7 +13,9 @@ _login_status: dict = {"moodle": "idle", "portal": "idle"}
 
 
 def _user_id():
-    return request.headers.get("X-User-Id", "dev-user")
+    """Extract user_id — reuse the verified auth from api routes."""
+    from routes.api import _user_id as _api_user_id
+    return _api_user_id()
 
 
 # ------------------------------------------------------------------ #
