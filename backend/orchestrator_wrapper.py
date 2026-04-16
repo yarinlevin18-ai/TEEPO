@@ -143,7 +143,8 @@ class StudyOrchestrator:
                     isinstance(cls, type)
                     and hasattr(cls, "name")
                     and hasattr(cls, "execute")
-                    and cls.__name__ != "BaseStudyAgent"
+                    and cls.__name__ not in ("BaseStudyAgent", "BaseAgent")
+                    and not getattr(cls, '__abstractmethods__', None)
                 ):
                     instance = cls()
                     agents[instance.name] = instance
