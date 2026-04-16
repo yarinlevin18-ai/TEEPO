@@ -7,6 +7,10 @@ export const metadata: Metadata = {
   title: 'SmartDesk — מערכת לימודים חכמה',
   description: 'SmartDesk — מארגן לימודים אישי עם בינה מלאכותית',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/logo-48.png',
+    apple: '/logo-512.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -5,8 +5,9 @@ import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, CheckSquare,
-  FileText, MessageCircle, GraduationCap, Wifi, Plus, LogOut,
+  FileText, MessageCircle, Wifi, Plus, LogOut,
 } from 'lucide-react'
+import Image from 'next/image'
 import { useAuth } from '@/lib/auth-context'
 
 const NAV = [
@@ -33,12 +34,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="px-5 py-6 border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-glow-sm"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-          >
-            <GraduationCap size={20} className="text-white" />
-          </div>
+          <Image src="/logo-128.png" alt="SmartDesk" width={40} height={40} className="flex-shrink-0" />
           <div>
             <p className="font-bold text-ink text-sm leading-tight">SmartDesk</p>
             <p className="text-xs mt-0.5 gradient-text">מערכת לימודים חכמה</p>

@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { GraduationCap, MessageCircle, Wifi, CheckSquare, ArrowLeft, Sparkles } from 'lucide-react'
+import { MessageCircle, Wifi, CheckSquare, ArrowLeft, Sparkles } from 'lucide-react'
+import Image from 'next/image'
 
 const features = [
   {
@@ -43,9 +44,7 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-8 py-6">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-accent flex items-center justify-center shadow-glow-sm">
-            <GraduationCap size={20} className="text-white" />
-          </div>
+          <Image src="/logo-128.png" alt="SmartDesk" width={36} height={36} />
           <span className="font-bold text-ink text-lg">SmartDesk</span>
         </div>
         <Link
