@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { GraduationCap, Mail, Lock, ArrowLeft, Loader2 } from 'lucide-react'
@@ -8,7 +8,14 @@ import Link from 'next/link'
 
 export default function AuthPage() {
   const router = useRouter()
-  const { signIn, signUp } = useAuth()
+  const { user, loading: authLoading, signIn, signUp } = useAuth()
+
+  // Redirect to dashboard if already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/dashboard')
+    }
+  }, [user, authLoading, router])
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

@@ -4,7 +4,7 @@ BGU Routes - חיבור לאתרי אוניברסיטת בן-גוריון
 import threading
 from flask import Blueprint, request, jsonify
 from services import bgu_scraper
-from config import BGU_USERNAME, BGU_PASSWORD, IS_PRODUCTION
+from config import BGU_USERNAME, BGU_PASSWORD, IS_PRODUCTION, logger
 
 ALLOWED_BGU_DOMAINS = ("moodle.bgu.ac.il", "my.bgu.ac.il", "bgu.ac.il")
 
@@ -47,8 +47,8 @@ def connection_status():
             if result.data:
                 _login_status[site] = "connected"
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"bgu_sessions check failed for {site}: {e}")
         # 3. Live cookie validation (slowest, last resort)
         return bgu_scraper.is_session_valid(site)
 
@@ -156,8 +156,7 @@ def sync_all():
         result = agent.execute({"action": "sync_all", "user_id": user_id})
         return jsonify(result)
     except Exception as e:
-        import traceback
-        print(f"[sync] ERROR: {traceback.format_exc()}")
+        logger.error(f"BGU sync failed for user {user_id}: {e}", exc_info=True)
         return jsonify({"status": "error", "message": f"שגיאה בסנכרון: {str(e)}"}), 500
 
 

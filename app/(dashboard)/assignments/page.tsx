@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, FileText, ChevronDown, Loader2, Sparkles } from 'lucide-react'
 import { api } from '@/lib/api-client'
+import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { Assignment } from '@/types'
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
@@ -15,11 +16,15 @@ export default function AssignmentsPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [breaking, setBreaking] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', deadline: '' })
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     api.assignments.list()
       .then(setAssignments)
-      .catch(console.error)
+      .catch((e) => {
+        console.error(e)
+        setError('שגיאה בטעינת המטלות. נסה לרענן את העמוד.')
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -51,7 +56,8 @@ export default function AssignmentsPage() {
       setShowAdd(false)
       setExpanded(newAssignment.id)
     } catch (e: any) {
-      alert('שגיאה: ' + e.message)
+      console.error(e)
+      setError('שגיאה בפירוק המטלה. נסה שוב.')
     } finally {
       setBreaking(false)
     }
@@ -82,6 +88,8 @@ export default function AssignmentsPage() {
           <Plus size={16} /> מטלה חדשה
         </button>
       </div>
+
+      <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {/* Add form */}
       <AnimatePresence>

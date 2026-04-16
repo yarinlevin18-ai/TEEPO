@@ -3,14 +3,17 @@
 מפעיל את כל ה-API routes ואת הצ'אט בזמן אמת.
 """
 import os
+import time as _time
 from flask import Flask
 from flask_socketio import SocketIO
 from flask_cors import CORS
 
-from config import FLASK_SECRET_KEY, FLASK_ENV, BGU_USERNAME, BGU_PASSWORD
+from config import FLASK_SECRET_KEY, FLASK_ENV, IS_PRODUCTION, BGU_USERNAME, BGU_PASSWORD, logger
 from routes.api import api
 from routes.bgu import bgu, _login_status
 from routes.websocket import register_socket_events
+
+_start_time = _time.time()
 
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET_KEY
@@ -36,7 +39,7 @@ def add_security_headers(response):
 
 socketio = SocketIO(
     app,
-    cors_allowed_origins="*",
+    cors_allowed_origins=_allowed_origins if IS_PRODUCTION else "*",
     async_mode="threading",
     logger=FLASK_ENV == "development",
     engineio_logger=False,
@@ -52,16 +55,38 @@ register_socket_events(socketio)
 
 @app.get("/health")
 def health():
-    supabase_status = "connected"
+    checks = {}
+
+    # Supabase
     try:
         from services import supabase_client as db
         db.get_client().table("courses").select("id").limit(1).execute()
+        checks["supabase"] = "connected"
     except Exception as e:
-        supabase_status = f"error: {e}"
-    status = "ok" if supabase_status == "connected" else "degraded"
+        checks["supabase"] = f"error: {e}"
+        logger.warning(f"Health check — Supabase error: {e}")
+
+    # Claude API (lightweight key check, no actual call)
+    from config import ANTHROPIC_API_KEY
+    checks["claude_api"] = "configured" if ANTHROPIC_API_KEY else "missing_key"
+
+    # Orchestrator
+    from orchestrator_wrapper import get_orchestrator
+    try:
+        orch = get_orchestrator()
+        agent_count = len(getattr(orch, "_local_agents", {}))
+        checks["orchestrator"] = f"ok ({agent_count} agents)"
+    except Exception as e:
+        checks["orchestrator"] = f"error: {e}"
+
+    all_ok = checks["supabase"] == "connected" and checks["claude_api"] == "configured"
+    uptime = int(_time.time() - _start_time)
+
     return {
-        "status": status,
-        "supabase": supabase_status,
+        "status": "ok" if all_ok else "degraded",
+        "checks": checks,
+        "uptime_seconds": uptime,
+        "environment": FLASK_ENV,
         "message": "שרת הלמידה פעיל",
     }
 
@@ -101,12 +126,12 @@ def _auto_login_on_startup():
     time.sleep(5)  # wait for server to be ready
     for site in ("moodle", "portal"):
         try:
-            print(f"🔐 מתחבר אוטומטית ל-{site}...")
+            logger.info(f"Auto-login: connecting to {site}...")
             result = bgu_scraper.login_headless(site, BGU_USERNAME, BGU_PASSWORD)
             _login_status[site] = "connected" if result.get("status") == "success" else "failed"
-            print(f"{'✅' if _login_status[site] == 'connected' else '❌'} {site}: {_login_status[site]}")
+            logger.info(f"Auto-login {site}: {_login_status[site]}")
         except Exception as e:
-            print(f"❌ שגיאה בהתחברות אוטומטית ל-{site}: {e}")
+            logger.error(f"Auto-login {site} failed: {e}")
             _login_status[site] = "failed"
 
 
@@ -116,5 +141,5 @@ _threading.Thread(target=_auto_login_on_startup, daemon=True).start()
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
-    print(f"🚀 מפעיל שרת לימודים על פורט {port}...")
+    logger.info(f"Starting study server on port {port} (env={FLASK_ENV})...")
     socketio.run(app, host="0.0.0.0", port=port, debug=FLASK_ENV == "development", allow_unsafe_werkzeug=True)

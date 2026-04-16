@@ -14,6 +14,7 @@ from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
+from config import logger
 
 # --------------------------------------------------------------------------- #
 #  Environment detection                                                        #
@@ -45,9 +46,9 @@ def _save_cookies_to_store(site: str, cookies: list):
     try:
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(cookies, f, ensure_ascii=False, indent=2)
-        print(f"[BGU] Cookies saved to local file for {site}")
+        logger.debug(f"[BGU] Cookies saved to local file for {site}")
     except Exception as e:
-        print(f"[BGU] Warning: could not save cookies to file: {e}")
+        logger.debug(f"[BGU] Warning: could not save cookies to file: {e}")
 
     # Also save to Supabase (persists across Render restarts)
     try:
@@ -57,9 +58,9 @@ def _save_cookies_to_store(site: str, cookies: list):
             "cookies": json.dumps(cookies),
             "updated_at": _dt.utcnow().isoformat(),
         }, on_conflict="site").execute()
-        print(f"[BGU] Cookies saved to Supabase for {site}")
+        logger.debug(f"[BGU] Cookies saved to Supabase for {site}")
     except Exception as e:
-        print(f"[BGU] Warning: could not save cookies to Supabase: {e}")
+        logger.debug(f"[BGU] Warning: could not save cookies to Supabase: {e}")
 
 
 def _load_cookies_from_store(site: str) -> Optional[list]:
@@ -69,10 +70,10 @@ def _load_cookies_from_store(site: str) -> Optional[list]:
         from services.supabase_client import get_client
         result = get_client().table("bgu_sessions").select("cookies").eq("site", site).execute()
         if result.data:
-            print(f"[BGU] Cookies loaded from Supabase for {site}")
+            logger.debug(f"[BGU] Cookies loaded from Supabase for {site}")
             return json.loads(result.data[0]["cookies"])
     except Exception as e:
-        print(f"[BGU] Warning: could not load cookies from Supabase: {e}")
+        logger.debug(f"[BGU] Warning: could not load cookies from Supabase: {e}")
 
     # Fall back to local file
     filepath = MOODLE_COOKIES_FILE if site == "moodle" else PORTAL_COOKIES_FILE
@@ -80,12 +81,12 @@ def _load_cookies_from_store(site: str) -> Optional[list]:
         try:
             with open(filepath, encoding="utf-8") as f:
                 cookies = json.load(f)
-            print(f"[BGU] Cookies loaded from local file for {site}")
+            logger.debug(f"[BGU] Cookies loaded from local file for {site}")
             return cookies
         except Exception as e:
-            print(f"[BGU] Warning: could not load cookies from file: {e}")
+            logger.debug(f"[BGU] Warning: could not load cookies from file: {e}")
 
-    print(f"[BGU] No cookies found for {site}")
+    logger.debug(f"[BGU] No cookies found for {site}")
     return None
 
 
@@ -169,7 +170,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
         )
         wait = WebDriverWait(driver, 20)
 
-        print(f"[BGU] Headless login → {target_url}")
+        logger.debug(f"[BGU] Headless login → {target_url}")
         driver.get(target_url)
         time.sleep(3)
 
@@ -180,7 +181,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
                 field = driver.find_element(By.CSS_SELECTOR, user_sel)
                 field.clear()
                 field.send_keys(username)
-                print(f"[BGU] Filled username field: {user_sel}")
+                logger.debug(f"[BGU] Filled username field: {user_sel}")
                 break
             except Exception:
                 continue
@@ -191,7 +192,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
                 field = driver.find_element(By.CSS_SELECTOR, pass_sel)
                 field.clear()
                 field.send_keys(password)
-                print(f"[BGU] Filled password field: {pass_sel}")
+                logger.debug(f"[BGU] Filled password field: {pass_sel}")
                 break
             except Exception:
                 continue
@@ -201,7 +202,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
             try:
                 btn = driver.find_element(By.CSS_SELECTOR, submit_sel)
                 btn.click()
-                print(f"[BGU] Clicked submit: {submit_sel}")
+                logger.debug(f"[BGU] Clicked submit: {submit_sel}")
                 break
             except Exception:
                 continue
@@ -220,7 +221,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
                 break
 
             if current_url != last_url:
-                print(f"[BGU] URL → {current_url}")
+                logger.debug(f"[BGU] URL → {current_url}")
                 last_url = current_url
 
             if success_check(current_url):
@@ -228,7 +229,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
                 cookies = driver.get_cookies()
                 _save_cookies_to_store(site, cookies)
                 logged_in = True
-                print("[BGU] Headless login successful!")
+                logger.debug("[BGU] Headless login successful!")
                 break
 
         if not logged_in:
@@ -238,7 +239,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
         return {"status": "success", "message": f"מחובר בהצלחה ל-{site}"}
 
     except Exception as e:
-        print(f"[BGU] Headless login error: {e}")
+        logger.debug(f"[BGU] Headless login error: {e}")
         return {"status": "error", "message": str(e)}
     finally:
         try:
@@ -285,7 +286,7 @@ def open_browser_for_login(site: str = "moodle") -> dict:
             return not any(b in url.lower() for b in bad)
 
     app_profile = _get_app_chrome_profile()
-    print(f"[BGU] Using dedicated app Chrome profile: {app_profile}")
+    logger.debug(f"[BGU] Using dedicated app Chrome profile: {app_profile}")
 
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
@@ -304,7 +305,7 @@ def open_browser_for_login(site: str = "moodle") -> dict:
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
 
-        print(f"[BGU] Navigating to {target_url}")
+        logger.debug(f"[BGU] Navigating to {target_url}")
         driver.get(target_url)
 
         timeout = 300
@@ -317,11 +318,11 @@ def open_browser_for_login(site: str = "moodle") -> dict:
             try:
                 current_url = driver.current_url
             except Exception:
-                print("[BGU] Browser closed unexpectedly.")
+                logger.debug("[BGU] Browser closed unexpectedly.")
                 break
 
             if current_url != last_url:
-                print(f"[BGU] URL changed → {current_url}")
+                logger.debug(f"[BGU] URL changed → {current_url}")
                 last_url = current_url
 
             if logged_in_check(current_url):
@@ -330,7 +331,7 @@ def open_browser_for_login(site: str = "moodle") -> dict:
                 _save_cookies(driver, cookies_file)
                 _save_cookies_to_store(site, cookies)
                 logged_in = True
-                print("[BGU] Logged in! Cookies saved.")
+                logger.debug("[BGU] Logged in! Cookies saved.")
                 break
 
         if not logged_in:
@@ -345,7 +346,7 @@ def open_browser_for_login(site: str = "moodle") -> dict:
         return {"status": "success", "message": f"מחובר בהצלחה ל-{site}"}
 
     except Exception as e:
-        print(f"[BGU] Error: {e}")
+        logger.debug(f"[BGU] Error: {e}")
         return {"status": "error", "message": str(e)}
     finally:
         try:
@@ -418,9 +419,9 @@ def scrape_moodle_courses() -> dict:
                         "moodle_id": str(course.get("id", "")),
                         "summary": course.get("summary", ""),
                     })
-                print(f"[BGU] AJAX API found {len(courses)} courses")
+                logger.debug(f"[BGU] AJAX API found {len(courses)} courses")
     except Exception as e:
-        print(f"[BGU] AJAX strategy failed: {e}")
+        logger.debug(f"[BGU] AJAX strategy failed: {e}")
 
     # ── Strategy 2: Scan ALL <a> tags for course/view.php links ──────────────
     if not courses:
@@ -450,9 +451,9 @@ def scrape_moodle_courses() -> dict:
                         "url": href if href.startswith("http") else f"{MOODLE_URL}{href}",
                         "moodle_id": cid,
                     })
-            print(f"[BGU] HTML scan found {len(courses)} courses")
+            logger.debug(f"[BGU] HTML scan found {len(courses)} courses")
         except Exception as e:
-            print(f"[BGU] HTML strategy failed: {e}")
+            logger.debug(f"[BGU] HTML strategy failed: {e}")
 
     # ── Strategy 3: /course/ index page ──────────────────────────────────────
     if not courses:
@@ -476,9 +477,9 @@ def scrape_moodle_courses() -> dict:
                         "url": href if href.startswith("http") else f"{MOODLE_URL}{href}",
                         "moodle_id": cid,
                     })
-            print(f"[BGU] /course/ page found {len(courses)} courses")
+            logger.debug(f"[BGU] /course/ page found {len(courses)} courses")
         except Exception as e:
-            print(f"[BGU] /course/ strategy failed: {e}")
+            logger.debug(f"[BGU] /course/ strategy failed: {e}")
 
     # Deduplicate by moodle_id
     seen = set()
@@ -489,7 +490,7 @@ def scrape_moodle_courses() -> dict:
             seen.add(key)
             unique.append(c)
 
-    print(f"[BGU] Total unique courses found: {len(unique)}")
+    logger.debug(f"[BGU] Total unique courses found: {len(unique)}")
     return {"status": "success", "courses": unique, "count": len(unique)}
 
 

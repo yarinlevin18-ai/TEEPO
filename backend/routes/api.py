@@ -102,7 +102,7 @@ def list_courses():
         result = db.get_courses(_user_id())
         return jsonify(result.data or [])
     except Exception as e:
-        print(f"[courses] DB error: {e}")
+        logger.warning(f"[courses] DB error: {e}")
         return jsonify([])
 
 
@@ -162,7 +162,7 @@ def list_tasks():
         result = db.get_tasks(_user_id(), date)
         return jsonify(result.data or [])
     except Exception as e:
-        print(f"[tasks] DB error: {e}")
+        logger.warning(f"[tasks] DB error: {e}")
         return jsonify([])
 
 
@@ -186,7 +186,7 @@ def update_task(task_id):
             return jsonify({"error": "משימה לא נמצאה"}), 404
         return jsonify(result.data[0])
     except Exception as e:
-        print(f"[update_task] error: {e}")
+        logger.warning(f"[update_task] error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -196,7 +196,7 @@ def delete_task(task_id):
         db.delete_task(task_id)
         return jsonify({"ok": True})
     except Exception as e:
-        print(f"[delete_task] error: {e}")
+        logger.warning(f"[delete_task] error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -210,7 +210,7 @@ def list_assignments():
         result = db.get_assignments(_user_id())
         return jsonify(result.data or [])
     except Exception as e:
-        print(f"[assignments] DB error: {e}")
+        logger.warning(f"[assignments] DB error: {e}")
         return jsonify([])
 
 

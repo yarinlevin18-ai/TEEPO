@@ -45,8 +45,8 @@ def register_socket_events(socketio: SocketIO):
                 _sessions[sid]["conv_id"] = conv["id"]
                 _sessions[sid]["history"] = conv.get("messages", [])
                 emit("history_loaded", {"messages": _sessions[sid]["history"]})
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to load conversation history for {user_id}: {e}")
 
     @socketio.on("message")
     def on_message(data):
@@ -89,6 +89,7 @@ def register_socket_events(socketio: SocketIO):
             emit("reply", {"text": answer, "agent": agent_type})
 
         except Exception as exc:
+            logger.error(f"WebSocket message error (user={user_id}, agent={agent_type}): {exc}")
             emit("error", {"message": f"שגיאה: {str(exc)}"})
 
     # ------------------------------------------------------------------ #
@@ -111,8 +112,8 @@ def register_socket_events(socketio: SocketIO):
                     "agent_type": agent_type,
                     "messages": messages,
                 })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to save conversation for {user_id}: {e}")
 
 
 def _get_sid():

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { api } from '@/lib/api-client'
+import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { StudyTask, Course, Assignment } from '@/types'
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
@@ -24,12 +25,16 @@ export default function DashboardPage() {
   const [courses, setCourses] = useState<Course[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const today = format(new Date(), 'yyyy-MM-dd')
 
   useEffect(() => {
     Promise.all([api.tasks.list(today), api.courses.list(), api.assignments.list()])
       .then(([t, c, a]) => { setTasks(t); setCourses(c); setAssignments(a) })
-      .catch(console.error)
+      .catch((e) => {
+        console.error(e)
+        setError('שגיאה בטעינת הנתונים. נסה לרענן את העמוד.')
+      })
       .finally(() => setLoading(false))
   }, [today])
 
@@ -47,6 +52,8 @@ export default function DashboardPage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8 animate-fade-in">
+
+      <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {/* Header */}
       <div>
@@ -105,7 +112,11 @@ export default function DashboardPage() {
               tasks.map(task => (
                 <TaskRow key={task.id} task={task} onToggle={(id, done) => {
                   setTasks(prev => prev.map(t => t.id === id ? { ...t, is_completed: done } : t))
-                  api.tasks.update(id, { is_completed: done }).catch(console.error)
+                  api.tasks.update(id, { is_completed: done }).catch((e) => {
+                    console.error(e)
+                    setTasks(prev => prev.map(t => t.id === id ? { ...t, is_completed: !done } : t))
+                    setError('שגיאה בעדכון המשימה.')
+                  })
                 }} />
               ))
             )}

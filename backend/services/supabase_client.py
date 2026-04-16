@@ -1,6 +1,6 @@
 """Supabase client wrapper."""
 from supabase import create_client, Client
-from config import SUPABASE_URL, SUPABASE_SERVICE_KEY
+from config import SUPABASE_URL, SUPABASE_SERVICE_KEY, logger
 
 # ── Compatibility patch ─────────────────────────────────────────────────────
 # supabase-py 2.3 passes 'proxy' to httpx.Client which removed it in >=0.24.
@@ -19,11 +19,11 @@ try:
         kw.pop('proxy', None)
         _orig_async(self, *a, **kw)
     _httpx.AsyncClient.__init__ = _async_init
-    print("[supabase_client] httpx proxy compatibility patch applied successfully")
+    logger.debug("httpx proxy compatibility patch applied successfully")
 except ImportError:
     pass  # if httpx isn't installed, supabase will fail anyway
 except Exception as e:
-    print(f"[supabase_client] httpx monkey-patch failed: {e}")
+    logger.warning(f"httpx monkey-patch failed: {e}")
 # ───────────────────────────────────────────────────────────────────────────
 
 _client: Client | None = None

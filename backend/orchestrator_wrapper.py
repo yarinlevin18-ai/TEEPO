@@ -35,16 +35,19 @@ def _sanitize_for_prompt(text: str, max_len: int = MAX_CONTENT_LENGTH) -> str:
     return text.strip()
 
 # Inject the existing orchestrator so we can reuse its agents
-sys.path.insert(0, ORCHESTRATOR_PATH)
+if ORCHESTRATOR_PATH and os.path.isdir(ORCHESTRATOR_PATH):
+    sys.path.insert(0, ORCHESTRATOR_PATH)
 
 try:
     from orchestrator.orchestrator import Orchestrator as BaseOrchestrator
     from orchestrator.agent_registry import AgentRegistry
     _BASE_AVAILABLE = True
+    logger.info("External orchestrator loaded successfully.")
 except ImportError:
     _BASE_AVAILABLE = False
     BaseOrchestrator = object
     AgentRegistry = None
+    logger.info("External orchestrator not available — using direct Claude API calls.")
 
 
 class StudyOrchestrator:
@@ -62,14 +65,16 @@ class StudyOrchestrator:
         if _BASE_AVAILABLE and AgentRegistry:
             try:
                 self.registry = AgentRegistry()
-                # Also load our local study agents
                 self._load_study_agents(agents_dir)
-            except Exception:
+                logger.info("Agent registry initialized with external orchestrator.")
+            except Exception as e:
+                logger.warning(f"Failed to init agent registry: {e}. Using local agents.")
                 self.registry = None
                 self._local_agents = self._load_local_agents(agents_dir)
         else:
             self.registry = None
             self._local_agents = self._load_local_agents(agents_dir)
+            logger.info(f"Loaded {len(self._local_agents)} local agents: {list(self._local_agents.keys())}")
 
     def _load_local_agents(self, agents_dir: str) -> Dict:
         """Load agents from local agents/ directory."""
@@ -114,12 +119,14 @@ class StudyOrchestrator:
         if self.registry:
             try:
                 return self.registry.execute_agent(agent_name, input_data)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Registry agent '{agent_name}' failed: {e}. Trying local agents.")
         agents = getattr(self, "_local_agents", {})
         if agent_name in agents:
+            logger.debug(f"Executing local agent: {agent_name}")
             return agents[agent_name].execute(input_data)
         # Fallback: direct Claude call
+        logger.debug(f"Agent '{agent_name}' not found — falling back to direct Claude call.")
         return self._direct_claude(input_data.get("prompt", str(input_data)))
 
     def _direct_claude(self, prompt: str) -> Dict:

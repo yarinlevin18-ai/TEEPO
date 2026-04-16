@@ -5,6 +5,7 @@ import uuid
 from typing import Dict, Any
 from agents.base_study_agent import BaseStudyAgent
 from services import bgu_scraper, supabase_client as db
+from config import logger
 
 
 class BGUSyncAgent(BaseStudyAgent):
@@ -81,7 +82,7 @@ class BGUSyncAgent(BaseStudyAgent):
             if existing.data:
                 existing_titles = {c["title"] for c in existing.data}
         except Exception as e:
-            print(f"[sync] Warning: could not load existing courses: {e}")
+            logger.warning(f"[sync] Could not load existing courses: {e}")
 
         for course in courses:
             # Skip if course already exists
@@ -107,7 +108,7 @@ class BGUSyncAgent(BaseStudyAgent):
                     try:
                         self._sync_assignments(user_id, course["url"], course_id)
                     except Exception as e:
-                        print(f"[sync] Assignment sync error for {course['title']}: {e}")
+                        logger.warning(f"[sync] Assignment sync error for {course['title']}: {e}")
 
             except Exception as e:
                 db_errors.append(str(e))

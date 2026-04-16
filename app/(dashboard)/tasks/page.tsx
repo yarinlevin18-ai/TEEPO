@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, CheckSquare, Trash2, Calendar } from 'lucide-react'
 import { api } from '@/lib/api-client'
+import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { StudyTask } from '@/types'
 import { format, addDays, subDays } from 'date-fns'
 import { he } from 'date-fns/locale'
@@ -14,38 +15,61 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [addingTask, setAddingTask] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const loadTasks = async (date: string) => {
     setLoading(true)
+    setError(null)
     try {
       const data = await api.tasks.list(date)
       setTasks(data)
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
+    } catch (e: any) {
+      console.error(e)
+      setError('שגיאה בטעינת המשימות. נסה לרענן את העמוד.')
+    } finally { setLoading(false) }
   }
 
   useEffect(() => { loadTasks(selectedDate) }, [selectedDate])
 
   const addTask = async () => {
     if (!newTitle.trim()) return
-    const task = await api.tasks.create({
-      title: newTitle.trim(),
-      scheduled_date: selectedDate,
-      category: 'study',
-    })
-    setTasks((prev) => [...prev, task])
-    setNewTitle('')
-    setAddingTask(false)
+    setError(null)
+    try {
+      const task = await api.tasks.create({
+        title: newTitle.trim(),
+        scheduled_date: selectedDate,
+        category: 'study',
+      })
+      setTasks((prev) => [...prev, task])
+      setNewTitle('')
+      setAddingTask(false)
+    } catch (e: any) {
+      console.error(e)
+      setError('שגיאה בהוספת המשימה. נסה שוב.')
+    }
   }
 
   const toggleTask = async (id: string, done: boolean) => {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, is_completed: done } : t))
-    await api.tasks.update(id, { is_completed: done })
+    try {
+      await api.tasks.update(id, { is_completed: done })
+    } catch (e: any) {
+      console.error(e)
+      setTasks((prev) => prev.map((t) => t.id === id ? { ...t, is_completed: !done } : t))
+      setError('שגיאה בעדכון המשימה. נסה שוב.')
+    }
   }
 
   const deleteTask = async (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id))
-    await api.tasks.delete(id)
+    const prev = tasks
+    setTasks((t) => t.filter((task) => task.id !== id))
+    try {
+      await api.tasks.delete(id)
+    } catch (e: any) {
+      console.error(e)
+      setTasks(prev)
+      setError('שגיאה במחיקת המשימה. נסה שוב.')
+    }
   }
 
   // Build a 7-day strip around selectedDate
@@ -60,6 +84,8 @@ export default function TasksPage() {
   return (
     <div className="p-8 max-w-2xl mx-auto space-y-6 animate-fade-in">
       <h1 className="text-2xl font-bold text-ink">משימות</h1>
+
+      <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {/* Date strip */}
       <div className="flex gap-2 overflow-x-auto pb-1">

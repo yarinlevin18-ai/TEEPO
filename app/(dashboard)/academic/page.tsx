@@ -4,12 +4,14 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { GraduationCap, Loader2, Sparkles, BookOpen } from 'lucide-react'
 import { api } from '@/lib/api-client'
+import ErrorAlert from '@/components/ui/ErrorAlert'
 
 export default function AcademicPage() {
   const [courseName, setCourseName] = useState('')
   const [major, setMajor] = useState('')
   const [courses, setCourses] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<{ advice: string; bgu_resources: Record<string, string> } | null>(null)
 
   const getAdvice = async (e: React.FormEvent) => {
@@ -17,6 +19,7 @@ export default function AcademicPage() {
     if (!courseName && !major) return
     setLoading(true)
     setResult(null)
+    setError(null)
     try {
       const data = await api.academic.advise(
         courseName,
@@ -25,7 +28,8 @@ export default function AcademicPage() {
       )
       setResult(data)
     } catch (err: any) {
-      alert('שגיאה: ' + err.message)
+      console.error(err)
+      setError('שגיאה בקבלת ייעוץ אקדמי. נסה שוב.')
     } finally {
       setLoading(false)
     }
@@ -48,6 +52,8 @@ export default function AcademicPage() {
           קבל עצות אקדמיות מותאמות לקורסים, לדרישות האוניברסיטה, ולמחלקה שלך
         </p>
       </div>
+
+      <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {/* Form */}
       <form onSubmit={getAdvice} className="glass rounded-2xl p-6 space-y-4">
