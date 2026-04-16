@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Bot, User, Trash2, GraduationCap } from 'lucide-react'
 import { io, Socket } from 'socket.io-client'
 import type { ChatMessage } from '@/types'
+import { useAuth } from '@/lib/auth-context'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -26,6 +27,7 @@ const AGENT_CONFIG: Record<AgentType, { label: string; icon: React.ElementType; 
 }
 
 export default function StudyBuddyPage() {
+  const { user } = useAuth()
   const [activeAgent, setActiveAgent] = useState<AgentType>('study_buddy')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -41,7 +43,7 @@ export default function StudyBuddyPage() {
 
     socket.on('connect', () => {
       setConnected(true)
-      socket.emit('join', { user_id: 'dev-user', agent_type: activeAgent })
+      socket.emit('join', { user_id: user?.id || 'anonymous', agent_type: activeAgent })
     })
 
     socket.on('disconnect', () => setConnected(false))

@@ -6,7 +6,7 @@ export interface Course {
   id: string
   user_id: string
   title: string
-  source: 'udemy' | 'coursera' | 'custom_url'
+  source: 'bgu' | 'udemy' | 'coursera' | 'custom_url'
   source_url?: string
   thumbnail_url?: string
   description?: string

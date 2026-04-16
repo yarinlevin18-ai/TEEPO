@@ -6,8 +6,17 @@ import {
   GraduationCap, WifiOff, RefreshCw,
   CheckCircle, Loader2, BookOpen, Calendar, ExternalLink, Puzzle,
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.access_token) {
+    return { Authorization: `Bearer ${session.access_token}` }
+  }
+  return {}
+}
 
 type Status = { moodle: boolean; portal: boolean; login_status: Record<string, string> }
 
@@ -21,7 +30,8 @@ export default function BGUConnectPage() {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch(`${BACKEND}/api/bgu/status`, { signal: AbortSignal.timeout(10000) })
+      const headers = await authHeaders()
+      const res = await fetch(`${BACKEND}/api/bgu/status`, { headers, signal: AbortSignal.timeout(10000) })
       if (res.ok) setStatus(await res.json())
     } catch {}
   }
@@ -39,9 +49,10 @@ export default function BGUConnectPage() {
   const connect = async (site: 'moodle' | 'portal', creds?: { username: string; password: string }) => {
     setLoading(p => ({ ...p, [site]: true }))
     try {
+      const headers = { 'Content-Type': 'application/json', ...(await authHeaders()) }
       await fetch(`${BACKEND}/api/bgu/connect/${site}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(creds || {}),
       })
       pollRef.current = setInterval(async () => {
@@ -68,8 +79,10 @@ export default function BGUConnectPage() {
       } catch {}
 
       setSyncResult('מסנכרן נתונים...')
+      const headers = await authHeaders()
       const res = await fetch(`${BACKEND}/api/bgu/sync`, {
         method: 'POST',
+        headers,
         signal: AbortSignal.timeout(120000), // 2 min for full sync
       })
       const data = await res.json()
