@@ -156,9 +156,8 @@ async function saveUrl() {
 }
 
 // ---------- Boot ----------
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('moodle-btn').addEventListener('click', () => syncSite('moodle'))
-  document.getElementById('portal-btn').addEventListener('click', () => syncSite('portal'))
-  document.getElementById('save-url-btn').addEventListener('click', saveUrl)
-  init()
-})
+// Script is at end of <body> so DOM is already ready — attach directly
+document.getElementById('moodle-btn').addEventListener('click', () => syncSite('moodle'))
+document.getElementById('portal-btn').addEventListener('click', () => syncSite('portal'))
+document.getElementById('save-url-btn').addEventListener('click', saveUrl)
+init()
