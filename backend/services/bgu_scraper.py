@@ -976,6 +976,140 @@ def _find_col_idx(headers: list[str], keywords: list[str]) -> int | None:
     return None
 
 
+def parse_portal_html(html: str, url: str = "", title: str = "") -> dict:
+    """
+    Parse raw HTML from the BGU portal (captured by Chrome extension)
+    and extract grades + credits (נק"ז).
+    Returns {status, grades: [...], grades_found: int}
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    grades = []
+    seen = set()
+
+    tables = soup.find_all("table")
+    logger.debug(f"[BGU] parse_portal_html: found {len(tables)} tables in HTML ({len(html)} chars)")
+
+    for table in tables:
+        rows = table.find_all("tr")
+        if len(rows) < 2:
+            continue
+
+        # Try to find header row with grade-related columns
+        header = rows[0]
+        header_cells = [th.get_text(strip=True) for th in header.find_all(["th", "td"])]
+        header_lower = [h.lower() for h in header_cells]
+
+        # Look for columns: course name, grade, semester, credits, year, course ID
+        name_idx = _find_col_idx(header_lower, ["קורס", "שם קורס", "course", "מקצוע", "שם המקצוע", "שם הקורס"])
+        grade_idx = _find_col_idx(header_lower, ["ציון", "grade", "ציון סופי", "ציון מועד"])
+        sem_idx = _find_col_idx(header_lower, ["סמסטר", "semester", "תקופה"])
+        year_idx = _find_col_idx(header_lower, ["שנה", "year", "שנת לימודים", "שנה אקדמית"])
+        credits_idx = _find_col_idx(header_lower, ["נקודות", 'נק"ז', "credits", "נ.ז.", "נקודות זכות", "נק״ז", "נקז"])
+        course_id_idx = _find_col_idx(header_lower, ["מספר קורס", "מספר מקצוע", "course id", "קוד קורס", "מס' קורס"])
+
+        if name_idx is None or grade_idx is None:
+            # Try: maybe the table has no clear header — scan first row for numeric patterns
+            # or skip this table
+            continue
+
+        logger.debug(f"[BGU] parse_portal_html: table has columns: name={name_idx} grade={grade_idx} "
+                     f"credits={credits_idx} semester={sem_idx} year={year_idx}")
+
+        for row in rows[1:]:
+            cells = [td.get_text(strip=True) for td in row.find_all(["td", "th"])]
+            if len(cells) <= max(name_idx, grade_idx):
+                continue
+
+            name = cells[name_idx].strip()
+            raw_grade = cells[grade_idx].strip()
+            if not name or not raw_grade or raw_grade == "-" or raw_grade == "":
+                continue
+
+            # Deduplicate by course name + semester
+            semester = ""
+            if sem_idx is not None and sem_idx < len(cells):
+                semester = cells[sem_idx].strip()
+            dedup_key = f"{name}_{semester}"
+            if dedup_key in seen:
+                continue
+            seen.add(dedup_key)
+
+            grade_num = None
+            try:
+                cleaned = raw_grade.replace(",", ".").strip()
+                grade_num = round(float(cleaned), 1)
+            except (ValueError, TypeError):
+                pass
+
+            g = {
+                "course_name": name,
+                "grade": grade_num,
+                "grade_text": raw_grade if grade_num is None else None,
+                "source": "portal",
+            }
+            if semester:
+                g["semester"] = semester
+            if year_idx is not None and year_idx < len(cells):
+                g["academic_year"] = cells[year_idx].strip()
+            if credits_idx is not None and credits_idx < len(cells):
+                try:
+                    cred_val = cells[credits_idx].strip().replace(",", ".")
+                    if cred_val:
+                        g["credits"] = float(cred_val)
+                except (ValueError, TypeError):
+                    pass
+            if course_id_idx is not None and course_id_idx < len(cells):
+                g["course_id"] = cells[course_id_idx].strip()
+
+            grades.append(g)
+
+    # If no tables with headers matched, try a broader scan for any table with numbers
+    if not grades:
+        for table in tables:
+            rows = table.find_all("tr")
+            if len(rows) < 3:
+                continue
+            # Check all rows for grade-like patterns (numbers 0-100)
+            for row in rows:
+                cells = [td.get_text(strip=True) for td in row.find_all(["td", "th"])]
+                # Look for rows with: text (course name), number (grade), possibly number (credits)
+                if len(cells) >= 2:
+                    for i, cell in enumerate(cells):
+                        try:
+                            val = float(cell.replace(",", "."))
+                            if 0 <= val <= 100 and i > 0:
+                                # Previous cell might be course name
+                                name_cell = cells[i - 1].strip()
+                                if name_cell and len(name_cell) > 2 and not name_cell.replace(".", "").replace(",", "").isdigit():
+                                    dedup_key = f"{name_cell}_"
+                                    if dedup_key not in seen:
+                                        seen.add(dedup_key)
+                                        g = {
+                                            "course_name": name_cell,
+                                            "grade": round(val, 1),
+                                            "source": "portal",
+                                        }
+                                        # Check if next cell is credits (small number 0-10)
+                                        if i + 1 < len(cells):
+                                            try:
+                                                cred = float(cells[i + 1].replace(",", "."))
+                                                if 0 < cred <= 15:
+                                                    g["credits"] = cred
+                                            except (ValueError, TypeError):
+                                                pass
+                                        grades.append(g)
+                                    break
+                        except (ValueError, TypeError):
+                            continue
+
+    logger.debug(f"[BGU] parse_portal_html: extracted {len(grades)} grades total")
+    return {
+        "status": "success",
+        "grades": grades,
+        "grades_found": len(grades),
+    }
+
+
 # --------------------------------------------------------------------------- #
 #  My BGU Portal Scraper                                                        #
 # --------------------------------------------------------------------------- #

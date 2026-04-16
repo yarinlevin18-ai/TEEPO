@@ -146,6 +146,79 @@ def receive_cookies():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@bgu.post("/parse-portal")
+def parse_portal():
+    """Receive raw HTML from the Chrome extension and parse grades + credits from it."""
+    body = request.get_json() or {}
+    html = body.get("html", "")
+    url = body.get("url", "")
+    title = body.get("title", "")
+    site = body.get("site", "portal")
+
+    if not html or len(html) < 100:
+        return jsonify({"status": "error", "message": "HTML ריק או קצר מדי"}), 400
+
+    try:
+        result = bgu_scraper.parse_portal_html(html, url, title)
+        grades = result.get("grades", [])
+
+        # Persist grades to Supabase
+        if grades:
+            user_id = None
+            try:
+                user_id = _user_id()
+            except Exception:
+                pass  # No auth — still return grades but don't persist
+
+            if user_id:
+                from datetime import datetime as _dt
+                from services.supabase_client import get_client
+                saved = 0
+                for g in grades:
+                    try:
+                        row = {
+                            "user_id": user_id,
+                            "course_name": g["course_name"],
+                            "source": "portal",
+                            "updated_at": _dt.utcnow().isoformat(),
+                        }
+                        if g.get("grade") is not None:
+                            row["grade"] = g["grade"]
+                        if g.get("grade_text"):
+                            row["grade_text"] = g["grade_text"]
+                        if g.get("semester"):
+                            row["semester"] = g["semester"]
+                        if g.get("academic_year"):
+                            row["academic_year"] = g["academic_year"]
+                        if g.get("credits"):
+                            row["credits"] = g["credits"]
+                        if g.get("course_id"):
+                            row["course_moodle_id"] = g["course_id"]
+
+                        # Delete existing record first (expression index can't use on_conflict)
+                        sem = g.get("semester", "") or ""
+                        (get_client().table("student_grades")
+                         .delete()
+                         .eq("user_id", user_id)
+                         .eq("course_name", g["course_name"])
+                         .eq("semester", sem)
+                         .execute())
+                        # Insert new record
+                        get_client().table("student_grades").insert(row).execute()
+                        saved += 1
+                    except Exception as e:
+                        logger.debug(f"[parse-portal] Failed to persist grade for {g['course_name']}: {e}")
+
+                logger.info(f"[parse-portal] Parsed {len(grades)}, stored {saved} grades for user {user_id}")
+                result["grades_saved"] = saved
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"[parse-portal] Failed: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @bgu.post("/sync")
 def sync_all():
     """Sync all BGU data into the app."""
