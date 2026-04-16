@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND = 'http://localhost:5000'
+const DEFAULT_BACKEND = 'https://bgu-study-backend.onrender.com'
 
 const SITES = {
   moodle: {
@@ -28,8 +28,8 @@ async function init() {
   document.getElementById('backend-url').value = url
 
   // Set app link
-  const appUrl = url.replace('localhost:5000', 'localhost:3000')
-    .replace('.onrender.com', '-frontend.vercel.app') // best guess fallback
+  let appUrl = 'https://bgu-study-organizer.vercel.app'
+  if (url.includes('localhost')) appUrl = 'http://localhost:3000'
   chrome.storage.local.get(['appUrl'], res => {
     document.getElementById('app-link').href = res.appUrl || appUrl
   })
