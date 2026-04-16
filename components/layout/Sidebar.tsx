@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, CheckSquare,
-  FileText, MessageCircle, Wifi, Plus, LogOut,
+  FileText, MessageCircle, Wifi, Plus, LogOut, GraduationCap,
 } from 'lucide-react'
 import Image from 'next/image'
 import { useAuth } from '@/lib/auth-context'
@@ -15,6 +15,7 @@ const NAV = [
   { href: '/courses',         icon: BookOpen,         label: 'הקורסים שלי' },
   { href: '/tasks',           icon: CheckSquare,      label: 'משימות' },
   { href: '/assignments',     icon: FileText,         label: 'מטלות' },
+  { href: '/credits',         icon: GraduationCap,    label: "מעקב נק\"ז" },
   { href: '/study-buddy',     icon: MessageCircle,    label: 'עוזר הלימוד' },
   { href: '/bgu-connect',     icon: Wifi,             label: 'חיבור BGU' },
 ]

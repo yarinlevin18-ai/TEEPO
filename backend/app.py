@@ -11,6 +11,7 @@ from flask_cors import CORS
 from config import FLASK_SECRET_KEY, FLASK_ENV, IS_PRODUCTION, BGU_USERNAME, BGU_PASSWORD, logger
 from routes.api import api
 from routes.bgu import bgu, _login_status
+from routes.catalog import catalog
 from routes.websocket import register_socket_events
 
 _start_time = _time.time()
@@ -48,6 +49,7 @@ socketio = SocketIO(
 # Register REST routes
 app.register_blueprint(api)
 app.register_blueprint(bgu)
+app.register_blueprint(catalog)
 
 # Register WebSocket events
 register_socket_events(socketio)

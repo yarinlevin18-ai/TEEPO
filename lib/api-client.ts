@@ -138,4 +138,28 @@ export const api = {
     saveDegree: (data: Record<string, any>) =>
       request<any>('/api/bgu/degree', { method: 'POST', body: JSON.stringify(data) }),
   },
+
+  catalog: {
+    departments: () => request<any[]>('/api/catalog/departments'),
+    tracks: () => request<any[]>('/api/catalog/tracks'),
+    track: (id: string) => request<any>(`/api/catalog/tracks/${id}`),
+    searchCourses: (q: string, dept?: string, track?: string) => {
+      const params = new URLSearchParams()
+      if (q) params.set('q', q)
+      if (dept) params.set('dept', dept)
+      if (track) params.set('track', track)
+      return request<any[]>(`/api/catalog/courses?${params}`)
+    },
+    profile: () => request<any>('/api/catalog/profile'),
+    saveProfile: (data: Record<string, any>) =>
+      request<any>('/api/catalog/profile', { method: 'POST', body: JSON.stringify(data) }),
+    myCourses: () => request<any[]>('/api/catalog/my-courses'),
+    addCourse: (data: Record<string, any>) =>
+      request<any>('/api/catalog/my-courses', { method: 'POST', body: JSON.stringify(data) }),
+    addCoursesBulk: (courses: any[]) =>
+      request<any>('/api/catalog/my-courses/bulk', { method: 'POST', body: JSON.stringify({ courses }) }),
+    removeCourse: (courseId: string) =>
+      request<any>(`/api/catalog/my-courses/${courseId}`, { method: 'DELETE' }),
+    credits: () => request<any>('/api/catalog/credits'),
+  },
 }

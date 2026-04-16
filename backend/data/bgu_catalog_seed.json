@@ -1,0 +1,857 @@
+{
+  "metadata": {
+    "source": "BGU Shnaton 2024-2025 (תשפ\"ה)",
+    "generated": "2026-04-17",
+    "description": "Complete course catalog for Entrepreneurship & Innovation (689) and Politics & Government (138) dual-track program at Ben-Gurion University"
+  },
+  "departments": [
+    {
+      "id": "entrepreneurship",
+      "name": "יזמות וחדשנות",
+      "name_en": "Entrepreneurship and Innovation",
+      "faculty": "הפקולטה לניהול",
+      "faculty_en": "Faculty of Management",
+      "program_code": "689"
+    },
+    {
+      "id": "politics",
+      "name": "פוליטיקה וממשל",
+      "name_en": "Politics and Government",
+      "faculty": "הפקולטה למדעי הרוח והחברה",
+      "faculty_en": "Faculty of Humanities and Social Sciences",
+      "program_code": "138"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "yz_politics",
+      "name": "יזמות וחדשנות + פוליטיקה וממשל",
+      "name_en": "Entrepreneurship & Innovation + Politics & Government",
+      "departments": ["entrepreneurship", "politics"],
+      "total_credits": 120,
+      "yz_mandatory_credits": 52.5,
+      "yz_elective_credits": 6,
+      "yz_credits": 58.5,
+      "politics_credits": 59.5,
+      "university_requirements_credits": 2,
+      "type": "dual",
+      "notes": "שאר רו\"ח - אנגלית מתקדמים 2 נק\"ז, הדרכה בספריה 0 נק\"ז, לומדה למניעת הטרדה מינית 0 נק\"ז"
+    }
+  ],
+  "courses": [
+    {
+      "course_id": "68110279",
+      "name": "Computer Applications in Management",
+      "name_he": "יישומי מחשב בניהול",
+      "credits": 0.5,
+      "department": "entrepreneurship",
+      "year": 1,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 1,
+        "tutorial": 0,
+        "total": 1
+      },
+      "format": "סדנא",
+      "prerequisites": []
+    },
+    {
+      "course_id": "68910001",
+      "name": "Introduction to Entrepreneurship",
+      "name_he": "מבוא ליזמות",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": 1,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 0,
+        "total": 3
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68110036",
+      "name": "Introduction to Statistics for Management",
+      "name_he": "מבוא לסטטיסטיקה לניהול",
+      "credits": 4.0,
+      "department": "entrepreneurship",
+      "year": 1,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 2,
+        "total": 5
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68110280",
+      "name": "Introduction to Economics for Management",
+      "name_he": "מבוא לכלכלה לניהול",
+      "credits": 4.0,
+      "department": "entrepreneurship",
+      "year": 1,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 2,
+        "total": 5
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68910002",
+      "name": "Accounting and Finance",
+      "name_he": "חשבונאות ומימון",
+      "credits": 4.0,
+      "department": "entrepreneurship",
+      "year": 1,
+      "semester": "ב",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 2,
+        "total": 5
+      },
+      "prerequisites": ["68110036", "68110280"]
+    },
+    {
+      "course_id": "68910003",
+      "name": "Marketing and Strategy",
+      "name_he": "שיווק ואסטרטגיה",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": 1,
+      "semester": "ב",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 0,
+        "total": 3
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68110024",
+      "name": "Data Analysis for Managers",
+      "name_he": "ניתוח נתונים למנהלים",
+      "credits": 4.0,
+      "department": "entrepreneurship",
+      "year": 1,
+      "semester": "ב",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 2,
+        "total": 5
+      },
+      "prerequisites": ["68110036"]
+    },
+    {
+      "course_id": "68110058",
+      "name": "Market Research",
+      "name_he": "חקר שווקים",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": 2,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 1,
+        "total": 4
+      },
+      "prerequisites": ["68110036", "68110002"]
+    },
+    {
+      "course_id": "68910004",
+      "name": "Intra-Organizational Innovation",
+      "name_he": "חדשנות פנים ארגונית",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": 2,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 0,
+        "total": 3
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68110252",
+      "name": "High-Tech Entrepreneurship",
+      "name_he": "יזמות הייטק",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": 2,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 0,
+        "total": 3
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68910005",
+      "name": "Law for Entrepreneurs and Managers",
+      "name_he": "משפט ליזמים ולמנהלים",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": 2,
+      "semester": "ב",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 0,
+        "total": 3
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68110288",
+      "name": "Entrepreneurship, Society and Environment",
+      "name_he": "יזמות חברה וסביבה",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": 2,
+      "semester": "ב",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 0,
+        "total": 3
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68110304",
+      "name": "Social Entrepreneurship",
+      "name_he": "יזמות חברתית",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": 2,
+      "semester": "ב",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 0,
+        "total": 3
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68910006",
+      "name": "Ethics in Entrepreneurship and Responsibility in Innovation",
+      "name_he": "אתיקה ביזמות ואחריות בחדשנות",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": 3,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 0,
+        "total": 3
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68910007",
+      "name": "Issues in Innovation and Entrepreneurship Finance",
+      "name_he": "סוגיות במימון חדשנות ויזמות",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": 3,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 0,
+        "total": 3
+      },
+      "prerequisites": ["68910002"]
+    },
+    {
+      "course_id": "68110185",
+      "name": "Capstone Project A - Technological Entrepreneurship - Social Impact",
+      "name_he": "פרויקט מסכם א' - יזמות טכנולוגית - אימפקט חברתי",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": 3,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 0,
+        "total": 3
+      },
+      "prerequisites": ["completed_year_a_b"],
+      "prerequisites_note": "סיים חובות שנה א' + ב'"
+    },
+    {
+      "course_id": "68110285",
+      "name": "Capstone Project B - Technological Entrepreneurship - Social Impact",
+      "name_he": "פרויקט מסכם ב' - יזמות טכנולוגית - אימפקט חברתי",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": 3,
+      "semester": "ב",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 0,
+        "total": 3
+      },
+      "prerequisites": ["68110185"]
+    },
+    {
+      "course_id": "68110291",
+      "name": "Introduction to Data Science - Python and Tableau",
+      "name_he": "מבוא ל-Data Science - פייטון וטאבלו",
+      "credits": 3.0,
+      "department": "entrepreneurship",
+      "year": null,
+      "semester": null,
+      "type": "elective",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 3,
+        "tutorial": 0,
+        "total": 3
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68110289",
+      "name": "Innovation Management",
+      "name_he": "ניהול חדשנות",
+      "credits": 2.0,
+      "department": "entrepreneurship",
+      "year": null,
+      "semester": null,
+      "type": "elective",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 0,
+        "total": 2
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68111003",
+      "name": "Technological Thinking for Managers",
+      "name_he": "חשיבה טכנולוגית למנהלים",
+      "credits": 2.0,
+      "department": "entrepreneurship",
+      "year": null,
+      "semester": null,
+      "type": "elective",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 0,
+        "total": 2
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68110254",
+      "name": "International Entrepreneurship Workshop",
+      "name_he": "סדנא בינ''ל ביזמות",
+      "credits": 2.0,
+      "department": "entrepreneurship",
+      "year": null,
+      "semester": null,
+      "type": "elective",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 0,
+        "total": 2
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68110290",
+      "name": "The Entrepreneurial Arena in Development",
+      "name_he": "הזירה היזמית בפיתוח",
+      "credits": 2.0,
+      "department": "entrepreneurship",
+      "year": null,
+      "semester": null,
+      "type": "elective",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 0,
+        "total": 2
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68110292",
+      "name": "Innovation in the Public Sector",
+      "name_he": "חדשנות במגזר הציבורי",
+      "credits": 2.0,
+      "department": "entrepreneurship",
+      "year": null,
+      "semester": null,
+      "type": "elective",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 0,
+        "total": 2
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "68110293",
+      "name": "360 Entrepreneurship Leadership",
+      "name_he": "הובלת יזמות 360",
+      "credits": 2.0,
+      "department": "entrepreneurship",
+      "year": null,
+      "semester": null,
+      "type": "elective",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 0,
+        "total": 2
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "1381026101",
+      "name": "Introduction to Politics and Government",
+      "name_he": "מבוא לפוליטיקה וממשל",
+      "credits": 4.0,
+      "department": "politics",
+      "year": 1,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 2,
+        "total": 4
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "1381013101",
+      "name": "Introduction to Political Thought",
+      "name_he": "מבוא למחשבה פוליטית",
+      "credits": 4.0,
+      "department": "politics",
+      "year": 1,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 2,
+        "total": 4
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "1381017101",
+      "name": "Historical Introduction to Contemporary Politics",
+      "name_he": "מבוא היסטורי לפוליטיקה בת זמננו",
+      "credits": 4.0,
+      "department": "politics",
+      "year": 1,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 2,
+        "total": 4
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "12911021",
+      "name": "Introduction to Quantitative Research Methods in Social Sciences",
+      "name_he": "מבוא לשיטות מחקר כמותיות במדעי החברה",
+      "credits": 4.0,
+      "department": "politics",
+      "year": 1,
+      "semester": "ב",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 2,
+        "total": 4
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "1381012101",
+      "name": "The Political System in Israel",
+      "name_he": "המערכת הפוליטית בישראל",
+      "credits": 4.0,
+      "department": "politics",
+      "year": 1,
+      "semester": "ב",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 2,
+        "total": 4
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "1381015101",
+      "name": "Introduction to Approaches in Political Research",
+      "name_he": "מבוא לגישות במחקר הפוליטי",
+      "credits": 4.0,
+      "department": "politics",
+      "year": 2,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 2,
+        "total": 4
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "1381024101",
+      "name": "Introduction to International Relations",
+      "name_he": "מבוא ליחסים בינלאומיים",
+      "credits": 4.0,
+      "department": "politics",
+      "year": 2,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 2,
+        "total": 4
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "1381029101",
+      "name": "Introduction to Comparative Politics",
+      "name_he": "מבוא לפוליטיקה השוואתית",
+      "credits": 4.0,
+      "department": "politics",
+      "year": 2,
+      "semester": "ב",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 2,
+        "total": 4
+      },
+      "prerequisites": []
+    },
+    {
+      "course_id": "1381090101",
+      "name": "Seminar in Politics and Government",
+      "name_he": "סמינריון בפוליטיקה וממשל",
+      "credits": 4.0,
+      "department": "politics",
+      "year": 3,
+      "semester": "א",
+      "type": "mandatory",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 0,
+        "total": 2
+      },
+      "prerequisites": [],
+      "notes": "סמינריון - נבחר מתוך הרשימה המוצעת"
+    },
+    {
+      "course_id": "1380000001",
+      "name": "Politics Elective Course 1",
+      "name_he": "קורס בחירה בפוליטיקה 1",
+      "credits": 4.0,
+      "department": "politics",
+      "year": 2,
+      "semester": "ב",
+      "type": "elective",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 2,
+        "total": 4
+      },
+      "prerequisites": [],
+      "notes": "קורס בחירה - נבחר מתוך רשימת הקורסים המוצעים ע\"י החוג לפוליטיקה וממשל"
+    },
+    {
+      "course_id": "1380000002",
+      "name": "Politics Elective Course 2",
+      "name_he": "קורס בחירה בפוליטיקה 2",
+      "credits": 4.0,
+      "department": "politics",
+      "year": 3,
+      "semester": "א",
+      "type": "elective",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 2,
+        "total": 4
+      },
+      "prerequisites": [],
+      "notes": "קורס בחירה - נבחר מתוך רשימת הקורסים המוצעים ע\"י החוג לפוליטיקה וממשל"
+    },
+    {
+      "course_id": "1380000003",
+      "name": "Politics Elective Course 3",
+      "name_he": "קורס בחירה בפוליטיקה 3",
+      "credits": 4.0,
+      "department": "politics",
+      "year": 3,
+      "semester": "ב",
+      "type": "elective",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 2,
+        "total": 4
+      },
+      "prerequisites": [],
+      "notes": "קורס בחירה - נבחר מתוך רשימת הקורסים המוצעים ע\"י החוג לפוליטיקה וממשל"
+    },
+    {
+      "course_id": "1380000004",
+      "name": "Politics Elective Course 4",
+      "name_he": "קורס בחירה בפוליטיקה 4",
+      "credits": 3.5,
+      "department": "politics",
+      "year": 3,
+      "semester": "ב",
+      "type": "elective",
+      "tracks": ["yz_politics"],
+      "weekly_hours": {
+        "lecture": 2,
+        "tutorial": 0,
+        "total": 2
+      },
+      "prerequisites": [],
+      "notes": "קורס בחירה - נבחר מתוך רשימת הקורסים המוצעים ע\"י החוג לפוליטיקה וממשל"
+    }
+  ],
+  "degree_requirements": {
+    "yz_politics": {
+      "university_requirements": [
+        {
+          "name": "הדרכה בספריה",
+          "name_en": "Library Orientation",
+          "credits": 0,
+          "mandatory": true
+        },
+        {
+          "name": "לומדה למניעת הטרדה מינית",
+          "name_en": "Sexual Harassment Prevention",
+          "credits": 0,
+          "mandatory": true
+        },
+        {
+          "name": "אנגלית מתקדמים 2",
+          "name_en": "Advanced English 2",
+          "credits": 2,
+          "mandatory": true
+        }
+      ],
+      "yz_requirements": {
+        "mandatory_credits": 52.5,
+        "elective_credits": 6,
+        "total_credits": 58.5,
+        "year_breakdown": {
+          "year_1_sem_a": {
+            "courses": ["68110279", "68910001", "68110036", "68110280"],
+            "total_credits": 11.5
+          },
+          "year_1_sem_b": {
+            "courses": ["68910002", "68910003", "68110024"],
+            "total_credits": 11
+          },
+          "year_2_sem_a": {
+            "courses": ["68110058", "68910004", "68110252"],
+            "total_credits": 9
+          },
+          "year_2_sem_b": {
+            "courses": ["68910005", "68110288", "68110304"],
+            "total_credits": 9
+          },
+          "year_3_sem_a": {
+            "courses": ["68910006", "68910007", "68110185"],
+            "mandatory_credits": 9,
+            "elective_credits": 2,
+            "total_credits": 11,
+            "notes": "כולל קורס בחירה אחד בניהול (2 נק\"ז)"
+          },
+          "year_3_sem_b": {
+            "courses": ["68110285"],
+            "mandatory_credits": 3,
+            "elective_credits": 4,
+            "total_credits": 7,
+            "notes": "כולל קורסי בחירה ביזמות וחדשנות (4 נק\"ז)"
+          }
+        }
+      },
+      "politics_requirements": {
+        "mandatory_credits": 32,
+        "seminar_credits": 4,
+        "elective_credits": 23.5,
+        "total_credits": 59.5,
+        "mandatory_courses": [
+          "1381026101",
+          "1381013101",
+          "1381017101",
+          "12911021",
+          "1381012101",
+          "1381015101",
+          "1381024101",
+          "1381029101"
+        ],
+        "seminar_courses": ["1381090101"],
+        "elective_slots": ["1380000001", "1380000002", "1380000003", "1380000004"]
+      },
+      "total_degree_credits": 120,
+      "notes": [
+        "ההרשמה לקורסים מותנית בעמידה בדרישות הקדם",
+        "אין להירשם לקורסים החופפים בזמן (מלא או חלקי)",
+        "לא ניתן ללמוד קורסי בחירה מפקולטות אחרות",
+        "במידה ודרישת הקדם לקורס מסוים לא נלמדת במחלקה לניהול, על הסטודנטים להשלים את הקורס המקביל במחלקה הנוספת"
+      ]
+    }
+  },
+  "prerequisite_map": {
+    "68910002": {
+      "course_name": "חשבונאות ומימון",
+      "requires": ["68110036", "68110280"],
+      "requires_names": ["מבוא לסטטיסטיקה לניהול", "מבוא לכלכלה לניהול"]
+    },
+    "68110024": {
+      "course_name": "ניתוח נתונים למנהלים",
+      "requires": ["68110036"],
+      "requires_names": ["מבוא לסטטיסטיקה לניהול"]
+    },
+    "68110058": {
+      "course_name": "חקר שווקים",
+      "requires": ["68110036", "68110002"],
+      "requires_names": ["מבוא לסטטיסטיקה לניהול", "חשבונאות ומימון"]
+    },
+    "68910007": {
+      "course_name": "סוגיות במימון חדשנות ויזמות",
+      "requires": ["68910002"],
+      "requires_names": ["חשבונאות ומימון"]
+    },
+    "68110185": {
+      "course_name": "פרויקט מסכם א' - יזמות טכנולוגית - אימפקט חברתי",
+      "requires": ["completed_year_a_b"],
+      "requires_names": ["סיום חובות שנה א' + ב'"]
+    },
+    "68110285": {
+      "course_name": "פרויקט מסכם ב' - יזמות טכנולוגית - אימפקט חברתי",
+      "requires": ["68110185"],
+      "requires_names": ["פרויקט מסכם א'"]
+    }
+  },
+  "semester_plan": {
+    "yz_politics": [
+      {
+        "year": 1,
+        "semester": "א",
+        "yz_courses": ["68110279", "68910001", "68110036", "68110280"],
+        "politics_courses": ["1381026101", "1381013101", "1381017101"],
+        "yz_credits": 11.5,
+        "politics_credits": 12,
+        "total_credits": 23.5
+      },
+      {
+        "year": 1,
+        "semester": "ב",
+        "yz_courses": ["68910002", "68910003", "68110024"],
+        "politics_courses": ["12911021", "1381012101"],
+        "yz_credits": 11,
+        "politics_credits": 8,
+        "total_credits": 19
+      },
+      {
+        "year": 2,
+        "semester": "א",
+        "yz_courses": ["68110058", "68910004", "68110252"],
+        "politics_courses": ["1381015101", "1381024101"],
+        "yz_credits": 9,
+        "politics_credits": 8,
+        "total_credits": 17
+      },
+      {
+        "year": 2,
+        "semester": "ב",
+        "yz_courses": ["68910005", "68110288", "68110304"],
+        "politics_courses": ["1381029101", "1380000001"],
+        "yz_credits": 9,
+        "politics_credits": 8,
+        "total_credits": 17
+      },
+      {
+        "year": 3,
+        "semester": "א",
+        "yz_courses": ["68910006", "68910007", "68110185"],
+        "yz_electives_credits": 2,
+        "politics_courses": ["1381090101", "1380000002"],
+        "yz_credits": 11,
+        "politics_credits": 8,
+        "total_credits": 19
+      },
+      {
+        "year": 3,
+        "semester": "ב",
+        "yz_courses": ["68110285"],
+        "yz_electives_credits": 4,
+        "politics_courses": ["1380000003", "1380000004"],
+        "yz_credits": 7,
+        "politics_credits": 7.5,
+        "total_credits": 14.5
+      }
+    ]
+  }
+}
