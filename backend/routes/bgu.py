@@ -148,6 +148,29 @@ def sync_all():
         return jsonify({"status": "error", "message": f"שגיאה בסנכרון: {str(e)}"}), 500
 
 
+@bgu.get("/debug")
+def debug_status():
+    """Full diagnostic — check Supabase connection, cookie store, and scraper."""
+    info = {"is_server": bgu_scraper.IS_SERVER, "tables": {}, "cookies": {}, "errors": []}
+
+    # Check Supabase tables
+    for table in ("bgu_sessions", "courses", "assignments", "study_tasks"):
+        try:
+            from services.supabase_client import get_client
+            result = get_client().table(table).select("*", count="exact").limit(1).execute()
+            info["tables"][table] = "✓ exists"
+        except Exception as e:
+            info["tables"][table] = f"✗ {str(e)[:80]}"
+            info["errors"].append(f"{table}: {e}")
+
+    # Check cookies in store
+    for site in ("moodle", "portal"):
+        cookies = bgu_scraper._load_cookies_from_store(site)
+        info["cookies"][site] = f"{len(cookies)} cookies" if cookies else "none"
+
+    return jsonify(info)
+
+
 @bgu.get("/courses")
 def get_bgu_courses():
     """Get live course list from Moodle."""

@@ -37,43 +37,56 @@ PORTAL_URL = "https://my.bgu.ac.il"
 # --------------------------------------------------------------------------- #
 
 def _save_cookies_to_store(site: str, cookies: list):
-    """Save cookies — Supabase on server, local file in dev."""
-    if IS_SERVER:
-        try:
-            from services.supabase_client import get_client
-            from datetime import datetime as _dt
-            get_client().table("bgu_sessions").upsert({
-                "site": site,
-                "cookies": json.dumps(cookies),
-                "updated_at": _dt.utcnow().isoformat(),
-            }, on_conflict="site").execute()
-            print(f"[BGU] Cookies saved to Supabase for {site}")
-        except Exception as e:
-            print(f"[BGU] Warning: could not save cookies to Supabase: {e}")
-    else:
-        filepath = MOODLE_COOKIES_FILE if site == "moodle" else PORTAL_COOKIES_FILE
+    """Save cookies to BOTH local file and Supabase for maximum persistence."""
+    from datetime import datetime as _dt
+
+    # Always save to local file (fast, works in dev)
+    filepath = MOODLE_COOKIES_FILE if site == "moodle" else PORTAL_COOKIES_FILE
+    try:
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(cookies, f, ensure_ascii=False, indent=2)
-        print(f"[BGU] Cookies saved to file for {site}")
+        print(f"[BGU] Cookies saved to local file for {site}")
+    except Exception as e:
+        print(f"[BGU] Warning: could not save cookies to file: {e}")
+
+    # Also save to Supabase (persists across Render restarts)
+    try:
+        from services.supabase_client import get_client
+        get_client().table("bgu_sessions").upsert({
+            "site": site,
+            "cookies": json.dumps(cookies),
+            "updated_at": _dt.utcnow().isoformat(),
+        }, on_conflict="site").execute()
+        print(f"[BGU] Cookies saved to Supabase for {site}")
+    except Exception as e:
+        print(f"[BGU] Warning: could not save cookies to Supabase: {e}")
 
 
 def _load_cookies_from_store(site: str) -> Optional[list]:
-    """Load cookies — Supabase on server, local file in dev."""
-    if IS_SERVER:
+    """Load cookies — try Supabase first (persists restarts), fall back to local file."""
+    # Try Supabase first
+    try:
+        from services.supabase_client import get_client
+        result = get_client().table("bgu_sessions").select("cookies").eq("site", site).execute()
+        if result.data:
+            print(f"[BGU] Cookies loaded from Supabase for {site}")
+            return json.loads(result.data[0]["cookies"])
+    except Exception as e:
+        print(f"[BGU] Warning: could not load cookies from Supabase: {e}")
+
+    # Fall back to local file
+    filepath = MOODLE_COOKIES_FILE if site == "moodle" else PORTAL_COOKIES_FILE
+    if filepath.exists():
         try:
-            from services.supabase_client import get_client
-            result = get_client().table("bgu_sessions").select("cookies").eq("site", site).execute()
-            if result.data:
-                return json.loads(result.data[0]["cookies"])
+            with open(filepath, encoding="utf-8") as f:
+                cookies = json.load(f)
+            print(f"[BGU] Cookies loaded from local file for {site}")
+            return cookies
         except Exception as e:
-            print(f"[BGU] Warning: could not load cookies from Supabase: {e}")
-        return None
-    else:
-        filepath = MOODLE_COOKIES_FILE if site == "moodle" else PORTAL_COOKIES_FILE
-        if not filepath.exists():
-            return None
-        with open(filepath, encoding="utf-8") as f:
-            return json.load(f)
+            print(f"[BGU] Warning: could not load cookies from file: {e}")
+
+    print(f"[BGU] No cookies found for {site}")
+    return None
 
 
 # Keep local file helpers for Selenium callback

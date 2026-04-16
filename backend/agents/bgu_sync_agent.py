@@ -36,15 +36,29 @@ class BGUSyncAgent(BaseStudyAgent):
 
     def _sync_all(self, user_id: str) -> Dict:
         results = {}
+        errors = []
 
         # Sync Moodle courses
-        courses_result = self._sync_courses(user_id)
-        results["courses"] = courses_result
+        try:
+            courses_result = self._sync_courses(user_id)
+            results["courses"] = courses_result
+        except Exception as e:
+            errors.append(f"courses: {e}")
+            courses_result = {"count": 0}
+
+        total = courses_result.get("count", 0)
+        scraped = len(courses_result.get("courses", []))
+
+        msg = f"נמצאו {scraped} קורסים ב-Moodle"
+        if total > 0:
+            msg += f", נשמרו {total} בבסיס הנתונים"
+        if errors:
+            msg += f" (שגיאות: {'; '.join(errors)})"
 
         return {
             "status": "success",
             "synced": results,
-            "message": f"סונכרנו {courses_result.get('count', 0)} קורסים מ-Moodle",
+            "message": msg,
         }
 
     def _sync_courses(self, user_id: str) -> Dict:
@@ -54,6 +68,7 @@ class BGUSyncAgent(BaseStudyAgent):
 
         courses = result.get("courses", [])
         saved = 0
+        db_errors = []
 
         for course in courses:
             course_id = str(uuid.uuid4())
@@ -62,8 +77,8 @@ class BGUSyncAgent(BaseStudyAgent):
                     "id": course_id,
                     "user_id": user_id,
                     "title": course["title"],
-                    "source": "udemy",          # reuse field, BGU = custom
-                    "source_url": course["url"],
+                    "source": "bgu",
+                    "source_url": course.get("url", ""),
                     "description": f"קורס BGU - {course['title']}",
                     "status": "active",
                 })
@@ -71,12 +86,20 @@ class BGUSyncAgent(BaseStudyAgent):
 
                 # Sync assignments for this course
                 if course.get("url"):
-                    self._sync_assignments(user_id, course["url"], course_id)
+                    try:
+                        self._sync_assignments(user_id, course["url"], course_id)
+                    except Exception:
+                        pass
 
-            except Exception:
-                pass  # Course might already exist (unique constraint)
+            except Exception as e:
+                db_errors.append(str(e))
 
-        return {"status": "success", "count": saved, "courses": courses}
+        return {
+            "status": "success",
+            "count": saved,
+            "courses": courses,
+            "db_errors": db_errors[:3] if db_errors else [],  # first 3 errors for debug
+        }
 
     def _sync_assignments(self, user_id: str, course_url: str, course_id: str = None) -> Dict:
         result = bgu_scraper.scrape_course_assignments(course_url)
@@ -95,6 +118,7 @@ class BGUSyncAgent(BaseStudyAgent):
                     "description": f"מקור: {a.get('url', '')}",
                     "status": "todo",
                     "priority": "medium",
+                    "deadline": None,
                 }
                 if course_id:
                     data["course_id"] = course_id
