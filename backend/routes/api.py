@@ -28,8 +28,12 @@ def _user_id():
 
 @api.get("/courses")
 def list_courses():
-    result = db.get_courses(_user_id())
-    return jsonify(result.data)
+    try:
+        result = db.get_courses(_user_id())
+        return jsonify(result.data or [])
+    except Exception as e:
+        print(f"[courses] DB error: {e}")
+        return jsonify([])
 
 
 @api.post("/courses/extract")
@@ -81,9 +85,13 @@ def extract_course():
 
 @api.get("/tasks")
 def list_tasks():
-    date = request.args.get("date")
-    result = db.get_tasks(_user_id(), date)
-    return jsonify(result.data)
+    try:
+        date = request.args.get("date")
+        result = db.get_tasks(_user_id(), date)
+        return jsonify(result.data or [])
+    except Exception as e:
+        print(f"[tasks] DB error: {e}")
+        return jsonify([])
 
 
 @api.post("/tasks")
@@ -114,8 +122,12 @@ def delete_task(task_id):
 
 @api.get("/assignments")
 def list_assignments():
-    result = db.get_assignments(_user_id())
-    return jsonify(result.data)
+    try:
+        result = db.get_assignments(_user_id())
+        return jsonify(result.data or [])
+    except Exception as e:
+        print(f"[assignments] DB error: {e}")
+        return jsonify([])
 
 
 @api.post("/assignments/breakdown")

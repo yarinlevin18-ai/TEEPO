@@ -376,60 +376,121 @@ def is_session_valid(site: str = "moodle") -> bool:
 # --------------------------------------------------------------------------- #
 
 def scrape_moodle_courses() -> dict:
-    """Scrape all enrolled courses from Moodle."""
+    """Scrape all enrolled courses from Moodle using AJAX API + HTML fallback."""
     cookies = _load_cookies_from_store("moodle")
     if not cookies:
         return {"status": "error", "message": "לא מחובר ל-Moodle. אנא התחבר תחילה."}
 
     session = _build_session(cookies)
+    courses = []
 
+    # ── Strategy 1: Moodle AJAX service API (most reliable for Moodle 4.x) ──
     try:
+        # Get sesskey from dashboard page
         resp = session.get(f"{MOODLE_URL}/my/", timeout=15)
-        soup = BeautifulSoup(resp.text, "html.parser")
+        sesskey_match = re.search(r'"sesskey"\s*:\s*"([^"]+)"', resp.text)
+        if not sesskey_match:
+            sesskey_match = re.search(r'sesskey=([a-zA-Z0-9]+)', resp.text)
+        sesskey = sesskey_match.group(1) if sesskey_match else None
 
-        courses = []
+        if sesskey:
+            ajax_url = f"{MOODLE_URL}/lib/ajax/service.php?sesskey={sesskey}&info=core_course_get_enrolled_courses_by_timeline_classification"
+            payload = [{
+                "index": 0,
+                "methodname": "core_course_get_enrolled_courses_by_timeline_classification",
+                "args": {
+                    "offset": 0,
+                    "limit": 0,
+                    "classification": "all",
+                    "sort": "fullname",
+                    "customfieldname": "",
+                    "customfieldvalue": "",
+                }
+            }]
+            ajax_resp = session.post(ajax_url, json=payload, timeout=15)
+            data = ajax_resp.json()
 
-        course_items = (
-            soup.find_all("div", {"data-region": "course-content"})
-            or soup.find_all("div", class_=re.compile(r"coursename|course-title", re.I))
-            or soup.find_all("h3", class_=re.compile(r"coursename", re.I))
-            or soup.find_all("a", {"data-type": "course"})
-        )
+            if isinstance(data, list) and data and data[0].get("error") is False:
+                for course in data[0].get("data", {}).get("courses", []):
+                    courses.append({
+                        "title": course.get("fullname", ""),
+                        "url": course.get("viewurl", ""),
+                        "moodle_id": str(course.get("id", "")),
+                        "summary": course.get("summary", ""),
+                    })
+                print(f"[BGU] AJAX API found {len(courses)} courses")
+    except Exception as e:
+        print(f"[BGU] AJAX strategy failed: {e}")
 
-        for item in course_items:
-            link = item if item.name == "a" else item.find("a")
-            if not link:
-                continue
-            href = link.get("href", "")
-            if "course/view.php" not in href:
-                continue
-            title = link.get_text(strip=True)
-            course_id = re.search(r"id=(\d+)", href)
-            courses.append({
-                "title": title,
-                "url": href if href.startswith("http") else f"{MOODLE_URL}{href}",
-                "moodle_id": course_id.group(1) if course_id else None,
-            })
+    # ── Strategy 2: Scan ALL <a> tags for course/view.php links ──────────────
+    if not courses:
+        try:
+            resp = session.get(f"{MOODLE_URL}/my/", timeout=15)
+            soup = BeautifulSoup(resp.text, "html.parser")
+            seen_ids = set()
 
-        if not courses:
-            resp2 = session.get(f"{MOODLE_URL}/course/", timeout=15)
-            soup2 = BeautifulSoup(resp2.text, "html.parser")
-            for a in soup2.find_all("a", href=re.compile(r"course/view\.php\?id=\d+")):
+            for a in soup.find_all("a", href=True):
+                href = a["href"]
+                if "course/view.php" not in href:
+                    continue
+                course_id_match = re.search(r"id=(\d+)", href)
+                if not course_id_match:
+                    continue
+                cid = course_id_match.group(1)
+                if cid in seen_ids:
+                    continue
+                seen_ids.add(cid)
+                title = a.get_text(strip=True)
+                if not title or len(title) < 3:
+                    # Try parent element text
+                    title = a.find_parent().get_text(strip=True)[:100] if a.find_parent() else title
+                if title and len(title) > 2:
+                    courses.append({
+                        "title": title,
+                        "url": href if href.startswith("http") else f"{MOODLE_URL}{href}",
+                        "moodle_id": cid,
+                    })
+            print(f"[BGU] HTML scan found {len(courses)} courses")
+        except Exception as e:
+            print(f"[BGU] HTML strategy failed: {e}")
+
+    # ── Strategy 3: /course/ index page ──────────────────────────────────────
+    if not courses:
+        try:
+            resp3 = session.get(f"{MOODLE_URL}/course/index.php", timeout=15)
+            soup3 = BeautifulSoup(resp3.text, "html.parser")
+            seen_ids = set()
+            for a in soup3.find_all("a", href=re.compile(r"course/view\.php\?id=\d+")):
+                href = a["href"]
+                cid_match = re.search(r"id=(\d+)", href)
+                if not cid_match:
+                    continue
+                cid = cid_match.group(1)
+                if cid in seen_ids:
+                    continue
+                seen_ids.add(cid)
                 title = a.get_text(strip=True)
                 if title and len(title) > 2:
-                    href = a["href"]
-                    course_id = re.search(r"id=(\d+)", href)
-                    if not any(c["url"] == href for c in courses):
-                        courses.append({
-                            "title": title,
-                            "url": href if href.startswith("http") else f"{MOODLE_URL}{href}",
-                            "moodle_id": course_id.group(1) if course_id else None,
-                        })
+                    courses.append({
+                        "title": title,
+                        "url": href if href.startswith("http") else f"{MOODLE_URL}{href}",
+                        "moodle_id": cid,
+                    })
+            print(f"[BGU] /course/ page found {len(courses)} courses")
+        except Exception as e:
+            print(f"[BGU] /course/ strategy failed: {e}")
 
-        return {"status": "success", "courses": courses, "count": len(courses)}
+    # Deduplicate by moodle_id
+    seen = set()
+    unique = []
+    for c in courses:
+        key = c.get("moodle_id") or c.get("url")
+        if key not in seen:
+            seen.add(key)
+            unique.append(c)
 
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    print(f"[BGU] Total unique courses found: {len(unique)}")
+    return {"status": "success", "courses": unique, "count": len(unique)}
 
 
 def scrape_course_assignments(course_url: str) -> dict:
