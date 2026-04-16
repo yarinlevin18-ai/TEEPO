@@ -86,6 +86,14 @@ async function getCookiesForSite(urls) {
       }
     }
   }
+  // Debug: if nothing found by URL, try getting ALL cookies and filter manually
+  if (all.length === 0) {
+    const allCookies = await chrome.cookies.getAll({})
+    const bguCookies = allCookies.filter(c =>
+      c.domain.includes('bgu.ac.il') || c.domain.includes('moodle')
+    )
+    return bguCookies
+  }
   return all
 }
 
@@ -101,8 +109,10 @@ async function syncSite(site) {
     const { urls } = SITES[site]
     const cookies = await getCookiesForSite(urls)
 
+    // Debug info
+    const allCount = (await chrome.cookies.getAll({})).length
     if (cookies.length === 0) {
-      showToast(`לא נמצאו cookies של ${site}. פתח את האתר והתחבר תחילה.`, 'error')
+      showToast(`0 cookies של ${site} (סה"כ ${allCount} cookies בדפדפן). נסה להסיר ולהוסיף מחדש את התוסף.`, 'error')
       btn.disabled = false
       btn.textContent = 'שלח Session ל-App'
       return
