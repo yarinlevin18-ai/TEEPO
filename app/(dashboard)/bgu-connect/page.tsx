@@ -7,6 +7,7 @@ import {
   CheckCircle, Loader2, BookOpen, Calendar, ExternalLink, Puzzle,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import GlowCard from '@/components/ui/GlowCard'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -116,7 +117,8 @@ export default function BGUConnectPage() {
       </div>
 
       {/* How it works */}
-      <div className="glass p-5 text-sm space-y-2" style={{ borderColor: 'rgba(99,102,241,0.2)' }}>
+      <GlowCard glowColor="rgba(99,102,241,0.10)">
+      <div className="p-5 text-sm space-y-2">
         <p className="font-semibold gradient-text mb-3">איך זה עובד?</p>
         {serverMode ? (
           <div className="space-y-2.5">
@@ -155,6 +157,7 @@ export default function BGUConnectPage() {
           </>
         )}
       </div>
+      </GlowCard>
 
       {/* Site cards */}
       <div className="grid gap-4">
@@ -173,8 +176,9 @@ export default function BGUConnectPage() {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass p-6 space-y-4"
         >
+          <GlowCard glowColor="rgba(99,102,241,0.10)">
+          <div className="p-6 space-y-4">
           <div className="flex items-center gap-3">
             <RefreshCw size={18} style={{ color: '#818cf8' }} />
             <div>
@@ -195,6 +199,8 @@ export default function BGUConnectPage() {
               {syncResult}
             </p>
           )}
+          </div>
+          </GlowCard>
         </motion.div>
       )}
     </div>
@@ -231,9 +237,10 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
   }, [connected])
 
   return (
-    <div
-      className="glass overflow-hidden transition-all duration-300"
-      style={connected ? { boxShadow: `0 0 24px ${color}33`, borderColor: `${color}55` } : {}}
+    <GlowCard
+      className="transition-all duration-300"
+      glowColor={connected ? 'rgba(16,185,129,0.10)' : undefined}
+      style={connected ? { boxShadow: `0 0 24px ${color}33` } : {}}
     >
       {/* Main row */}
       <div className="flex items-center gap-4 p-5">
@@ -339,6 +346,6 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </GlowCard>
   )
 }

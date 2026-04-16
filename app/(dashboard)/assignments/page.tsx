@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, FileText, ChevronDown, Loader2, Sparkles } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import ErrorAlert from '@/components/ui/ErrorAlert'
+import GlowCard from '@/components/ui/GlowCard'
 import type { Assignment } from '@/types'
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
@@ -98,47 +99,50 @@ export default function AssignmentsPage() {
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
-            className="glass rounded-2xl p-6 space-y-4"
           >
-            <h2 className="font-semibold text-ink">מטלה חדשה + פירוק AI</h2>
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="שם המטלה *"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="input-dark w-full"
-              />
-              <textarea
-                placeholder="תיאור המטלה (אופציונלי)"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                rows={2}
-                className="input-dark w-full resize-none"
-              />
-              <input
-                type="date"
-                value={form.deadline}
-                onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                className="input-dark w-full"
-              />
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={breakdownAssignment}
-                disabled={!form.title || breaking}
-                className="btn-gradient flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-90"
-              >
-                {breaking ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                {breaking ? 'מפרק...' : 'פרק למשימות עם AI'}
-              </button>
-              <button
-                onClick={() => setShowAdd(false)}
-                className="px-4 py-2.5 border border-white/8 rounded-xl text-sm text-ink-muted hover:text-ink hover:border-white/10 transition-colors"
-              >
-                ביטול
-              </button>
-            </div>
+            <GlowCard>
+              <div className="p-6 space-y-4">
+                <h2 className="font-semibold text-ink">מטלה חדשה + פירוק AI</h2>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="שם המטלה *"
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    className="input-dark w-full"
+                  />
+                  <textarea
+                    placeholder="תיאור המטלה (אופציונלי)"
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    rows={2}
+                    className="input-dark w-full resize-none"
+                  />
+                  <input
+                    type="date"
+                    value={form.deadline}
+                    onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+                    className="input-dark w-full"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={breakdownAssignment}
+                    disabled={!form.title || breaking}
+                    className="btn-gradient flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-50 transition-opacity hover:opacity-90"
+                  >
+                    {breaking ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                    {breaking ? 'מפרק...' : 'פרק למשימות עם AI'}
+                  </button>
+                  <button
+                    onClick={() => setShowAdd(false)}
+                    className="px-4 py-2.5 border border-white/8 rounded-xl text-sm text-ink-muted hover:text-ink hover:border-white/10 transition-colors"
+                  >
+                    ביטול
+                  </button>
+                </div>
+              </div>
+            </GlowCard>
           </motion.div>
         )}
       </AnimatePresence>
@@ -149,21 +153,27 @@ export default function AssignmentsPage() {
           {[1, 2].map((i) => <div key={i} className="h-20 shimmer rounded-2xl" />)}
         </div>
       ) : assignments.length === 0 ? (
-        <div className="glass rounded-2xl p-12 text-center">
-          <FileText size={36} className="text-white/10 mx-auto mb-3" />
-          <p className="text-ink-muted">אין מטלות עדיין</p>
-          <button onClick={() => setShowAdd(true)} className="mt-3 text-sm text-indigo-400 hover:text-indigo-300 hover:underline transition-colors">
-            הוסף מטלה ראשונה
-          </button>
-        </div>
+        <GlowCard>
+          <div className="p-12 text-center">
+            <FileText size={36} className="text-white/10 mx-auto mb-3" />
+            <p className="text-ink-muted">אין מטלות עדיין</p>
+            <button onClick={() => setShowAdd(true)} className="mt-3 text-sm text-indigo-400 hover:text-indigo-300 hover:underline transition-colors">
+              הוסף מטלה ראשונה
+            </button>
+          </div>
+        </GlowCard>
       ) : (
         <div className="space-y-3">
           {assignments.map((a) => (
-            <div
+            <GlowCard
               key={a.id}
-              className={`glass rounded-2xl overflow-hidden ${
-                a.priority === 'high' ? 'priority-high' : a.priority === 'low' ? 'priority-low' : 'priority-medium'
-              }`}
+              glowColor={
+                a.priority === 'high'
+                  ? 'rgba(239,68,68,0.10)'
+                  : a.priority === 'low'
+                  ? 'rgba(16,185,129,0.10)'
+                  : 'rgba(245,158,11,0.10)'
+              }
             >
               <button
                 onClick={() => setExpanded(expanded === a.id ? null : a.id)}
@@ -227,7 +237,7 @@ export default function AssignmentsPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
+            </GlowCard>
           ))}
         </div>
       )}

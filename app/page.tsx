@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { MessageCircle, Wifi, CheckSquare, ArrowLeft, Sparkles } from 'lucide-react'
 import Image from 'next/image'
+import GlowCard from '@/components/ui/GlowCard'
 
 const features = [
   {
@@ -33,13 +34,13 @@ export default function LandingPage() {
   return (
     <div className="relative min-h-screen bg-base overflow-hidden flex flex-col" dir="rtl">
 
-      {/* Background orbs */}
-      <div className="orb w-96 h-96 top-[-100px] right-[-80px]"
-           style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.4) 0%, transparent 70%)' }} />
-      <div className="orb w-80 h-80 bottom-[10%] left-[-60px]"
-           style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.35) 0%, transparent 70%)' }} />
-      <div className="orb w-64 h-64 top-[40%] left-[30%]"
-           style={{ background: 'radial-gradient(circle, rgba(56,189,248,0.15) 0%, transparent 70%)' }} />
+      {/* Animated aurora background */}
+      <div className="aurora-mesh">
+        <div className="aurora-blob aurora-blob-1" />
+        <div className="aurora-blob aurora-blob-2" />
+        <div className="aurora-blob aurora-blob-3" />
+        <div className="aurora-blob aurora-blob-4" />
+      </div>
 
       {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-8 py-6">
@@ -105,17 +106,23 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 + i * 0.12, duration: 0.5 }}
-              className="glass p-6 text-right"
-              style={{ boxShadow: `0 0 32px ${f.glow}` }}
             >
-              <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
-                style={{ background: `${f.color}22` }}
+              <GlowCard
+                className="text-right hover:scale-[1.03] transition-transform"
+                glowColor={f.glow.replace('0.25', '0.15')}
+                style={{ boxShadow: `0 0 32px ${f.glow}` }}
               >
-                <f.icon size={22} style={{ color: f.color }} />
-              </div>
-              <h3 className="font-bold text-ink mb-2">{f.title}</h3>
-              <p className="text-ink-muted text-sm leading-relaxed">{f.desc}</p>
+                <div className="p-6">
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
+                    style={{ background: `${f.color}22` }}
+                  >
+                    <f.icon size={22} style={{ color: f.color }} />
+                  </div>
+                  <h3 className="font-bold text-ink mb-2">{f.title}</h3>
+                  <p className="text-ink-muted text-sm leading-relaxed">{f.desc}</p>
+                </div>
+              </GlowCard>
             </motion.div>
           ))}
         </div>

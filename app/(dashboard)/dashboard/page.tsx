@@ -16,6 +16,8 @@ import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 import ErrorAlert from '@/components/ui/ErrorAlert'
+import GlowCard from '@/components/ui/GlowCard'
+import AnimatedBorder from '@/components/ui/AnimatedBorder'
 import type { Course, Assignment, StudyTask, BGUGrade } from '@/types'
 import { format, formatDistanceToNow, differenceInDays, differenceInHours } from 'date-fns'
 import { he } from 'date-fns/locale'
@@ -343,8 +345,8 @@ export default function DashboardPage() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="glass overflow-hidden"
       >
+      <GlowCard className="overflow-hidden" glowColor="rgba(99,102,241,0.08)">
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
           <div className="flex items-center gap-2">
             <Calendar size={16} style={{ color: '#818cf8' }} />
@@ -420,6 +422,7 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+      </GlowCard>
       </motion.div>
 
       {/* ── Main Content Grid ── */}
@@ -532,7 +535,9 @@ export default function DashboardPage() {
                 </div>
                 <h2 className="font-semibold text-ink">התקדמות תואר</h2>
               </div>
-              <CreditsSection credits={credits} />
+              <AnimatedBorder speed={4}>
+                <CreditsSection credits={credits} />
+              </AnimatedBorder>
             </motion.div>
           ) : (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
@@ -565,24 +570,56 @@ export default function DashboardPage() {
   )
 }
 
+// ── Animated Number ─────────────────────────────────────────
+
+function AnimatedNumber({ value, decimals = 0 }: { value: number; decimals?: number }) {
+  const [display, setDisplay] = useState(0)
+  useEffect(() => {
+    const dur = 1200
+    const t0 = performance.now()
+    let raf: number
+    function tick(now: number) {
+      const p = Math.min((now - t0) / dur, 1)
+      const ease = 1 - Math.pow(1 - p, 3)              // ease-out cubic
+      setDisplay(Number((ease * value).toFixed(decimals)))
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [value, decimals])
+  return <>{display}</>
+}
+
 // ── Stat Card ───────────────────────────────────────────────
 
 function StatCard({ icon, iconColor, iconBg, label, value, sub, subColor }: {
   icon: React.ReactNode; iconColor: string; iconBg: string
   label: string; value: string | number; sub: string; subColor: string
 }) {
+  const numericValue = typeof value === 'number' ? value : NaN
+  const isAnimatable = !isNaN(numericValue)
+
   return (
-    <div className="glass p-4 flex items-center gap-3 group hover:scale-[1.02] transition-all">
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
-        style={{ background: iconBg, color: iconColor }}>
-        {icon}
+    <GlowCard
+      className="group hover:scale-[1.02] transition-transform"
+      glowColor={iconBg.replace('0.15', '0.18')}
+    >
+      <div className="p-4 flex items-center gap-3">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
+          style={{ background: iconBg, color: iconColor }}
+        >
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs text-ink-muted truncate">{label}</p>
+          <p className="text-xl font-extrabold text-ink leading-tight">
+            {isAnimatable ? <AnimatedNumber value={numericValue} /> : value}
+          </p>
+          <p className="text-[10px] font-medium truncate" style={{ color: subColor }}>{sub}</p>
+        </div>
       </div>
-      <div className="min-w-0">
-        <p className="text-xs text-ink-muted truncate">{label}</p>
-        <p className="text-xl font-extrabold text-ink leading-tight">{value}</p>
-        <p className="text-[10px] font-medium truncate" style={{ color: subColor }}>{sub}</p>
-      </div>
-    </div>
+    </GlowCard>
   )
 }
 
@@ -597,11 +634,13 @@ function ScheduleSection({ dayData, calLoading, courses, assignments, providerTo
 
   if (!providerToken) {
     return (
-      <div className="glass p-8 text-center">
-        <Calendar size={28} className="mx-auto mb-2" style={{ color: '#818cf8' }} />
-        <p className="text-ink-muted text-sm mb-1">חבר את Google Calendar</p>
-        <p className="text-ink-subtle text-xs">כדי לראות את המערכת שלך כאן</p>
-      </div>
+      <GlowCard className="text-center">
+        <div className="p-8">
+          <Calendar size={28} className="mx-auto mb-2" style={{ color: '#818cf8' }} />
+          <p className="text-ink-muted text-sm mb-1">חבר את Google Calendar</p>
+          <p className="text-ink-subtle text-xs">כדי לראות את המערכת שלך כאן</p>
+        </div>
+      </GlowCard>
     )
   }
 
@@ -611,11 +650,13 @@ function ScheduleSection({ dayData, calLoading, courses, assignments, providerTo
 
   if (events.length === 0 && dayAssignments.length === 0) {
     return (
-      <div className="glass p-8 text-center">
-        <div className="text-3xl mb-2">🎉</div>
-        <p className="text-ink font-semibold text-sm">יום פנוי!</p>
-        <p className="text-ink-muted text-xs mt-1">אין שיעורים או מטלות</p>
-      </div>
+      <GlowCard className="text-center" glowColor="rgba(16,185,129,0.10)">
+        <div className="p-8">
+          <div className="text-3xl mb-2">🎉</div>
+          <p className="text-ink font-semibold text-sm">יום פנוי!</p>
+          <p className="text-ink-muted text-xs mt-1">אין שיעורים או מטלות</p>
+        </div>
+      </GlowCard>
     )
   }
 
@@ -721,18 +762,21 @@ function TasksSection({ tasks, todayStr, onToggle, loading }: {
 
   if (allShown.length === 0) {
     return (
-      <div className="glass p-6 text-center">
-        <Sparkles size={24} className="mx-auto mb-2" style={{ color: '#818cf8' }} />
-        <p className="text-ink-muted text-sm">אין משימות</p>
-        <Link href="/tasks">
-          <button className="mt-2 text-xs text-accent-400 hover:text-accent transition-colors">הוסף משימה</button>
-        </Link>
-      </div>
+      <GlowCard className="text-center">
+        <div className="p-6">
+          <Sparkles size={24} className="mx-auto mb-2" style={{ color: '#818cf8' }} />
+          <p className="text-ink-muted text-sm">אין משימות</p>
+          <Link href="/tasks">
+            <button className="mt-2 text-xs text-accent-400 hover:text-accent transition-colors">הוסף משימה</button>
+          </Link>
+        </div>
+      </GlowCard>
     )
   }
 
   return (
-    <div className="glass overflow-hidden divide-y divide-white/5">
+    <GlowCard className="overflow-hidden">
+    <div className="divide-y divide-white/5">
       {todayTasks.length > 0 && (
         <div className="px-3 py-2">
           <p className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wider">היום</p>
@@ -750,6 +794,7 @@ function TasksSection({ tasks, todayStr, onToggle, loading }: {
         <TaskRow key={task.id} task={task} onToggle={onToggle} index={todayTasks.length + i} />
       ))}
     </div>
+    </GlowCard>
   )
 }
 
@@ -814,11 +859,13 @@ function AssignmentsSection({ assignments, courses, loading }: {
 
   if (assignments.length === 0) {
     return (
-      <div className="glass p-6 text-center">
-        <Target size={24} className="mx-auto mb-2" style={{ color: '#10b981' }} />
-        <p className="text-ink-muted text-sm">אין מטלות ממתינות</p>
-        <p className="text-ink-subtle text-xs mt-0.5">יפה! הכל מעודכן</p>
-      </div>
+      <GlowCard className="text-center" glowColor="rgba(16,185,129,0.10)">
+        <div className="p-6">
+          <Target size={24} className="mx-auto mb-2" style={{ color: '#10b981' }} />
+          <p className="text-ink-muted text-sm">אין מטלות ממתינות</p>
+          <p className="text-ink-subtle text-xs mt-0.5">יפה! הכל מעודכן</p>
+        </div>
+      </GlowCard>
     )
   }
 
@@ -834,9 +881,12 @@ function AssignmentsSection({ assignments, courses, loading }: {
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.04 }}
-            className="glass p-3.5 hover:scale-[1.01] transition-all"
           >
-            <div className="flex items-start gap-3">
+          <GlowCard
+            className="hover:scale-[1.01] transition-transform"
+            glowColor={a.priority === 'high' ? 'rgba(239,68,68,0.10)' : a.priority === 'medium' ? 'rgba(245,158,11,0.10)' : 'rgba(16,185,129,0.10)'}
+          >
+            <div className="flex items-start gap-3 p-3.5">
               {/* Priority strip */}
               <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{
                 background: a.priority === 'high' ? '#ef4444' : a.priority === 'medium' ? '#f59e0b' : '#10b981'
@@ -877,6 +927,7 @@ function AssignmentsSection({ assignments, courses, loading }: {
                 })()}
               </div>
             </div>
+          </GlowCard>
           </motion.div>
         )
       })}
@@ -902,30 +953,35 @@ function GradesSection({ grades, bguConnected, avgGrade, loading }: {
 
   if (!bguConnected) {
     return (
-      <div className="glass p-6 text-center">
-        <GraduationCap size={24} className="mx-auto mb-2" style={{ color: '#64748b' }} />
-        <p className="text-ink-muted text-sm">חבר את BGU כדי לראות ציונים</p>
-        <Link href="/bgu-connect">
-          <button className="mt-2 inline-flex items-center gap-1.5 text-xs text-accent-400 hover:text-accent transition-colors">
-            <Wifi size={12} /> התחבר עכשיו
-          </button>
-        </Link>
-      </div>
+      <GlowCard className="text-center">
+        <div className="p-6">
+          <GraduationCap size={24} className="mx-auto mb-2" style={{ color: '#64748b' }} />
+          <p className="text-ink-muted text-sm">חבר את BGU כדי לראות ציונים</p>
+          <Link href="/bgu-connect">
+            <button className="mt-2 inline-flex items-center gap-1.5 text-xs text-accent-400 hover:text-accent transition-colors">
+              <Wifi size={12} /> התחבר עכשיו
+            </button>
+          </Link>
+        </div>
+      </GlowCard>
     )
   }
 
   if (grades.length === 0) {
     return (
-      <div className="glass p-6 text-center">
-        <BarChart3 size={24} className="mx-auto mb-2" style={{ color: '#64748b' }} />
-        <p className="text-ink-muted text-sm">אין ציונים עדיין</p>
-        <p className="text-ink-subtle text-xs mt-0.5">ציונים יופיעו כאן אחרי פרסום</p>
-      </div>
+      <GlowCard className="text-center">
+        <div className="p-6">
+          <BarChart3 size={24} className="mx-auto mb-2" style={{ color: '#64748b' }} />
+          <p className="text-ink-muted text-sm">אין ציונים עדיין</p>
+          <p className="text-ink-subtle text-xs mt-0.5">ציונים יופיעו כאן אחרי פרסום</p>
+        </div>
+      </GlowCard>
     )
   }
 
   return (
-    <div className="glass overflow-hidden">
+    <GlowCard className="overflow-hidden">
+    <div>
       {/* Average header */}
       {avgGrade !== null && (
         <div className="px-4 py-3 flex items-center justify-between border-b border-white/5"
@@ -995,6 +1051,7 @@ function GradesSection({ grades, bguConnected, avgGrade, loading }: {
         })()}
       </div>
     </div>
+    </GlowCard>
   )
 }
 
@@ -1025,7 +1082,8 @@ function DegreeSetupPrompt() {
 
   if (!open) {
     return (
-      <div className="glass p-5 text-center">
+      <GlowCard className="text-center" glowColor="rgba(167,139,250,0.12)">
+        <div className="p-5">
         <GraduationCap size={24} className="mx-auto mb-2" style={{ color: '#a78bfa' }} />
         <p className="text-ink-muted text-sm mb-1">הגדר את פרטי התואר שלך</p>
         <p className="text-ink-subtle text-xs mb-3">כדי לעקוב אחרי נק״ז והתקדמות</p>
@@ -1036,12 +1094,14 @@ function DegreeSetupPrompt() {
         >
           <GraduationCap size={14} /> הגדר תואר
         </button>
-      </div>
+        </div>
+      </GlowCard>
     )
   }
 
   return (
-    <div className="glass p-5 space-y-3">
+    <GlowCard glowColor="rgba(167,139,250,0.12)">
+    <div className="p-5 space-y-3">
       <div className="flex items-center gap-2 mb-1">
         <GraduationCap size={16} style={{ color: '#a78bfa' }} />
         <h3 className="text-sm font-semibold text-ink">הגדרות תואר</h3>
@@ -1094,6 +1154,7 @@ function DegreeSetupPrompt() {
         </button>
       </div>
     </div>
+    </GlowCard>
   )
 }
 
@@ -1104,7 +1165,7 @@ function CreditsSection({ credits }: { credits: CreditsInfo }) {
   const pctColor = pct >= 75 ? '#10b981' : pct >= 50 ? '#3b82f6' : '#a78bfa'
 
   return (
-    <div className="glass p-4 space-y-3">
+    <div className="p-4 space-y-3">
       {/* Main progress */}
       <div>
         <div className="flex justify-between items-baseline mb-2">
@@ -1155,13 +1216,15 @@ function SubjectsSection({ courses, assignments, loading }: {
 
   if (courses.length === 0) {
     return (
-      <div className="glass p-6 text-center">
-        <div className="text-2xl mb-1">📖</div>
-        <p className="text-ink-muted text-sm">אין מקצועות ביום הזה</p>
-        <Link href="/courses">
-          <button className="mt-2 text-xs text-accent-400 hover:text-accent transition-colors">ראה את כל הקורסים</button>
-        </Link>
-      </div>
+      <GlowCard className="text-center">
+        <div className="p-6">
+          <div className="text-2xl mb-1">📖</div>
+          <p className="text-ink-muted text-sm">אין מקצועות ביום הזה</p>
+          <Link href="/courses">
+            <button className="mt-2 text-xs text-accent-400 hover:text-accent transition-colors">ראה את כל הקורסים</button>
+          </Link>
+        </div>
+      </GlowCard>
     )
   }
 
@@ -1174,9 +1237,10 @@ function SubjectsSection({ courses, assignments, loading }: {
         return (
           <motion.div key={course.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
             <Link href={`/courses/${course.id}`}>
-              <div className="relative overflow-hidden rounded-xl p-4 group hover:scale-[1.02] transition-all cursor-pointer"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl" style={{
+              <GlowCard className="group hover:scale-[1.02] transition-transform cursor-pointer"
+                glowColor={course.progress_percentage >= 70 ? 'rgba(16,185,129,0.10)' : 'rgba(99,102,241,0.10)'}>
+              <div className="relative overflow-hidden p-4">
+                <div className="absolute top-0 left-0 right-0 h-1" style={{
                   background: `linear-gradient(90deg, ${course.progress_percentage >= 70 ? '#10b981' : '#6366f1'}, ${course.progress_percentage >= 70 ? '#34d399' : '#8b5cf6'})`
                 }} />
                 <div className="flex items-start justify-between mb-2">
@@ -1214,6 +1278,7 @@ function SubjectsSection({ courses, assignments, loading }: {
                   </div>
                 </div>
               </div>
+              </GlowCard>
             </Link>
           </motion.div>
         )

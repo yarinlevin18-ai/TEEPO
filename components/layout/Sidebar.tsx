@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, CheckSquare,
-  FileText, MessageCircle, Wifi, Plus, LogOut, GraduationCap,
+  FileText, MessageCircle, Wifi, Plus, LogOut, GraduationCap, Settings,
 } from 'lucide-react'
 import Image from 'next/image'
 import { useAuth } from '@/lib/auth-context'
@@ -96,8 +96,18 @@ export default function Sidebar() {
         {user && (
           <div className="flex items-center gap-2">
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-ink-muted truncate" dir="ltr">{user.email}</p>
+              <p className="text-xs text-ink-muted truncate" dir="ltr">
+                {user.user_metadata?.display_name || user.email}
+              </p>
             </div>
+            <Link href="/settings">
+              <button
+                className="p-1.5 rounded-lg hover:bg-white/5 text-ink-subtle hover:text-indigo-400 transition-colors"
+                title="הגדרות"
+              >
+                <Settings size={16} />
+              </button>
+            </Link>
             <button
               onClick={() => signOut()}
               className="p-1.5 rounded-lg hover:bg-white/5 text-ink-subtle hover:text-red-400 transition-colors"

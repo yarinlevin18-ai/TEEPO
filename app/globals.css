@@ -141,6 +141,138 @@ body {
   opacity: 0.35;
 }
 
+/* ══════════════════════════════════════════
+   AURORA MESH BACKGROUND
+   ══════════════════════════════════════════ */
+.aurora-mesh {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  will-change: transform;
+}
+.aurora-blob-1 {
+  width: 600px; height: 600px;
+  background: rgba(99, 102, 241, 0.13);
+  top: -5%; left: 10%;
+  animation: aurora1 25s ease-in-out infinite;
+}
+.aurora-blob-2 {
+  width: 500px; height: 500px;
+  background: rgba(139, 92, 246, 0.10);
+  top: 40%; right: -5%;
+  animation: aurora2 30s ease-in-out infinite;
+}
+.aurora-blob-3 {
+  width: 400px; height: 400px;
+  background: rgba(6, 182, 212, 0.07);
+  bottom: -5%; left: 30%;
+  animation: aurora3 22s ease-in-out infinite;
+}
+.aurora-blob-4 {
+  width: 350px; height: 350px;
+  background: rgba(236, 72, 153, 0.06);
+  top: 60%; left: 5%;
+  animation: aurora4 28s ease-in-out infinite;
+}
+
+@keyframes aurora1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(12%, 18%) scale(1.08); }
+  50% { transform: translate(4%, -8%) scale(0.95); }
+  75% { transform: translate(-10%, 12%) scale(1.05); }
+}
+@keyframes aurora2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(-18%, -8%) scale(1.05); }
+  50% { transform: translate(8%, 14%) scale(1.12); }
+  75% { transform: translate(-4%, -18%) scale(0.96); }
+}
+@keyframes aurora3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(16%, -12%) scale(1.1); }
+  50% { transform: translate(-12%, 6%) scale(0.92); }
+  75% { transform: translate(8%, 16%) scale(1.06); }
+}
+@keyframes aurora4 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(10%, -14%) scale(1.08); }
+  66% { transform: translate(-8%, 10%) scale(0.94); }
+}
+
+/* ══════════════════════════════════════════
+   GLOW CARD — cursor-following spotlight
+   ══════════════════════════════════════════ */
+.glow-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  transition: border-color 0.35s ease, box-shadow 0.35s ease;
+}
+.glow-card:hover {
+  border-color: rgba(99,102,241,0.2);
+  box-shadow: 0 0 30px rgba(99,102,241,0.06);
+}
+
+/* Internal spotlight following the cursor */
+.glow-card .glow-spotlight {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  background: radial-gradient(
+    600px circle at var(--glow-x, 50%) var(--glow-y, 50%),
+    var(--glow-color, rgba(99,102,241,0.10)),
+    transparent 40%
+  );
+}
+
+/* 1px border that glows near the cursor */
+.glow-card .glow-border-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 16px;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  padding: 1px;
+  background: radial-gradient(
+    400px circle at var(--glow-x, 50%) var(--glow-y, 50%),
+    rgba(99,102,241,0.45),
+    transparent 40%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.glow-card.glow-active .glow-spotlight { opacity: 1; }
+.glow-card.glow-active .glow-border-fx { opacity: 1; }
+
+/* ══════════════════════════════════════════
+   ANIMATED NUMBER — count-up ticker
+   ══════════════════════════════════════════ */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-count-up {
+  animation: countUp 0.5s ease-out forwards;
+}
+
 /* ── Input dark ── */
 .input-dark {
   background: rgba(255,255,255,0.05);

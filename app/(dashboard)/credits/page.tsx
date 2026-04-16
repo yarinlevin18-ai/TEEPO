@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
+import GlowCard from '@/components/ui/GlowCard'
 
 // ── Types ──────────────────────────────────────────────────────
 type Track = {
@@ -166,175 +167,178 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass rounded-2xl p-8"
       >
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mb-4">
-            <GraduationCap className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-2">
-            בוא נתחיל!
-          </h1>
-          <p className="text-slate-400">
-            ספר לנו מה אתה לומד כדי שנחשב את הנק"ז שלך
-          </p>
-        </div>
+        <GlowCard>
+          <div className="p-8">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mb-4">
+                <GraduationCap className="w-8 h-8 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold text-slate-100 mb-2">
+                בוא נתחיל!
+              </h1>
+              <p className="text-slate-400">
+                ספר לנו מה אתה לומד כדי שנחשב את הנק"ז שלך
+              </p>
+            </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {[1, 2].map(s => (
-            <div
-              key={s}
-              className={`w-3 h-3 rounded-full transition-all ${
-                s === step ? 'bg-indigo-500 w-8' : s < step ? 'bg-emerald-500' : 'bg-slate-700'
-              }`}
-            />
-          ))}
-        </div>
+            {/* Step indicator */}
+            <div className="flex items-center justify-center gap-2 mb-8">
+              {[1, 2].map(s => (
+                <div
+                  key={s}
+                  className={`w-3 h-3 rounded-full transition-all ${
+                    s === step ? 'bg-indigo-500 w-8' : s < step ? 'bg-emerald-500' : 'bg-slate-700'
+                  }`}
+                />
+              ))}
+            </div>
 
-        <AnimatePresence mode="wait">
-          {step === 1 && (
-            <motion.div
-              key="step1"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-            >
-              <h2 className="text-lg font-semibold text-slate-200 mb-4">
-                מה אתה לומד?
-              </h2>
+            <AnimatePresence mode="wait">
+              {step === 1 && (
+                <motion.div
+                  key="step1"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                >
+                  <h2 className="text-lg font-semibold text-slate-200 mb-4">
+                    מה אתה לומד?
+                  </h2>
 
-              {dualTracks.length > 0 && (
-                <>
-                  <p className="text-sm text-slate-400 mb-3">תוכניות דו-מחלקתיות (שילובים)</p>
-                  <div className="space-y-2 mb-6">
-                    {dualTracks.map(t => (
-                      <button
-                        key={t.id}
-                        onClick={() => setSelectedTrack(t.id)}
-                        className={`w-full text-right p-4 rounded-xl border transition-all ${
-                          selectedTrack === t.id
-                            ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                            : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20'
-                        }`}
-                      >
-                        <div className="font-medium">{t.name}</div>
-                        <div className="text-sm text-slate-500 mt-1">
-                          {t.total_credits} נק"ז | {t.type === 'dual' ? 'דו-מחלקתי' : 'חד-מחלקתי'}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+                  {dualTracks.length > 0 && (
+                    <>
+                      <p className="text-sm text-slate-400 mb-3">תוכניות דו-מחלקתיות (שילובים)</p>
+                      <div className="space-y-2 mb-6">
+                        {dualTracks.map(t => (
+                          <button
+                            key={t.id}
+                            onClick={() => setSelectedTrack(t.id)}
+                            className={`w-full text-right p-4 rounded-xl border transition-all ${
+                              selectedTrack === t.id
+                                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
+                                : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20'
+                            }`}
+                          >
+                            <div className="font-medium">{t.name}</div>
+                            <div className="text-sm text-slate-500 mt-1">
+                              {t.total_credits} נק"ז | {t.type === 'dual' ? 'דו-מחלקתי' : 'חד-מחלקתי'}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
 
-              {singleTracks.length > 0 && (
-                <>
-                  <p className="text-sm text-slate-400 mb-3">מסלולים חד-מחלקתיים</p>
-                  <div className="space-y-2 mb-6">
-                    {singleTracks.map(t => (
-                      <button
-                        key={t.id}
-                        onClick={() => setSelectedTrack(t.id)}
-                        className={`w-full text-right p-4 rounded-xl border transition-all ${
-                          selectedTrack === t.id
-                            ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                            : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20'
-                        }`}
-                      >
-                        <div className="font-medium">{t.name}</div>
-                        <div className="text-sm text-slate-500 mt-1">
-                          {t.total_credits} נק"ז
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+                  {singleTracks.length > 0 && (
+                    <>
+                      <p className="text-sm text-slate-400 mb-3">מסלולים חד-מחלקתיים</p>
+                      <div className="space-y-2 mb-6">
+                        {singleTracks.map(t => (
+                          <button
+                            key={t.id}
+                            onClick={() => setSelectedTrack(t.id)}
+                            className={`w-full text-right p-4 rounded-xl border transition-all ${
+                              selectedTrack === t.id
+                                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
+                                : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20'
+                            }`}
+                          >
+                            <div className="font-medium">{t.name}</div>
+                            <div className="text-sm text-slate-500 mt-1">
+                              {t.total_credits} נק"ז
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
 
-              {tracks.length === 0 && (
-                <div className="text-center py-8 text-slate-500">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                  טוען מסלולים...
-                </div>
-              )}
+                  {tracks.length === 0 && (
+                    <div className="text-center py-8 text-slate-500">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                      טוען מסלולים...
+                    </div>
+                  )}
 
-              <button
-                disabled={!selectedTrack}
-                onClick={() => setStep(2)}
-                className="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold disabled:opacity-40 hover:shadow-lg hover:shadow-indigo-500/25 transition-all"
-              >
-                המשך
-                <ChevronLeft className="inline w-4 h-4 mr-1" />
-              </button>
-            </motion.div>
-          )}
-
-          {step === 2 && (
-            <motion.div
-              key="step2"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-            >
-              <h2 className="text-lg font-semibold text-slate-200 mb-4">
-                פרטים נוספים
-              </h2>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">שנת התחלה</label>
-                  <select
-                    value={startYear}
-                    onChange={e => setStartYear(Number(e.target.value))}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-200 focus:border-indigo-500 focus:outline-none"
+                  <button
+                    disabled={!selectedTrack}
+                    onClick={() => setStep(2)}
+                    className="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold disabled:opacity-40 hover:shadow-lg hover:shadow-indigo-500/25 transition-all"
                   >
-                    {Array.from({ length: 8 }, (_, i) => currentYearOptions - i).map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                </div>
+                    המשך
+                    <ChevronLeft className="inline w-4 h-4 mr-1" />
+                  </button>
+                </motion.div>
+              )}
 
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">באיזה שנה אתה עכשיו?</label>
-                  <div className="flex gap-2">
-                    {[1, 2, 3, 4].map(y => (
-                      <button
-                        key={y}
-                        onClick={() => setCurrentYear(y)}
-                        className={`flex-1 py-3 rounded-xl border font-medium transition-all ${
-                          currentYear === y
-                            ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                            : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/20'
-                        }`}
+              {step === 2 && (
+                <motion.div
+                  key="step2"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                >
+                  <h2 className="text-lg font-semibold text-slate-200 mb-4">
+                    פרטים נוספים
+                  </h2>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">שנת התחלה</label>
+                      <select
+                        value={startYear}
+                        onChange={e => setStartYear(Number(e.target.value))}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-200 focus:border-indigo-500 focus:outline-none"
                       >
-                        שנה {y === 1 ? "א'" : y === 2 ? "ב'" : y === 3 ? "ג'" : "ד'"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+                        {Array.from({ length: 8 }, (_, i) => currentYearOptions - i).map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </div>
 
-              <div className="flex gap-3 mt-8">
-                <button
-                  onClick={() => setStep(1)}
-                  className="flex-1 py-3 rounded-xl border border-white/10 text-slate-400 hover:bg-white/5 transition-all"
-                >
-                  <ChevronRight className="inline w-4 h-4 ml-1" />
-                  חזרה
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex-[2] py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold disabled:opacity-60 hover:shadow-lg hover:shadow-indigo-500/25 transition-all"
-                >
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'סיימתי — הציגו לי את הקורסים'}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">באיזה שנה אתה עכשיו?</label>
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 4].map(y => (
+                          <button
+                            key={y}
+                            onClick={() => setCurrentYear(y)}
+                            className={`flex-1 py-3 rounded-xl border font-medium transition-all ${
+                              currentYear === y
+                                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
+                                : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/20'
+                            }`}
+                          >
+                            שנה {y === 1 ? "א'" : y === 2 ? "ב'" : y === 3 ? "ג'" : "ד'"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-8">
+                    <button
+                      onClick={() => setStep(1)}
+                      className="flex-1 py-3 rounded-xl border border-white/10 text-slate-400 hover:bg-white/5 transition-all"
+                    >
+                      <ChevronRight className="inline w-4 h-4 ml-1" />
+                      חזרה
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="flex-[2] py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold disabled:opacity-60 hover:shadow-lg hover:shadow-indigo-500/25 transition-all"
+                    >
+                      {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'סיימתי — הציגו לי את הקורסים'}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </GlowCard>
       </motion.div>
     </div>
   )
@@ -469,24 +473,26 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
       </div>
 
       {/* Progress Bar */}
-      <div className="glass rounded-xl p-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-slate-400">התקדמות לתואר</span>
-          <span className="text-sm font-medium text-indigo-400">{progressPercent.toFixed(0)}%</span>
+      <GlowCard>
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-slate-400">התקדמות לתואר</span>
+            <span className="text-sm font-medium text-indigo-400">{progressPercent.toFixed(0)}%</span>
+          </div>
+          <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPercent}%` }}
+              transition={{ duration: 1, ease: 'easeOut' }}
+              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
+            />
+          </div>
+          <div className="flex justify-between mt-1 text-xs text-slate-500">
+            <span>{completedCredits} נק"ז</span>
+            <span>{totalRequired} נק"ז</span>
+          </div>
         </div>
-        <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${progressPercent}%` }}
-            transition={{ duration: 1, ease: 'easeOut' }}
-            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
-          />
-        </div>
-        <div className="flex justify-between mt-1 text-xs text-slate-500">
-          <span>{completedCredits} נק"ז</span>
-          <span>{totalRequired} נק"ז</span>
-        </div>
-      </div>
+      </GlowCard>
 
       {/* Course Search */}
       <AnimatePresence>
@@ -551,54 +557,56 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
       </AnimatePresence>
 
       {/* My Courses */}
-      <div className="glass rounded-xl p-4">
-        <h2 className="text-lg font-semibold text-slate-200 mb-4">הקורסים שלי</h2>
-        {myCourses.length === 0 ? (
-          <p className="text-center text-slate-500 py-8">
-            עדיין לא נוספו קורסים. לחץ "הוסף קורס" למעלה
-          </p>
-        ) : (
-          <div className="space-y-1">
-            {myCourses.map(c => (
-              <div
-                key={c.id}
-                className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-all group"
-              >
-                <button
-                  onClick={() => toggleStatus(c)}
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                    c.status === 'completed'
-                      ? 'bg-emerald-500 border-emerald-500'
-                      : c.status === 'in_progress'
-                      ? 'bg-amber-500/20 border-amber-500'
-                      : 'border-slate-600 hover:border-slate-400'
-                  }`}
+      <GlowCard>
+        <div className="p-4">
+          <h2 className="text-lg font-semibold text-slate-200 mb-4">הקורסים שלי</h2>
+          {myCourses.length === 0 ? (
+            <p className="text-center text-slate-500 py-8">
+              עדיין לא נוספו קורסים. לחץ "הוסף קורס" למעלה
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {myCourses.map(c => (
+                <div
+                  key={c.id}
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-all group"
                 >
-                  {c.status === 'completed' && <Check className="w-3.5 h-3.5 text-white" />}
-                  {c.status === 'in_progress' && <div className="w-2 h-2 rounded-full bg-amber-400" />}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <div className={`text-sm truncate ${
-                    c.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-200'
-                  }`}>
-                    {c.course_name}
+                  <button
+                    onClick={() => toggleStatus(c)}
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                      c.status === 'completed'
+                        ? 'bg-emerald-500 border-emerald-500'
+                        : c.status === 'in_progress'
+                        ? 'bg-amber-500/20 border-amber-500'
+                        : 'border-slate-600 hover:border-slate-400'
+                    }`}
+                  >
+                    {c.status === 'completed' && <Check className="w-3.5 h-3.5 text-white" />}
+                    {c.status === 'in_progress' && <div className="w-2 h-2 rounded-full bg-amber-400" />}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm truncate ${
+                      c.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-200'
+                    }`}>
+                      {c.course_name}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {c.credits} נק"ז
+                      {c.grade && <span className="text-emerald-400 mr-2">ציון: {c.grade}</span>}
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500">
-                    {c.credits} נק"ז
-                    {c.grade && <span className="text-emerald-400 mr-2">ציון: {c.grade}</span>}
-                  </div>
+                  <button
+                    onClick={() => removeCourse(c.course_id)}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-500 hover:text-red-400 transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => removeCourse(c.course_id)}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-500 hover:text-red-400 transition-all"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </GlowCard>
     </div>
   )
 }
@@ -615,12 +623,14 @@ function StatCard({ icon, label, value, sub, color }: {
     violet: 'from-violet-500/20 to-violet-500/5 text-violet-400',
   }
   return (
-    <div className="glass rounded-xl p-4">
-      <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${colors[color]} flex items-center justify-center mb-2`}>
-        {icon}
+    <GlowCard>
+      <div className="p-4">
+        <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${colors[color]} flex items-center justify-center mb-2`}>
+          {icon}
+        </div>
+        <div className="text-xl font-bold text-slate-100">{value}</div>
+        <div className="text-xs text-slate-500">{sub}</div>
       </div>
-      <div className="text-xl font-bold text-slate-100">{value}</div>
-      <div className="text-xs text-slate-500">{sub}</div>
-    </div>
+    </GlowCard>
   )
 }

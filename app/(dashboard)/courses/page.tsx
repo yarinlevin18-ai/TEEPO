@@ -9,6 +9,7 @@ import {
 import Link from 'next/link'
 import { api } from '@/lib/api-client'
 import ErrorAlert from '@/components/ui/ErrorAlert'
+import GlowCard from '@/components/ui/GlowCard'
 import type { Course } from '@/types'
 
 // ── Semester / Year helpers ──────────────────────────────────────────
@@ -165,7 +166,8 @@ export default function CoursesPage() {
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {courses.length === 0 ? (
-        <div className="glass rounded-2xl p-12 text-center">
+        <GlowCard className="text-center">
+        <div className="p-12">
           <BookOpen size={40} className="text-white/10 mx-auto mb-4" />
           <p className="text-ink-muted mb-2">עדיין לא הוספת קורסים</p>
           <p className="text-ink-subtle text-sm mb-4">חבר את חשבון BGU שלך או הוסף קורס מ-Udemy/Coursera</p>
@@ -182,6 +184,7 @@ export default function CoursesPage() {
             </Link>
           </div>
         </div>
+        </GlowCard>
       ) : (
         <>
           {/* Grouped courses */}
@@ -318,7 +321,7 @@ function CourseCard({
   }
 
   return (
-    <div className="glass rounded-xl overflow-hidden group hover:border-accent/30 transition-all">
+    <GlowCard className="group hover:scale-[1.01] transition-transform">
       <div className="p-4 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium text-ink leading-snug line-clamp-2 flex-1">
@@ -424,6 +427,6 @@ function CourseCard({
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </GlowCard>
   )
 }

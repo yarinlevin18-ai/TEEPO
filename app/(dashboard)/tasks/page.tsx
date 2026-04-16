@@ -8,6 +8,7 @@ import {
   Clock, BookOpen, Dumbbell, Star, Zap,
 } from 'lucide-react'
 import { api } from '@/lib/api-client'
+import GlowCard from '@/components/ui/GlowCard'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { StudyTask } from '@/types'
 import { format, addDays, subDays, isToday, isTomorrow, isYesterday } from 'date-fns'
@@ -22,6 +23,13 @@ const CATEGORIES = [
 
 function getCategoryInfo(cat?: string) {
   return CATEGORIES.find(c => c.key === cat) || CATEGORIES[0]
+}
+
+const CATEGORY_GLOW: Record<string, string> = {
+  urgent:   'rgba(239,68,68,0.10)',
+  personal: 'rgba(245,158,11,0.10)',
+  exercise: 'rgba(16,185,129,0.10)',
+  // study uses the default indigo glow
 }
 
 function getDateLabel(dateStr: string): string {
@@ -277,55 +285,58 @@ export default function TasksPage() {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass rounded-2xl p-5 relative overflow-hidden"
         >
-          {/* Background glow on completion */}
-          {pct === 100 && (
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-indigo-500/5" />
-          )}
-          <div className="relative flex items-center gap-5">
-            {/* Circular progress */}
-            <div className="relative w-16 h-16 flex-shrink-0">
-              <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
-                <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
-                <circle
-                  cx="32" cy="32" r="28" fill="none"
-                  stroke="url(#progressGrad)" strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeDasharray={`${pct * 1.76} 176`}
-                  className="transition-all duration-700"
-                />
-                <defs>
-                  <linearGradient id="progressGrad" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="#6366f1" />
-                    <stop offset="100%" stopColor="#8b5cf6" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-sm font-bold gradient-text">{pct}%</span>
-              </div>
-            </div>
+          <GlowCard glowColor={pct === 100 ? "rgba(16,185,129,0.10)" : undefined}>
+            <div className="p-5 relative">
+              {/* Background glow on completion */}
+              {pct === 100 && (
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-indigo-500/5" />
+              )}
+              <div className="relative flex items-center gap-5">
+                {/* Circular progress */}
+                <div className="relative w-16 h-16 flex-shrink-0">
+                  <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
+                    <circle
+                      cx="32" cy="32" r="28" fill="none"
+                      stroke="url(#progressGrad)" strokeWidth="4"
+                      strokeLinecap="round"
+                      strokeDasharray={`${pct * 1.76} 176`}
+                      className="transition-all duration-700"
+                    />
+                    <defs>
+                      <linearGradient id="progressGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stopColor="#6366f1" />
+                        <stop offset="100%" stopColor="#8b5cf6" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-sm font-bold gradient-text">{pct}%</span>
+                  </div>
+                </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <MotivIcon size={16} className="text-indigo-400" />
-                <p className="text-sm font-medium text-ink">{motivation.text}</p>
-              </div>
-              <p className="text-xs text-ink-muted">
-                {completed} מתוך {tasks.length} משימות הושלמו
-              </p>
-              <div className="mt-2.5 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
-                  transition={{ duration: 0.7, ease: 'easeOut' }}
-                  className="h-full rounded-full"
-                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <MotivIcon size={16} className="text-indigo-400" />
+                    <p className="text-sm font-medium text-ink">{motivation.text}</p>
+                  </div>
+                  <p className="text-xs text-ink-muted">
+                    {completed} מתוך {tasks.length} משימות הושלמו
+                  </p>
+                  <div className="mt-2.5 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.7, ease: 'easeOut' }}
+                      className="h-full rounded-full"
+                      style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </GlowCard>
         </motion.div>
       )}
 
@@ -338,57 +349,59 @@ export default function TasksPage() {
             exit={{ height: 0, opacity: 0, scale: 0.95 }}
             className="overflow-hidden"
           >
-            <div className="glass rounded-2xl p-5 space-y-4">
-              <p className="text-sm font-semibold text-ink flex items-center gap-2">
-                <Sparkles size={14} className="text-indigo-400" />
-                משימה חדשה
-              </p>
-              <input
-                autoFocus
-                type="text"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') addTask(); if (e.key === 'Escape') setAddingTask(false) }}
-                placeholder="מה צריך לעשות?"
-                className="input-dark w-full text-sm"
-              />
-              {/* Category picker */}
-              <div className="flex gap-2 flex-wrap">
-                {CATEGORIES.map(cat => (
+            <GlowCard>
+              <div className="p-5 space-y-4">
+                <p className="text-sm font-semibold text-ink flex items-center gap-2">
+                  <Sparkles size={14} className="text-indigo-400" />
+                  משימה חדשה
+                </p>
+                <input
+                  autoFocus
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') addTask(); if (e.key === 'Escape') setAddingTask(false) }}
+                  placeholder="מה צריך לעשות?"
+                  className="input-dark w-full text-sm"
+                />
+                {/* Category picker */}
+                <div className="flex gap-2 flex-wrap">
+                  {CATEGORIES.map(cat => (
+                    <button
+                      key={cat.key}
+                      onClick={() => setNewCategory(cat.key)}
+                      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all ${
+                        newCategory === cat.key
+                          ? 'ring-1 ring-offset-0'
+                          : 'opacity-60 hover:opacity-100'
+                      }`}
+                      style={{
+                        background: cat.bg,
+                        color: cat.color,
+                        ...(newCategory === cat.key ? { ringColor: cat.color } : {}),
+                      }}
+                    >
+                      <cat.icon size={12} />
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2 justify-end">
                   <button
-                    key={cat.key}
-                    onClick={() => setNewCategory(cat.key)}
-                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all ${
-                      newCategory === cat.key
-                        ? 'ring-1 ring-offset-0'
-                        : 'opacity-60 hover:opacity-100'
-                    }`}
-                    style={{
-                      background: cat.bg,
-                      color: cat.color,
-                      ...(newCategory === cat.key ? { ringColor: cat.color } : {}),
-                    }}
+                    onClick={() => setAddingTask(false)}
+                    className="px-4 py-2 text-ink-muted hover:text-ink text-sm transition-colors rounded-lg"
                   >
-                    <cat.icon size={12} />
-                    {cat.label}
+                    ביטול
                   </button>
-                ))}
+                  <button
+                    onClick={addTask}
+                    className="btn-gradient px-5 py-2 rounded-lg text-sm text-white font-medium"
+                  >
+                    הוסף משימה
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={() => setAddingTask(false)}
-                  className="px-4 py-2 text-ink-muted hover:text-ink text-sm transition-colors rounded-lg"
-                >
-                  ביטול
-                </button>
-                <button
-                  onClick={addTask}
-                  className="btn-gradient px-5 py-2 rounded-lg text-sm text-white font-medium"
-                >
-                  הוסף משימה
-                </button>
-              </div>
-            </div>
+            </GlowCard>
           </motion.div>
         )}
       </AnimatePresence>
@@ -398,10 +411,12 @@ export default function TasksPage() {
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="glass rounded-xl p-4 flex items-center gap-3">
-                <div className="w-5 h-5 shimmer rounded-md" />
-                <div className="flex-1 h-4 shimmer rounded-lg" />
-              </div>
+              <GlowCard key={i}>
+                <div className="p-4 flex items-center gap-3">
+                  <div className="w-5 h-5 shimmer rounded-md" />
+                  <div className="flex-1 h-4 shimmer rounded-lg" />
+                </div>
+              </GlowCard>
             ))}
           </div>
         ) : tasks.length === 0 ? (
@@ -409,32 +424,35 @@ export default function TasksPage() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass rounded-2xl p-10 text-center relative overflow-hidden"
           >
-            {/* Decorative background */}
-            <div className="absolute inset-0 opacity-30">
-              <div className="absolute top-6 right-10 w-20 h-20 rounded-full bg-indigo-500/10 blur-2xl" />
-              <div className="absolute bottom-8 left-12 w-16 h-16 rounded-full bg-violet-500/10 blur-2xl" />
-            </div>
+            <GlowCard>
+              <div className="p-10 text-center relative">
+                {/* Decorative background */}
+                <div className="absolute inset-0 opacity-30">
+                  <div className="absolute top-6 right-10 w-20 h-20 rounded-full bg-indigo-500/10 blur-2xl" />
+                  <div className="absolute bottom-8 left-12 w-16 h-16 rounded-full bg-violet-500/10 blur-2xl" />
+                </div>
 
-            <div className="relative">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
-                <Coffee size={28} className="text-indigo-400" />
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
+                    <Coffee size={28} className="text-indigo-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-ink mb-1">אין משימות {isToday(new Date(selectedDate + 'T00:00:00')) ? 'להיום' : 'ליום זה'}</h3>
+                  <p className="text-sm text-ink-muted mb-5 max-w-xs mx-auto">
+                    {isToday(new Date(selectedDate + 'T00:00:00'))
+                      ? 'היום יום מצוין להתחיל משהו חדש! הוסף משימה ותתחיל להתקדם.'
+                      : 'הוסף משימות כדי לתכנן את היום שלך.'}
+                  </p>
+                  <button
+                    onClick={() => setAddingTask(true)}
+                    className="btn-gradient px-5 py-2.5 rounded-xl text-sm text-white font-medium inline-flex items-center gap-2 shadow-lg shadow-indigo-500/20"
+                  >
+                    <Plus size={16} />
+                    הוסף משימה ראשונה
+                  </button>
+                </div>
               </div>
-              <h3 className="text-lg font-semibold text-ink mb-1">אין משימות {isToday(new Date(selectedDate + 'T00:00:00')) ? 'להיום' : 'ליום זה'}</h3>
-              <p className="text-sm text-ink-muted mb-5 max-w-xs mx-auto">
-                {isToday(new Date(selectedDate + 'T00:00:00'))
-                  ? 'היום יום מצוין להתחיל משהו חדש! הוסף משימה ותתחיל להתקדם.'
-                  : 'הוסף משימות כדי לתכנן את היום שלך.'}
-              </p>
-              <button
-                onClick={() => setAddingTask(true)}
-                className="btn-gradient px-5 py-2.5 rounded-xl text-sm text-white font-medium inline-flex items-center gap-2 shadow-lg shadow-indigo-500/20"
-              >
-                <Plus size={16} />
-                הוסף משימה ראשונה
-              </button>
-            </div>
+            </GlowCard>
           </motion.div>
         ) : (
           <AnimatePresence>
@@ -450,56 +468,60 @@ export default function TasksPage() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 12, height: 0 }}
                   transition={{ delay: i * 0.03 }}
-                  className={`glass rounded-xl p-4 flex items-center gap-3 group transition-all ${
-                    task.is_completed ? 'opacity-60' : 'hover:border-white/10'
-                  }`}
+                  className={task.is_completed ? 'opacity-60' : ''}
                 >
-                  {/* Checkbox */}
-                  <button
-                    onClick={() => toggleTask(task.id, !task.is_completed)}
-                    className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                      task.is_completed
-                        ? 'border-indigo-500 bg-indigo-500 shadow-sm shadow-indigo-500/30'
-                        : 'border-white/20 hover:border-indigo-400 hover:shadow-sm hover:shadow-indigo-500/20'
-                    }`}
-                  >
-                    {task.is_completed && (
-                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                        <CheckSquare size={12} className="text-white" />
-                      </motion.div>
-                    )}
-                  </button>
+                  <GlowCard glowColor={task.is_completed ? undefined : CATEGORY_GLOW[task.category || 'study']}>
+                    <div className={`p-4 flex items-center gap-3 group transition-all ${
+                      task.is_completed ? '' : 'hover:border-white/10'
+                    }`}>
+                      {/* Checkbox */}
+                      <button
+                        onClick={() => toggleTask(task.id, !task.is_completed)}
+                        className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                          task.is_completed
+                            ? 'border-indigo-500 bg-indigo-500 shadow-sm shadow-indigo-500/30'
+                            : 'border-white/20 hover:border-indigo-400 hover:shadow-sm hover:shadow-indigo-500/20'
+                        }`}
+                      >
+                        {task.is_completed && (
+                          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                            <CheckSquare size={12} className="text-white" />
+                          </motion.div>
+                        )}
+                      </button>
 
-                  {/* Category icon */}
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: cat.bg }}
-                  >
-                    <CatIcon size={14} style={{ color: cat.color }} />
-                  </div>
+                      {/* Category icon */}
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ background: cat.bg }}
+                      >
+                        <CatIcon size={14} style={{ color: cat.color }} />
+                      </div>
 
-                  {/* Title */}
-                  <span className={`flex-1 text-sm transition-all ${
-                    task.is_completed ? 'line-through text-ink-muted' : 'text-ink'
-                  }`}>
-                    {task.title}
-                  </span>
+                      {/* Title */}
+                      <span className={`flex-1 text-sm transition-all ${
+                        task.is_completed ? 'line-through text-ink-muted' : 'text-ink'
+                      }`}>
+                        {task.title}
+                      </span>
 
-                  {/* Duration */}
-                  {task.duration_minutes && (
-                    <span className="text-[11px] text-ink-subtle flex items-center gap-1 flex-shrink-0">
-                      <Clock size={10} />
-                      {task.duration_minutes} דק׳
-                    </span>
-                  )}
+                      {/* Duration */}
+                      {task.duration_minutes && (
+                        <span className="text-[11px] text-ink-subtle flex items-center gap-1 flex-shrink-0">
+                          <Clock size={10} />
+                          {task.duration_minutes} דק׳
+                        </span>
+                      )}
 
-                  {/* Delete */}
-                  <button
-                    onClick={() => deleteTask(task.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-ink-muted hover:text-red-400 hover:bg-red-500/10 transition-all"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                      {/* Delete */}
+                      <button
+                        onClick={() => deleteTask(task.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-ink-muted hover:text-red-400 hover:bg-red-500/10 transition-all"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </GlowCard>
                 </motion.div>
               )
             })}

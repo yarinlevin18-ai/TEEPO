@@ -33,8 +33,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen bg-base">
+      {/* Aurora animated mesh background */}
+      <div className="aurora-mesh">
+        <div className="aurora-blob aurora-blob-1" />
+        <div className="aurora-blob aurora-blob-2" />
+        <div className="aurora-blob aurora-blob-3" />
+        <div className="aurora-blob aurora-blob-4" />
+      </div>
+
       <Sidebar />
-      <main className="flex-1 overflow-auto bg-gradient-mesh">
+      <main className="flex-1 overflow-auto relative z-[1]">
         {children}
       </main>
       <AIChatWidget />
