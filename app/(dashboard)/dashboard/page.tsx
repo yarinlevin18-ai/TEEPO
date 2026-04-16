@@ -269,26 +269,37 @@ export default function DashboardPage() {
         />
       </motion.div>
 
-      {/* ── Subjects ── */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
-              <BookOpen size={14} style={{ color: '#a78bfa' }} />
+      {/* ── Subjects for selected day ── */}
+      {(() => {
+        // Filter courses to only those that have a matching event on the selected day
+        const dayEvents = todayData?.events || []
+        const dayCourses = activeCourses.filter(c =>
+          dayEvents.some(e => matchEventToCourse(e, [c]) !== null)
+        )
+        return (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
+                  <BookOpen size={14} style={{ color: '#a78bfa' }} />
+                </div>
+                <h2 className="font-semibold text-ink">מקצועות היום</h2>
+                {dayCourses.length > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.12)', color: '#c4b5fd' }}>
+                    {dayCourses.length}
+                  </span>
+                )}
+              </div>
+              <Link href="/courses">
+                <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
+                  כל הקורסים <ArrowLeft size={12} />
+                </button>
+              </Link>
             </div>
-            <h2 className="font-semibold text-ink">מקצועות</h2>
-            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.12)', color: '#c4b5fd' }}>
-              {activeCourses.length} פעילים
-            </span>
-          </div>
-          <Link href="/courses">
-            <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
-              כל הקורסים <ArrowLeft size={12} />
-            </button>
-          </Link>
-        </div>
-        <SubjectsView courses={activeCourses} assignments={assignments} loading={loading} />
-      </motion.div>
+            <SubjectsView courses={dayCourses} assignments={assignments} loading={loading} />
+          </motion.div>
+        )
+      })()}
     </div>
   )
 }
@@ -470,12 +481,11 @@ function SubjectsView({ courses, assignments, loading }: {
 
   if (courses.length === 0) {
     return (
-      <div className="glass p-10 text-center">
-        <BookOpen size={32} className="mx-auto mb-3" style={{ color: '#818cf8' }} />
-        <p className="text-ink font-semibold">אין מקצועות עדיין</p>
-        <p className="text-ink-muted text-sm mt-1">הוסף קורסים כדי להתחיל</p>
-        <Link href="/courses/extract">
-          <button className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold btn-gradient">הוסף קורס</button>
+      <div className="glass p-8 text-center">
+        <div className="text-3xl mb-2">📖</div>
+        <p className="text-ink-muted text-sm">אין מקצועות ביום הזה</p>
+        <Link href="/courses">
+          <button className="mt-3 text-xs text-accent-400 hover:text-accent transition-colors">ראה את כל הקורסים</button>
         </Link>
       </div>
     )
