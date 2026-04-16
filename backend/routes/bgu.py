@@ -224,3 +224,25 @@ def get_course_materials():
         return jsonify({"error": "כתובת URL חייבת להיות מאתר BGU"}), 400
     result = bgu_scraper.scrape_course_materials(course_url)
     return jsonify(result)
+
+
+@bgu.get("/grades")
+def get_grades():
+    """Get grades from Moodle."""
+    try:
+        result = bgu_scraper.scrape_grades()
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Grade fetch failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@bgu.get("/assignments/all")
+def get_all_assignments():
+    """Get all assignments from all Moodle courses (AJAX bulk fetch)."""
+    try:
+        result = bgu_scraper.scrape_all_assignments()
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Bulk assignment fetch failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500

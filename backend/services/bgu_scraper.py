@@ -494,13 +494,159 @@ def scrape_moodle_courses() -> dict:
     return {"status": "success", "courses": unique, "count": len(unique)}
 
 
+def _get_sesskey(session: requests.Session) -> Optional[str]:
+    """Extract Moodle sesskey from dashboard page."""
+    try:
+        resp = session.get(f"{MOODLE_URL}/my/", timeout=15)
+        m = re.search(r'"sesskey"\s*:\s*"([^"]+)"', resp.text)
+        if not m:
+            m = re.search(r'sesskey=([a-zA-Z0-9]+)', resp.text)
+        return m.group(1) if m else None
+    except Exception:
+        return None
+
+
+def _moodle_ajax(session: requests.Session, sesskey: str,
+                 method: str, args: dict) -> Optional[list]:
+    """Call a Moodle AJAX web service method."""
+    ajax_url = f"{MOODLE_URL}/lib/ajax/service.php?sesskey={sesskey}&info={method}"
+    payload = [{"index": 0, "methodname": method, "args": args}]
+    try:
+        resp = session.post(ajax_url, json=payload, timeout=20)
+        data = resp.json()
+        if isinstance(data, list) and data and data[0].get("error") is False:
+            return data[0].get("data")
+    except Exception as e:
+        logger.debug(f"[BGU] AJAX {method} failed: {e}")
+    return None
+
+
+def scrape_all_assignments(course_ids: list = None) -> dict:
+    """Fetch assignments for all enrolled courses via Moodle AJAX API.
+    Much more reliable than per-course HTML scraping.
+    Falls back to HTML scraping per course if AJAX fails."""
+    cookies = _load_cookies_from_store("moodle")
+    if not cookies:
+        return {"status": "error", "message": "לא מחובר ל-Moodle."}
+
+    session = _build_session(cookies)
+    sesskey = _get_sesskey(session)
+    assignments = []
+
+    # ── Strategy 1: AJAX mod_assign_get_assignments ──
+    if sesskey:
+        try:
+            args = {"courseids": course_ids} if course_ids else {"courseids": []}
+            # If no course IDs provided, get them first
+            if not course_ids:
+                courses_result = scrape_moodle_courses()
+                if courses_result.get("courses"):
+                    args["courseids"] = [
+                        int(c["moodle_id"]) for c in courses_result["courses"]
+                        if c.get("moodle_id") and c["moodle_id"].isdigit()
+                    ]
+
+            if args["courseids"]:
+                data = _moodle_ajax(session, sesskey, "mod_assign_get_assignments", args)
+                if data and "courses" in data:
+                    for course in data["courses"]:
+                        course_name = course.get("fullname", "")
+                        for assign in course.get("assignments", []):
+                            deadline = None
+                            if assign.get("duedate") and assign["duedate"] > 0:
+                                from datetime import datetime, timezone
+                                deadline = datetime.fromtimestamp(
+                                    assign["duedate"], tz=timezone.utc
+                                ).strftime("%Y-%m-%d")
+                            assignments.append({
+                                "title": assign.get("name", ""),
+                                "url": f"{MOODLE_URL}/mod/assign/view.php?id={assign.get('cmid', '')}",
+                                "moodle_id": str(assign.get("id", "")),
+                                "course_name": course_name,
+                                "course_moodle_id": str(course.get("id", "")),
+                                "deadline": deadline,
+                                "deadline_text": deadline or "",
+                                "description": BeautifulSoup(
+                                    assign.get("intro", ""), "html.parser"
+                                ).get_text(strip=True)[:500],
+                            })
+                    logger.debug(f"[BGU] AJAX found {len(assignments)} assignments across {len(data['courses'])} courses")
+                    if assignments:
+                        return {"status": "success", "assignments": assignments, "count": len(assignments)}
+        except Exception as e:
+            logger.debug(f"[BGU] AJAX assignment fetch failed: {e}")
+
+    # ── Strategy 2: Upcoming events API (calendar deadlines) ──
+    if sesskey and not assignments:
+        try:
+            from datetime import datetime, timezone
+            now_ts = int(datetime.now(timezone.utc).timestamp())
+            future_ts = now_ts + (90 * 86400)  # 90 days ahead
+            data = _moodle_ajax(session, sesskey, "core_calendar_get_action_events_by_timesort", {
+                "timesortfrom": now_ts,
+                "timesortto": future_ts,
+                "limitnum": 50,
+            })
+            if data and "events" in data:
+                for event in data["events"]:
+                    if event.get("modulename") == "assign":
+                        deadline = None
+                        if event.get("timestart"):
+                            deadline = datetime.fromtimestamp(
+                                event["timestart"], tz=timezone.utc
+                            ).strftime("%Y-%m-%d")
+                        assignments.append({
+                            "title": event.get("name", ""),
+                            "url": event.get("url", ""),
+                            "course_name": event.get("course", {}).get("fullname", ""),
+                            "deadline": deadline,
+                            "deadline_text": deadline or "",
+                        })
+                logger.debug(f"[BGU] Calendar API found {len(assignments)} assignment events")
+                if assignments:
+                    return {"status": "success", "assignments": assignments, "count": len(assignments)}
+        except Exception as e:
+            logger.debug(f"[BGU] Calendar strategy failed: {e}")
+
+    logger.debug(f"[BGU] AJAX assignment strategies returned {len(assignments)} results")
+    return {"status": "success", "assignments": assignments, "count": len(assignments)}
+
+
 def scrape_course_assignments(course_url: str) -> dict:
+    """Scrape assignments for a single course (HTML fallback)."""
     cookies = _load_cookies_from_store("moodle")
     if not cookies:
         return {"status": "error", "message": "לא מחובר"}
 
     session = _build_session(cookies)
 
+    # Try AJAX first if we can extract course ID
+    course_id_match = re.search(r"id=(\d+)", course_url)
+    if course_id_match:
+        sesskey = _get_sesskey(session)
+        if sesskey:
+            cid = int(course_id_match.group(1))
+            data = _moodle_ajax(session, sesskey, "mod_assign_get_assignments", {"courseids": [cid]})
+            if data and "courses" in data:
+                assignments = []
+                for course in data["courses"]:
+                    for assign in course.get("assignments", []):
+                        deadline = None
+                        if assign.get("duedate") and assign["duedate"] > 0:
+                            from datetime import datetime, timezone
+                            deadline = datetime.fromtimestamp(
+                                assign["duedate"], tz=timezone.utc
+                            ).strftime("%Y-%m-%d")
+                        assignments.append({
+                            "title": assign.get("name", ""),
+                            "url": f"{MOODLE_URL}/mod/assign/view.php?id={assign.get('cmid', '')}",
+                            "deadline": deadline,
+                            "deadline_text": deadline or "",
+                        })
+                if assignments:
+                    return {"status": "success", "assignments": assignments}
+
+    # HTML fallback
     try:
         resp = session.get(course_url, timeout=15)
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -533,6 +679,34 @@ def scrape_course_materials(course_url: str) -> dict:
 
     session = _build_session(cookies)
 
+    # Try AJAX for course contents first
+    course_id_match = re.search(r"id=(\d+)", course_url)
+    if course_id_match:
+        sesskey = _get_sesskey(session)
+        if sesskey:
+            cid = int(course_id_match.group(1))
+            data = _moodle_ajax(session, sesskey, "core_course_get_contents", {"courseid": cid})
+            if data:
+                materials = []
+                sections = []
+                for section in data:
+                    sec_name = section.get("name", "")
+                    if sec_name:
+                        sections.append(sec_name)
+                    for module in section.get("modules", []):
+                        mod_type = module.get("modname", "")
+                        if mod_type in ("resource", "url", "folder", "page", "forum"):
+                            materials.append({
+                                "title": module.get("name", ""),
+                                "url": module.get("url", ""),
+                                "type": mod_type,
+                                "description": module.get("description", ""),
+                            })
+                if materials or sections:
+                    logger.debug(f"[BGU] AJAX found {len(materials)} materials, {len(sections)} sections")
+                    return {"status": "success", "materials": materials, "sections": sections}
+
+    # HTML fallback
     try:
         resp = session.get(course_url, timeout=15)
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -561,6 +735,59 @@ def scrape_course_materials(course_url: str) -> dict:
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def scrape_grades() -> dict:
+    """Fetch grades for all courses via Moodle AJAX API."""
+    cookies = _load_cookies_from_store("moodle")
+    if not cookies:
+        return {"status": "error", "message": "לא מחובר ל-Moodle."}
+
+    session = _build_session(cookies)
+    sesskey = _get_sesskey(session)
+
+    if not sesskey:
+        return {"status": "error", "message": "לא ניתן לשלוף sesskey."}
+
+    # Get user ID from Moodle
+    try:
+        resp = session.get(f"{MOODLE_URL}/my/", timeout=15)
+        uid_match = re.search(r'data-userid="(\d+)"', resp.text)
+        if not uid_match:
+            uid_match = re.search(r'"userid"\s*:\s*(\d+)', resp.text)
+        if not uid_match:
+            return {"status": "error", "message": "לא ניתן לזהות משתמש Moodle."}
+        moodle_user_id = int(uid_match.group(1))
+    except Exception as e:
+        return {"status": "error", "message": f"שגיאה בזיהוי משתמש: {e}"}
+
+    # Get enrolled courses first
+    courses_result = scrape_moodle_courses()
+    if not courses_result.get("courses"):
+        return {"status": "error", "message": "לא נמצאו קורסים."}
+
+    grades = []
+    for course in courses_result["courses"]:
+        cid = course.get("moodle_id")
+        if not cid or not cid.isdigit():
+            continue
+        try:
+            data = _moodle_ajax(session, sesskey, "gradereport_overview_get_course_grades", {
+                "userid": moodle_user_id,
+            })
+            if data and "grades" in data:
+                for g in data["grades"]:
+                    grades.append({
+                        "course_id": str(g.get("courseid", "")),
+                        "course_name": g.get("coursename", course.get("title", "")),
+                        "grade": g.get("grade", ""),
+                        "rank": g.get("rank", ""),
+                    })
+                break  # This API returns all courses at once
+        except Exception as e:
+            logger.debug(f"[BGU] Grade fetch failed for course {cid}: {e}")
+
+    return {"status": "success", "grades": grades, "count": len(grades)}
 
 
 # --------------------------------------------------------------------------- #
