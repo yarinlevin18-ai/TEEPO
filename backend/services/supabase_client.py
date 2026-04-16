@@ -2,6 +2,27 @@
 from supabase import create_client, Client
 from config import SUPABASE_URL, SUPABASE_SERVICE_KEY
 
+# ── Compatibility patch ─────────────────────────────────────────────────────
+# supabase-py 2.3 passes 'proxy' to httpx.Client which removed it in >=0.24.
+# Monkey-patch both sync and async httpx clients to silently drop the kwarg.
+try:
+    import httpx as _httpx
+
+    _orig_sync = _httpx.Client.__init__
+    def _sync_init(self, *a, **kw):
+        kw.pop('proxy', None)
+        _orig_sync(self, *a, **kw)
+    _httpx.Client.__init__ = _sync_init
+
+    _orig_async = _httpx.AsyncClient.__init__
+    def _async_init(self, *a, **kw):
+        kw.pop('proxy', None)
+        _orig_async(self, *a, **kw)
+    _httpx.AsyncClient.__init__ = _async_init
+except Exception:
+    pass  # if httpx isn't installed, supabase will fail anyway
+# ───────────────────────────────────────────────────────────────────────────
+
 _client: Client | None = None
 
 
