@@ -1,477 +1,562 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  BookOpen, CheckSquare, Clock, TrendingUp,
-  Calendar, ArrowLeft, Zap, Target, Flame, Star,
+  BookOpen, Clock, Calendar, ArrowLeft, ArrowRight,
+  ChevronRight, ChevronLeft, MapPin, ExternalLink,
+  PenLine, FileText, TrendingUp, RefreshCw,
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
-import CalendarWidget from '@/components/CalendarWidget'
+import { supabase } from '@/lib/supabase'
 import ErrorAlert from '@/components/ui/ErrorAlert'
-import type { StudyTask, Course, Assignment } from '@/types'
+import type { Course, Assignment } from '@/types'
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
+import {
+  type GoogleCalendarEvent,
+  fetchCalendarEvents,
+  formatEventTime,
+  getEventColor,
+} from '@/lib/google-calendar'
 
-/**
- * Detect current semester from date:
- *  Semester א = October–February  (months 10-12, 1-2)
- *  Semester ב = March–July        (months 3-7)
- *  Summer     = August–September  (months 8-9)
- */
-function getCurrentSemester(): { semester: string; label: string } {
-  const month = new Date().getMonth() + 1
-  if (month >= 10 || month <= 2) return { semester: '1', label: "סמסטר א'" }
-  if (month >= 3 && month <= 7) return { semester: '2', label: "סמסטר ב'" }
-  return { semester: 'קיץ', label: 'קיץ' }
-}
+// ── Helpers ──────────────────────────────────────────────────
 
-function isCourseCurrentSemester(title: string): boolean {
-  const { semester } = getCurrentSemester()
-
-  if (semester === '1') {
-    if (/סמ['\s]*1|סמסטר\s*א|sem(?:ester)?\s*1|\bS1\b/i.test(title)) return true
-  } else if (semester === '2') {
-    if (/סמ['\s]*2|סמסטר\s*ב|sem(?:ester)?\s*2|\bS2\b/i.test(title)) return true
-  } else {
-    if (/קיץ|summer/i.test(title)) return true
-  }
-
-  if (!/סמ['\s]*[12]|סמסטר|sem(?:ester)?|summer|קיץ|\bS[12]\b/i.test(title)) return true
-
-  return false
-}
+const DAYS_SHORT = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳']
 
 function getGreeting(): string {
-  const hour = new Date().getHours()
-  if (hour >= 5 && hour < 12) return 'בוקר טוב'
-  if (hour >= 12 && hour < 17) return 'צהריים טובים'
-  if (hour >= 17 && hour < 21) return 'ערב טוב'
+  const h = new Date().getHours()
+  if (h >= 5 && h < 12) return 'בוקר טוב'
+  if (h >= 12 && h < 17) return 'צהריים טובים'
+  if (h >= 17 && h < 21) return 'ערב טוב'
   return 'לילה טוב'
 }
 
+function getCurrentSemester(): string {
+  const m = new Date().getMonth() + 1
+  if (m >= 10 || m <= 2) return "סמסטר א'"
+  if (m >= 3 && m <= 7) return "סמסטר ב'"
+  return 'קיץ'
+}
+
+/** Try to match a Google Calendar event to a course by fuzzy title matching */
+function matchEventToCourse(event: GoogleCalendarEvent, courses: Course[]): Course | null {
+  const summary = (event.summary || '').toLowerCase()
+  if (!summary) return null
+  // Direct match
+  for (const c of courses) {
+    const title = c.title.toLowerCase()
+    if (summary.includes(title) || title.includes(summary)) return c
+    // Try matching without common prefixes
+    const cleanSummary = summary.replace(/^(הרצאה|תרגול|מעבדה|שיעור|lecture|tutorial|lab)\s*[-:]\s*/i, '')
+    const cleanTitle = title.replace(/^(הרצאה|תרגול|מעבדה|שיעור)\s*[-:]\s*/i, '')
+    if (cleanSummary && cleanTitle && (cleanSummary.includes(cleanTitle) || cleanTitle.includes(cleanSummary))) return c
+    // Word-level match (at least 2 significant words match)
+    const sWords = cleanSummary.split(/\s+/).filter(w => w.length > 2)
+    const tWords = cleanTitle.split(/\s+/).filter(w => w.length > 2)
+    const matches = sWords.filter(w => tWords.some(tw => tw.includes(w) || w.includes(tw)))
+    if (matches.length >= 2) return c
+  }
+  return null
+}
+
+// ── Types ────────────────────────────────────────────────────
+
+type Tab = 'schedule' | 'subjects'
+
+interface DayData {
+  date: Date
+  events: GoogleCalendarEvent[]
+  isToday: boolean
+}
+
+// ── Component ────────────────────────────────────────────────
+
 export default function DashboardPage() {
-  const { user } = useAuth()
-  const [tasks, setTasks] = useState<StudyTask[]>([])
+  const { user, session } = useAuth()
   const [courses, setCourses] = useState<Course[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const [activeTab, setActiveTab] = useState<Tab>('schedule')
 
-  const displayName = user?.user_metadata?.display_name
-    || user?.email?.split('@')[0]
-    || ''
+  // Calendar state
+  const [weekDays, setWeekDays] = useState<DayData[]>([])
+  const [selectedDay, setSelectedDay] = useState(new Date().getDay())
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [calLoading, setCalLoading] = useState(true)
+  const [calError, setCalError] = useState<string | null>(null)
 
+  const providerToken = session?.provider_token
+  const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || ''
+
+  // ── Load app data ──────────────────────────────────────────
   useEffect(() => {
-    Promise.all([api.tasks.list(today), api.courses.list(), api.assignments.list()])
-      .then(([t, c, a]) => { setTasks(t); setCourses(c); setAssignments(a) })
-      .catch((e) => {
-        console.error(e)
-        setError('שגיאה בטעינת הנתונים. נסה לרענן את העמוד.')
-      })
+    Promise.all([api.courses.list(), api.assignments.list()])
+      .then(([c, a]) => { setCourses(c); setAssignments(a) })
+      .catch(() => setError('שגיאה בטעינת הנתונים'))
       .finally(() => setLoading(false))
-  }, [today])
+  }, [])
 
-  const completedToday = tasks.filter(t => t.is_completed).length
-  const totalTasks = tasks.length
-  const completionRate = totalTasks > 0 ? Math.round((completedToday / totalTasks) * 100) : 0
+  // ── Load calendar events ───────────────────────────────────
+  useEffect(() => {
+    if (!providerToken) { setCalLoading(false); return }
+    loadCalendar()
+  }, [providerToken, weekOffset])
+
+  async function loadCalendar() {
+    setCalLoading(true)
+    setCalError(null)
+    try {
+      const now = new Date()
+      const sunday = new Date(now)
+      sunday.setDate(now.getDate() - now.getDay() + weekOffset * 7)
+      sunday.setHours(0, 0, 0, 0)
+      const saturday = new Date(sunday)
+      saturday.setDate(sunday.getDate() + 6)
+      saturday.setHours(23, 59, 59, 999)
+
+      const events = await fetchCalendarEvents(providerToken!, sunday.toISOString(), saturday.toISOString())
+      const today = new Date(); today.setHours(0, 0, 0, 0)
+
+      const days: DayData[] = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date(sunday); date.setDate(sunday.getDate() + i)
+        return {
+          date,
+          events: events.filter(e => {
+            const ed = new Date(e.start.dateTime || e.start.date || '')
+            return ed.toDateString() === date.toDateString()
+          }),
+          isToday: date.toDateString() === today.toDateString(),
+        }
+      })
+      setWeekDays(days)
+    } catch (e: any) {
+      setCalError(e.message === 'TOKEN_EXPIRED' ? 'TOKEN_EXPIRED' : 'calendar_error')
+    } finally {
+      setCalLoading(false)
+    }
+  }
+
+  const todayData = weekDays[selectedDay]
   const activeCourses = courses.filter(c => c.status === 'active')
-  const avgProgress = activeCourses.length > 0
-    ? Math.round(activeCourses.reduce((sum, c) => sum + c.progress_percentage, 0) / activeCourses.length)
-    : 0
-  const urgentAssignments = assignments.filter(
-    a => a.deadline && new Date(a.deadline) < new Date(Date.now() + 3 * 86400000) && a.status !== 'submitted'
-  )
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8 animate-fade-in">
+    <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-6 animate-fade-in">
 
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
-      {/* Hero Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl p-8"
-        style={{
-          background: 'linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(139,92,246,0.15) 50%, rgba(56,189,248,0.1) 100%)',
-          border: '1px solid rgba(99,102,241,0.2)',
-        }}
-      >
-        {/* Background decoration */}
-        <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-30"
-          style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.4) 0%, transparent 70%)', filter: 'blur(40px)' }} />
-        <div className="absolute bottom-0 right-0 w-48 h-48 rounded-full opacity-20"
-          style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.5) 0%, transparent 70%)', filter: 'blur(30px)' }} />
-
-        <div className="relative z-10 flex items-center justify-between">
+      {/* ── Header ── */}
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Image src="/logo-128.png" alt="SmartDesk" width={38} height={38} />
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Image src="/logo-128.png" alt="SmartDesk" width={42} height={42} />
-              <span className="text-sm font-bold px-3 py-1 rounded-full"
-                style={{ background: 'rgba(99,102,241,0.2)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}>
-                MyDesk
-              </span>
-            </div>
-            <h1 className="text-3xl font-extrabold mt-3">
+            <h1 className="text-2xl font-extrabold">
               <span className="text-ink">{getGreeting()}, </span>
               <span className="gradient-text">{displayName}</span>
-              <span className="ml-1">👋</span>
             </h1>
-            <p className="text-ink-muted mt-2 flex items-center gap-2">
-              <Calendar size={14} />
-              {format(new Date(), 'EEEE, d בMMMM yyyy', { locale: he })}
-              <span className="mx-1">·</span>
-              <span className="text-accent-400">{getCurrentSemester().label}</span>
-            </p>
-          </div>
-
-          {/* Daily Progress Ring */}
-          <div className="hidden md:flex flex-col items-center gap-2">
-            <div className="relative w-24 h-24">
-              <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
-                <circle
-                  cx="50" cy="50" r="42" fill="none"
-                  stroke="url(#progressGrad)" strokeWidth="8" strokeLinecap="round"
-                  strokeDasharray={`${completionRate * 2.64} 264`}
-                  className="transition-all duration-1000"
-                />
-                <defs>
-                  <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#6366f1" />
-                    <stop offset="100%" stopColor="#8b5cf6" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-bold text-ink">{completionRate}%</span>
-              </div>
-            </div>
-            <span className="text-xs text-ink-muted">ביצוע יומי</span>
+            <p className="text-xs text-ink-muted mt-0.5">{getCurrentSemester()}</p>
           </div>
         </div>
+        <span className="text-sm font-bold px-3 py-1.5 rounded-xl"
+          style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.2)' }}>
+          MyDesk
+        </span>
       </motion.div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'קורסים פעילים', value: activeCourses.length, icon: BookOpen, color: '#6366f1', bg: 'rgba(99,102,241,0.12)', border: 'rgba(99,102,241,0.2)' },
-          { label: 'משימות להיום', value: totalTasks, icon: Target, color: '#10b981', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.2)' },
-          { label: 'הושלמו היום', value: completedToday, icon: Flame, color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.2)' },
-          { label: 'מטלות דחופות', value: urgentAssignments.length, icon: Zap, color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.2)' },
-        ].map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 + i * 0.08 }}
-            className="relative overflow-hidden rounded-xl p-5 group hover:scale-[1.02] transition-transform"
-            style={{ background: stat.bg, border: `1px solid ${stat.border}` }}
-          >
-            <div className="absolute top-3 left-3 opacity-10 group-hover:opacity-20 transition-opacity">
-              <stat.icon size={40} style={{ color: stat.color }} />
-            </div>
-            <div className="relative z-10">
-              <stat.icon size={20} style={{ color: stat.color }} className="mb-3" />
-              <p className="text-3xl font-extrabold text-ink">{stat.value}</p>
-              <p className="text-xs text-ink-muted mt-1">{stat.label}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Overall Progress Bar */}
-      {activeCourses.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="glass p-5"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={16} style={{ color: '#8b5cf6' }} />
-              <span className="text-sm font-semibold text-ink">התקדמות כללית</span>
-            </div>
-            <span className="text-sm font-bold gradient-text">{avgProgress}%</span>
-          </div>
-          <div className="w-full h-3 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${avgProgress}%` }}
-              transition={{ duration: 1.2, ease: 'easeOut' }}
-              className="h-3 rounded-full"
-              style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6, #a78bfa)' }}
-            />
-          </div>
-          <p className="text-xs text-ink-muted mt-2">ממוצע על פני {activeCourses.length} קורסים פעילים</p>
-        </motion.div>
-      )}
-
-      {/* Google Calendar */}
-      <CalendarWidget />
-
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Today's Tasks */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="glass overflow-hidden"
-        >
-          <div className="flex items-center justify-between p-5 border-b border-white/5">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
-                <CheckSquare size={14} style={{ color: '#818cf8' }} />
-              </div>
-              <h2 className="font-semibold text-ink">משימות היום</h2>
-              {totalTasks > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
-                  {completedToday}/{totalTasks}
-                </span>
-              )}
-            </div>
-            <Link href="/tasks">
-              <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
-                הכל <ArrowLeft size={12} />
-              </button>
-            </Link>
-          </div>
-          <div className="divide-y divide-white/5 max-h-72 overflow-y-auto">
-            {loading ? <LoadingSkeleton rows={3} /> : tasks.length === 0 ? (
-              <EmptyState message="אין משימות להיום" action={{ href: '/tasks', label: 'הוסף משימה' }} icon={Star} />
-            ) : (
-              tasks.map(task => (
-                <TaskRow key={task.id} task={task} onToggle={(id, done) => {
-                  setTasks(prev => prev.map(t => t.id === id ? { ...t, is_completed: done } : t))
-                  api.tasks.update(id, { is_completed: done }).catch((e) => {
-                    console.error(e)
-                    setTasks(prev => prev.map(t => t.id === id ? { ...t, is_completed: !done } : t))
-                    setError('שגיאה בעדכון המשימה.')
-                  })
-                }} />
-              ))
-            )}
-          </div>
-        </motion.div>
-
-        {/* Upcoming assignments */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="glass overflow-hidden"
-        >
-          <div className="flex items-center justify-between p-5 border-b border-white/5">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(245,158,11,0.15)' }}>
-                <Clock size={14} style={{ color: '#f59e0b' }} />
-              </div>
-              <h2 className="font-semibold text-ink">מטלות קרובות</h2>
-              {urgentAssignments.length > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>
-                  {urgentAssignments.length} דחופות
-                </span>
-              )}
-            </div>
-            <Link href="/assignments">
-              <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
-                הכל <ArrowLeft size={12} />
-              </button>
-            </Link>
-          </div>
-          <div className="divide-y divide-white/5 max-h-72 overflow-y-auto">
-            {loading ? <LoadingSkeleton rows={3} /> : assignments.length === 0 ? (
-              <EmptyState message="אין מטלות קרובות" action={{ href: '/assignments', label: 'הוסף מטלה' }} icon={Star} />
-            ) : (
-              assignments.slice(0, 5).map(a => {
-                const daysLeft = a.deadline
-                  ? Math.ceil((new Date(a.deadline).getTime() - Date.now()) / 86400000)
-                  : null
-                return (
-                  <div key={a.id} className="p-4 flex justify-between items-center hover:bg-white/[0.02] transition-colors">
-                    <div>
-                      <p className="text-sm font-medium text-ink">{a.title}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        {a.deadline && (
-                          <span className="text-xs text-ink-muted">
-                            {format(new Date(a.deadline), 'd בMMM', { locale: he })}
-                          </span>
-                        )}
-                        {daysLeft !== null && daysLeft <= 3 && daysLeft >= 0 && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>
-                            {daysLeft === 0 ? 'היום!' : daysLeft === 1 ? 'מחר' : `עוד ${daysLeft} ימים`}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <PriorityBadge priority={a.priority} />
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Active Courses */}
+      {/* ── Calendar Strip ── */}
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
+        transition={{ delay: 0.1 }}
         className="glass overflow-hidden"
       >
-        <div className="flex items-center justify-between p-5 border-b border-white/5">
+        {/* Week nav + date */}
+        <div className="flex items-center justify-between px-5 pt-4 pb-2">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
-              <BookOpen size={14} style={{ color: '#818cf8' }} />
-            </div>
-            <h2 className="font-semibold text-ink">קורסים פעילים</h2>
-            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.15)', color: '#c4b5fd' }}>
-              {getCurrentSemester().label}
+            <Calendar size={16} style={{ color: '#818cf8' }} />
+            <span className="text-sm font-semibold text-ink">
+              {format(new Date(), 'EEEE, d בMMMM yyyy', { locale: he })}
             </span>
           </div>
-          <Link href="/courses">
-            <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
-              כל הקורסים <ArrowLeft size={12} />
+          <div className="flex items-center gap-1">
+            <button onClick={() => setWeekOffset(w => w - 1)} className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/5 transition-colors">
+              <ChevronRight size={16} />
             </button>
-          </Link>
-        </div>
-        {loading ? (
-          <div className="p-5"><LoadingSkeleton rows={2} /></div>
-        ) : courses.length === 0 ? (
-          <EmptyState message="עדיין לא הוספת קורסים" action={{ href: '/bgu-connect', label: 'חבר BGU' }} icon={BookOpen} />
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 p-5">
-            {courses
-              .filter(c => c.status === 'active' && isCourseCurrentSemester(c.title))
-              .map((course, i) => (
-                <motion.div
-                  key={course.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.8 + i * 0.05 }}
-                >
-                  <Link href={`/courses/${course.id}`}>
-                    <div className="relative overflow-hidden rounded-xl p-4 group hover:scale-[1.02] transition-all cursor-pointer"
-                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-                    >
-                      {/* Accent top border */}
-                      <div className="absolute top-0 left-0 right-0 h-0.5"
-                        style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }} />
-                      <p className="font-medium text-ink text-sm line-clamp-2 group-hover:text-accent-400 transition-colors">{course.title}</p>
-                      <div className="mt-3">
-                        <div className="flex justify-between text-xs text-ink-muted mb-1.5">
-                          <span>התקדמות</span>
-                          <span className="font-semibold" style={{ color: course.progress_percentage >= 70 ? '#10b981' : '#a5b4fc' }}>
-                            {Math.round(course.progress_percentage)}%
-                          </span>
-                        </div>
-                        <div className="w-full h-2 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                          <div
-                            className="h-2 rounded-full transition-all"
-                            style={{
-                              width: `${course.progress_percentage}%`,
-                              background: course.progress_percentage >= 70
-                                ? 'linear-gradient(90deg, #10b981, #34d399)'
-                                : 'linear-gradient(90deg, #6366f1, #8b5cf6)',
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))
-            }
-            {courses.filter(c => c.status === 'active' && isCourseCurrentSemester(c.title)).length === 0 && (
-              <div className="col-span-full p-6 text-center">
-                <p className="text-ink-muted text-sm">אין קורסים פעילים לסמסטר הנוכחי</p>
-                <Link href="/courses">
-                  <button className="mt-2 text-sm text-accent-400 hover:text-accent transition-colors">
-                    ראה את כל הקורסים
-                  </button>
-                </Link>
-              </div>
-            )}
+            <button onClick={() => { setWeekOffset(0); setSelectedDay(new Date().getDay()) }}
+              className="px-2.5 py-1 rounded-lg text-xs text-accent-400 hover:bg-white/5 transition-colors font-medium">
+              היום
+            </button>
+            <button onClick={() => setWeekOffset(w => w + 1)} className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/5 transition-colors">
+              <ChevronLeft size={16} />
+            </button>
           </div>
-        )}
+        </div>
+
+        {/* Day pills */}
+        <div className="grid grid-cols-7 gap-1.5 px-4 pb-4">
+          {weekDays.map((day, i) => (
+            <button
+              key={i}
+              onClick={() => setSelectedDay(i)}
+              className={`flex flex-col items-center py-2.5 px-1 rounded-xl transition-all ${
+                selectedDay === i ? 'text-white shadow-lg' : day.isToday ? 'text-accent-400' : 'text-ink-muted hover:text-ink hover:bg-white/5'
+              }`}
+              style={selectedDay === i ? {
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
+              } : undefined}
+            >
+              <span className="text-[10px] font-medium">{DAYS_SHORT[i]}</span>
+              <span className="text-lg font-bold mt-0.5">{day.date.getDate()}</span>
+              {day.events.length > 0 && selectedDay !== i && (
+                <div className="flex gap-0.5 mt-1">
+                  {day.events.slice(0, 3).map((_, j) => (
+                    <div key={j} className="w-1 h-1 rounded-full bg-accent-400" />
+                  ))}
+                </div>
+              )}
+            </button>
+          ))}
+          {weekDays.length === 0 && !calLoading && (
+            <div className="col-span-7 text-center py-4">
+              {!providerToken ? (
+                <button
+                  onClick={() => supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: { redirectTo: `${window.location.origin}/dashboard`, scopes: 'https://www.googleapis.com/auth/calendar.readonly' },
+                  })}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                  style={{ background: 'rgba(66,133,244,0.15)', color: '#8ab4f8', border: '1px solid rgba(66,133,244,0.25)' }}
+                >
+                  <Calendar size={14} /> חבר Google Calendar
+                </button>
+              ) : calError === 'TOKEN_EXPIRED' ? (
+                <button
+                  onClick={() => supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: { redirectTo: `${window.location.origin}/dashboard`, scopes: 'https://www.googleapis.com/auth/calendar.readonly' },
+                  })}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-accent-400"
+                >
+                  <RefreshCw size={12} /> התחבר מחדש ל-Google
+                </button>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </motion.div>
+
+      {/* ── Tabs: Schedule / Subjects ── */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+        <div className="flex gap-2 mb-5">
+          {([
+            { key: 'schedule' as Tab, label: 'מערכת שעות', icon: Clock },
+            { key: 'subjects' as Tab, label: 'מקצועות', icon: BookOpen },
+          ]).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === tab.key
+                  ? 'text-white shadow-lg'
+                  : 'text-ink-muted hover:text-ink glass-sm'
+              }`}
+              style={activeTab === tab.key ? {
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                boxShadow: '0 4px 16px rgba(99,102,241,0.3)',
+              } : undefined}
+            >
+              <tab.icon size={16} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <AnimatePresence mode="wait">
+          {activeTab === 'schedule' ? (
+            <motion.div key="schedule" initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}>
+              <ScheduleView
+                dayData={todayData}
+                calLoading={calLoading}
+                courses={courses}
+                assignments={assignments}
+                providerToken={providerToken}
+              />
+            </motion.div>
+          ) : (
+            <motion.div key="subjects" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
+              <SubjectsView courses={activeCourses} assignments={assignments} loading={loading} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   )
 }
 
-function TaskRow({ task, onToggle }: { task: StudyTask; onToggle: (id: string, done: boolean) => void }) {
-  return (
-    <div className="flex items-center gap-3 p-4 hover:bg-white/[0.02] transition-colors">
-      <button
-        onClick={() => onToggle(task.id, !task.is_completed)}
-        className="w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all hover:scale-110"
-        style={task.is_completed
-          ? { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', borderColor: '#6366f1' }
-          : { borderColor: 'rgba(255,255,255,0.2)' }}
-      >
-        {task.is_completed && (
-          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-      </button>
-      <span className={`text-sm flex-1 transition-all ${task.is_completed ? 'line-through text-ink-muted' : 'text-ink'}`}>
-        {task.title}
-      </span>
-      {task.duration_minutes && (
-        <span className="text-xs px-2 py-0.5 rounded-full text-ink-muted" style={{ background: 'rgba(255,255,255,0.05)' }}>
-          {task.duration_minutes} דק׳
-        </span>
-      )}
-    </div>
-  )
-}
+// ── Schedule Tab ─────────────────────────────────────────────
 
-function PriorityBadge({ priority }: { priority: string }) {
-  const styles = {
-    high:   { bg: 'rgba(239,68,68,0.15)',  color: '#f87171', border: 'rgba(239,68,68,0.25)', label: 'דחוף' },
-    medium: { bg: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: 'rgba(245,158,11,0.25)', label: 'בינוני' },
-    low:    { bg: 'rgba(16,185,129,0.15)', color: '#34d399', border: 'rgba(16,185,129,0.25)', label: 'נמוך' },
+function ScheduleView({ dayData, calLoading, courses, assignments, providerToken }: {
+  dayData?: DayData
+  calLoading: boolean
+  courses: Course[]
+  assignments: Assignment[]
+  providerToken?: string | null
+}) {
+  if (calLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl shimmer" />)}
+      </div>
+    )
   }
-  const s = styles[priority as keyof typeof styles] || styles.medium
-  return (
-    <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
-      {s.label}
-    </span>
-  )
-}
 
-function LoadingSkeleton({ rows }: { rows: number }) {
+  if (!providerToken) {
+    return (
+      <div className="glass p-10 text-center">
+        <Calendar size={32} className="mx-auto mb-3" style={{ color: '#818cf8' }} />
+        <p className="text-ink-muted text-sm mb-1">חבר את Google Calendar כדי לראות את המערכת שלך</p>
+        <p className="text-ink-subtle text-xs">התחבר מחדש עם Google כדי לסנכרן את לוח השנה</p>
+      </div>
+    )
+  }
+
+  const events = dayData?.events || []
+
+  // Also show assignments due on this day
+  const dayStr = dayData ? format(dayData.date, 'yyyy-MM-dd') : ''
+  const dayAssignments = assignments.filter(a => a.deadline && a.deadline.startsWith(dayStr) && a.status !== 'submitted')
+
+  if (events.length === 0 && dayAssignments.length === 0) {
+    return (
+      <div className="glass p-10 text-center">
+        <div className="text-4xl mb-3">🎉</div>
+        <p className="text-ink font-semibold">יום פנוי!</p>
+        <p className="text-ink-muted text-sm mt-1">אין שיעורים או מטלות היום</p>
+      </div>
+    )
+  }
+
+  // Sort events by time
+  const sorted = [...events].sort((a, b) => {
+    const ta = new Date(a.start.dateTime || a.start.date || '').getTime()
+    const tb = new Date(b.start.dateTime || b.start.date || '').getTime()
+    return ta - tb
+  })
+
   return (
-    <div className="space-y-3 p-4">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-9 rounded-lg shimmer" />
+    <div className="space-y-3">
+      {sorted.map((event, i) => {
+        const color = getEventColor(event.colorId)
+        const time = formatEventTime(event)
+        const endTime = event.end.dateTime
+          ? new Date(event.end.dateTime).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+          : ''
+        const matchedCourse = matchEventToCourse(event, courses)
+
+        return (
+          <motion.div
+            key={event.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+          >
+            {matchedCourse ? (
+              <Link href={`/courses/${matchedCourse.id}`}>
+                <EventCard event={event} color={color} time={time} endTime={endTime} matchedCourse={matchedCourse} clickable />
+              </Link>
+            ) : (
+              <EventCard event={event} color={color} time={time} endTime={endTime} />
+            )}
+          </motion.div>
+        )
+      })}
+
+      {/* Assignments due today */}
+      {dayAssignments.map((a, i) => (
+        <motion.div
+          key={a.id}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: (sorted.length + i) * 0.05 }}
+          className="flex items-center gap-4 p-4 rounded-xl"
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
+        >
+          <div className="w-1 h-12 rounded-full bg-red-400 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-ink">{a.title}</p>
+            <span className="text-xs text-red-400">מטלה להגשה היום</span>
+          </div>
+          <FileText size={16} className="text-red-400" />
+        </motion.div>
       ))}
     </div>
   )
 }
 
-function EmptyState({ message, action, icon: Icon }: { message: string; action?: { href: string; label: string }; icon?: React.ElementType }) {
+function EventCard({ event, color, time, endTime, matchedCourse, clickable }: {
+  event: GoogleCalendarEvent
+  color: { bg: string; text: string; border: string }
+  time: string
+  endTime: string
+  matchedCourse?: Course
+  clickable?: boolean
+}) {
   return (
-    <div className="p-8 text-center">
-      {Icon && (
-        <div className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)' }}>
-          <Icon size={20} style={{ color: '#818cf8' }} />
+    <div
+      className={`flex items-stretch gap-4 p-4 rounded-xl transition-all ${clickable ? 'cursor-pointer hover:scale-[1.01] group' : ''}`}
+      style={{ background: color.bg, border: `1px solid ${color.border}` }}
+    >
+      {/* Color bar */}
+      <div className="w-1 rounded-full flex-shrink-0" style={{ background: color.text }} />
+
+      {/* Time */}
+      <div className="flex flex-col items-center justify-center min-w-[52px]">
+        <span className="text-sm font-bold text-ink">{time}</span>
+        {endTime && <span className="text-[10px] text-ink-muted">{endTime}</span>}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm font-semibold text-ink truncate ${clickable ? 'group-hover:text-accent-400 transition-colors' : ''}`}>
+          {event.summary}
+        </p>
+        <div className="flex items-center gap-3 mt-1">
+          {event.location && (
+            <span className="flex items-center gap-1 text-xs text-ink-muted truncate">
+              <MapPin size={10} /> {event.location}
+            </span>
+          )}
+          {matchedCourse && (
+            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
+              <PenLine size={9} /> כתוב סיכום
+            </span>
+          )}
         </div>
-      )}
-      <p className="text-ink-muted text-sm">{message}</p>
-      {action && (
-        <Link href={action.href}>
-          <button className="mt-3 text-sm text-accent-400 hover:text-accent transition-colors">{action.label}</button>
+      </div>
+
+      {/* Action */}
+      <div className="flex items-center">
+        {matchedCourse ? (
+          <div className="p-2 rounded-lg text-accent-400 opacity-0 group-hover:opacity-100 transition-opacity">
+            <ArrowLeft size={16} />
+          </div>
+        ) : event.htmlLink ? (
+          <a href={event.htmlLink} target="_blank" rel="noopener noreferrer"
+            className="p-2 rounded-lg text-ink-subtle hover:text-accent-400 transition-colors"
+            onClick={e => e.stopPropagation()}>
+            <ExternalLink size={14} />
+          </a>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+// ── Subjects Tab ─────────────────────────────────────────────
+
+function SubjectsView({ courses, assignments, loading }: {
+  courses: Course[]
+  assignments: Assignment[]
+  loading: boolean
+}) {
+  if (loading) {
+    return (
+      <div className="grid sm:grid-cols-2 gap-4">
+        {[1, 2, 3, 4].map(i => <div key={i} className="h-36 rounded-xl shimmer" />)}
+      </div>
+    )
+  }
+
+  if (courses.length === 0) {
+    return (
+      <div className="glass p-10 text-center">
+        <BookOpen size={32} className="mx-auto mb-3" style={{ color: '#818cf8' }} />
+        <p className="text-ink font-semibold">אין מקצועות עדיין</p>
+        <p className="text-ink-muted text-sm mt-1">הוסף קורסים כדי להתחיל</p>
+        <Link href="/courses/extract">
+          <button className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold btn-gradient">הוסף קורס</button>
         </Link>
-      )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid sm:grid-cols-2 gap-4">
+      {courses.map((course, i) => {
+        // Count assignments for this course
+        const courseAssignments = assignments.filter(a => a.course_id === course.id)
+        const pendingCount = courseAssignments.filter(a => a.status !== 'submitted' && a.status !== 'graded').length
+
+        return (
+          <motion.div
+            key={course.id}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.06 }}
+          >
+            <Link href={`/courses/${course.id}`}>
+              <div className="relative overflow-hidden rounded-xl p-5 group hover:scale-[1.02] transition-all cursor-pointer"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                {/* Top accent */}
+                <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl"
+                  style={{ background: `linear-gradient(90deg, ${course.progress_percentage >= 70 ? '#10b981' : '#6366f1'}, ${course.progress_percentage >= 70 ? '#34d399' : '#8b5cf6'})` }} />
+
+                {/* Course info */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-ink text-sm line-clamp-2 group-hover:text-accent-400 transition-colors">
+                      {course.title}
+                    </p>
+                  </div>
+                  <ArrowLeft size={16} className="text-ink-subtle group-hover:text-accent-400 transition-colors flex-shrink-0 mt-0.5" />
+                </div>
+
+                {/* Stats row */}
+                <div className="flex items-center gap-3 mb-3">
+                  {pendingCount > 0 && (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"
+                      style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.2)' }}>
+                      <FileText size={10} /> {pendingCount} מטלות
+                    </span>
+                  )}
+                  <span className="text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"
+                    style={{ background: 'rgba(99,102,241,0.12)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.2)' }}>
+                    <PenLine size={10} /> כתוב סיכום
+                  </span>
+                </div>
+
+                {/* Progress */}
+                <div>
+                  <div className="flex justify-between text-xs text-ink-muted mb-1.5">
+                    <span className="flex items-center gap-1"><TrendingUp size={10} /> התקדמות</span>
+                    <span className="font-bold" style={{ color: course.progress_percentage >= 70 ? '#10b981' : '#a5b4fc' }}>
+                      {Math.round(course.progress_percentage)}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div
+                      className="h-2 rounded-full transition-all"
+                      style={{
+                        width: `${course.progress_percentage}%`,
+                        background: course.progress_percentage >= 70
+                          ? 'linear-gradient(90deg, #10b981, #34d399)'
+                          : 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </motion.div>
+        )
+      })}
     </div>
   )
 }
