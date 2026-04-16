@@ -156,4 +156,9 @@ async function saveUrl() {
 }
 
 // ---------- Boot ----------
-init()
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('moodle-btn').addEventListener('click', () => syncSite('moodle'))
+  document.getElementById('portal-btn').addEventListener('click', () => syncSite('portal'))
+  document.getElementById('save-url-btn').addEventListener('click', saveUrl)
+  init()
+})

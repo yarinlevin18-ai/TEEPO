@@ -158,7 +158,7 @@
           <span id="moodle-status-text">לא מחובר</span>
         </div>
       </div>
-      <button class="btn btn-primary" id="moodle-btn" onclick="syncSite('moodle')">
+      <button class="btn btn-primary" id="moodle-btn">
         שלח Session ל-App
       </button>
     </div>
@@ -176,7 +176,7 @@
           <span id="portal-status-text">לא מחובר</span>
         </div>
       </div>
-      <button class="btn btn-primary" id="portal-btn" onclick="syncSite('portal')">
+      <button class="btn btn-primary" id="portal-btn">
         שלח Session ל-App
       </button>
     </div>
@@ -189,7 +189,7 @@
       <div class="settings">
         <label>כתובת השרת</label>
         <input type="text" id="backend-url" placeholder="https://your-app.onrender.com" />
-        <button class="settings-save" onclick="saveUrl()">שמור</button>
+        <button class="settings-save" id="save-url-btn">שמור</button>
       </div>
     </div>
   </div>
