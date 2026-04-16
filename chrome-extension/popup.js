@@ -2,12 +2,12 @@ const DEFAULT_BACKEND = 'https://bgu-study-backend.onrender.com'
 
 const SITES = {
   moodle: {
-    domains: ['moodle.bgu.ac.il'],
+    urls: ['https://moodle.bgu.ac.il/', 'https://bgu.ac.il/'],
     checkUrl: 'https://moodle.bgu.ac.il/moodle/my/',
     indicator: 'data-userid',
   },
   portal: {
-    domains: ['my.bgu.ac.il'],
+    urls: ['https://my.bgu.ac.il/', 'https://bgu.ac.il/'],
     checkUrl: 'https://my.bgu.ac.il/',
     indicator: 'studentId',
   },
@@ -73,11 +73,18 @@ function updateStatusUI(site, connected) {
 
 // ---------- Cookie sync ----------
 
-async function getCookiesForDomains(domains) {
+async function getCookiesForSite(urls) {
   const all = []
-  for (const domain of domains) {
-    const cookies = await chrome.cookies.getAll({ domain })
-    all.push(...cookies)
+  const seen = new Set()
+  for (const url of urls) {
+    const cookies = await chrome.cookies.getAll({ url })
+    for (const c of cookies) {
+      const key = `${c.name}|${c.domain}|${c.path}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        all.push(c)
+      }
+    }
   }
   return all
 }
@@ -91,8 +98,8 @@ async function syncSite(site) {
 
   try {
     const backendUrl = await getBackendUrl()
-    const { domains } = SITES[site]
-    const cookies = await getCookiesForDomains(domains)
+    const { urls } = SITES[site]
+    const cookies = await getCookiesForSite(urls)
 
     if (cookies.length === 0) {
       showToast(`לא נמצאו cookies של ${site}. פתח את האתר והתחבר תחילה.`, 'error')
