@@ -102,3 +102,16 @@ export interface QuizQuestion {
   explanation?: string
   order_index: number
 }
+
+export interface BGUGrade {
+  course_id: string
+  course_name: string
+  grade: number | string
+  rank?: string
+}
+
+export interface BGUStatus {
+  moodle: boolean
+  portal: boolean
+  login_status?: Record<string, any>
+}

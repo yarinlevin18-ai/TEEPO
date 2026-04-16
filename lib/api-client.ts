@@ -127,4 +127,12 @@ export const api = {
         body: JSON.stringify({ content, num_questions: numQuestions }),
       }),
   },
+
+  bgu: {
+    status: () => request<any>('/api/bgu/status'),
+    grades: () => request<any>('/api/bgu/grades'),
+    courses: () => request<any>('/api/bgu/courses'),
+    assignmentsAll: () => request<any>('/api/bgu/assignments/all'),
+    schedule: () => request<any>('/api/bgu/schedule'),
+  },
 }

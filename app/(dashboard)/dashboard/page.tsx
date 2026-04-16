@@ -1,11 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useState, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  BookOpen, Clock, Calendar, ArrowLeft, ArrowRight,
+  BookOpen, Clock, Calendar, ArrowLeft,
   ChevronRight, ChevronLeft, MapPin, ExternalLink,
   PenLine, FileText, TrendingUp, RefreshCw,
+  CheckCircle2, Circle, AlertTriangle, GraduationCap,
+  Target, Award, ListTodo, Flame,
+  CheckSquare, BarChart3, Sparkles, Wifi, WifiOff,
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -13,8 +16,8 @@ import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 import ErrorAlert from '@/components/ui/ErrorAlert'
-import type { Course, Assignment } from '@/types'
-import { format } from 'date-fns'
+import type { Course, Assignment, StudyTask, BGUGrade } from '@/types'
+import { format, formatDistanceToNow, differenceInDays, differenceInHours } from 'date-fns'
 import { he } from 'date-fns/locale'
 import {
   type GoogleCalendarEvent,
@@ -42,25 +45,42 @@ function getCurrentSemester(): string {
   return 'קיץ'
 }
 
-/** Try to match a Google Calendar event to a course by fuzzy title matching */
 function matchEventToCourse(event: GoogleCalendarEvent, courses: Course[]): Course | null {
   const summary = (event.summary || '').toLowerCase()
   if (!summary) return null
-  // Direct match
   for (const c of courses) {
     const title = c.title.toLowerCase()
     if (summary.includes(title) || title.includes(summary)) return c
-    // Try matching without common prefixes
     const cleanSummary = summary.replace(/^(הרצאה|תרגול|מעבדה|שיעור|lecture|tutorial|lab)\s*[-:]\s*/i, '')
     const cleanTitle = title.replace(/^(הרצאה|תרגול|מעבדה|שיעור)\s*[-:]\s*/i, '')
     if (cleanSummary && cleanTitle && (cleanSummary.includes(cleanTitle) || cleanTitle.includes(cleanSummary))) return c
-    // Word-level match (at least 2 significant words match)
     const sWords = cleanSummary.split(/\s+/).filter(w => w.length > 2)
     const tWords = cleanTitle.split(/\s+/).filter(w => w.length > 2)
     const matches = sWords.filter(w => tWords.some(tw => tw.includes(w) || w.includes(tw)))
     if (matches.length >= 2) return c
   }
   return null
+}
+
+function getDeadlineColor(deadline: string): { text: string; bg: string; border: string; label: string } {
+  const now = new Date()
+  const dl = new Date(deadline)
+  const hours = differenceInHours(dl, now)
+  const days = differenceInDays(dl, now)
+
+  if (hours < 0) return { text: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.25)', label: 'עבר' }
+  if (hours < 24) return { text: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.25)', label: `${hours} שעות` }
+  if (days <= 3) return { text: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)', label: `${days} ימים` }
+  if (days <= 7) return { text: '#3b82f6', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.25)', label: `${days} ימים` }
+  return { text: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)', label: `${days} ימים` }
+}
+
+function getGradeColor(grade: number): string {
+  if (grade >= 90) return '#10b981'
+  if (grade >= 80) return '#3b82f6'
+  if (grade >= 70) return '#f59e0b'
+  if (grade >= 60) return '#f97316'
+  return '#ef4444'
 }
 
 // ── Types ────────────────────────────────────────────────────
@@ -77,6 +97,9 @@ export default function DashboardPage() {
   const { user, session } = useAuth()
   const [courses, setCourses] = useState<Course[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [tasks, setTasks] = useState<StudyTask[]>([])
+  const [grades, setGrades] = useState<BGUGrade[]>([])
+  const [bguConnected, setBguConnected] = useState<boolean>(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -90,12 +113,38 @@ export default function DashboardPage() {
   const providerToken = session?.provider_token
   const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || ''
 
-  // ── Load app data ──────────────────────────────────────────
+  // ── Load ALL app data ──────────────────────────────────────
   useEffect(() => {
-    Promise.all([api.courses.list(), api.assignments.list()])
-      .then(([c, a]) => { setCourses(c); setAssignments(a) })
-      .catch(() => setError('שגיאה בטעינת הנתונים'))
-      .finally(() => setLoading(false))
+    async function loadAll() {
+      try {
+        const [c, a, t] = await Promise.all([
+          api.courses.list().catch(() => []),
+          api.assignments.list().catch(() => []),
+          api.tasks.list().catch(() => []),
+        ])
+        setCourses(c)
+        setAssignments(a)
+        setTasks(t)
+
+        // Try loading BGU data (may fail if not connected)
+        try {
+          const statusRes = await api.bgu.status()
+          const isConnected = statusRes?.moodle || statusRes?.portal
+          setBguConnected(!!isConnected)
+          if (isConnected) {
+            const gradesRes = await api.bgu.grades().catch(() => ({ grades: [] }))
+            setGrades(gradesRes?.grades || [])
+          }
+        } catch {
+          setBguConnected(false)
+        }
+      } catch {
+        setError('שגיאה בטעינת הנתונים')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadAll()
   }, [])
 
   // ── Load calendar events ───────────────────────────────────
@@ -138,12 +187,54 @@ export default function DashboardPage() {
     }
   }
 
+  // ── Toggle task completion ─────────────────────────────────
+  const toggleTask = useCallback(async (taskId: string, isCompleted: boolean) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, is_completed: !isCompleted } : t))
+    try {
+      await api.tasks.update(taskId, { is_completed: !isCompleted })
+    } catch {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, is_completed: isCompleted } : t))
+    }
+  }, [])
+
+  // ── Computed data ──────────────────────────────────────────
   const todayData = weekDays[selectedDay]
   const activeCourses = courses.filter(c => c.status === 'active')
 
-  return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-6 animate-fade-in">
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  const todayTasks = tasks.filter(t => t.scheduled_date === todayStr)
+  const completedTodayTasks = todayTasks.filter(t => t.is_completed)
+  const pendingTasks = tasks.filter(t => !t.is_completed)
 
+  const pendingAssignments = assignments
+    .filter(a => a.status !== 'submitted' && a.status !== 'graded')
+    .sort((a, b) => {
+      if (!a.deadline) return 1
+      if (!b.deadline) return -1
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+    })
+
+  const urgentAssignments = pendingAssignments.filter(a => {
+    if (!a.deadline) return false
+    return differenceInDays(new Date(a.deadline), new Date()) <= 3
+  })
+
+  const avgGrade = grades.length > 0
+    ? grades.reduce((sum, g) => sum + (typeof g.grade === 'number' ? g.grade : parseFloat(String(g.grade)) || 0), 0) / grades.length
+    : null
+
+  const overallProgress = activeCourses.length > 0
+    ? activeCourses.reduce((sum, c) => sum + c.progress_percentage, 0) / activeCourses.length
+    : 0
+
+  // Filter courses by day events
+  const dayEvents = todayData?.events || []
+  const dayCourses = activeCourses.filter(c =>
+    dayEvents.some(e => matchEventToCourse(e, [c]) !== null)
+  )
+
+  return (
+    <div className="p-6 md:p-8 max-w-6xl mx-auto space-y-6 animate-fade-in">
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {/* ── Header ── */}
@@ -155,13 +246,67 @@ export default function DashboardPage() {
               <span className="text-ink">{getGreeting()}, </span>
               <span className="gradient-text">{displayName}</span>
             </h1>
-            <p className="text-xs text-ink-muted mt-0.5">{getCurrentSemester()}</p>
+            <p className="text-xs text-ink-muted mt-0.5">
+              {getCurrentSemester()} &middot; {format(new Date(), 'EEEE, d בMMMM', { locale: he })}
+            </p>
           </div>
         </div>
-        <span className="text-sm font-bold px-3 py-1.5 rounded-xl"
-          style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.2)' }}>
-          MyDesk
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg ${bguConnected ? 'text-emerald-400' : 'text-ink-subtle'}`}
+            style={{ background: bguConnected ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${bguConnected ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
+            {bguConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
+            BGU
+          </span>
+          <span className="text-sm font-bold px-3 py-1.5 rounded-xl"
+            style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.2)' }}>
+            MyDesk
+          </span>
+        </div>
+      </motion.div>
+
+      {/* ── Quick Stats ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="grid grid-cols-2 lg:grid-cols-4 gap-3"
+      >
+        <StatCard
+          icon={<BookOpen size={18} />}
+          iconColor="#818cf8"
+          iconBg="rgba(99,102,241,0.15)"
+          label="קורסים פעילים"
+          value={activeCourses.length}
+          sub={`${Math.round(overallProgress)}% ממוצע התקדמות`}
+          subColor={overallProgress >= 60 ? '#10b981' : '#f59e0b'}
+        />
+        <StatCard
+          icon={<ListTodo size={18} />}
+          iconColor="#3b82f6"
+          iconBg="rgba(59,130,246,0.15)"
+          label="משימות היום"
+          value={`${completedTodayTasks.length}/${todayTasks.length}`}
+          sub={todayTasks.length === 0 ? 'אין משימות' : completedTodayTasks.length === todayTasks.length ? 'הכל בוצע!' : `${todayTasks.length - completedTodayTasks.length} נותרו`}
+          subColor={completedTodayTasks.length === todayTasks.length && todayTasks.length > 0 ? '#10b981' : '#64748b'}
+        />
+        <StatCard
+          icon={<AlertTriangle size={18} />}
+          iconColor={urgentAssignments.length > 0 ? '#f59e0b' : '#10b981'}
+          iconBg={urgentAssignments.length > 0 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)'}
+          label="מטלות להגשה"
+          value={pendingAssignments.length}
+          sub={urgentAssignments.length > 0 ? `${urgentAssignments.length} דחופות!` : 'אין דחופות'}
+          subColor={urgentAssignments.length > 0 ? '#f59e0b' : '#10b981'}
+        />
+        <StatCard
+          icon={<Award size={18} />}
+          iconColor={avgGrade !== null ? getGradeColor(avgGrade) : '#64748b'}
+          iconBg={avgGrade !== null ? `${getGradeColor(avgGrade)}20` : 'rgba(100,116,139,0.15)'}
+          label="ממוצע ציונים"
+          value={avgGrade !== null ? avgGrade.toFixed(1) : '—'}
+          sub={grades.length > 0 ? `${grades.length} קורסים` : 'לא זמין'}
+          subColor="#64748b"
+        />
       </motion.div>
 
       {/* ── Calendar Strip ── */}
@@ -171,12 +316,14 @@ export default function DashboardPage() {
         transition={{ delay: 0.1 }}
         className="glass overflow-hidden"
       >
-        {/* Week nav + date */}
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
           <div className="flex items-center gap-2">
             <Calendar size={16} style={{ color: '#818cf8' }} />
             <span className="text-sm font-semibold text-ink">
-              {format(new Date(), 'EEEE, d בMMMM yyyy', { locale: he })}
+              {weekDays.length > 0 && weekOffset !== 0
+                ? `${format(weekDays[0].date, 'd/M')} - ${format(weekDays[6].date, 'd/M')}`
+                : 'השבוע שלי'
+              }
             </span>
           </div>
           <div className="flex items-center gap-1">
@@ -193,7 +340,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Day pills */}
         <div className="grid grid-cols-7 gap-1.5 px-4 pb-4">
           {weekDays.map((day, i) => (
             <button
@@ -247,38 +393,37 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* ── Schedule ── */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
-            <Clock size={14} style={{ color: '#818cf8' }} />
-          </div>
-          <h2 className="font-semibold text-ink">מערכת שעות</h2>
-          {todayData && todayData.events.length > 0 && (
-            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
-              {todayData.events.length} אירועים
-            </span>
-          )}
-        </div>
-        <ScheduleView
-          dayData={todayData}
-          calLoading={calLoading}
-          courses={courses}
-          assignments={assignments}
-          providerToken={providerToken}
-        />
-      </motion.div>
+      {/* ── Main Content Grid ── */}
+      <div className="grid lg:grid-cols-5 gap-6">
 
-      {/* ── Subjects for selected day ── */}
-      {(() => {
-        // Filter courses to only those that have a matching event on the selected day
-        const dayEvents = todayData?.events || []
-        const dayCourses = activeCourses.filter(c =>
-          dayEvents.some(e => matchEventToCourse(e, [c]) !== null)
-        )
-        return (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <div className="flex items-center justify-between mb-4">
+        {/* ── Left Column (3/5): Schedule + Subjects ── */}
+        <div className="lg:col-span-3 space-y-6">
+
+          {/* Schedule */}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
+                <Clock size={14} style={{ color: '#818cf8' }} />
+              </div>
+              <h2 className="font-semibold text-ink">מערכת שעות</h2>
+              {todayData && todayData.events.length > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
+                  {todayData.events.length}
+                </span>
+              )}
+            </div>
+            <ScheduleSection
+              dayData={todayData}
+              calLoading={calLoading}
+              courses={courses}
+              assignments={assignments}
+              providerToken={providerToken}
+            />
+          </motion.div>
+
+          {/* Subjects for selected day */}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
                   <BookOpen size={14} style={{ color: '#a78bfa' }} />
@@ -296,58 +441,138 @@ export default function DashboardPage() {
                 </button>
               </Link>
             </div>
-            <SubjectsView courses={dayCourses} assignments={assignments} loading={loading} />
+            <SubjectsSection courses={dayCourses} assignments={assignments} loading={loading} />
           </motion.div>
-        )
-      })()}
+        </div>
+
+        {/* ── Right Column (2/5): Tasks + Assignments + Grades ── */}
+        <div className="lg:col-span-2 space-y-6">
+
+          {/* Tasks */}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.15)' }}>
+                  <CheckSquare size={14} style={{ color: '#60a5fa' }} />
+                </div>
+                <h2 className="font-semibold text-ink">משימות</h2>
+                {pendingTasks.length > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(59,130,246,0.12)', color: '#93c5fd' }}>
+                    {pendingTasks.length}
+                  </span>
+                )}
+              </div>
+              <Link href="/tasks">
+                <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
+                  הכל <ArrowLeft size={12} />
+                </button>
+              </Link>
+            </div>
+            <TasksSection tasks={tasks} todayStr={todayStr} onToggle={toggleTask} loading={loading} />
+          </motion.div>
+
+          {/* Upcoming Assignments */}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(245,158,11,0.15)' }}>
+                  <FileText size={14} style={{ color: '#fbbf24' }} />
+                </div>
+                <h2 className="font-semibold text-ink">מטלות קרובות</h2>
+                {urgentAssignments.length > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full animate-pulse" style={{ background: 'rgba(239,68,68,0.15)', color: '#fca5a5' }}>
+                    {urgentAssignments.length} דחוף
+                  </span>
+                )}
+              </div>
+              <Link href="/assignments">
+                <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
+                  הכל <ArrowLeft size={12} />
+                </button>
+              </Link>
+            </div>
+            <AssignmentsSection assignments={pendingAssignments} courses={courses} loading={loading} />
+          </motion.div>
+
+          {/* Grades */}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: avgGrade !== null ? `${getGradeColor(avgGrade)}20` : 'rgba(100,116,139,0.15)' }}>
+                  <BarChart3 size={14} style={{ color: avgGrade !== null ? getGradeColor(avgGrade) : '#64748b' }} />
+                </div>
+                <h2 className="font-semibold text-ink">ציונים</h2>
+              </div>
+              {!bguConnected && (
+                <Link href="/bgu-connect">
+                  <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
+                    חבר BGU <ArrowLeft size={12} />
+                  </button>
+                </Link>
+              )}
+            </div>
+            <GradesSection grades={grades} bguConnected={bguConnected} avgGrade={avgGrade} loading={loading} />
+          </motion.div>
+        </div>
+      </div>
     </div>
   )
 }
 
-// ── Schedule Tab ─────────────────────────────────────────────
+// ── Stat Card ───────────────────────────────────────────────
 
-function ScheduleView({ dayData, calLoading, courses, assignments, providerToken }: {
-  dayData?: DayData
-  calLoading: boolean
-  courses: Course[]
-  assignments: Assignment[]
-  providerToken?: string | null
+function StatCard({ icon, iconColor, iconBg, label, value, sub, subColor }: {
+  icon: React.ReactNode; iconColor: string; iconBg: string
+  label: string; value: string | number; sub: string; subColor: string
+}) {
+  return (
+    <div className="glass p-4 flex items-center gap-3 group hover:scale-[1.02] transition-all">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
+        style={{ background: iconBg, color: iconColor }}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-ink-muted truncate">{label}</p>
+        <p className="text-xl font-extrabold text-ink leading-tight">{value}</p>
+        <p className="text-[10px] font-medium truncate" style={{ color: subColor }}>{sub}</p>
+      </div>
+    </div>
+  )
+}
+
+// ── Schedule Section ────────────────────────────────────────
+
+function ScheduleSection({ dayData, calLoading, courses, assignments, providerToken }: {
+  dayData?: DayData; calLoading: boolean; courses: Course[]; assignments: Assignment[]; providerToken?: string | null
 }) {
   if (calLoading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl shimmer" />)}
-      </div>
-    )
+    return <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl shimmer" />)}</div>
   }
 
   if (!providerToken) {
     return (
-      <div className="glass p-10 text-center">
-        <Calendar size={32} className="mx-auto mb-3" style={{ color: '#818cf8' }} />
-        <p className="text-ink-muted text-sm mb-1">חבר את Google Calendar כדי לראות את המערכת שלך</p>
-        <p className="text-ink-subtle text-xs">התחבר מחדש עם Google כדי לסנכרן את לוח השנה</p>
+      <div className="glass p-8 text-center">
+        <Calendar size={28} className="mx-auto mb-2" style={{ color: '#818cf8' }} />
+        <p className="text-ink-muted text-sm mb-1">חבר את Google Calendar</p>
+        <p className="text-ink-subtle text-xs">כדי לראות את המערכת שלך כאן</p>
       </div>
     )
   }
 
   const events = dayData?.events || []
-
-  // Also show assignments due on this day
   const dayStr = dayData ? format(dayData.date, 'yyyy-MM-dd') : ''
   const dayAssignments = assignments.filter(a => a.deadline && a.deadline.startsWith(dayStr) && a.status !== 'submitted')
 
   if (events.length === 0 && dayAssignments.length === 0) {
     return (
-      <div className="glass p-10 text-center">
-        <div className="text-4xl mb-3">🎉</div>
-        <p className="text-ink font-semibold">יום פנוי!</p>
-        <p className="text-ink-muted text-sm mt-1">אין שיעורים או מטלות היום</p>
+      <div className="glass p-8 text-center">
+        <div className="text-3xl mb-2">🎉</div>
+        <p className="text-ink font-semibold text-sm">יום פנוי!</p>
+        <p className="text-ink-muted text-xs mt-1">אין שיעורים או מטלות</p>
       </div>
     )
   }
 
-  // Sort events by time
   const sorted = [...events].sort((a, b) => {
     const ta = new Date(a.start.dateTime || a.start.date || '').getTime()
     const tb = new Date(b.start.dateTime || b.start.date || '').getTime()
@@ -355,7 +580,7 @@ function ScheduleView({ dayData, calLoading, courses, assignments, providerToken
   })
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {sorted.map((event, i) => {
         const color = getEventColor(event.colorId)
         const time = formatEventTime(event)
@@ -364,197 +589,407 @@ function ScheduleView({ dayData, calLoading, courses, assignments, providerToken
           : ''
         const matchedCourse = matchEventToCourse(event, courses)
 
-        return (
-          <motion.div
-            key={event.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
+        const card = (
+          <div
+            className={`flex items-stretch gap-3 p-3.5 rounded-xl transition-all ${matchedCourse ? 'cursor-pointer hover:scale-[1.01] group' : ''}`}
+            style={{ background: color.bg, border: `1px solid ${color.border}` }}
           >
+            <div className="w-1 rounded-full flex-shrink-0" style={{ background: color.text }} />
+            <div className="flex flex-col items-center justify-center min-w-[48px]">
+              <span className="text-sm font-bold text-ink">{time}</span>
+              {endTime && <span className="text-[10px] text-ink-muted">{endTime}</span>}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-semibold text-ink truncate ${matchedCourse ? 'group-hover:text-accent-400 transition-colors' : ''}`}>
+                {event.summary}
+              </p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {event.location && (
+                  <span className="flex items-center gap-1 text-xs text-ink-muted truncate">
+                    <MapPin size={10} /> {event.location}
+                  </span>
+                )}
+                {matchedCourse && (
+                  <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full"
+                    style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
+                    <PenLine size={8} /> סיכום
+                  </span>
+                )}
+              </div>
+            </div>
             {matchedCourse ? (
-              <Link href={`/courses/${matchedCourse.id}`}>
-                <EventCard event={event} color={color} time={time} endTime={endTime} matchedCourse={matchedCourse} clickable />
-              </Link>
-            ) : (
-              <EventCard event={event} color={color} time={time} endTime={endTime} />
-            )}
+              <div className="flex items-center p-1.5 text-accent-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                <ArrowLeft size={14} />
+              </div>
+            ) : event.htmlLink ? (
+              <a href={event.htmlLink} target="_blank" rel="noopener noreferrer"
+                className="flex items-center p-1.5 text-ink-subtle hover:text-accent-400 transition-colors"
+                onClick={e => e.stopPropagation()}>
+                <ExternalLink size={13} />
+              </a>
+            ) : null}
+          </div>
+        )
+
+        return (
+          <motion.div key={event.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+            {matchedCourse ? <Link href={`/courses/${matchedCourse.id}`}>{card}</Link> : card}
           </motion.div>
         )
       })}
 
-      {/* Assignments due today */}
       {dayAssignments.map((a, i) => (
-        <motion.div
-          key={a.id}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: (sorted.length + i) * 0.05 }}
-          className="flex items-center gap-4 p-4 rounded-xl"
-          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
-        >
-          <div className="w-1 h-12 rounded-full bg-red-400 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-ink">{a.title}</p>
+        <motion.div key={a.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: (sorted.length + i) * 0.04 }}
+          className="flex items-center gap-3 p-3.5 rounded-xl"
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <div className="w-1 h-10 rounded-full bg-red-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-ink truncate">{a.title}</p>
             <span className="text-xs text-red-400">מטלה להגשה היום</span>
           </div>
-          <FileText size={16} className="text-red-400" />
+          <FileText size={14} className="text-red-400 flex-shrink-0" />
         </motion.div>
       ))}
     </div>
   )
 }
 
-function EventCard({ event, color, time, endTime, matchedCourse, clickable }: {
-  event: GoogleCalendarEvent
-  color: { bg: string; text: string; border: string }
-  time: string
-  endTime: string
-  matchedCourse?: Course
-  clickable?: boolean
-}) {
-  return (
-    <div
-      className={`flex items-stretch gap-4 p-4 rounded-xl transition-all ${clickable ? 'cursor-pointer hover:scale-[1.01] group' : ''}`}
-      style={{ background: color.bg, border: `1px solid ${color.border}` }}
-    >
-      {/* Color bar */}
-      <div className="w-1 rounded-full flex-shrink-0" style={{ background: color.text }} />
+// ── Tasks Section ───────────────────────────────────────────
 
-      {/* Time */}
-      <div className="flex flex-col items-center justify-center min-w-[52px]">
-        <span className="text-sm font-bold text-ink">{time}</span>
-        {endTime && <span className="text-[10px] text-ink-muted">{endTime}</span>}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm font-semibold text-ink truncate ${clickable ? 'group-hover:text-accent-400 transition-colors' : ''}`}>
-          {event.summary}
-        </p>
-        <div className="flex items-center gap-3 mt-1">
-          {event.location && (
-            <span className="flex items-center gap-1 text-xs text-ink-muted truncate">
-              <MapPin size={10} /> {event.location}
-            </span>
-          )}
-          {matchedCourse && (
-            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-              style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
-              <PenLine size={9} /> כתוב סיכום
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Action */}
-      <div className="flex items-center">
-        {matchedCourse ? (
-          <div className="p-2 rounded-lg text-accent-400 opacity-0 group-hover:opacity-100 transition-opacity">
-            <ArrowLeft size={16} />
-          </div>
-        ) : event.htmlLink ? (
-          <a href={event.htmlLink} target="_blank" rel="noopener noreferrer"
-            className="p-2 rounded-lg text-ink-subtle hover:text-accent-400 transition-colors"
-            onClick={e => e.stopPropagation()}>
-            <ExternalLink size={14} />
-          </a>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
-// ── Subjects Tab ─────────────────────────────────────────────
-
-function SubjectsView({ courses, assignments, loading }: {
-  courses: Course[]
-  assignments: Assignment[]
-  loading: boolean
+function TasksSection({ tasks, todayStr, onToggle, loading }: {
+  tasks: StudyTask[]; todayStr: string; onToggle: (id: string, done: boolean) => void; loading: boolean
 }) {
   if (loading) {
-    return (
-      <div className="grid sm:grid-cols-2 gap-4">
-        {[1, 2, 3, 4].map(i => <div key={i} className="h-36 rounded-xl shimmer" />)}
-      </div>
-    )
+    return <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl shimmer" />)}</div>
   }
 
-  if (courses.length === 0) {
+  // Show today's tasks first, then upcoming incomplete
+  const todayTasks = tasks.filter(t => t.scheduled_date === todayStr)
+  const upcomingTasks = tasks
+    .filter(t => !t.is_completed && t.scheduled_date && t.scheduled_date > todayStr)
+    .sort((a, b) => (a.scheduled_date || '').localeCompare(b.scheduled_date || ''))
+    .slice(0, 3)
+
+  const allShown = [...todayTasks, ...upcomingTasks]
+
+  if (allShown.length === 0) {
     return (
-      <div className="glass p-8 text-center">
-        <div className="text-3xl mb-2">📖</div>
-        <p className="text-ink-muted text-sm">אין מקצועות ביום הזה</p>
-        <Link href="/courses">
-          <button className="mt-3 text-xs text-accent-400 hover:text-accent transition-colors">ראה את כל הקורסים</button>
+      <div className="glass p-6 text-center">
+        <Sparkles size={24} className="mx-auto mb-2" style={{ color: '#818cf8' }} />
+        <p className="text-ink-muted text-sm">אין משימות</p>
+        <Link href="/tasks">
+          <button className="mt-2 text-xs text-accent-400 hover:text-accent transition-colors">הוסף משימה</button>
         </Link>
       </div>
     )
   }
 
   return (
-    <div className="grid sm:grid-cols-2 gap-4">
+    <div className="glass overflow-hidden divide-y divide-white/5">
+      {todayTasks.length > 0 && (
+        <div className="px-3 py-2">
+          <p className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wider">היום</p>
+        </div>
+      )}
+      {todayTasks.map((task, i) => (
+        <TaskRow key={task.id} task={task} onToggle={onToggle} index={i} isToday />
+      ))}
+      {upcomingTasks.length > 0 && (
+        <div className="px-3 py-2">
+          <p className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wider">בקרוב</p>
+        </div>
+      )}
+      {upcomingTasks.map((task, i) => (
+        <TaskRow key={task.id} task={task} onToggle={onToggle} index={todayTasks.length + i} />
+      ))}
+    </div>
+  )
+}
+
+function TaskRow({ task, onToggle, index, isToday }: {
+  task: StudyTask; onToggle: (id: string, done: boolean) => void; index: number; isToday?: boolean
+}) {
+  const priorityColors: Record<string, string> = {
+    high: '#ef4444',
+    medium: '#f59e0b',
+    low: '#10b981',
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.03 }}
+      className="flex items-center gap-3 px-3 py-3 hover:bg-white/3 transition-colors"
+    >
+      <button
+        onClick={() => onToggle(task.id, task.is_completed)}
+        className="flex-shrink-0 transition-transform hover:scale-110"
+      >
+        {task.is_completed ? (
+          <CheckCircle2 size={18} style={{ color: '#10b981' }} />
+        ) : (
+          <Circle size={18} style={{ color: priorityColors[task.category] || '#64748b' }} />
+        )}
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm truncate ${task.is_completed ? 'line-through text-ink-subtle' : 'text-ink'}`}>
+          {task.title}
+        </p>
+        <div className="flex items-center gap-2 mt-0.5">
+          {task.duration_minutes && (
+            <span className="text-[10px] text-ink-subtle flex items-center gap-0.5">
+              <Clock size={8} /> {task.duration_minutes} דק׳
+            </span>
+          )}
+          {!isToday && task.scheduled_date && (
+            <span className="text-[10px] text-ink-subtle">
+              {format(new Date(task.scheduled_date), 'd/M')}
+            </span>
+          )}
+        </div>
+      </div>
+      {(task as any).priority && (
+        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: priorityColors[(task as any).priority] || '#64748b' }} />
+      )}
+    </motion.div>
+  )
+}
+
+// ── Assignments Section ─────────────────────────────────────
+
+function AssignmentsSection({ assignments, courses, loading }: {
+  assignments: Assignment[]; courses: Course[]; loading: boolean
+}) {
+  if (loading) {
+    return <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-16 rounded-xl shimmer" />)}</div>
+  }
+
+  if (assignments.length === 0) {
+    return (
+      <div className="glass p-6 text-center">
+        <Target size={24} className="mx-auto mb-2" style={{ color: '#10b981' }} />
+        <p className="text-ink-muted text-sm">אין מטלות ממתינות</p>
+        <p className="text-ink-subtle text-xs mt-0.5">יפה! הכל מעודכן</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {assignments.slice(0, 5).map((a, i) => {
+        const course = courses.find(c => c.id === a.course_id)
+        const dl = a.deadline ? getDeadlineColor(a.deadline) : null
+
+        return (
+          <motion.div
+            key={a.id}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.04 }}
+            className="glass p-3.5 hover:scale-[1.01] transition-all"
+          >
+            <div className="flex items-start gap-3">
+              {/* Priority strip */}
+              <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{
+                background: a.priority === 'high' ? '#ef4444' : a.priority === 'medium' ? '#f59e0b' : '#10b981'
+              }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-ink truncate">{a.title}</p>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  {course && (
+                    <span className="text-[10px] text-ink-subtle truncate max-w-[120px]">{course.title}</span>
+                  )}
+                  {dl && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: dl.bg, color: dl.text, border: `1px solid ${dl.border}` }}>
+                      {dl.label}
+                    </span>
+                  )}
+                  {a.deadline && (
+                    <span className="text-[10px] text-ink-subtle">
+                      {format(new Date(a.deadline), 'd/M')}
+                    </span>
+                  )}
+                </div>
+                {/* Progress: assignment tasks */}
+                {a.assignment_tasks && a.assignment_tasks.length > 0 && (() => {
+                  const done = a.assignment_tasks!.filter(t => t.is_completed).length
+                  const total = a.assignment_tasks!.length
+                  const pct = (done / total) * 100
+                  return (
+                    <div className="flex items-center gap-2 mt-2">
+                      <div className="flex-1 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                        <div className="h-1.5 rounded-full transition-all" style={{
+                          width: `${pct}%`,
+                          background: pct === 100 ? '#10b981' : 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+                        }} />
+                      </div>
+                      <span className="text-[10px] text-ink-subtle font-medium">{done}/{total}</span>
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+          </motion.div>
+        )
+      })}
+      {assignments.length > 5 && (
+        <Link href="/assignments">
+          <button className="w-full text-center text-xs text-accent-400 hover:text-accent py-2 transition-colors">
+            +{assignments.length - 5} נוספות
+          </button>
+        </Link>
+      )}
+    </div>
+  )
+}
+
+// ── Grades Section ──────────────────────────────────────────
+
+function GradesSection({ grades, bguConnected, avgGrade, loading }: {
+  grades: BGUGrade[]; bguConnected: boolean; avgGrade: number | null; loading: boolean
+}) {
+  if (loading) {
+    return <div className="space-y-2">{[1, 2].map(i => <div key={i} className="h-14 rounded-xl shimmer" />)}</div>
+  }
+
+  if (!bguConnected) {
+    return (
+      <div className="glass p-6 text-center">
+        <GraduationCap size={24} className="mx-auto mb-2" style={{ color: '#64748b' }} />
+        <p className="text-ink-muted text-sm">חבר את BGU כדי לראות ציונים</p>
+        <Link href="/bgu-connect">
+          <button className="mt-2 inline-flex items-center gap-1.5 text-xs text-accent-400 hover:text-accent transition-colors">
+            <Wifi size={12} /> התחבר עכשיו
+          </button>
+        </Link>
+      </div>
+    )
+  }
+
+  if (grades.length === 0) {
+    return (
+      <div className="glass p-6 text-center">
+        <BarChart3 size={24} className="mx-auto mb-2" style={{ color: '#64748b' }} />
+        <p className="text-ink-muted text-sm">אין ציונים עדיין</p>
+        <p className="text-ink-subtle text-xs mt-0.5">ציונים יופיעו כאן אחרי פרסום</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="glass overflow-hidden">
+      {/* Average header */}
+      {avgGrade !== null && (
+        <div className="px-4 py-3 flex items-center justify-between border-b border-white/5"
+          style={{ background: `${getGradeColor(avgGrade)}08` }}>
+          <span className="text-xs text-ink-muted">ממוצע</span>
+          <span className="text-lg font-extrabold" style={{ color: getGradeColor(avgGrade) }}>
+            {avgGrade.toFixed(1)}
+          </span>
+        </div>
+      )}
+      {/* Grade rows */}
+      <div className="divide-y divide-white/5 max-h-64 overflow-y-auto">
+        {grades.map((g, i) => {
+          const numGrade = typeof g.grade === 'number' ? g.grade : parseFloat(String(g.grade))
+          const color = !isNaN(numGrade) ? getGradeColor(numGrade) : '#64748b'
+          return (
+            <motion.div
+              key={g.course_id || i}
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.03 }}
+              className="flex items-center justify-between px-4 py-3 hover:bg-white/3 transition-colors"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-ink truncate">{g.course_name}</p>
+                {g.rank && <p className="text-[10px] text-ink-subtle mt-0.5">דירוג: {g.rank}</p>}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold" style={{ color }}>{g.grade}</span>
+                {!isNaN(numGrade) && (
+                  <div className="w-12 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div className="h-1.5 rounded-full" style={{ width: `${numGrade}%`, background: color }} />
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Subjects Section ────────────────────────────────────────
+
+function SubjectsSection({ courses, assignments, loading }: {
+  courses: Course[]; assignments: Assignment[]; loading: boolean
+}) {
+  if (loading) {
+    return <div className="grid sm:grid-cols-2 gap-3">{[1, 2].map(i => <div key={i} className="h-32 rounded-xl shimmer" />)}</div>
+  }
+
+  if (courses.length === 0) {
+    return (
+      <div className="glass p-6 text-center">
+        <div className="text-2xl mb-1">📖</div>
+        <p className="text-ink-muted text-sm">אין מקצועות ביום הזה</p>
+        <Link href="/courses">
+          <button className="mt-2 text-xs text-accent-400 hover:text-accent transition-colors">ראה את כל הקורסים</button>
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid sm:grid-cols-2 gap-3">
       {courses.map((course, i) => {
-        // Count assignments for this course
         const courseAssignments = assignments.filter(a => a.course_id === course.id)
         const pendingCount = courseAssignments.filter(a => a.status !== 'submitted' && a.status !== 'graded').length
 
         return (
-          <motion.div
-            key={course.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.06 }}
-          >
+          <motion.div key={course.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
             <Link href={`/courses/${course.id}`}>
-              <div className="relative overflow-hidden rounded-xl p-5 group hover:scale-[1.02] transition-all cursor-pointer"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
-              >
-                {/* Top accent */}
-                <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl"
-                  style={{ background: `linear-gradient(90deg, ${course.progress_percentage >= 70 ? '#10b981' : '#6366f1'}, ${course.progress_percentage >= 70 ? '#34d399' : '#8b5cf6'})` }} />
-
-                {/* Course info */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-ink text-sm line-clamp-2 group-hover:text-accent-400 transition-colors">
-                      {course.title}
-                    </p>
-                  </div>
-                  <ArrowLeft size={16} className="text-ink-subtle group-hover:text-accent-400 transition-colors flex-shrink-0 mt-0.5" />
+              <div className="relative overflow-hidden rounded-xl p-4 group hover:scale-[1.02] transition-all cursor-pointer"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl" style={{
+                  background: `linear-gradient(90deg, ${course.progress_percentage >= 70 ? '#10b981' : '#6366f1'}, ${course.progress_percentage >= 70 ? '#34d399' : '#8b5cf6'})`
+                }} />
+                <div className="flex items-start justify-between mb-2">
+                  <p className="font-semibold text-ink text-sm line-clamp-2 group-hover:text-accent-400 transition-colors flex-1 min-w-0">
+                    {course.title}
+                  </p>
+                  <ArrowLeft size={14} className="text-ink-subtle group-hover:text-accent-400 transition-colors flex-shrink-0 mt-0.5 mr-2" />
                 </div>
-
-                {/* Stats row */}
-                <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
                   {pendingCount > 0 && (
-                    <span className="text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-1"
                       style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.2)' }}>
-                      <FileText size={10} /> {pendingCount} מטלות
+                      <FileText size={9} /> {pendingCount} מטלות
                     </span>
                   )}
-                  <span className="text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-1"
                     style={{ background: 'rgba(99,102,241,0.12)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.2)' }}>
-                    <PenLine size={10} /> כתוב סיכום
+                    <PenLine size={9} /> סיכום
                   </span>
                 </div>
-
-                {/* Progress */}
                 <div>
-                  <div className="flex justify-between text-xs text-ink-muted mb-1.5">
-                    <span className="flex items-center gap-1"><TrendingUp size={10} /> התקדמות</span>
+                  <div className="flex justify-between text-[10px] text-ink-muted mb-1">
+                    <span className="flex items-center gap-1"><TrendingUp size={9} /> התקדמות</span>
                     <span className="font-bold" style={{ color: course.progress_percentage >= 70 ? '#10b981' : '#a5b4fc' }}>
                       {Math.round(course.progress_percentage)}%
                     </span>
                   </div>
-                  <div className="w-full h-2 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                    <div
-                      className="h-2 rounded-full transition-all"
-                      style={{
-                        width: `${course.progress_percentage}%`,
-                        background: course.progress_percentage >= 70
-                          ? 'linear-gradient(90deg, #10b981, #34d399)'
-                          : 'linear-gradient(90deg, #6366f1, #8b5cf6)',
-                      }}
-                    />
+                  <div className="w-full h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div className="h-1.5 rounded-full transition-all" style={{
+                      width: `${course.progress_percentage}%`,
+                      background: course.progress_percentage >= 70
+                        ? 'linear-gradient(90deg, #10b981, #34d399)'
+                        : 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+                    }} />
                   </div>
                 </div>
               </div>
