@@ -66,6 +66,14 @@ def register_socket_events(socketio: SocketIO):
         # Emit typing indicator
         emit("typing", {"agent": agent_type})
 
+        # Check if web search will happen and notify client
+        try:
+            from services.web_search import should_search
+            if should_search(question):
+                emit("searching", {"agent": agent_type})
+        except Exception:
+            pass
+
         orch = get_orchestrator()
 
         # Build course context if a course_id is provided

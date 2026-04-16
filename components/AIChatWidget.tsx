@@ -28,6 +28,7 @@ export default function AIChatWidget() {
   const [isTyping, setIsTyping] = useState(false)
   const [connected, setConnected] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [isSearching, setIsSearching] = useState(false)
 
   const socketRef = useRef<Socket | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -73,14 +74,18 @@ export default function AIChatWidget() {
 
     socket.on('typing', () => setIsTyping(true))
 
+    socket.on('searching', () => setIsSearching(true))
+
     socket.on('reply', ({ text }: { text: string }) => {
       setIsTyping(false)
+      setIsSearching(false)
       setMessages((prev) => [...prev, { role: 'assistant', content: text }])
       if (!isOpen) setUnread((u) => u + 1)
     })
 
     socket.on('error', ({ message }: { message: string }) => {
       setIsTyping(false)
+      setIsSearching(false)
       setMessages((prev) => [...prev, { role: 'assistant', content: `❌ ${message}` }])
     })
 
@@ -260,16 +265,28 @@ export default function AIChatWidget() {
                 ))}
               </AnimatePresence>
 
-              {isTyping && (
+              {(isTyping || isSearching) && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2">
                   <div className="w-6 h-6 rounded-full bg-white/5 border border-white/8 flex items-center justify-center">
                     <Bot size={12} className="text-indigo-400" />
                   </div>
-                  <div className="px-3 py-2 rounded-2xl rounded-tr-sm flex gap-1 items-center"
+                  <div className="px-3 py-2 rounded-2xl rounded-tr-sm flex gap-1.5 items-center"
                     style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div className="typing-dot" />
-                    <div className="typing-dot" />
-                    <div className="typing-dot" />
+                    {isSearching ? (
+                      <>
+                        <svg className="animate-spin h-3 w-3 text-indigo-400" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        <span className="text-[11px] text-indigo-400">מחפש באינטרנט...</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="typing-dot" />
+                        <div className="typing-dot" />
+                        <div className="typing-dot" />
+                      </>
+                    )}
                   </div>
                 </motion.div>
               )}

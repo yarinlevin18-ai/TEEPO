@@ -189,6 +189,17 @@ class StudyOrchestrator:
         messages = history[-20:] if history else []
         messages.append({"role": "user", "content": question})
 
+        # Web search for relevant info
+        web_context = ""
+        try:
+            from services.web_search import should_search, search_web, format_search_results
+            if should_search(question):
+                results = search_web(question, max_results=4)
+                web_context = format_search_results(results)
+                logger.debug(f"[answer_question] web search returned {len(results)} results")
+        except Exception as e:
+            logger.debug(f"[answer_question] web search skipped: {e}")
+
         system_parts = [
             "אתה עוזר לימוד אישי חכם ומדויק, בסגנון NotebookLM של Google. ",
             "אתה מתמחה בהוראה, סיכום, והסברת חומר אקדמי.",
@@ -210,6 +221,9 @@ class StudyOrchestrator:
             system_parts.append(f"\n\n## סיכומים והערות של הסטודנט:\n{notes_context}")
         if context:
             system_parts.append(f"\n\n## הקשר נוסף:\n{context}")
+        if web_context:
+            system_parts.append(f"\n\n{web_context}")
+            system_parts.append("\nהשתמש במידע מהאינטרנט כשהוא רלוונטי, אבל ציין שמדובר במקור חיצוני. אם יש סתירה בין החומר של הסטודנט לבין האינטרנט, העדף את החומר של הסטודנט.")
 
         system = "\n".join(system_parts)
 

@@ -32,6 +32,7 @@ export default function StudyBuddyPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
   const [connected, setConnected] = useState(false)
   const socketRef = useRef<Socket | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -62,14 +63,17 @@ export default function StudyBuddyPage() {
     })
 
     socket.on('typing', () => setIsTyping(true))
+    socket.on('searching', () => setIsSearching(true))
 
     socket.on('reply', ({ text }: { text: string }) => {
       setIsTyping(false)
+      setIsSearching(false)
       setMessages((prev) => [...prev, { role: 'assistant', content: text }])
     })
 
     socket.on('error', ({ message }: { message: string }) => {
       setIsTyping(false)
+      setIsSearching(false)
       setMessages((prev) => [...prev, { role: 'assistant', content: `❌ ${message}` }])
     })
 
@@ -179,16 +183,28 @@ export default function StudyBuddyPage() {
           ))}
         </AnimatePresence>
 
-        {/* Typing indicator */}
-        {isTyping && (
+        {/* Typing / Searching indicator */}
+        {(isTyping || isSearching) && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
             <div className="w-8 h-8 rounded-full bg-white/5 border border-white/8 flex items-center justify-center">
               <config.icon size={16} className="text-ink-muted" />
             </div>
-            <div className="glass-sm rounded-2xl rounded-tr-sm px-4 py-3 flex gap-1 items-center">
-              <div className="typing-dot" />
-              <div className="typing-dot" />
-              <div className="typing-dot" />
+            <div className="glass-sm rounded-2xl rounded-tr-sm px-4 py-3 flex gap-1.5 items-center">
+              {isSearching ? (
+                <>
+                  <svg className="animate-spin h-3.5 w-3.5 text-indigo-400" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="text-xs text-indigo-400">מחפש באינטרנט...</span>
+                </>
+              ) : (
+                <>
+                  <div className="typing-dot" />
+                  <div className="typing-dot" />
+                  <div className="typing-dot" />
+                </>
+              )}
             </div>
           </motion.div>
         )}

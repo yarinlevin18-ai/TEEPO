@@ -11,3 +11,4 @@ requests>=2.31.0
 python-jose>=3.3.0
 simple-websocket>=1.0.0
 httpx>=0.24.0
+duckduckgo-search>=7.0.0
