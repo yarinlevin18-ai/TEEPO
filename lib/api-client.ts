@@ -38,6 +38,11 @@ export const api = {
   courses: {
     list: () => request<any[]>('/api/courses'),
     get: (id: string) => request<any>(`/api/courses/${id}`),
+    update: (id: string, data: Record<string, any>) =>
+      request<any>(`/api/courses/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     extract: (url: string) =>
       request<any>('/api/courses/extract', {
         method: 'POST',
@@ -106,6 +111,11 @@ export const api = {
   },
 
   lessons: {
+    update: (id: string, data: Record<string, any>) =>
+      request<any>(`/api/lessons/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     summarize: (content: string, title?: string) =>
       request<any>('/api/lessons/summarize', {
         method: 'POST',

@@ -65,22 +65,18 @@ export default function CoursesPage() {
 
   const yearOptions = useMemo(() => guessYearOptions(), [])
 
-  // Load courses & merge with saved semester/year from localStorage
+  // Load courses — semester/year now come from Supabase columns
   useEffect(() => {
     const load = async () => {
       try {
         const data: Course[] = await api.courses.list()
-        // Load saved semester/year from localStorage
-        const saved: Record<string, { semester?: SemesterLabel; year?: string }> =
-          JSON.parse(localStorage.getItem('course-semesters') || '{}')
 
         const enriched: CourseWithMeta[] = data.map((c) => {
-          const s = saved[c.id]
           const guess = guessSemesterFromTitle(c.title)
           return {
             ...c,
-            semester: s?.semester || guess.semester,
-            year: s?.year || guess.year,
+            semester: (c as any).semester || guess.semester,
+            year: (c as any).academic_year || guess.year,
           }
         })
         setCourses(enriched)
@@ -94,25 +90,16 @@ export default function CoursesPage() {
     load()
   }, [])
 
-  // Save semester/year to localStorage whenever courses change
-  const persistMeta = (updated: CourseWithMeta[]) => {
-    const map: Record<string, { semester?: SemesterLabel; year?: string }> = {}
-    updated.forEach((c) => {
-      if (c.semester || c.year) {
-        map[c.id] = { semester: c.semester, year: c.year }
-      }
-    })
-    localStorage.setItem('course-semesters', JSON.stringify(map))
-  }
-
   const updateCourseMeta = (id: string, semester?: SemesterLabel, year?: string) => {
-    setCourses((prev) => {
-      const updated = prev.map((c) =>
-        c.id === id ? { ...c, semester, year } : c
-      )
-      persistMeta(updated)
-      return updated
-    })
+    setCourses((prev) =>
+      prev.map((c) => c.id === id ? { ...c, semester, year } : c)
+    )
+    // Persist to Supabase
+    api.courses.update(id, { semester: semester || null, academic_year: year || null })
+      .catch((e) => {
+        console.error('Failed to save semester/year:', e)
+        setError('שגיאה בשמירת הסמסטר. נסה שוב.')
+      })
   }
 
   // ── Group courses by year → semester ──────────────────────────────

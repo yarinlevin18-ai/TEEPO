@@ -743,11 +743,30 @@ export default function CourseDetailPage() {
                     className="w-full flex items-center gap-3 p-4 text-right hover:bg-white/[0.03] transition-colors"
                   >
                     <span
-                      className={`w-7 h-7 rounded-full text-xs flex items-center justify-center flex-shrink-0 font-medium ${
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const newVal = !lesson.is_completed
+                        setCourse((prev) => prev ? {
+                          ...prev,
+                          lessons: prev.lessons.map((l) =>
+                            l.id === lesson.id ? { ...l, is_completed: newVal } : l
+                          ),
+                        } : prev)
+                        api.lessons.update(lesson.id, { is_completed: newVal }).catch(() => {
+                          setCourse((prev) => prev ? {
+                            ...prev,
+                            lessons: prev.lessons.map((l) =>
+                              l.id === lesson.id ? { ...l, is_completed: !newVal } : l
+                            ),
+                          } : prev)
+                        })
+                      }}
+                      className={`w-7 h-7 rounded-full text-xs flex items-center justify-center flex-shrink-0 font-medium cursor-pointer transition-all hover:scale-110 ${
                         lesson.is_completed
-                          ? 'bg-emerald-500/15 text-emerald-400'
-                          : 'bg-white/5 text-ink-muted'
+                          ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                          : 'bg-white/5 text-ink-muted hover:bg-indigo-500/15 hover:text-indigo-400'
                       }`}
+                      title={lesson.is_completed ? 'סמן כלא הושלם' : 'סמן כהושלם'}
                     >
                       {lesson.is_completed ? <CheckCircle2 size={14} /> : index + 1}
                     </span>

@@ -127,6 +127,26 @@ def get_course(course_id: str):
         return jsonify({"error": "שגיאה בטעינת הקורס"}), 500
 
 
+@api.patch("/courses/<course_id>")
+def update_course_route(course_id: str):
+    """Update a course (semester, year, progress, etc.)."""
+    try:
+        body = request.get_json() or {}
+        allowed = {"semester", "academic_year", "progress_percentage", "status", "title", "description"}
+        update_data = {k: v for k, v in body.items() if k in allowed}
+        if not update_data:
+            return jsonify({"error": "אין שדות לעדכון"}), 400
+        from datetime import datetime, timezone
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        result = db.update_course(course_id, update_data)
+        if not result.data:
+            return jsonify({"error": "קורס לא נמצא"}), 404
+        return jsonify(result.data[0])
+    except Exception as e:
+        logger.warning(f"[update_course] error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @api.post("/courses/extract")
 def extract_course():
     body = request.get_json() or {}
@@ -481,6 +501,49 @@ def summarize_note_content(course_id: str):
     except Exception as e:
         logger.warning(f"[summarize_note] error: {e}")
         return jsonify({"error": "שגיאה ביצירת הסיכום"}), 500
+
+
+# ------------------------------------------------------------------ #
+#  Lesson toggle completion                                            #
+# ------------------------------------------------------------------ #
+
+@api.patch("/lessons/<lesson_id>")
+def update_lesson(lesson_id: str):
+    """Toggle lesson completion and recalculate course progress."""
+    body = request.get_json() or {}
+    try:
+        client = db.get_client()
+        update_data = {}
+        if "is_completed" in body:
+            update_data["is_completed"] = bool(body["is_completed"])
+            if body["is_completed"]:
+                from datetime import datetime, timezone
+                update_data["completed_at"] = datetime.now(timezone.utc).isoformat()
+            else:
+                update_data["completed_at"] = None
+
+        if not update_data:
+            return jsonify({"error": "אין שדות לעדכון"}), 400
+
+        result = client.table("lessons").update(update_data).eq("id", lesson_id).execute()
+        if not result.data:
+            return jsonify({"error": "שיעור לא נמצא"}), 404
+
+        # Recalculate course progress
+        lesson = result.data[0]
+        course_id = lesson.get("course_id")
+        if course_id:
+            all_lessons = client.table("lessons").select("is_completed").eq("course_id", course_id).execute()
+            if all_lessons.data:
+                total = len(all_lessons.data)
+                done = sum(1 for l in all_lessons.data if l.get("is_completed"))
+                progress = round((done / total) * 100) if total > 0 else 0
+                client.table("courses").update({"progress_percentage": progress}).eq("id", course_id).execute()
+
+        return jsonify(result.data[0])
+    except Exception as e:
+        logger.warning(f"[update_lesson] error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 # ------------------------------------------------------------------ #

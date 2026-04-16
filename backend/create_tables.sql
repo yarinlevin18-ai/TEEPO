@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS courses (
   status              TEXT DEFAULT 'active',
   progress_percentage INTEGER DEFAULT 0,
   thumbnail_url       TEXT,
+  semester            TEXT,
+  academic_year       TEXT,
   created_at          TIMESTAMPTZ DEFAULT now(),
   updated_at          TIMESTAMPTZ DEFAULT now()
 );
@@ -33,6 +35,8 @@ CREATE TABLE IF NOT EXISTS lessons (
   order_index      INTEGER DEFAULT 0,
   duration_minutes INTEGER DEFAULT 0,
   lesson_url       TEXT,
+  is_completed     BOOLEAN DEFAULT false,
+  completed_at     TIMESTAMPTZ,
   created_at       TIMESTAMPTZ DEFAULT now()
 );
 
@@ -45,6 +49,8 @@ CREATE TABLE IF NOT EXISTS study_tasks (
   scheduled_date DATE,
   is_completed   BOOLEAN DEFAULT false,
   priority       TEXT DEFAULT 'medium',
+  category       TEXT DEFAULT 'study',
+  duration_minutes INTEGER,
   created_at     TIMESTAMPTZ DEFAULT now()
 );
 
@@ -68,7 +74,7 @@ CREATE TABLE IF NOT EXISTS assignment_tasks (
   assignment_id   UUID REFERENCES assignments(id) ON DELETE CASCADE,
   title           TEXT NOT NULL,
   description     TEXT,
-  completed       BOOLEAN DEFAULT false,
+  is_completed    BOOLEAN DEFAULT false,
   order_index     INTEGER DEFAULT 0,
   estimated_hours NUMERIC DEFAULT 1
 );

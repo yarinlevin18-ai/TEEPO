@@ -168,7 +168,7 @@ export default function ExtractCoursePage() {
 
             {/* Actions */}
             <div className="p-5 border-t border-white/5 flex gap-3">
-              <Link href={`/dashboard/courses/${result.course.id}`} className="flex-1">
+              <Link href={`/courses/${result.course.id}`} className="flex-1">
                 <button className="w-full btn-gradient px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-opacity hover:opacity-90">
                   פתח את הקורס
                 </button>
