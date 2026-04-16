@@ -53,9 +53,10 @@ def register_socket_events(socketio: SocketIO):
         sid = _get_sid()
         session = _sessions.get(sid, {})
         user_id = session.get("user_id", "anonymous")
-        question: str = str(data.get("text", ""))[:5000]  # limit message length
+        question: str = str(data.get("text", ""))[:5000]
         context: str = str(data.get("context", ""))[:10000]
         agent_type: str = data.get("agent_type", "study_buddy")
+        course_id: str = str(data.get("course_id", ""))[:64]
         if agent_type not in ("study_buddy", "academic"):
             agent_type = "study_buddy"
 
@@ -66,6 +67,37 @@ def register_socket_events(socketio: SocketIO):
         emit("typing", {"agent": agent_type})
 
         orch = get_orchestrator()
+
+        # Build course context if a course_id is provided
+        course_context = ""
+        notes_context = ""
+        if course_id:
+            try:
+                client = db.get_client()
+                # Get course info
+                cr = client.table("courses").select("title,description").eq("id", course_id).limit(1).execute()
+                if cr.data:
+                    c = cr.data[0]
+                    course_context = f"קורס: {c.get('title', '')}\nתיאור: {c.get('description', '')}"
+
+                # Get lessons
+                lr = client.table("lessons").select("title,content,ai_summary").eq("course_id", course_id).order("order_index").limit(20).execute()
+                if lr.data:
+                    lessons_text = "\n".join([
+                        f"- {l.get('title','')}" + (f": {l.get('ai_summary','')[:300]}" if l.get('ai_summary') else "")
+                        for l in lr.data
+                    ])
+                    course_context += f"\n\nשיעורים:\n{lessons_text}"
+
+                # Get user notes
+                nr = client.table("course_notes").select("title,content").eq("course_id", course_id).eq("user_id", user_id).order("updated_at", desc=True).limit(5).execute()
+                if nr.data:
+                    notes_context = "\n---\n".join([
+                        f"**{n.get('title','')}**\n{n.get('content','')[:500]}"
+                        for n in nr.data
+                    ])
+            except Exception as e:
+                logger.debug(f"Failed to load course context: {e}")
 
         try:
             if agent_type == "academic":
@@ -79,6 +111,8 @@ def register_socket_events(socketio: SocketIO):
                     question=question,
                     context=context,
                     history=list(session.get("history", [])),
+                    course_context=course_context,
+                    notes_context=notes_context,
                 )
                 answer = result.get("answer", "")
                 _sessions[sid]["history"] = result.get("history", [])

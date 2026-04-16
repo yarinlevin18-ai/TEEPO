@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import Sidebar from '@/components/layout/Sidebar'
+import AIChatWidget from '@/components/AIChatWidget'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -36,6 +37,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex-1 overflow-auto bg-gradient-mesh">
         {children}
       </main>
+      <AIChatWidget />
     </div>
   )
 }

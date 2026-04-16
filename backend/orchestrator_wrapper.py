@@ -179,20 +179,43 @@ class StudyOrchestrator:
 }}"""
         return self._execute_agent("content", {"topic": prompt, "type": "quiz"})
 
-    def answer_question(self, question: str, context: str = "", history: List = None) -> Dict:
-        """עונה על שאלת לימוד בצ'אט אינטראקטיבי."""
+    def answer_question(self, question: str, context: str = "", history: List = None,
+                        course_context: str = "", notes_context: str = "") -> Dict:
+        """עונה על שאלת לימוד בצ'אט אינטראקטיבי — בסגנון NotebookLM."""
         question = _sanitize_for_prompt(question, 5000)
         context = _sanitize_for_prompt(context, 10000)
-        messages = history[-20:] if history else []  # limit history to last 20 messages
+        course_context = _sanitize_for_prompt(course_context, 15000)
+        notes_context = _sanitize_for_prompt(notes_context, 15000)
+        messages = history[-20:] if history else []
         messages.append({"role": "user", "content": question})
-        system = (
-            "אתה מנחה לימוד אישי שעונה בעברית בצורה ברורה וחינוכית. "
-            "השתמש בדוגמאות כשצריך. "
-            + (f"הקשר מהקורס: {context}" if context else "")
-        )
+
+        system_parts = [
+            "אתה עוזר לימוד אישי חכם ומדויק, בסגנון NotebookLM של Google. ",
+            "אתה מתמחה בהוראה, סיכום, והסברת חומר אקדמי.",
+            "\n\n## כללי התנהגות:",
+            "- ענה תמיד בעברית, בצורה ברורה ומדויקת.",
+            "- השתמש בפורמט מסודר: כותרות, נקודות, מספור.",
+            "- כשמסביר מושג — תן דוגמה קונקרטית אחת לפחות.",
+            "- כשמסכם — צור סיכום מובנה עם נקודות עיקריות, מושגים, ומה חשוב לבחינה.",
+            "- כשעוזר בתרגיל — הסבר צעד אחר צעד, אל תתן תשובה סופית מיד.",
+            "- אם הסטודנט טועה — הסבר למה זה שגוי בעדינות, ותן רמז לכיוון הנכון.",
+            "- התאם את רמת ההסבר — אם שואלים שאלה בסיסית, הסבר מהיסוד. אם מתקדמת, דלג על הבסיס.",
+            "- היה תמציתי אבל שלם. אל תחסוך מידע חשוב, אבל אל תמלא טקסט מיותר.",
+            "- אם אתה לא בטוח — אמור זאת במפורש, אל תמציא.",
+        ]
+
+        if course_context:
+            system_parts.append(f"\n\n## הקשר הקורס הנוכחי:\n{course_context}")
+        if notes_context:
+            system_parts.append(f"\n\n## סיכומים והערות של הסטודנט:\n{notes_context}")
+        if context:
+            system_parts.append(f"\n\n## הקשר נוסף:\n{context}")
+
+        system = "\n".join(system_parts)
+
         resp = self.client.messages.create(
             model=self.model,
-            max_tokens=2048,
+            max_tokens=3000,
             system=system,
             messages=messages,
         )
