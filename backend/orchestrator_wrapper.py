@@ -40,27 +40,37 @@ def _sanitize_for_prompt(text: str, max_len: int = MAX_CONTENT_LENGTH) -> str:
 _memory_available = False
 _memory_module = None
 
-# The real memory agent lives at ~/OneDrive/Desktop/AI/Agents/Memory/agents/
-MEMORY_AGENT_PATH = os.path.join(
-    os.path.expanduser("~"),
-    "OneDrive", "Desktop", "AI", "Agents", "Memory", "agents"
-)
-
-if os.path.isdir(MEMORY_AGENT_PATH):
-    sys.path.insert(0, MEMORY_AGENT_PATH)
-    try:
-        import memory_agent as _memory_module
-        _memory_available = True
-        info = _memory_module.agent_info()
-        logger.info(
-            f"Global memory system connected. "
-            f"{info.get('memory_count', 0)} memories in database. "
-            f"DB: {info.get('storage', {}).get('db', 'unknown')}"
-        )
-    except Exception as e:
-        logger.warning(f"Failed to load global memory agent: {e}")
-else:
-    logger.info(f"Memory agent path not found: {MEMORY_AGENT_PATH}. Memory disabled.")
+# Try bundled copy first (works on Render / any deployment),
+# then fall back to the external path (dev machine).
+try:
+    from services import memory_agent as _memory_module
+    _memory_available = True
+    info = _memory_module.agent_info()
+    logger.info(
+        f"Memory system connected (bundled). "
+        f"{info.get('memory_count', 0)} memories in database. "
+        f"DB: {info.get('storage', {}).get('db', 'unknown')}"
+    )
+except Exception:
+    MEMORY_AGENT_PATH = os.path.join(
+        os.path.expanduser("~"),
+        "OneDrive", "Desktop", "AI", "Agents", "Memory", "agents"
+    )
+    if os.path.isdir(MEMORY_AGENT_PATH):
+        sys.path.insert(0, MEMORY_AGENT_PATH)
+        try:
+            import memory_agent as _memory_module
+            _memory_available = True
+            info = _memory_module.agent_info()
+            logger.info(
+                f"Memory system connected (external). "
+                f"{info.get('memory_count', 0)} memories in database. "
+                f"DB: {info.get('storage', {}).get('db', 'unknown')}"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load memory agent: {e}")
+    else:
+        logger.info("Memory agent not found. Memory disabled.")
 
 
 # ── Connect to the real orchestrator ──────────────────────────────────
