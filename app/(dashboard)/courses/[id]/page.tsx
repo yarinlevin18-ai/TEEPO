@@ -10,7 +10,11 @@ import {
   StickyNote, Wand2, FileUp, Edit3, Link2,
 } from 'lucide-react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { api } from '@/lib/api-client'
+
+// Load rich editor only client-side (TipTap uses browser APIs)
+const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false })
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { Course, Lesson, CourseNote } from '@/types'
 import { format } from 'date-fns'
@@ -459,12 +463,10 @@ export default function CourseDetailPage() {
                     className="input-dark w-full text-sm"
                   />
 
-                  <textarea
-                    value={noteContent}
-                    onChange={(e) => setNoteContent(e.target.value)}
+                  <RichTextEditor
+                    content={noteContent}
+                    onChange={setNoteContent}
                     placeholder="כתוב את הסיכום שלך כאן, או הדבק תוכן מהרצאה..."
-                    rows={8}
-                    className="input-dark w-full text-sm resize-y min-h-[120px] leading-relaxed"
                   />
 
                   <div className="flex items-center gap-2 justify-between">
@@ -622,10 +624,11 @@ export default function CourseDetailPage() {
                         </div>
                       </div>
 
-                      {/* Note content */}
-                      <p className="text-xs text-ink-muted leading-relaxed whitespace-pre-wrap line-clamp-6 pr-10">
-                        {note.content}
-                      </p>
+                      {/* Note content — rendered as rich HTML */}
+                      <div
+                        className="note-display line-clamp-6 pr-10"
+                        dangerouslySetInnerHTML={{ __html: note.content }}
+                      />
                     </div>
                   </motion.div>
                 ))}
