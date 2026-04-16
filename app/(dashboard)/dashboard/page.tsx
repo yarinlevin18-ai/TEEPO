@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   BookOpen, Clock, Calendar, ArrowLeft, ArrowRight,
   ChevronRight, ChevronLeft, MapPin, ExternalLink,
@@ -65,8 +65,6 @@ function matchEventToCourse(event: GoogleCalendarEvent, courses: Course[]): Cour
 
 // ── Types ────────────────────────────────────────────────────
 
-type Tab = 'schedule' | 'subjects'
-
 interface DayData {
   date: Date
   events: GoogleCalendarEvent[]
@@ -81,7 +79,6 @@ export default function DashboardPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<Tab>('schedule')
 
   // Calendar state
   const [weekDays, setWeekDays] = useState<DayData[]>([])
@@ -250,49 +247,47 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* ── Tabs: Schedule / Subjects ── */}
+      {/* ── Schedule ── */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-        <div className="flex gap-2 mb-5">
-          {([
-            { key: 'schedule' as Tab, label: 'מערכת שעות', icon: Clock },
-            { key: 'subjects' as Tab, label: 'מקצועות', icon: BookOpen },
-          ]).map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === tab.key
-                  ? 'text-white shadow-lg'
-                  : 'text-ink-muted hover:text-ink glass-sm'
-              }`}
-              style={activeTab === tab.key ? {
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                boxShadow: '0 4px 16px rgba(99,102,241,0.3)',
-              } : undefined}
-            >
-              <tab.icon size={16} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <AnimatePresence mode="wait">
-          {activeTab === 'schedule' ? (
-            <motion.div key="schedule" initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}>
-              <ScheduleView
-                dayData={todayData}
-                calLoading={calLoading}
-                courses={courses}
-                assignments={assignments}
-                providerToken={providerToken}
-              />
-            </motion.div>
-          ) : (
-            <motion.div key="subjects" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
-              <SubjectsView courses={activeCourses} assignments={assignments} loading={loading} />
-            </motion.div>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
+            <Clock size={14} style={{ color: '#818cf8' }} />
+          </div>
+          <h2 className="font-semibold text-ink">מערכת שעות</h2>
+          {todayData && todayData.events.length > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
+              {todayData.events.length} אירועים
+            </span>
           )}
-        </AnimatePresence>
+        </div>
+        <ScheduleView
+          dayData={todayData}
+          calLoading={calLoading}
+          courses={courses}
+          assignments={assignments}
+          providerToken={providerToken}
+        />
+      </motion.div>
+
+      {/* ── Subjects ── */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
+              <BookOpen size={14} style={{ color: '#a78bfa' }} />
+            </div>
+            <h2 className="font-semibold text-ink">מקצועות</h2>
+            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.12)', color: '#c4b5fd' }}>
+              {activeCourses.length} פעילים
+            </span>
+          </div>
+          <Link href="/courses">
+            <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
+              כל הקורסים <ArrowLeft size={12} />
+            </button>
+          </Link>
+        </div>
+        <SubjectsView courses={activeCourses} assignments={assignments} loading={loading} />
       </motion.div>
     </div>
   )
