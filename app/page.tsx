@@ -46,7 +46,7 @@ export default function LandingPage() {
           <div className="w-9 h-9 rounded-xl bg-gradient-accent flex items-center justify-center shadow-glow-sm">
             <GraduationCap size={20} className="text-white" />
           </div>
-          <span className="font-bold text-ink text-lg">מערכת לימודים</span>
+          <span className="font-bold text-ink text-lg">SmartDesk</span>
         </div>
         <Link
           href="/auth"
@@ -73,9 +73,9 @@ export default function LandingPage() {
 
           {/* Headline */}
           <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6">
-            <span className="text-ink">מערכת הלימודים</span>
+            <span className="gradient-text">SmartDesk</span>
             <br />
-            <span className="gradient-text">החכמה שלך</span>
+            <span className="text-ink">מערכת הלימודים החכמה שלך</span>
           </h1>
 
           <p className="text-ink-muted text-xl leading-relaxed mb-12 max-w-xl mx-auto">
@@ -123,9 +123,12 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 text-center py-6 text-ink-muted text-xs">
-        <span className="gradient-text font-medium">BGU Study Organizer</span>
-        {' '}· מופעל על ידי Claude Sonnet 4.6
+      <footer className="relative z-10 text-center py-6 text-ink-muted text-xs space-y-1">
+        <div>
+          <span className="gradient-text font-medium">SmartDesk</span>
+          {' '}· מופעל על ידי Claude AI
+        </div>
+        <div>&copy; 2026 Yarin Levin. All rights reserved.</div>
       </footer>
     </div>
   )

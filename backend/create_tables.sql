@@ -1,4 +1,4 @@
--- BGU Study Organizer - Full Database Schema
+-- SmartDesk - Full Database Schema
 -- Run this in Supabase SQL Editor: https://supabase.com/dashboard -> SQL Editor -> New query
 
 -- ── BGU Sessions (cookie persistence across restarts) ──────────────────────

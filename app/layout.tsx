@@ -4,8 +4,8 @@ import { AuthProvider } from '@/lib/auth-context'
 import ErrorBoundary from '@/components/ErrorBoundary'
 
 export const metadata: Metadata = {
-  title: 'מערכת לימודים חכמה',
-  description: 'מארגן לימודים אישי עם בינה מלאכותית',
+  title: 'SmartDesk — מערכת לימודים חכמה',
+  description: 'SmartDesk — מארגן לימודים אישי עם בינה מלאכותית',
   manifest: '/manifest.json',
 }
 

@@ -41,8 +41,8 @@ export default function Sidebar() {
             <GraduationCap size={20} className="text-white" />
           </div>
           <div>
-            <p className="font-bold text-ink text-sm leading-tight">מערכת לימודים</p>
-            <p className="text-xs mt-0.5 gradient-text">עם בינה מלאכותית</p>
+            <p className="font-bold text-ink text-sm leading-tight">SmartDesk</p>
+            <p className="text-xs mt-0.5 gradient-text">מערכת לימודים חכמה</p>
           </div>
         </div>
       </div>
@@ -111,9 +111,10 @@ export default function Sidebar() {
             </button>
           </div>
         )}
-        <p className="text-xs text-center gradient-text font-medium">
-          מופעל על ידי Claude AI
-        </p>
+        <div className="text-center space-y-0.5">
+          <p className="text-xs gradient-text font-medium">SmartDesk</p>
+          <p className="text-[10px] text-ink-subtle">&copy; 2026 Yarin Levin. All rights reserved.</p>
+        </div>
       </div>
     </aside>
   )

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "BGU Study Organizer",
+  "name": "SmartDesk",
   "version": "1.0",
-  "description": "מסנכרן את חשבון ה-BGU שלך עם אפליקציית הלמידה",
+  "description": "SmartDesk — מסנכרן את חשבון ה-BGU שלך עם מערכת הלימודים",
   "permissions": ["cookies", "tabs", "storage"],
   "host_permissions": [
     "<all_urls>"
