@@ -5,11 +5,7 @@
   "description": "מסנכרן את חשבון ה-BGU שלך עם אפליקציית הלמידה",
   "permissions": ["cookies", "tabs", "storage"],
   "host_permissions": [
-    "https://*.bgu.ac.il/*",
-    "https://bgu.ac.il/*",
-    "https://*.onrender.com/*",
-    "http://localhost:5000/*",
-    "http://localhost:3000/*"
+    "<all_urls>"
   ],
   "action": {
     "default_popup": "popup.html",
