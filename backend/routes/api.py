@@ -97,6 +97,8 @@ def list_tasks():
 @api.post("/tasks")
 def create_task():
     body = request.get_json() or {}
+    if not body.get("title"):
+        return jsonify({"error": "חסר שדה חובה: title"}), 400
     body["id"] = str(uuid.uuid4())
     body["user_id"] = _user_id()
     result = db.create_task(body)
@@ -105,15 +107,25 @@ def create_task():
 
 @api.patch("/tasks/<task_id>")
 def update_task(task_id):
-    body = request.get_json() or {}
-    result = db.update_task(task_id, body)
-    return jsonify(result.data[0] if result.data else {})
+    try:
+        body = request.get_json() or {}
+        result = db.update_task(task_id, body)
+        if not result.data:
+            return jsonify({"error": "משימה לא נמצאה"}), 404
+        return jsonify(result.data[0])
+    except Exception as e:
+        print(f"[update_task] error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @api.delete("/tasks/<task_id>")
 def delete_task(task_id):
-    db.delete_task(task_id)
-    return jsonify({"ok": True})
+    try:
+        db.delete_task(task_id)
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"[delete_task] error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 # ------------------------------------------------------------------ #

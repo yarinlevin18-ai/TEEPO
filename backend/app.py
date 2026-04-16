@@ -36,7 +36,18 @@ register_socket_events(socketio)
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "message": "שרת הלמידה פעיל"}
+    supabase_status = "connected"
+    try:
+        from services import supabase_client as db
+        db.get_client().table("courses").select("id").limit(1).execute()
+    except Exception as e:
+        supabase_status = f"error: {e}"
+    status = "ok" if supabase_status == "connected" else "degraded"
+    return {
+        "status": status,
+        "supabase": supabase_status,
+        "message": "שרת הלמידה פעיל",
+    }
 
 
 @app.get("/api/setup-db")

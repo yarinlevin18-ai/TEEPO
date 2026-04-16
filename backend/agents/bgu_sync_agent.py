@@ -48,10 +48,13 @@ class BGUSyncAgent(BaseStudyAgent):
 
         total = courses_result.get("count", 0)
         scraped = len(courses_result.get("courses", []))
+        skipped = courses_result.get("skipped", 0)
 
         msg = f"נמצאו {scraped} קורסים ב-Moodle"
         if total > 0:
-            msg += f", נשמרו {total} בבסיס הנתונים"
+            msg += f", נשמרו {total} חדשים"
+        if skipped > 0:
+            msg += f", {skipped} כבר קיימים"
         if errors:
             msg += f" (שגיאות: {'; '.join(errors)})"
 
@@ -68,9 +71,24 @@ class BGUSyncAgent(BaseStudyAgent):
 
         courses = result.get("courses", [])
         saved = 0
+        skipped = 0
         db_errors = []
 
+        # Load existing courses to avoid duplicates
+        existing_titles = set()
+        try:
+            existing = db.get_courses(user_id)
+            if existing.data:
+                existing_titles = {c["title"] for c in existing.data}
+        except Exception as e:
+            print(f"[sync] Warning: could not load existing courses: {e}")
+
         for course in courses:
+            # Skip if course already exists
+            if course["title"] in existing_titles:
+                skipped += 1
+                continue
+
             course_id = str(uuid.uuid4())
             try:
                 db.create_course({
@@ -88,8 +106,8 @@ class BGUSyncAgent(BaseStudyAgent):
                 if course.get("url"):
                     try:
                         self._sync_assignments(user_id, course["url"], course_id)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[sync] Assignment sync error for {course['title']}: {e}")
 
             except Exception as e:
                 db_errors.append(str(e))
@@ -97,8 +115,9 @@ class BGUSyncAgent(BaseStudyAgent):
         return {
             "status": "success",
             "count": saved,
+            "skipped": skipped,
             "courses": courses,
-            "db_errors": db_errors[:3] if db_errors else [],  # first 3 errors for debug
+            "db_errors": db_errors[:3] if db_errors else [],
         }
 
     def _sync_assignments(self, user_id: str, course_url: str, course_id: str = None) -> Dict:

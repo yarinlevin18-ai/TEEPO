@@ -19,8 +19,11 @@ try:
         kw.pop('proxy', None)
         _orig_async(self, *a, **kw)
     _httpx.AsyncClient.__init__ = _async_init
-except Exception:
+    print("[supabase_client] httpx proxy compatibility patch applied successfully")
+except ImportError:
     pass  # if httpx isn't installed, supabase will fail anyway
+except Exception as e:
+    print(f"[supabase_client] httpx monkey-patch failed: {e}")
 # ───────────────────────────────────────────────────────────────────────────
 
 _client: Client | None = None
