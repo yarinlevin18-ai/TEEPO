@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { api } from '@/lib/api-client'
+import { useAuth } from '@/lib/auth-context'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { StudyTask, Course, Assignment } from '@/types'
 import { format } from 'date-fns'
@@ -20,13 +21,51 @@ const STATS = [
   { key: 'urgent',  label: 'מטלות דחופות', icon: Zap,         color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
 ]
 
+/**
+ * Detect current semester from date:
+ *  Semester א = October–February  (months 10-12, 1-2)
+ *  Semester ב = March–July        (months 3-7)
+ *  Summer     = August–September  (months 8-9)
+ */
+function getCurrentSemester(): { semester: string; label: string } {
+  const month = new Date().getMonth() + 1
+  if (month >= 10 || month <= 2) return { semester: '1', label: "סמסטר א'" }
+  if (month >= 3 && month <= 7) return { semester: '2', label: "סמסטר ב'" }
+  return { semester: 'קיץ', label: 'קיץ' }
+}
+
+function isCourseCurrentSemester(title: string): boolean {
+  const { semester } = getCurrentSemester()
+  const t = title.toLowerCase()
+
+  // Explicit semester markers
+  if (semester === '1') {
+    if (/סמ['\s]*1|סמסטר\s*א|sem(?:ester)?\s*1|\bS1\b/i.test(title)) return true
+  } else if (semester === '2') {
+    if (/סמ['\s]*2|סמסטר\s*ב|sem(?:ester)?\s*2|\bS2\b/i.test(title)) return true
+  } else {
+    if (/קיץ|summer/i.test(title)) return true
+  }
+
+  // Courses without semester marker — include them (could be year-long)
+  if (!/סמ['\s]*[12]|סמסטר|sem(?:ester)?|summer|קיץ|\bS[12]\b/i.test(title)) return true
+
+  return false
+}
+
 export default function DashboardPage() {
+  const { user } = useAuth()
   const [tasks, setTasks] = useState<StudyTask[]>([])
   const [courses, setCourses] = useState<Course[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const today = format(new Date(), 'yyyy-MM-dd')
+
+  // Extract user display name
+  const displayName = user?.user_metadata?.display_name
+    || user?.email?.split('@')[0]
+    || ''
 
   useEffect(() => {
     Promise.all([api.tasks.list(today), api.courses.list(), api.assignments.list()])
@@ -58,7 +97,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">
-          <span className="text-ink">שלום! </span>
+          <span className="text-ink">שלום {displayName}! </span>
           <span className="gradient-text">בוא נלמד היום</span>
           <span className="ml-2">📚</span>
         </h1>
@@ -163,7 +202,7 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* Active Courses */}
+      {/* Active Courses — current semester only */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -173,39 +212,52 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between p-5 border-b border-white/5">
           <div className="flex items-center gap-2">
             <BookOpen size={17} style={{ color: '#818cf8' }} />
-            <h2 className="font-semibold text-ink">קורסים פעילים</h2>
+            <h2 className="font-semibold text-ink">קורסים פעילים — {getCurrentSemester().label}</h2>
           </div>
-          <Link href="/courses/extract">
+          <Link href="/courses">
             <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
-              <Plus size={12} /> הוסף קורס
+              כל הקורסים <ArrowLeft size={12} />
             </button>
           </Link>
         </div>
         {loading ? (
           <div className="p-5"><LoadingSkeleton rows={2} /></div>
         ) : courses.length === 0 ? (
-          <EmptyState message="עדיין לא הוספת קורסים" action={{ href: '/courses/extract', label: 'הוסף קורס ראשון' }} />
+          <EmptyState message="עדיין לא הוספת קורסים" action={{ href: '/bgu-connect', label: 'חבר BGU' }} />
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 p-5">
-            {courses.filter(c => c.status === 'active').map(course => (
-              <Link key={course.id} href={`/courses/${course.id}`}>
-                <div className="glass-sm p-4 hover:border-accent/40 transition-all cursor-pointer group">
-                  <p className="font-medium text-ink text-sm line-clamp-2 group-hover:text-accent-400 transition-colors">{course.title}</p>
-                  <div className="mt-3">
-                    <div className="flex justify-between text-xs text-ink-muted mb-1.5">
-                      <span>התקדמות</span>
-                      <span>{Math.round(course.progress_percentage)}%</span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                      <div
-                        className="h-1.5 rounded-full transition-all"
-                        style={{ width: `${course.progress_percentage}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }}
-                      />
+            {courses
+              .filter(c => c.status === 'active' && isCourseCurrentSemester(c.title))
+              .map(course => (
+                <Link key={course.id} href={`/courses/${course.id}`}>
+                  <div className="glass-sm p-4 hover:border-accent/40 transition-all cursor-pointer group">
+                    <p className="font-medium text-ink text-sm line-clamp-2 group-hover:text-accent-400 transition-colors">{course.title}</p>
+                    <div className="mt-3">
+                      <div className="flex justify-between text-xs text-ink-muted mb-1.5">
+                        <span>התקדמות</span>
+                        <span>{Math.round(course.progress_percentage)}%</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                        <div
+                          className="h-1.5 rounded-full transition-all"
+                          style={{ width: `${course.progress_percentage}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              ))
+            }
+            {courses.filter(c => c.status === 'active' && isCourseCurrentSemester(c.title)).length === 0 && (
+              <div className="col-span-full p-6 text-center">
+                <p className="text-ink-muted text-sm">אין קורסים פעילים לסמסטר הנוכחי</p>
+                <Link href="/courses">
+                  <button className="mt-2 text-sm text-accent-400 hover:text-accent transition-colors">
+                    ראה את כל הקורסים
+                  </button>
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </motion.div>

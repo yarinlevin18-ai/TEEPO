@@ -106,6 +106,27 @@ def list_courses():
         return jsonify([])
 
 
+@api.get("/courses/<course_id>")
+def get_course(course_id: str):
+    """Get a single course with its lessons."""
+    try:
+        user_id = _user_id()
+        # Get the course
+        course_res = db.get_client().table("courses").select("*").eq("id", course_id).eq("user_id", user_id).limit(1).execute()
+        if not course_res.data:
+            return jsonify({"error": "קורס לא נמצא"}), 404
+        course = course_res.data[0]
+
+        # Get lessons
+        lessons_res = db.get_lessons(course_id)
+        course["lessons"] = lessons_res.data or []
+
+        return jsonify(course)
+    except Exception as e:
+        logger.warning(f"[course_detail] DB error: {e}")
+        return jsonify({"error": "שגיאה בטעינת הקורס"}), 500
+
+
 @api.post("/courses/extract")
 def extract_course():
     body = request.get_json() or {}

@@ -37,6 +37,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const api = {
   courses: {
     list: () => request<any[]>('/api/courses'),
+    get: (id: string) => request<any>(`/api/courses/${id}`),
     extract: (url: string) =>
       request<any>('/api/courses/extract', {
         method: 'POST',

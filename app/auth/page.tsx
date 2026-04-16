@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
-import { GraduationCap, Mail, Lock, ArrowLeft, Loader2 } from 'lucide-react'
+import { GraduationCap, Mail, Lock, ArrowLeft, Loader2, User } from 'lucide-react'
 import Link from 'next/link'
 
 export default function AuthPage() {
@@ -17,6 +17,7 @@ export default function AuthPage() {
     }
   }, [user, authLoading, router])
   const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -49,7 +50,7 @@ export default function AuthPage() {
         router.push('/dashboard')
       }
     } else {
-      const { error } = await signUp(email, password)
+      const { error } = await signUp(email, password, displayName.trim() || undefined)
       if (error) {
         setError(translateError(error))
       } else {
@@ -83,6 +84,23 @@ export default function AuthPage() {
         {/* Form Card */}
         <div className="glass p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Name (signup only) */}
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-sm font-medium text-ink-muted mb-2">שם מלא</label>
+                <div className="relative">
+                  <User size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle" />
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="השם שלך"
+                    className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-ink placeholder:text-ink-subtle focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500 transition-colors"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-ink-muted mb-2">אימייל</label>
