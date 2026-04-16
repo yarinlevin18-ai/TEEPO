@@ -141,6 +141,39 @@ CREATE TABLE IF NOT EXISTS course_notes (
   updated_at  TIMESTAMPTZ DEFAULT now()
 );
 
+-- ── Student Grades (persisted from Moodle + Portal) ────────────────────────
+CREATE TABLE IF NOT EXISTS student_grades (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         TEXT NOT NULL,
+  course_name     TEXT NOT NULL,
+  course_moodle_id TEXT,
+  grade           NUMERIC,
+  grade_text      TEXT,
+  semester        TEXT,
+  academic_year   TEXT,
+  source          TEXT DEFAULT 'moodle',
+  rank            TEXT,
+  credits         NUMERIC,
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- Prevent duplicates: same user + course + semester
+CREATE UNIQUE INDEX IF NOT EXISTS idx_student_grades_unique
+  ON student_grades(user_id, course_name, COALESCE(semester, ''));
+
+-- ── Degree Settings (user's degree program info) ───────────────────────────
+CREATE TABLE IF NOT EXISTS degree_settings (
+  user_id               TEXT PRIMARY KEY,
+  degree_name           TEXT,
+  total_credits_required NUMERIC DEFAULT 160,
+  start_year            INTEGER,
+  expected_end_year     INTEGER,
+  total_semesters       INTEGER DEFAULT 8,
+  created_at            TIMESTAMPTZ DEFAULT now(),
+  updated_at            TIMESTAMPTZ DEFAULT now()
+);
+
 -- ── Indexes for performance ─────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_courses_user ON courses(user_id);
 CREATE INDEX IF NOT EXISTS idx_study_tasks_user ON study_tasks(user_id);
@@ -150,6 +183,8 @@ CREATE INDEX IF NOT EXISTS idx_assignments_deadline ON assignments(deadline);
 CREATE INDEX IF NOT EXISTS idx_agent_conversations_user ON agent_conversations(user_id, agent_type);
 CREATE INDEX IF NOT EXISTS idx_course_notes_course ON course_notes(course_id);
 CREATE INDEX IF NOT EXISTS idx_course_notes_user ON course_notes(user_id);
+CREATE INDEX IF NOT EXISTS idx_student_grades_user ON student_grades(user_id);
+CREATE INDEX IF NOT EXISTS idx_student_grades_year ON student_grades(academic_year);
 
 -- ── RLS Policies ────────────────────────────────────────────────────────────
 -- Enable RLS on all tables (service_role bypasses RLS automatically)
@@ -164,6 +199,8 @@ ALTER TABLE quiz_questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quiz_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE study_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_grades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE degree_settings ENABLE ROW LEVEL SECURITY;
 
 -- Service role policy (backend uses service role key, so it bypasses RLS)
 -- But add explicit policies for anon/authenticated access if needed later
@@ -203,6 +240,12 @@ DO $$ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'service_all_course_notes') THEN
     CREATE POLICY service_all_course_notes ON course_notes FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'service_all_student_grades') THEN
+    CREATE POLICY service_all_student_grades ON student_grades FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'service_all_degree_settings') THEN
+    CREATE POLICY service_all_degree_settings ON degree_settings FOR ALL USING (true) WITH CHECK (true);
   END IF;
 END $$;
 

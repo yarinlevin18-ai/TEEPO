@@ -93,12 +93,22 @@ interface DayData {
 
 // ── Component ────────────────────────────────────────────────
 
+interface CreditsInfo {
+  completed: number
+  required: number
+  remaining: number
+  remaining_semesters: number
+  recommended_per_semester: number
+}
+
 export default function DashboardPage() {
   const { user, session } = useAuth()
   const [courses, setCourses] = useState<Course[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [tasks, setTasks] = useState<StudyTask[]>([])
   const [grades, setGrades] = useState<BGUGrade[]>([])
+  const [gradesAvg, setGradesAvg] = useState<number | null>(null)
+  const [credits, setCredits] = useState<CreditsInfo | null>(null)
   const [bguConnected, setBguConnected] = useState<boolean>(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -126,15 +136,20 @@ export default function DashboardPage() {
         setAssignments(a)
         setTasks(t)
 
-        // Try loading BGU data (may fail if not connected)
+        // Try loading BGU data (grades + credits)
         try {
           const statusRes = await api.bgu.status()
           const isConnected = statusRes?.moodle || statusRes?.portal
           setBguConnected(!!isConnected)
-          if (isConnected) {
-            const gradesRes = await api.bgu.grades().catch(() => ({ grades: [] }))
-            setGrades(gradesRes?.grades || [])
-          }
+
+          // Always try grades (they're persisted in DB even if not currently connected)
+          const [gradesRes, degreeRes] = await Promise.all([
+            api.bgu.grades().catch(() => ({ grades: [], average: null })),
+            api.bgu.degree().catch(() => ({ credits: null })),
+          ])
+          setGrades(gradesRes?.grades || [])
+          setGradesAvg(gradesRes?.average ?? null)
+          if (degreeRes?.credits) setCredits(degreeRes.credits)
         } catch {
           setBguConnected(false)
         }
@@ -219,9 +234,9 @@ export default function DashboardPage() {
     return differenceInDays(new Date(a.deadline), new Date()) <= 3
   })
 
-  const avgGrade = grades.length > 0
+  const avgGrade = gradesAvg ?? (grades.length > 0
     ? grades.reduce((sum, g) => sum + (typeof g.grade === 'number' ? g.grade : parseFloat(String(g.grade)) || 0), 0) / grades.length
-    : null
+    : null)
 
   const overallProgress = activeCourses.length > 0
     ? activeCourses.reduce((sum, c) => sum + c.progress_percentage, 0) / activeCourses.length
@@ -269,7 +284,7 @@ export default function DashboardPage() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-3"
+        className="grid grid-cols-2 lg:grid-cols-5 gap-3"
       >
         <StatCard
           icon={<BookOpen size={18} />}
@@ -306,6 +321,15 @@ export default function DashboardPage() {
           value={avgGrade !== null ? avgGrade.toFixed(1) : '—'}
           sub={grades.length > 0 ? `${grades.length} קורסים` : 'לא זמין'}
           subColor="#64748b"
+        />
+        <StatCard
+          icon={<GraduationCap size={18} />}
+          iconColor="#a78bfa"
+          iconBg="rgba(167,139,250,0.15)"
+          label="נק״ז"
+          value={credits ? `${credits.completed}/${credits.required}` : '—'}
+          sub={credits ? `${credits.recommended_per_semester} מומלץ/סמסטר` : 'הגדר תואר'}
+          subColor="#a78bfa"
         />
       </motion.div>
 
@@ -493,6 +517,19 @@ export default function DashboardPage() {
             </div>
             <AssignmentsSection assignments={pendingAssignments} courses={courses} loading={loading} />
           </motion.div>
+
+          {/* Credits Progress */}
+          {credits && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(167,139,250,0.15)' }}>
+                  <GraduationCap size={14} style={{ color: '#a78bfa' }} />
+                </div>
+                <h2 className="font-semibold text-ink">התקדמות תואר</h2>
+              </div>
+              <CreditsSection credits={credits} />
+            </motion.div>
+          )}
 
           {/* Grades */}
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
@@ -890,34 +927,110 @@ function GradesSection({ grades, bguConnected, avgGrade, loading }: {
           </span>
         </div>
       )}
-      {/* Grade rows */}
-      <div className="divide-y divide-white/5 max-h-64 overflow-y-auto">
-        {grades.map((g, i) => {
-          const numGrade = typeof g.grade === 'number' ? g.grade : parseFloat(String(g.grade))
-          const color = !isNaN(numGrade) ? getGradeColor(numGrade) : '#64748b'
-          return (
-            <motion.div
-              key={g.course_id || i}
-              initial={{ opacity: 0, x: -6 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.03 }}
-              className="flex items-center justify-between px-4 py-3 hover:bg-white/3 transition-colors"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-ink truncate">{g.course_name}</p>
-                {g.rank && <p className="text-[10px] text-ink-subtle mt-0.5">דירוג: {g.rank}</p>}
+      {/* Grade rows with semester groups */}
+      <div className="max-h-72 overflow-y-auto">
+        {(() => {
+          // Group grades by semester/year
+          const grouped: Record<string, typeof grades> = {}
+          const ungrouped: typeof grades = []
+          for (const g of grades) {
+            const key = (g as any).semester || (g as any).academic_year
+            if (key) {
+              ;(grouped[key] = grouped[key] || []).push(g)
+            } else {
+              ungrouped.push(g)
+            }
+          }
+          const groups = Object.entries(grouped)
+          const allRows = groups.length > 0 ? groups : [['', grades]]
+
+          return allRows.map(([label, items], gi) => (
+            <div key={String(label) || gi}>
+              {label && typeof label === 'string' && (
+                <div className="px-4 py-1.5 bg-white/3 border-y border-white/5">
+                  <span className="text-[10px] font-semibold text-ink-subtle">{String(label)}</span>
+                </div>
+              )}
+              <div className="divide-y divide-white/5">
+                {(items as typeof grades).map((g, i) => {
+                  const numGrade = typeof g.grade === 'number' ? g.grade : parseFloat(String(g.grade))
+                  const color = !isNaN(numGrade) ? getGradeColor(numGrade) : '#64748b'
+                  return (
+                    <div key={`${g.course_name}-${i}`}
+                      className="flex items-center justify-between px-4 py-2.5 hover:bg-white/3 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-ink truncate">{g.course_name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {(g as any).credits && (
+                            <span className="text-[10px] text-ink-subtle">{(g as any).credits} נק״ז</span>
+                          )}
+                          {g.rank && <span className="text-[10px] text-ink-subtle">דירוג: {g.rank}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold" style={{ color }}>
+                          {!isNaN(numGrade) ? numGrade : (g as any).grade_text || g.grade || '—'}
+                        </span>
+                        {!isNaN(numGrade) && (
+                          <div className="w-10 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                            <div className="h-1.5 rounded-full" style={{ width: `${numGrade}%`, background: color }} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold" style={{ color }}>{g.grade}</span>
-                {!isNaN(numGrade) && (
-                  <div className="w-12 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                    <div className="h-1.5 rounded-full" style={{ width: `${numGrade}%`, background: color }} />
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )
-        })}
+            </div>
+          ))
+        })()}
+      </div>
+    </div>
+  )
+}
+
+// ── Credits Section ─────────────────────────────────────────
+
+function CreditsSection({ credits }: { credits: CreditsInfo }) {
+  const pct = credits.required > 0 ? Math.min(100, (credits.completed / credits.required) * 100) : 0
+  const pctColor = pct >= 75 ? '#10b981' : pct >= 50 ? '#3b82f6' : '#a78bfa'
+
+  return (
+    <div className="glass p-4 space-y-3">
+      {/* Main progress */}
+      <div>
+        <div className="flex justify-between items-baseline mb-2">
+          <span className="text-sm font-semibold text-ink">נק״ז שהושלמו</span>
+          <span className="text-lg font-extrabold" style={{ color: pctColor }}>
+            {credits.completed} <span className="text-xs font-normal text-ink-muted">/ {credits.required}</span>
+          </span>
+        </div>
+        <div className="w-full h-3 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${pct}%` }}
+            transition={{ duration: 1, ease: 'easeOut' }}
+            className="h-3 rounded-full"
+            style={{ background: `linear-gradient(90deg, #6366f1, ${pctColor})` }}
+          />
+        </div>
+        <p className="text-[10px] text-ink-subtle mt-1 text-left" dir="ltr">{Math.round(pct)}%</p>
+      </div>
+
+      {/* Stats grid */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="text-center p-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)' }}>
+          <p className="text-lg font-bold text-ink">{credits.remaining}</p>
+          <p className="text-[10px] text-ink-muted">נותרו</p>
+        </div>
+        <div className="text-center p-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)' }}>
+          <p className="text-lg font-bold" style={{ color: '#a78bfa' }}>{credits.remaining_semesters}</p>
+          <p className="text-[10px] text-ink-muted">סמסטרים</p>
+        </div>
+        <div className="text-center p-2 rounded-lg" style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)' }}>
+          <p className="text-lg font-bold" style={{ color: '#a78bfa' }}>{credits.recommended_per_semester}</p>
+          <p className="text-[10px] text-ink-muted">מומלץ/סמסטר</p>
+        </div>
       </div>
     </div>
   )

@@ -737,57 +737,243 @@ def scrape_course_materials(course_url: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
-def scrape_grades() -> dict:
-    """Fetch grades for all courses via Moodle AJAX API."""
-    cookies = _load_cookies_from_store("moodle")
-    if not cookies:
-        return {"status": "error", "message": "לא מחובר ל-Moodle."}
-
-    session = _build_session(cookies)
-    sesskey = _get_sesskey(session)
-
-    if not sesskey:
-        return {"status": "error", "message": "לא ניתן לשלוף sesskey."}
-
-    # Get user ID from Moodle
+def _get_moodle_user_id(session: requests.Session) -> int | None:
+    """Extract the Moodle numeric user ID from the dashboard page."""
     try:
         resp = session.get(f"{MOODLE_URL}/my/", timeout=15)
         uid_match = re.search(r'data-userid="(\d+)"', resp.text)
         if not uid_match:
             uid_match = re.search(r'"userid"\s*:\s*(\d+)', resp.text)
-        if not uid_match:
-            return {"status": "error", "message": "לא ניתן לזהות משתמש Moodle."}
-        moodle_user_id = int(uid_match.group(1))
-    except Exception as e:
-        return {"status": "error", "message": f"שגיאה בזיהוי משתמש: {e}"}
+        return int(uid_match.group(1)) if uid_match else None
+    except Exception:
+        return None
 
-    # Get enrolled courses first
-    courses_result = scrape_moodle_courses()
-    if not courses_result.get("courses"):
-        return {"status": "error", "message": "לא נמצאו קורסים."}
 
-    grades = []
-    for course in courses_result["courses"]:
-        cid = course.get("moodle_id")
-        if not cid or not cid.isdigit():
-            continue
+def scrape_grades() -> dict:
+    """
+    Fetch grades using multiple strategies:
+      1. Moodle AJAX API (gradereport_overview_get_course_grades)
+      2. Moodle HTML grade overview page (fallback)
+      3. BGU Portal grade pages (historical grades)
+    Returns all grades merged from all sources.
+    """
+    all_grades = []
+    seen_courses = set()  # deduplicate by course name
+
+    # ── Strategy 1: Moodle AJAX API ──────────────────────────────────────────
+    cookies = _load_cookies_from_store("moodle")
+    if cookies:
+        session = _build_session(cookies)
+        sesskey = _get_sesskey(session)
+        moodle_uid = _get_moodle_user_id(session)
+
+        if sesskey and moodle_uid:
+            try:
+                data = _moodle_ajax(session, sesskey, "gradereport_overview_get_course_grades", {
+                    "userid": moodle_uid,
+                })
+                if data and "grades" in data:
+                    for g in data["grades"]:
+                        name = g.get("coursename", "").strip()
+                        if name and name not in seen_courses:
+                            seen_courses.add(name)
+                            raw_grade = g.get("grade", "")
+                            grade_num = None
+                            if raw_grade:
+                                try:
+                                    grade_num = round(float(str(raw_grade).replace(",", ".")), 1)
+                                except (ValueError, TypeError):
+                                    pass
+                            all_grades.append({
+                                "course_moodle_id": str(g.get("courseid", "")),
+                                "course_name": name,
+                                "grade": grade_num,
+                                "grade_text": str(raw_grade) if grade_num is None and raw_grade else None,
+                                "rank": g.get("rank") or None,
+                                "source": "moodle",
+                            })
+                    logger.debug(f"[BGU] AJAX grades: {len(all_grades)} courses")
+            except Exception as e:
+                logger.debug(f"[BGU] AJAX grade fetch failed: {e}")
+
+        # ── Strategy 2: Moodle HTML grade overview page ────────────────────────
+        if not all_grades:
+            try:
+                resp = session.get(
+                    f"{MOODLE_URL}/grade/report/overview/index.php",
+                    timeout=15,
+                )
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    # Look for the overview grade table
+                    table = soup.find("table", {"id": "overview-grade"}) or soup.find("table", class_=re.compile(r"generaltable|grade"))
+                    if table:
+                        rows = table.find_all("tr")
+                        for row in rows[1:]:
+                            cells = row.find_all(["td", "th"])
+                            if len(cells) >= 2:
+                                course_link = cells[0].find("a")
+                                name = course_link.get_text(strip=True) if course_link else cells[0].get_text(strip=True)
+                                grade_text = cells[1].get_text(strip=True) if len(cells) > 1 else ""
+                                if name and name not in seen_courses and grade_text and grade_text != "-":
+                                    seen_courses.add(name)
+                                    grade_num = None
+                                    try:
+                                        grade_num = round(float(grade_text.replace(",", ".")), 1)
+                                    except (ValueError, TypeError):
+                                        pass
+                                    all_grades.append({
+                                        "course_name": name,
+                                        "grade": grade_num,
+                                        "grade_text": grade_text if grade_num is None else None,
+                                        "source": "moodle",
+                                    })
+                        logger.debug(f"[BGU] HTML grade page: {len(all_grades)} courses")
+            except Exception as e:
+                logger.debug(f"[BGU] HTML grade page failed: {e}")
+
+    # ── Strategy 3: BGU Portal grade pages ───────────────────────────────────
+    portal_cookies = _load_cookies_from_store("portal")
+    if portal_cookies:
         try:
-            data = _moodle_ajax(session, sesskey, "gradereport_overview_get_course_grades", {
-                "userid": moodle_user_id,
-            })
-            if data and "grades" in data:
-                for g in data["grades"]:
-                    grades.append({
-                        "course_id": str(g.get("courseid", "")),
-                        "course_name": g.get("coursename", course.get("title", "")),
-                        "grade": g.get("grade", ""),
-                        "rank": g.get("rank", ""),
-                    })
-                break  # This API returns all courses at once
+            portal_grades = _scrape_portal_grades(portal_cookies)
+            for g in portal_grades:
+                name = g.get("course_name", "").strip()
+                key = f"{name}_{g.get('semester', '')}"
+                if name and key not in seen_courses:
+                    seen_courses.add(key)
+                    all_grades.append(g)
+            logger.debug(f"[BGU] Portal grades: {len(portal_grades)} found")
         except Exception as e:
-            logger.debug(f"[BGU] Grade fetch failed for course {cid}: {e}")
+            logger.debug(f"[BGU] Portal grade scraping failed: {e}")
 
-    return {"status": "success", "grades": grades, "count": len(grades)}
+    logger.debug(f"[BGU] Total grades from all sources: {len(all_grades)}")
+    return {"status": "success", "grades": all_grades, "count": len(all_grades)}
+
+
+def _scrape_portal_grades(cookies: list) -> list:
+    """
+    Try to scrape historical grades from the BGU portal (my.bgu.ac.il).
+    Searches for grade-related pages and parses tables.
+    """
+    session = _build_session(cookies)
+    grades = []
+
+    # Try common BGU portal grade URLs
+    grade_paths = [
+        "/pls/scwp/!scwp.grades",
+        "/pls/scwp/!scwp.tziounim",
+        "/pls/scwp/!scwp.student_grades",
+        "/pls/scwp/!scwp.grades_report",
+        "/pls/scwp/!scwp.student_record",
+        "/pls/scwp/!scwp.gradebook",
+    ]
+
+    # First: try loading the main portal page and find links to grades
+    try:
+        main_resp = session.get(f"{PORTAL_URL}/pls/scwp/!scwp.main", timeout=15)
+        if main_resp.status_code == 200:
+            main_soup = BeautifulSoup(main_resp.text, "html.parser")
+            # Find links that contain grade-related keywords
+            for a in main_soup.find_all("a", href=True):
+                text = a.get_text(strip=True).lower()
+                href = a["href"].lower()
+                if any(kw in text or kw in href for kw in [
+                    "ציונים", "ציון", "grades", "grade", "תעודה", "גיליון",
+                    "record", "transcript", "tziounim",
+                ]):
+                    full_url = a["href"]
+                    if not full_url.startswith("http"):
+                        full_url = f"{PORTAL_URL}{a['href']}"
+                    if full_url not in [f"{PORTAL_URL}{p}" for p in grade_paths]:
+                        grade_paths.insert(0, a["href"])
+                    logger.debug(f"[BGU] Found portal grade link: {a['href']} ({text})")
+    except Exception as e:
+        logger.debug(f"[BGU] Portal main page failed: {e}")
+
+    # Try each grade path
+    for path in grade_paths:
+        try:
+            url = path if path.startswith("http") else f"{PORTAL_URL}{path}"
+            resp = session.get(url, timeout=15)
+            if resp.status_code != 200 or len(resp.text) < 200:
+                continue
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            tables = soup.find_all("table")
+
+            for table in tables:
+                rows = table.find_all("tr")
+                if len(rows) < 2:
+                    continue
+
+                # Try to find header row with grade-related columns
+                header = rows[0]
+                header_cells = [th.get_text(strip=True) for th in header.find_all(["th", "td"])]
+                header_lower = [h.lower() for h in header_cells]
+
+                # Look for columns: course name, grade, semester, credits
+                name_idx = _find_col_idx(header_lower, ["קורס", "שם קורס", "course", "מקצוע", "שם המקצוע"])
+                grade_idx = _find_col_idx(header_lower, ["ציון", "grade", "ציון סופי", "ציון מועד"])
+                sem_idx = _find_col_idx(header_lower, ["סמסטר", "semester", "תקופה"])
+                year_idx = _find_col_idx(header_lower, ["שנה", "year", "שנת לימודים", "שנה אקדמית"])
+                credits_idx = _find_col_idx(header_lower, ["נקודות", "נק\"ז", "credits", "נ.ז.", "נקודות זכות"])
+
+                if name_idx is None or grade_idx is None:
+                    continue
+
+                for row in rows[1:]:
+                    cells = [td.get_text(strip=True) for td in row.find_all(["td", "th"])]
+                    if len(cells) <= max(name_idx, grade_idx):
+                        continue
+
+                    name = cells[name_idx].strip()
+                    raw_grade = cells[grade_idx].strip()
+                    if not name or not raw_grade or raw_grade == "-":
+                        continue
+
+                    grade_num = None
+                    try:
+                        grade_num = round(float(raw_grade.replace(",", ".")), 1)
+                    except (ValueError, TypeError):
+                        pass
+
+                    g = {
+                        "course_name": name,
+                        "grade": grade_num,
+                        "grade_text": raw_grade if grade_num is None else None,
+                        "source": "portal",
+                    }
+                    if sem_idx is not None and sem_idx < len(cells):
+                        g["semester"] = cells[sem_idx].strip()
+                    if year_idx is not None and year_idx < len(cells):
+                        g["academic_year"] = cells[year_idx].strip()
+                    if credits_idx is not None and credits_idx < len(cells):
+                        try:
+                            g["credits"] = float(cells[credits_idx].strip().replace(",", "."))
+                        except (ValueError, TypeError):
+                            pass
+
+                    grades.append(g)
+
+                if grades:
+                    logger.debug(f"[BGU] Portal: found {len(grades)} grades at {path}")
+                    return grades  # Found grades, stop trying other paths
+
+        except Exception as e:
+            logger.debug(f"[BGU] Portal path {path} failed: {e}")
+            continue
+
+    return grades
+
+
+def _find_col_idx(headers: list[str], keywords: list[str]) -> int | None:
+    """Find the index of a column that contains any of the keywords."""
+    for i, h in enumerate(headers):
+        for kw in keywords:
+            if kw in h:
+                return i
+    return None
 
 
 # --------------------------------------------------------------------------- #

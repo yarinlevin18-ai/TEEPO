@@ -228,12 +228,162 @@ def get_course_materials():
 
 @bgu.get("/grades")
 def get_grades():
-    """Get grades from Moodle."""
+    """Get all grades — saved from DB + live from Moodle/Portal.
+    First returns saved grades, then tries to fetch fresh ones and merge."""
+    user_id = _user_id()
+    all_grades = []
+    seen = set()
+
+    # 1. Load persisted grades from DB
     try:
-        result = bgu_scraper.scrape_grades()
-        return jsonify(result)
+        from services.supabase_client import get_client
+        result = get_client().table("student_grades").select("*").eq("user_id", user_id).order("academic_year", desc=True).execute()
+        if result.data:
+            for g in result.data:
+                key = f"{g['course_name']}_{g.get('semester', '')}"
+                seen.add(key)
+                all_grades.append({
+                    "course_id": g.get("course_moodle_id", ""),
+                    "course_name": g["course_name"],
+                    "grade": g.get("grade"),
+                    "grade_text": g.get("grade_text"),
+                    "semester": g.get("semester"),
+                    "academic_year": g.get("academic_year"),
+                    "credits": g.get("credits"),
+                    "rank": g.get("rank"),
+                    "source": g.get("source", "db"),
+                })
     except Exception as e:
-        logger.error(f"Grade fetch failed: {e}")
+        logger.debug(f"[grades] DB load failed: {e}")
+
+    # 2. Try live fetch and merge new grades
+    try:
+        live = bgu_scraper.scrape_grades()
+        if live.get("grades"):
+            from datetime import datetime as _dt
+            for g in live["grades"]:
+                name = g.get("course_name", "").strip()
+                key = f"{name}_{g.get('semester', '')}"
+                if name and key not in seen:
+                    seen.add(key)
+                    all_grades.append(g)
+
+                    # Also persist the new grade
+                    try:
+                        row = {
+                            "user_id": user_id,
+                            "course_name": name,
+                            "source": g.get("source", "moodle"),
+                            "updated_at": _dt.utcnow().isoformat(),
+                        }
+                        if g.get("grade") is not None:
+                            row["grade"] = g["grade"]
+                        if g.get("grade_text"):
+                            row["grade_text"] = g["grade_text"]
+                        if g.get("course_moodle_id"):
+                            row["course_moodle_id"] = g["course_moodle_id"]
+                        if g.get("semester"):
+                            row["semester"] = g["semester"]
+                        if g.get("academic_year"):
+                            row["academic_year"] = g["academic_year"]
+                        if g.get("credits"):
+                            row["credits"] = g["credits"]
+                        if g.get("rank"):
+                            row["rank"] = g["rank"]
+                        from services.supabase_client import get_client
+                        get_client().table("student_grades").upsert(row).execute()
+                    except Exception:
+                        pass
+    except Exception as e:
+        logger.debug(f"[grades] Live fetch failed (returning DB grades): {e}")
+
+    # Calculate stats
+    numeric_grades = [g["grade"] for g in all_grades if g.get("grade") is not None]
+    total_credits = sum(g.get("credits", 0) or 0 for g in all_grades if g.get("grade") is not None)
+    avg = round(sum(numeric_grades) / len(numeric_grades), 2) if numeric_grades else None
+
+    return jsonify({
+        "status": "success",
+        "grades": all_grades,
+        "count": len(all_grades),
+        "average": avg,
+        "total_credits": total_credits,
+    })
+
+
+@bgu.get("/degree")
+def get_degree_settings():
+    """Get user's degree settings + credits summary."""
+    user_id = _user_id()
+    try:
+        from services.supabase_client import get_client
+        # Get degree settings
+        result = get_client().table("degree_settings").select("*").eq("user_id", user_id).execute()
+        settings = result.data[0] if result.data else None
+
+        # Get total credits earned from grades
+        grades_result = get_client().table("student_grades").select("credits, grade").eq("user_id", user_id).execute()
+        completed_credits = 0
+        if grades_result.data:
+            for g in grades_result.data:
+                if g.get("credits") and g.get("grade") is not None:
+                    try:
+                        grade_val = float(g["grade"]) if g["grade"] else 0
+                        if grade_val >= 56:  # BGU passing grade
+                            completed_credits += float(g["credits"])
+                    except (ValueError, TypeError):
+                        pass
+
+        total_required = float(settings["total_credits_required"]) if settings else 160
+        remaining = max(0, total_required - completed_credits)
+
+        # Calculate recommended credits per semester
+        current_year = 2026
+        current_month = 4
+        if settings and settings.get("expected_end_year"):
+            end_year = settings["expected_end_year"]
+            # Estimate remaining semesters
+            remaining_semesters = max(1, (end_year - current_year) * 2 + (1 if current_month <= 7 else 0))
+        else:
+            remaining_semesters = settings.get("total_semesters", 6) if settings else 6
+
+        recommended_per_semester = round(remaining / max(1, remaining_semesters), 1) if remaining > 0 else 0
+
+        return jsonify({
+            "status": "success",
+            "settings": settings,
+            "credits": {
+                "completed": completed_credits,
+                "required": total_required,
+                "remaining": remaining,
+                "remaining_semesters": remaining_semesters,
+                "recommended_per_semester": recommended_per_semester,
+            },
+        })
+    except Exception as e:
+        logger.error(f"Degree settings failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@bgu.post("/degree")
+def save_degree_settings():
+    """Save/update user's degree settings."""
+    user_id = _user_id()
+    body = request.get_json() or {}
+    from datetime import datetime as _dt
+    try:
+        from services.supabase_client import get_client
+        data = {
+            "user_id": user_id,
+            "updated_at": _dt.utcnow().isoformat(),
+        }
+        for field in ["degree_name", "total_credits_required", "start_year", "expected_end_year", "total_semesters"]:
+            if field in body:
+                data[field] = body[field]
+        get_client().table("degree_settings").upsert(data, on_conflict="user_id").execute()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        logger.error(f"Degree save failed: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 

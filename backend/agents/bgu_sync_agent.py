@@ -28,6 +28,8 @@ class BGUSyncAgent(BaseStudyAgent):
             return self._sync_courses(user_id)
         elif action == "sync_assignments":
             return self._sync_assignments_bulk(user_id)
+        elif action == "sync_grades":
+            return self._sync_grades(user_id)
         elif action == "check_status":
             return self._check_status()
         return {"status": "error", "message": "פעולה לא ידועה"}
@@ -42,10 +44,11 @@ class BGUSyncAgent(BaseStudyAgent):
         }
 
     def _sync_all(self, user_id: str) -> Dict:
-        """Full sync: courses + assignments + schedule. Returns detailed report."""
+        """Full sync: courses + assignments + grades + schedule. Returns detailed report."""
         report = {
             "courses": {"synced": 0, "skipped": 0, "errors": []},
             "assignments": {"synced": 0, "skipped": 0, "errors": []},
+            "grades": {"synced": 0, "errors": []},
             "schedule": {"status": "skipped"},
         }
 
@@ -71,7 +74,15 @@ class BGUSyncAgent(BaseStudyAgent):
             report["assignments"]["errors"].append(str(e))
             logger.error(f"[sync] Assignment sync failed: {e}")
 
-        # 3. Try schedule
+        # 3. Sync grades
+        try:
+            grades_result = self._sync_grades(user_id)
+            report["grades"]["synced"] = grades_result.get("saved", 0)
+        except Exception as e:
+            report["grades"]["errors"].append(str(e))
+            logger.error(f"[sync] Grade sync failed: {e}")
+
+        # 4. Try schedule
         try:
             schedule_result = bgu_scraper.scrape_portal_schedule()
             report["schedule"]["status"] = schedule_result.get("status", "error")
@@ -81,6 +92,7 @@ class BGUSyncAgent(BaseStudyAgent):
         # Build human-readable summary
         c = report["courses"]
         a = report["assignments"]
+        g = report["grades"]
         parts = []
 
         if c.get("total_found", 0) > 0:
@@ -93,7 +105,10 @@ class BGUSyncAgent(BaseStudyAgent):
         else:
             parts.append("📝 לא נמצאו מטלות")
 
-        has_errors = bool(c.get("errors") or a.get("errors"))
+        if g.get("synced", 0) > 0:
+            parts.append(f"📊 {g['synced']} ציונים עודכנו")
+
+        has_errors = bool(c.get("errors") or a.get("errors") or g.get("errors"))
         if has_errors:
             parts.append("⚠️ חלק מהסנכרון נכשל — בדוק את הלוג")
 
@@ -157,6 +172,51 @@ class BGUSyncAgent(BaseStudyAgent):
             "courses": courses,
             "db_errors": db_errors[:5],
         }
+
+    def _sync_grades(self, user_id: str) -> Dict:
+        """Sync grades from Moodle + Portal into student_grades table."""
+        from datetime import datetime as _dt
+
+        result = bgu_scraper.scrape_grades()
+        if result["status"] != "success":
+            return result
+
+        grades = result.get("grades", [])
+        saved = 0
+
+        for g in grades:
+            name = g.get("course_name", "").strip()
+            if not name:
+                continue
+
+            try:
+                row = {
+                    "user_id": user_id,
+                    "course_name": name,
+                    "source": g.get("source", "moodle"),
+                    "updated_at": _dt.utcnow().isoformat(),
+                }
+                if g.get("grade") is not None:
+                    row["grade"] = g["grade"]
+                if g.get("grade_text"):
+                    row["grade_text"] = g["grade_text"]
+                if g.get("course_moodle_id"):
+                    row["course_moodle_id"] = g["course_moodle_id"]
+                if g.get("semester"):
+                    row["semester"] = g["semester"]
+                if g.get("academic_year"):
+                    row["academic_year"] = g["academic_year"]
+                if g.get("rank"):
+                    row["rank"] = g["rank"]
+                if g.get("credits"):
+                    row["credits"] = g["credits"]
+
+                db.get_client().table("student_grades").upsert(row).execute()
+                saved += 1
+            except Exception as e:
+                logger.debug(f"[sync] Grade save failed for {name}: {e}")
+
+        return {"status": "success", "saved": saved, "total_found": len(grades)}
 
     def _sync_assignments_bulk(self, user_id: str) -> Dict:
         """Sync all assignments at once via Moodle AJAX API."""

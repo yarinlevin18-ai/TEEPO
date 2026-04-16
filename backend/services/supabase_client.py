@@ -165,3 +165,32 @@ def delete_course_note(note_id: str, user_id: str):
         .eq("user_id", user_id)
         .execute()
     )
+
+
+# --- Student Grades ---
+
+def get_grades(user_id: str):
+    return (
+        get_client()
+        .table("student_grades")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("academic_year", desc=True)
+        .order("semester")
+        .execute()
+    )
+
+
+def upsert_grade(data: dict):
+    """Insert or update a grade (uses unique constraint on user_id + course_name + semester)."""
+    return get_client().table("student_grades").upsert(
+        data,
+        on_conflict="user_id,course_name,COALESCE(semester, '')",
+    ).execute()
+
+
+def upsert_grades_bulk(grades: list):
+    """Bulk upsert grades."""
+    if not grades:
+        return None
+    return get_client().table("student_grades").upsert(grades).execute()

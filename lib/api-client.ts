@@ -134,5 +134,8 @@ export const api = {
     courses: () => request<any>('/api/bgu/courses'),
     assignmentsAll: () => request<any>('/api/bgu/assignments/all'),
     schedule: () => request<any>('/api/bgu/schedule'),
+    degree: () => request<any>('/api/bgu/degree'),
+    saveDegree: (data: Record<string, any>) =>
+      request<any>('/api/bgu/degree', { method: 'POST', body: JSON.stringify(data) }),
   },
 }
