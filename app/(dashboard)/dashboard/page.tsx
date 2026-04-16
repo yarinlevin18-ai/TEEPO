@@ -10,6 +10,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
+import CalendarWidget from '@/components/CalendarWidget'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { StudyTask, Course, Assignment } from '@/types'
 import { format } from 'date-fns'
@@ -211,6 +212,9 @@ export default function DashboardPage() {
           <p className="text-xs text-ink-muted mt-2">ממוצע על פני {activeCourses.length} קורסים פעילים</p>
         </motion.div>
       )}
+
+      {/* Google Calendar */}
+      <CalendarWidget />
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Today's Tasks */}
