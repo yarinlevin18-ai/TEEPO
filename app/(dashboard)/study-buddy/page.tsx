@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Bot, User, Trash2, GraduationCap } from 'lucide-react'
+import { Send, Bot, User, Trash2 } from 'lucide-react'
 import { io, Socket } from 'socket.io-client'
 import type { ChatMessage } from '@/types'
 import { useAuth } from '@/lib/auth-context'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
-type AgentType = 'study_buddy' | 'academic'
+type AgentType = 'study_buddy'
 
 const AGENT_CONFIG: Record<AgentType, { label: string; icon: React.ElementType; placeholder: string; color: string }> = {
   study_buddy: {
@@ -17,12 +17,6 @@ const AGENT_CONFIG: Record<AgentType, { label: string; icon: React.ElementType; 
     icon: Bot,
     placeholder: 'שאל אותי כל שאלה בלימודים...',
     color: 'primary',
-  },
-  academic: {
-    label: 'יועץ BGU',
-    icon: GraduationCap,
-    placeholder: 'שאל על קורסים, דרישות, ואסטרטגיה ב-BGU...',
-    color: 'amber',
   },
 }
 
@@ -68,13 +62,15 @@ export default function StudyBuddyPage() {
     socket.on('reply', ({ text }: { text: string }) => {
       setIsTyping(false)
       setIsSearching(false)
-      setMessages((prev) => [...prev, { role: 'assistant', content: text }])
+      const content = typeof text === 'string' ? text : JSON.stringify(text)
+      setMessages((prev) => [...prev, { role: 'assistant', content }])
     })
 
     socket.on('error', ({ message }: { message: string }) => {
       setIsTyping(false)
       setIsSearching(false)
-      setMessages((prev) => [...prev, { role: 'assistant', content: `❌ ${message}` }])
+      const msg = typeof message === 'string' ? message : 'שגיאה לא צפויה'
+      setMessages((prev) => [...prev, { role: 'assistant', content: `❌ ${msg}` }])
     })
 
     return () => { socket.disconnect() }
@@ -105,7 +101,7 @@ export default function StudyBuddyPage() {
   const switchAgent = (agent: AgentType) => {
     setActiveAgent(agent)
     setMessages([])
-    socketRef.current?.emit('join', { user_id: 'dev-user', agent_type: agent })
+    socketRef.current?.emit('join', { user_id: user?.id || 'anonymous', agent_type: agent })
   }
 
   const config = AGENT_CONFIG[activeAgent]
@@ -114,22 +110,9 @@ export default function StudyBuddyPage() {
     <div className="flex flex-col h-screen">
       {/* Header */}
       <div className="border-b border-white/5 bg-[#0f1117]/80 backdrop-blur-sm px-6 py-4 flex items-center gap-4">
-        {/* Agent switcher */}
-        <div className="flex gap-2">
-          {(Object.entries(AGENT_CONFIG) as [AgentType, typeof AGENT_CONFIG[AgentType]][]).map(([key, cfg]) => (
-            <button
-              key={key}
-              onClick={() => switchAgent(key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                activeAgent === key
-                  ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/25'
-                  : 'text-ink-muted hover:text-ink hover:bg-white/5'
-              }`}
-            >
-              <cfg.icon size={16} />
-              {cfg.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
+          <Bot size={16} />
+          עוזר הלימוד
         </div>
 
         <div className="mr-auto flex items-center gap-3">
