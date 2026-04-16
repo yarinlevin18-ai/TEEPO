@@ -4,22 +4,16 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   BookOpen, CheckSquare, Clock, TrendingUp,
-  Calendar, ArrowLeft, Plus, Zap,
+  Calendar, ArrowLeft, Zap, Target, Flame, Star,
 } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { StudyTask, Course, Assignment } from '@/types'
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
-
-const STATS = [
-  { key: 'courses', label: 'קורסים פעילים', icon: BookOpen, color: '#6366f1', bg: 'rgba(99,102,241,0.15)' },
-  { key: 'tasks',   label: 'משימות להיום',  icon: CheckSquare, color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
-  { key: 'done',    label: 'הושלמו היום',   icon: TrendingUp,  color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)' },
-  { key: 'urgent',  label: 'מטלות דחופות', icon: Zap,         color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
-]
 
 /**
  * Detect current semester from date:
@@ -36,9 +30,7 @@ function getCurrentSemester(): { semester: string; label: string } {
 
 function isCourseCurrentSemester(title: string): boolean {
   const { semester } = getCurrentSemester()
-  const t = title.toLowerCase()
 
-  // Explicit semester markers
   if (semester === '1') {
     if (/סמ['\s]*1|סמסטר\s*א|sem(?:ester)?\s*1|\bS1\b/i.test(title)) return true
   } else if (semester === '2') {
@@ -47,10 +39,17 @@ function isCourseCurrentSemester(title: string): boolean {
     if (/קיץ|summer/i.test(title)) return true
   }
 
-  // Courses without semester marker — include them (could be year-long)
   if (!/סמ['\s]*[12]|סמסטר|sem(?:ester)?|summer|קיץ|\bS[12]\b/i.test(title)) return true
 
   return false
+}
+
+function getGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour >= 5 && hour < 12) return 'בוקר טוב'
+  if (hour >= 12 && hour < 17) return 'צהריים טובים'
+  if (hour >= 17 && hour < 21) return 'ערב טוב'
+  return 'לילה טוב'
 }
 
 export default function DashboardPage() {
@@ -62,7 +61,6 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const today = format(new Date(), 'yyyy-MM-dd')
 
-  // Extract user display name
   const displayName = user?.user_metadata?.display_name
     || user?.email?.split('@')[0]
     || ''
@@ -78,65 +76,161 @@ export default function DashboardPage() {
   }, [today])
 
   const completedToday = tasks.filter(t => t.is_completed).length
+  const totalTasks = tasks.length
+  const completionRate = totalTasks > 0 ? Math.round((completedToday / totalTasks) * 100) : 0
+  const activeCourses = courses.filter(c => c.status === 'active')
+  const avgProgress = activeCourses.length > 0
+    ? Math.round(activeCourses.reduce((sum, c) => sum + c.progress_percentage, 0) / activeCourses.length)
+    : 0
   const urgentAssignments = assignments.filter(
     a => a.deadline && new Date(a.deadline) < new Date(Date.now() + 3 * 86400000) && a.status !== 'submitted'
   )
 
-  const statValues = {
-    courses: courses.filter(c => c.status === 'active').length,
-    tasks: tasks.length,
-    done: completedToday,
-    urgent: urgentAssignments.length,
-  }
-
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8 animate-fade-in">
+    <div className="p-8 max-w-6xl mx-auto space-y-8 animate-fade-in">
 
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">
-          <span className="text-ink">שלום {displayName}! </span>
-          <span className="gradient-text">בוא נלמד היום</span>
-          <span className="ml-2">📚</span>
-        </h1>
-        <p className="text-ink-muted mt-1.5">
-          {format(new Date(), 'EEEE, d בMMMM yyyy', { locale: he })}
-        </p>
-      </div>
+      {/* Hero Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl p-8"
+        style={{
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(139,92,246,0.15) 50%, rgba(56,189,248,0.1) 100%)',
+          border: '1px solid rgba(99,102,241,0.2)',
+        }}
+      >
+        {/* Background decoration */}
+        <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-30"
+          style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.4) 0%, transparent 70%)', filter: 'blur(40px)' }} />
+        <div className="absolute bottom-0 right-0 w-48 h-48 rounded-full opacity-20"
+          style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.5) 0%, transparent 70%)', filter: 'blur(30px)' }} />
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {STATS.map(({ key, label, icon: Icon, color, bg }, i) => (
-          <motion.div
-            key={key}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
-            className="glass p-5"
-          >
-            <div className="inline-flex p-2.5 rounded-xl mb-3" style={{ background: bg }}>
-              <Icon size={20} style={{ color }} />
+        <div className="relative z-10 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <Image src="/logo-128.png" alt="SmartDesk" width={42} height={42} />
+              <span className="text-sm font-bold px-3 py-1 rounded-full"
+                style={{ background: 'rgba(99,102,241,0.2)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}>
+                MyDesk
+              </span>
             </div>
-            <p className="text-2xl font-bold text-ink">{statValues[key as keyof typeof statValues]}</p>
-            <p className="text-sm text-ink-muted mt-0.5">{label}</p>
+            <h1 className="text-3xl font-extrabold mt-3">
+              <span className="text-ink">{getGreeting()}, </span>
+              <span className="gradient-text">{displayName}</span>
+              <span className="ml-1">👋</span>
+            </h1>
+            <p className="text-ink-muted mt-2 flex items-center gap-2">
+              <Calendar size={14} />
+              {format(new Date(), 'EEEE, d בMMMM yyyy', { locale: he })}
+              <span className="mx-1">·</span>
+              <span className="text-accent-400">{getCurrentSemester().label}</span>
+            </p>
+          </div>
+
+          {/* Daily Progress Ring */}
+          <div className="hidden md:flex flex-col items-center gap-2">
+            <div className="relative w-24 h-24">
+              <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
+                <circle
+                  cx="50" cy="50" r="42" fill="none"
+                  stroke="url(#progressGrad)" strokeWidth="8" strokeLinecap="round"
+                  strokeDasharray={`${completionRate * 2.64} 264`}
+                  className="transition-all duration-1000"
+                />
+                <defs>
+                  <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#6366f1" />
+                    <stop offset="100%" stopColor="#8b5cf6" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-2xl font-bold text-ink">{completionRate}%</span>
+              </div>
+            </div>
+            <span className="text-xs text-ink-muted">ביצוע יומי</span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'קורסים פעילים', value: activeCourses.length, icon: BookOpen, color: '#6366f1', bg: 'rgba(99,102,241,0.12)', border: 'rgba(99,102,241,0.2)' },
+          { label: 'משימות להיום', value: totalTasks, icon: Target, color: '#10b981', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.2)' },
+          { label: 'הושלמו היום', value: completedToday, icon: Flame, color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.2)' },
+          { label: 'מטלות דחופות', value: urgentAssignments.length, icon: Zap, color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.2)' },
+        ].map((stat, i) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 + i * 0.08 }}
+            className="relative overflow-hidden rounded-xl p-5 group hover:scale-[1.02] transition-transform"
+            style={{ background: stat.bg, border: `1px solid ${stat.border}` }}
+          >
+            <div className="absolute top-3 left-3 opacity-10 group-hover:opacity-20 transition-opacity">
+              <stat.icon size={40} style={{ color: stat.color }} />
+            </div>
+            <div className="relative z-10">
+              <stat.icon size={20} style={{ color: stat.color }} className="mb-3" />
+              <p className="text-3xl font-extrabold text-ink">{stat.value}</p>
+              <p className="text-xs text-ink-muted mt-1">{stat.label}</p>
+            </div>
           </motion.div>
         ))}
       </div>
+
+      {/* Overall Progress Bar */}
+      {activeCourses.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="glass p-5"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp size={16} style={{ color: '#8b5cf6' }} />
+              <span className="text-sm font-semibold text-ink">התקדמות כללית</span>
+            </div>
+            <span className="text-sm font-bold gradient-text">{avgProgress}%</span>
+          </div>
+          <div className="w-full h-3 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${avgProgress}%` }}
+              transition={{ duration: 1.2, ease: 'easeOut' }}
+              className="h-3 rounded-full"
+              style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6, #a78bfa)' }}
+            />
+          </div>
+          <p className="text-xs text-ink-muted mt-2">ממוצע על פני {activeCourses.length} קורסים פעילים</p>
+        </motion.div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Today's Tasks */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.5 }}
           className="glass overflow-hidden"
         >
           <div className="flex items-center justify-between p-5 border-b border-white/5">
             <div className="flex items-center gap-2">
-              <Calendar size={17} style={{ color: '#818cf8' }} />
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
+                <CheckSquare size={14} style={{ color: '#818cf8' }} />
+              </div>
               <h2 className="font-semibold text-ink">משימות היום</h2>
+              {totalTasks > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
+                  {completedToday}/{totalTasks}
+                </span>
+              )}
             </div>
             <Link href="/tasks">
               <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
@@ -146,7 +240,7 @@ export default function DashboardPage() {
           </div>
           <div className="divide-y divide-white/5 max-h-72 overflow-y-auto">
             {loading ? <LoadingSkeleton rows={3} /> : tasks.length === 0 ? (
-              <EmptyState message="אין משימות להיום" action={{ href: '/tasks', label: 'הוסף משימה' }} />
+              <EmptyState message="אין משימות להיום" action={{ href: '/tasks', label: 'הוסף משימה' }} icon={Star} />
             ) : (
               tasks.map(task => (
                 <TaskRow key={task.id} task={task} onToggle={(id, done) => {
@@ -166,13 +260,20 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.6 }}
           className="glass overflow-hidden"
         >
           <div className="flex items-center justify-between p-5 border-b border-white/5">
             <div className="flex items-center gap-2">
-              <Clock size={17} style={{ color: '#f59e0b' }} />
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(245,158,11,0.15)' }}>
+                <Clock size={14} style={{ color: '#f59e0b' }} />
+              </div>
               <h2 className="font-semibold text-ink">מטלות קרובות</h2>
+              {urgentAssignments.length > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>
+                  {urgentAssignments.length} דחופות
+                </span>
+              )}
             </div>
             <Link href="/assignments">
               <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
@@ -182,37 +283,54 @@ export default function DashboardPage() {
           </div>
           <div className="divide-y divide-white/5 max-h-72 overflow-y-auto">
             {loading ? <LoadingSkeleton rows={3} /> : assignments.length === 0 ? (
-              <EmptyState message="אין מטלות קרובות" action={{ href: '/assignments', label: 'הוסף מטלה' }} />
+              <EmptyState message="אין מטלות קרובות" action={{ href: '/assignments', label: 'הוסף מטלה' }} icon={Star} />
             ) : (
-              assignments.slice(0, 5).map(a => (
-                <div key={a.id} className="p-4 flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-medium text-ink">{a.title}</p>
-                    {a.deadline && (
-                      <p className="text-xs text-ink-muted mt-0.5">
-                        {format(new Date(a.deadline), 'd בMMM', { locale: he })}
-                      </p>
-                    )}
+              assignments.slice(0, 5).map(a => {
+                const daysLeft = a.deadline
+                  ? Math.ceil((new Date(a.deadline).getTime() - Date.now()) / 86400000)
+                  : null
+                return (
+                  <div key={a.id} className="p-4 flex justify-between items-center hover:bg-white/[0.02] transition-colors">
+                    <div>
+                      <p className="text-sm font-medium text-ink">{a.title}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {a.deadline && (
+                          <span className="text-xs text-ink-muted">
+                            {format(new Date(a.deadline), 'd בMMM', { locale: he })}
+                          </span>
+                        )}
+                        {daysLeft !== null && daysLeft <= 3 && daysLeft >= 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>
+                            {daysLeft === 0 ? 'היום!' : daysLeft === 1 ? 'מחר' : `עוד ${daysLeft} ימים`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <PriorityBadge priority={a.priority} />
                   </div>
-                  <PriorityBadge priority={a.priority} />
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </motion.div>
       </div>
 
-      {/* Active Courses — current semester only */}
+      {/* Active Courses */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
+        transition={{ delay: 0.7 }}
         className="glass overflow-hidden"
       >
         <div className="flex items-center justify-between p-5 border-b border-white/5">
           <div className="flex items-center gap-2">
-            <BookOpen size={17} style={{ color: '#818cf8' }} />
-            <h2 className="font-semibold text-ink">קורסים פעילים — {getCurrentSemester().label}</h2>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
+              <BookOpen size={14} style={{ color: '#818cf8' }} />
+            </div>
+            <h2 className="font-semibold text-ink">קורסים פעילים</h2>
+            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.15)', color: '#c4b5fd' }}>
+              {getCurrentSemester().label}
+            </span>
           </div>
           <Link href="/courses">
             <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
@@ -223,29 +341,48 @@ export default function DashboardPage() {
         {loading ? (
           <div className="p-5"><LoadingSkeleton rows={2} /></div>
         ) : courses.length === 0 ? (
-          <EmptyState message="עדיין לא הוספת קורסים" action={{ href: '/bgu-connect', label: 'חבר BGU' }} />
+          <EmptyState message="עדיין לא הוספת קורסים" action={{ href: '/bgu-connect', label: 'חבר BGU' }} icon={BookOpen} />
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 p-5">
             {courses
               .filter(c => c.status === 'active' && isCourseCurrentSemester(c.title))
-              .map(course => (
-                <Link key={course.id} href={`/courses/${course.id}`}>
-                  <div className="glass-sm p-4 hover:border-accent/40 transition-all cursor-pointer group">
-                    <p className="font-medium text-ink text-sm line-clamp-2 group-hover:text-accent-400 transition-colors">{course.title}</p>
-                    <div className="mt-3">
-                      <div className="flex justify-between text-xs text-ink-muted mb-1.5">
-                        <span>התקדמות</span>
-                        <span>{Math.round(course.progress_percentage)}%</span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                        <div
-                          className="h-1.5 rounded-full transition-all"
-                          style={{ width: `${course.progress_percentage}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }}
-                        />
+              .map((course, i) => (
+                <motion.div
+                  key={course.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.8 + i * 0.05 }}
+                >
+                  <Link href={`/courses/${course.id}`}>
+                    <div className="relative overflow-hidden rounded-xl p-4 group hover:scale-[1.02] transition-all cursor-pointer"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                    >
+                      {/* Accent top border */}
+                      <div className="absolute top-0 left-0 right-0 h-0.5"
+                        style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }} />
+                      <p className="font-medium text-ink text-sm line-clamp-2 group-hover:text-accent-400 transition-colors">{course.title}</p>
+                      <div className="mt-3">
+                        <div className="flex justify-between text-xs text-ink-muted mb-1.5">
+                          <span>התקדמות</span>
+                          <span className="font-semibold" style={{ color: course.progress_percentage >= 70 ? '#10b981' : '#a5b4fc' }}>
+                            {Math.round(course.progress_percentage)}%
+                          </span>
+                        </div>
+                        <div className="w-full h-2 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                          <div
+                            className="h-2 rounded-full transition-all"
+                            style={{
+                              width: `${course.progress_percentage}%`,
+                              background: course.progress_percentage >= 70
+                                ? 'linear-gradient(90deg, #10b981, #34d399)'
+                                : 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                </motion.div>
               ))
             }
             {courses.filter(c => c.status === 'active' && isCourseCurrentSemester(c.title)).length === 0 && (
@@ -267,21 +404,27 @@ export default function DashboardPage() {
 
 function TaskRow({ task, onToggle }: { task: StudyTask; onToggle: (id: string, done: boolean) => void }) {
   return (
-    <div className="flex items-center gap-3 p-4">
+    <div className="flex items-center gap-3 p-4 hover:bg-white/[0.02] transition-colors">
       <button
         onClick={() => onToggle(task.id, !task.is_completed)}
-        className="w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all"
+        className="w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all hover:scale-110"
         style={task.is_completed
-          ? { background: '#6366f1', borderColor: '#6366f1' }
+          ? { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', borderColor: '#6366f1' }
           : { borderColor: 'rgba(255,255,255,0.2)' }}
       >
-        {task.is_completed && <CheckSquare size={11} className="text-white" />}
+        {task.is_completed && (
+          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
       </button>
       <span className={`text-sm flex-1 transition-all ${task.is_completed ? 'line-through text-ink-muted' : 'text-ink'}`}>
         {task.title}
       </span>
       {task.duration_minutes && (
-        <span className="text-xs text-ink-muted">{task.duration_minutes} דק׳</span>
+        <span className="text-xs px-2 py-0.5 rounded-full text-ink-muted" style={{ background: 'rgba(255,255,255,0.05)' }}>
+          {task.duration_minutes} דק׳
+        </span>
       )}
     </div>
   )
@@ -289,13 +432,13 @@ function TaskRow({ task, onToggle }: { task: StudyTask; onToggle: (id: string, d
 
 function PriorityBadge({ priority }: { priority: string }) {
   const styles = {
-    high:   { bg: 'rgba(239,68,68,0.15)',   color: '#ef4444', label: 'דחוף' },
-    medium: { bg: 'rgba(245,158,11,0.15)',  color: '#f59e0b', label: 'בינוני' },
-    low:    { bg: 'rgba(16,185,129,0.15)',  color: '#10b981', label: 'נמוך' },
+    high:   { bg: 'rgba(239,68,68,0.15)',  color: '#f87171', border: 'rgba(239,68,68,0.25)', label: 'דחוף' },
+    medium: { bg: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: 'rgba(245,158,11,0.25)', label: 'בינוני' },
+    low:    { bg: 'rgba(16,185,129,0.15)', color: '#34d399', border: 'rgba(16,185,129,0.25)', label: 'נמוך' },
   }
   const s = styles[priority as keyof typeof styles] || styles.medium
   return (
-    <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: s.bg, color: s.color }}>
+    <span className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
       {s.label}
     </span>
   )
@@ -311,9 +454,14 @@ function LoadingSkeleton({ rows }: { rows: number }) {
   )
 }
 
-function EmptyState({ message, action }: { message: string; action?: { href: string; label: string } }) {
+function EmptyState({ message, action, icon: Icon }: { message: string; action?: { href: string; label: string }; icon?: React.ElementType }) {
   return (
     <div className="p-8 text-center">
+      {Icon && (
+        <div className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)' }}>
+          <Icon size={20} style={{ color: '#818cf8' }} />
+        </div>
+      )}
       <p className="text-ink-muted text-sm">{message}</p>
       {action && (
         <Link href={action.href}>

@@ -11,7 +11,7 @@ import Image from 'next/image'
 import { useAuth } from '@/lib/auth-context'
 
 const NAV = [
-  { href: '/dashboard',       icon: LayoutDashboard, label: 'לוח בקרה' },
+  { href: '/dashboard',       icon: LayoutDashboard, label: 'MyDesk' },
   { href: '/courses',         icon: BookOpen,         label: 'הקורסים שלי' },
   { href: '/tasks',           icon: CheckSquare,      label: 'משימות' },
   { href: '/assignments',     icon: FileText,         label: 'מטלות' },
