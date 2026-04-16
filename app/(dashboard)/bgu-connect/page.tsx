@@ -21,8 +21,8 @@ export default function BGUConnectPage() {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch(`${BACKEND}/api/bgu/status`)
-      setStatus(await res.json())
+      const res = await fetch(`${BACKEND}/api/bgu/status`, { signal: AbortSignal.timeout(10000) })
+      if (res.ok) setStatus(await res.json())
     } catch {}
   }
 
@@ -61,11 +61,25 @@ export default function BGUConnectPage() {
   const syncAll = async () => {
     setSyncing(true); setSyncResult('')
     try {
-      const res = await fetch(`${BACKEND}/api/bgu/sync`, { method: 'POST' })
+      // Wake up Render server first (free tier sleeps after inactivity)
+      setSyncResult('מעיר את השרת...')
+      try {
+        await fetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(60000) })
+      } catch {}
+
+      setSyncResult('מסנכרן נתונים...')
+      const res = await fetch(`${BACKEND}/api/bgu/sync`, {
+        method: 'POST',
+        signal: AbortSignal.timeout(120000), // 2 min for full sync
+      })
       const data = await res.json()
-      setSyncResult(data.message || 'הסנכרון הושלם')
+      setSyncResult(data.message || 'הסנכרון הושלם ✓')
     } catch (e: any) {
-      setSyncResult('שגיאה בסנכרון: ' + e.message)
+      if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+        setSyncResult('השרת לא הגיב — נסה שוב בעוד דקה')
+      } else {
+        setSyncResult('שגיאה בסנכרון: ' + e.message)
+      }
     } finally {
       setSyncing(false)
     }
