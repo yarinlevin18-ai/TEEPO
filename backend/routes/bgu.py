@@ -4,7 +4,6 @@ BGU Routes - חיבור לאתרי אוניברסיטת בן-גוריון
 import threading
 from flask import Blueprint, request, jsonify
 from services import bgu_scraper
-from orchestrator_wrapper import get_orchestrator
 from config import BGU_USERNAME, BGU_PASSWORD
 
 bgu = Blueprint("bgu", __name__, url_prefix="/api/bgu")
@@ -138,9 +137,15 @@ def receive_cookies():
 def sync_all():
     """Sync all BGU data into the app."""
     user_id = _user_id()
-    orch = get_orchestrator()
-    result = orch._execute_agent("bgu_sync", {"action": "sync_all", "user_id": user_id})
-    return jsonify(result)
+    try:
+        from agents.bgu_sync_agent import BGUSyncAgent
+        agent = BGUSyncAgent()
+        result = agent.execute({"action": "sync_all", "user_id": user_id})
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        print(f"[sync] ERROR: {traceback.format_exc()}")
+        return jsonify({"status": "error", "message": f"שגיאה בסנכרון: {str(e)}"}), 500
 
 
 @bgu.get("/courses")
