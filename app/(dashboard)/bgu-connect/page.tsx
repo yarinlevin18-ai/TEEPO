@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  GraduationCap, Wifi, WifiOff, RefreshCw,
-  CheckCircle, Loader2, BookOpen, Calendar,
+  GraduationCap, WifiOff, RefreshCw,
+  CheckCircle, Loader2, BookOpen, Calendar, Eye, EyeOff, Lock, User,
 } from 'lucide-react'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
@@ -93,8 +93,8 @@ export default function BGUConnectPage() {
         <p className="font-semibold gradient-text">איך זה עובד?</p>
         {serverMode ? (
           <>
-            <p className="text-ink-muted">1. לחץ "התחבר" — הכניסה מתבצעת אוטומטית בשרת</p>
-            <p className="text-ink-muted">2. ה-session נשמר בצורה מאובטחת ומתחדש אוטומטית</p>
+            <p className="text-ink-muted">1. לחץ "התחבר" והזן מ.א. + סיסמה של BGU</p>
+            <p className="text-ink-muted">2. הכניסה מתבצעת בשרת — הפרטים לא נשמרים</p>
             <p className="text-ink-muted">3. לחץ "סנכרן הכל" לייבוא קורסים ומטלות</p>
           </>
         ) : (
@@ -159,25 +159,36 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
   onConnect: (creds?: { username: string; password: string }) => void
   icon: React.ElementType; color: string; serverMode: boolean
 }) {
-  const statusLabel: Record<string, string> = {
-    opening: 'פותח דפדפן...',
-    waiting_for_login: '⏳ מתחבר...',
-    connected: 'מחובר',
-    failed: 'ההתחברות נכשלה — נסה שוב',
+  const [showForm, setShowForm] = useState(false)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
+
+  const isFailed = loginStatus === 'failed'
+  const isConnecting = loginStatus === 'waiting_for_login' || loginStatus === 'opening'
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!username || !password) return
+    setShowForm(false)
+    onConnect(serverMode ? { username, password } : undefined)
   }
 
-  const handleConnect = () => {
-    // No form needed — backend uses BGU_USERNAME/BGU_PASSWORD env vars
-    onConnect()
+  const handleConnectClick = () => {
+    if (serverMode) {
+      setShowForm(true)
+    } else {
+      onConnect()
+    }
   }
 
   return (
     <div
-      className="glass overflow-hidden transition-all"
-      style={connected ? { boxShadow: `0 0 20px ${color}33`, borderColor: `${color}44` } : {}}
+      className="glass overflow-hidden transition-all duration-300"
+      style={connected ? { boxShadow: `0 0 24px ${color}33`, borderColor: `${color}55` } : {}}
     >
+      {/* Main row */}
       <div className="flex items-center gap-4 p-5">
-        {/* Status dot */}
         <div className="relative flex-shrink-0">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center"
                style={{ background: `${color}18` }}>
@@ -200,28 +211,105 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
           </div>
           <p className="text-xs text-ink-muted mt-0.5">{description}</p>
           <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.2)' }} dir="ltr">{url}</p>
-          {loginStatus && statusLabel[loginStatus] && (
-            <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#f59e0b' }}>
-              <Loader2 size={10} className="animate-spin" />
-              {statusLabel[loginStatus]}
+          {isConnecting && (
+            <p className="text-xs mt-1 flex items-center gap-1 text-amber-400">
+              <Loader2 size={10} className="animate-spin" /> מתחבר לשרת...
+            </p>
+          )}
+          {isFailed && !showForm && (
+            <p className="text-xs mt-1 text-red-400 cursor-pointer hover:text-red-300"
+               onClick={() => setShowForm(true)}>
+              ההתחברות נכשלה — <span className="underline">נסה שוב</span>
             </p>
           )}
         </div>
 
         <button
-          onClick={handleConnect}
-          disabled={loading || connected}
+          onClick={connected ? undefined : handleConnectClick}
+          disabled={loading || connected || isConnecting}
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex-shrink-0 ${
-            connected
-              ? 'text-ink-muted cursor-default'
-              : 'btn-gradient shadow-glow-sm'
+            connected ? 'text-ink-muted cursor-default'
+            : isConnecting ? 'opacity-50 cursor-wait'
+            : 'btn-gradient shadow-glow-sm hover:opacity-90'
           }`}
           style={connected ? { background: 'rgba(255,255,255,0.05)' } : {}}
         >
-          {loading ? <Loader2 size={14} className="animate-spin" /> : connected ? 'מחובר ✓' : 'התחבר'}
+          {loading || isConnecting
+            ? <Loader2 size={14} className="animate-spin" />
+            : connected ? 'מחובר ✓' : 'התחבר'}
         </button>
       </div>
 
+      {/* Inline credentials form — slides in for server mode */}
+      <AnimatePresence>
+        {showForm && !connected && (
+          <motion.form
+            onSubmit={handleSubmit}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-5 pb-5 pt-1 space-y-3 border-t"
+                 style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+              <p className="text-xs font-medium text-ink-muted pt-1">פרטי הכניסה ל-BGU</p>
+
+              {/* Username */}
+              <div className="relative">
+                <User size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="מ.א. BGU / אימייל / שם משתמש"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  autoFocus
+                  className="w-full input-dark pr-9 py-2.5 text-sm"
+                />
+              </div>
+
+              {/* Password */}
+              <div className="relative">
+                <Lock size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
+                <input
+                  type={showPass ? 'text' : 'password'}
+                  placeholder="סיסמה"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="w-full input-dark pr-9 pl-10 py-2.5 text-sm"
+                />
+                <button type="button" onClick={() => setShowPass(p => !p)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors">
+                  {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setShowForm(false); setUsername(''); setPassword('') }}
+                  className="flex-1 py-2 rounded-xl text-sm text-ink-muted transition-colors hover:text-ink"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
+                >
+                  ביטול
+                </button>
+                <button
+                  type="submit"
+                  disabled={!username || !password}
+                  className="flex-2 flex-grow py-2 rounded-xl text-sm font-medium btn-gradient shadow-glow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  כניסה
+                </button>
+              </div>
+
+              <p className="text-xs text-ink-muted text-center">
+                🔒 הפרטים נשלחים ישירות לשרת BGU בלבד
+              </p>
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
