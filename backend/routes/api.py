@@ -309,6 +309,181 @@ def academic_advise():
 
 
 # ------------------------------------------------------------------ #
+#  Google Docs Fetch                                                   #
+# ------------------------------------------------------------------ #
+
+@api.post("/gdocs/fetch")
+def fetch_google_doc():
+    """Fetch plain-text content from a public Google Docs link.
+    Works with any doc shared as 'Anyone with the link can view'.
+    Converts the share URL to export?format=txt automatically."""
+    body = request.get_json() or {}
+    url = body.get("url", "").strip()
+
+    if not url:
+        return jsonify({"error": "חסר קישור ל-Google Docs"}), 400
+
+    # Extract doc ID from various Google Docs URL formats
+    doc_id = None
+    patterns = [
+        r'docs\.google\.com/document/d/([a-zA-Z0-9_-]+)',
+        r'drive\.google\.com/file/d/([a-zA-Z0-9_-]+)',
+        r'drive\.google\.com/open\?id=([a-zA-Z0-9_-]+)',
+    ]
+    for pat in patterns:
+        m = re.search(pat, url)
+        if m:
+            doc_id = m.group(1)
+            break
+
+    if not doc_id:
+        return jsonify({"error": "לא ניתן לזהות מסמך Google. ודא שהקישור תקין."}), 400
+
+    # Fetch as plain text
+    export_url = f"https://docs.google.com/document/d/{doc_id}/export?format=txt"
+    try:
+        import requests as http_requests
+        resp = http_requests.get(export_url, timeout=15)
+        if resp.status_code == 404:
+            return jsonify({"error": "המסמך לא נמצא. ודא שהקישור נכון."}), 404
+        if resp.status_code == 403:
+            return jsonify({"error": "אין גישה למסמך. ודא שהמסמך משותף עם 'כל מי שיש לו את הקישור'."}), 403
+        resp.raise_for_status()
+
+        text = resp.text.strip()
+        if not text:
+            return jsonify({"error": "המסמך ריק."}), 400
+
+        # Truncate if too long
+        text = text[:MAX_CONTENT]
+
+        return jsonify({
+            "content": text,
+            "title": text.split('\n')[0][:200] if text else "Google Doc",
+            "char_count": len(text),
+        })
+    except Exception as e:
+        logger.warning(f"[gdocs_fetch] error: {e}")
+        return jsonify({"error": "שגיאה בשליפת המסמך מ-Google."}), 500
+
+
+# ------------------------------------------------------------------ #
+#  Lesson Summarize                                                    #
+# ------------------------------------------------------------------ #
+
+# ------------------------------------------------------------------ #
+#  Course Notes                                                        #
+# ------------------------------------------------------------------ #
+
+@api.get("/courses/<course_id>/notes")
+def list_course_notes(course_id: str):
+    """List all notes for a course."""
+    try:
+        user_id = _user_id()
+        result = db.get_course_notes(course_id, user_id)
+        return jsonify(result.data or [])
+    except Exception as e:
+        logger.warning(f"[course_notes] DB error: {e}")
+        return jsonify([])
+
+
+@api.post("/courses/<course_id>/notes")
+def create_course_note(course_id: str):
+    """Create a new note for a course."""
+    body = request.get_json() or {}
+    title = body.get("title", "")[:MAX_TITLE]
+    content = body.get("content", "")[:MAX_CONTENT]
+    note_type = body.get("note_type", "manual")
+
+    if not content.strip() and not title.strip():
+        return jsonify({"error": "חסר תוכן או כותרת"}), 400
+
+    note_data = {
+        "id": str(uuid.uuid4()),
+        "course_id": course_id,
+        "user_id": _user_id(),
+        "title": title,
+        "content": content,
+        "note_type": note_type,
+        "file_name": body.get("file_name"),
+    }
+    try:
+        result = db.create_course_note(note_data)
+        return jsonify(result.data[0] if result.data else note_data), 201
+    except Exception as e:
+        logger.warning(f"[create_note] DB error: {e}")
+        return jsonify({"error": "שגיאה בשמירת ההערה"}), 500
+
+
+@api.patch("/courses/<course_id>/notes/<note_id>")
+def update_course_note(course_id: str, note_id: str):
+    """Update a note."""
+    body = request.get_json() or {}
+    update_data = {}
+    if "title" in body:
+        update_data["title"] = body["title"][:MAX_TITLE]
+    if "content" in body:
+        update_data["content"] = body["content"][:MAX_CONTENT]
+    if not update_data:
+        return jsonify({"error": "אין שדות לעדכון"}), 400
+
+    from datetime import datetime, timezone
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    try:
+        result = db.update_course_note(note_id, _user_id(), update_data)
+        if not result.data:
+            return jsonify({"error": "הערה לא נמצאה"}), 404
+        return jsonify(result.data[0])
+    except Exception as e:
+        logger.warning(f"[update_note] error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@api.delete("/courses/<course_id>/notes/<note_id>")
+def delete_course_note(course_id: str, note_id: str):
+    """Delete a note."""
+    try:
+        db.delete_course_note(note_id, _user_id())
+        return jsonify({"ok": True})
+    except Exception as e:
+        logger.warning(f"[delete_note] error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@api.post("/courses/<course_id>/notes/summarize")
+def summarize_note_content(course_id: str):
+    """Take pasted or uploaded text content and generate an AI summary as a note."""
+    body = request.get_json() or {}
+    content = body.get("content", "")[:MAX_CONTENT]
+    title = body.get("title", "סיכום")[:MAX_TITLE]
+
+    if not content.strip():
+        return jsonify({"error": "חסר תוכן לסיכום"}), 400
+
+    try:
+        orch = get_orchestrator()
+        result = orch.summarize_lesson(content, title)
+        summary_text = result.get("result") or result.get("summary") or result.get("answer") or ""
+
+        # Save as a note
+        note_data = {
+            "id": str(uuid.uuid4()),
+            "course_id": course_id,
+            "user_id": _user_id(),
+            "title": f"סיכום AI: {title}",
+            "content": summary_text,
+            "note_type": "ai_generated",
+            "file_name": body.get("file_name"),
+        }
+        db_result = db.create_course_note(note_data)
+        return jsonify(db_result.data[0] if db_result.data else note_data), 201
+    except Exception as e:
+        logger.warning(f"[summarize_note] error: {e}")
+        return jsonify({"error": "שגיאה ביצירת הסיכום"}), 500
+
+
+# ------------------------------------------------------------------ #
 #  Lesson Summarize                                                    #
 # ------------------------------------------------------------------ #
 

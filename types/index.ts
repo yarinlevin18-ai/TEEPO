@@ -65,6 +65,18 @@ export interface AssignmentTask {
   estimated_hours?: number
 }
 
+export interface CourseNote {
+  id: string
+  course_id: string
+  user_id: string
+  title: string
+  content: string
+  note_type: 'manual' | 'file_upload' | 'ai_generated'
+  file_name?: string
+  created_at: string
+  updated_at: string
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string

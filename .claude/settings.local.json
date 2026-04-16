@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:bgu-study-backend.onrender.com)",
+      "Bash(curl -s -X POST \"https://qvoedinxmwbfjnzsuojm.supabase.co/rest/v1/rpc\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2b2VkaW54bXdiZmpuenN1b2ptIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTk3Nzg3MywiZXhwIjoyMDkxNTUzODczfQ.IsBUc5XgcQ7kMpTSddM5fiY3fylg0AGh4JQtXTC07cA\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2b2VkaW54bXdiZmpuenN1b2ptIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTk3Nzg3MywiZXhwIjoyMDkxNTUzODczfQ.IsBUc5XgcQ7kMpTSddM5fiY3fylg0AGh4JQtXTC07cA\" -H \"Content-Type: application/json\")",
+      "Bash(curl -s \"https://bgu-study-organizer.onrender.com/api/bgu/debug\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s \"https://bgu-study-organizer.onrender.com/health\")",
+      "Bash(curl -s \"https://bgu-study-backend.onrender.com/health\")",
+      "Bash(curl -s \"https://bgu-study-backend.onrender.com/api/bgu/debug\")"
+    ]
+  }
+}

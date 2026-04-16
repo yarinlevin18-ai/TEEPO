@@ -122,6 +122,19 @@ CREATE TABLE IF NOT EXISTS agent_conversations (
   last_message_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- ── Course Notes (user-written summaries & uploaded file summaries) ──────────
+CREATE TABLE IF NOT EXISTS course_notes (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_id   UUID REFERENCES courses(id) ON DELETE CASCADE,
+  user_id     TEXT NOT NULL,
+  title       TEXT NOT NULL DEFAULT '',
+  content     TEXT NOT NULL DEFAULT '',
+  note_type   TEXT DEFAULT 'manual',       -- 'manual' | 'file_upload' | 'ai_generated'
+  file_name   TEXT,                         -- original uploaded file name
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
 -- ── Indexes for performance ─────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_courses_user ON courses(user_id);
 CREATE INDEX IF NOT EXISTS idx_study_tasks_user ON study_tasks(user_id);
@@ -129,6 +142,8 @@ CREATE INDEX IF NOT EXISTS idx_study_tasks_date ON study_tasks(scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_assignments_user ON assignments(user_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_deadline ON assignments(deadline);
 CREATE INDEX IF NOT EXISTS idx_agent_conversations_user ON agent_conversations(user_id, agent_type);
+CREATE INDEX IF NOT EXISTS idx_course_notes_course ON course_notes(course_id);
+CREATE INDEX IF NOT EXISTS idx_course_notes_user ON course_notes(user_id);
 
 -- ── RLS Policies ────────────────────────────────────────────────────────────
 -- Enable RLS on all tables (service_role bypasses RLS automatically)
@@ -179,6 +194,9 @@ DO $$ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'service_all_agent_conversations') THEN
     CREATE POLICY service_all_agent_conversations ON agent_conversations FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'service_all_course_notes') THEN
+    CREATE POLICY service_all_course_notes ON course_notes FOR ALL USING (true) WITH CHECK (true);
   END IF;
 END $$;
 

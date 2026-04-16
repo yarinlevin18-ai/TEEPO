@@ -73,6 +73,38 @@ export const api = {
       }),
   },
 
+  notes: {
+    list: (courseId: string) =>
+      request<any[]>(`/api/courses/${courseId}/notes`),
+    create: (courseId: string, data: { title: string; content: string; note_type?: string; file_name?: string }) =>
+      request<any>(`/api/courses/${courseId}/notes`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (courseId: string, noteId: string, data: { title?: string; content?: string }) =>
+      request<any>(`/api/courses/${courseId}/notes/${noteId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    delete: (courseId: string, noteId: string) =>
+      request<any>(`/api/courses/${courseId}/notes/${noteId}`, {
+        method: 'DELETE',
+      }),
+    summarize: (courseId: string, content: string, title?: string, fileName?: string) =>
+      request<any>(`/api/courses/${courseId}/notes/summarize`, {
+        method: 'POST',
+        body: JSON.stringify({ content, title, file_name: fileName }),
+      }),
+  },
+
+  gdocs: {
+    fetch: (url: string) =>
+      request<{ content: string; title: string; char_count: number }>('/api/gdocs/fetch', {
+        method: 'POST',
+        body: JSON.stringify({ url }),
+      }),
+  },
+
   lessons: {
     summarize: (content: string, title?: string) =>
       request<any>('/api/lessons/summarize', {

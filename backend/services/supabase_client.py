@@ -125,3 +125,43 @@ def get_conversations(user_id: str, agent_type: str = "study_buddy"):
 
 def update_conversation(conv_id: str, data: dict):
     return get_client().table("agent_conversations").update(data).eq("id", conv_id).execute()
+
+
+# --- Course Notes ---
+
+def get_course_notes(course_id: str, user_id: str):
+    return (
+        get_client()
+        .table("course_notes")
+        .select("*")
+        .eq("course_id", course_id)
+        .eq("user_id", user_id)
+        .order("updated_at", desc=True)
+        .execute()
+    )
+
+
+def create_course_note(data: dict):
+    return get_client().table("course_notes").insert(data).execute()
+
+
+def update_course_note(note_id: str, user_id: str, data: dict):
+    return (
+        get_client()
+        .table("course_notes")
+        .update(data)
+        .eq("id", note_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+
+
+def delete_course_note(note_id: str, user_id: str):
+    return (
+        get_client()
+        .table("course_notes")
+        .delete()
+        .eq("id", note_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
