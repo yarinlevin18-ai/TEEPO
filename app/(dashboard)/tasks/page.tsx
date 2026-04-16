@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
 import {
   Plus, CheckSquare, Trash2, Calendar, Sparkles,
   Target, Flame, Coffee, ChevronLeft, ChevronRight,
@@ -152,58 +152,125 @@ export default function TasksPage() {
 
       {/* Date navigation */}
       <div className="flex items-center gap-2">
-        <button
+        <motion.button
+          whileHover={{ scale: 1.15 }}
+          whileTap={{ scale: 0.9 }}
           onClick={() => setDateOffset(o => o - 7)}
-          className="p-2 rounded-lg glass text-ink-muted hover:text-ink transition-colors"
+          className="p-2.5 rounded-xl glass text-ink-muted hover:text-ink hover:bg-white/[0.08] transition-colors"
         >
           <ChevronRight size={16} />
-        </button>
+        </motion.button>
 
-        <div className="flex gap-1.5 flex-1 overflow-x-auto pb-1 justify-center">
-          {days.map((d) => (
-            <button
-              key={d.date}
-              onClick={() => setSelectedDate(d.date)}
-              className={`relative flex flex-col items-center min-w-[54px] py-2.5 px-3 rounded-xl transition-all ${
-                d.date === selectedDate
-                  ? 'btn-gradient text-white shadow-lg shadow-indigo-500/25 scale-105'
-                  : d.isToday
-                    ? 'glass text-indigo-400 border-indigo-500/30'
-                    : 'glass text-ink-muted hover:text-ink hover:border-white/10'
-              }`}
-            >
-              <span className="text-[10px] uppercase tracking-wider opacity-80">{d.label}</span>
-              <span className="text-lg font-bold mt-0.5">{d.num}</span>
-              {d.isToday && d.date !== selectedDate && (
-                <div className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-indigo-400" />
-              )}
-            </button>
-          ))}
-        </div>
+        <LayoutGroup>
+          <div className="flex gap-2 flex-1 overflow-x-auto pb-1 justify-center">
+            <AnimatePresence mode="popLayout">
+              {days.map((d, i) => {
+                const isSelected = d.date === selectedDate
+                return (
+                  <motion.button
+                    key={d.date}
+                    layout
+                    initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                    animate={{ opacity: 1, y: 0, scale: isSelected ? 1.08 : 1 }}
+                    exit={{ opacity: 0, y: -20, scale: 0.8 }}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 400,
+                      damping: 25,
+                      delay: i * 0.04,
+                    }}
+                    whileHover={!isSelected ? { scale: 1.06, y: -2 } : {}}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setSelectedDate(d.date)}
+                    className={`relative flex flex-col items-center min-w-[56px] py-3 px-3.5 rounded-2xl transition-colors ${
+                      isSelected
+                        ? 'text-white'
+                        : d.isToday
+                          ? 'glass text-indigo-400 border-indigo-500/30'
+                          : 'glass text-ink-muted hover:text-ink'
+                    }`}
+                  >
+                    {/* Animated gradient background for selected */}
+                    {isSelected && (
+                      <motion.div
+                        layoutId="dateHighlight"
+                        className="absolute inset-0 rounded-2xl"
+                        style={{
+                          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%)',
+                          boxShadow: '0 8px 32px rgba(99,102,241,0.35), 0 0 60px rgba(139,92,246,0.15)',
+                        }}
+                        transition={{
+                          type: 'spring',
+                          stiffness: 350,
+                          damping: 30,
+                        }}
+                      />
+                    )}
 
-        <button
+                    {/* Pulse ring on today */}
+                    {d.isToday && !isSelected && (
+                      <motion.div
+                        className="absolute inset-0 rounded-2xl border border-indigo-500/40"
+                        animate={{
+                          boxShadow: [
+                            '0 0 0 0 rgba(99,102,241,0.3)',
+                            '0 0 0 6px rgba(99,102,241,0)',
+                          ]
+                        }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+                      />
+                    )}
+
+                    <span className="relative z-10 text-[10px] uppercase tracking-wider opacity-80 font-medium">
+                      {d.label}
+                    </span>
+                    <span className="relative z-10 text-lg font-bold mt-0.5">{d.num}</span>
+
+                    {/* Today dot indicator */}
+                    {d.isToday && !isSelected && (
+                      <motion.div
+                        className="absolute -bottom-1 w-1.5 h-1.5 rounded-full bg-indigo-400"
+                        animate={{ scale: [1, 1.3, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      />
+                    )}
+                  </motion.button>
+                )
+              })}
+            </AnimatePresence>
+          </div>
+        </LayoutGroup>
+
+        <motion.button
+          whileHover={{ scale: 1.15 }}
+          whileTap={{ scale: 0.9 }}
           onClick={() => setDateOffset(o => o + 7)}
-          className="p-2 rounded-lg glass text-ink-muted hover:text-ink transition-colors"
+          className="p-2.5 rounded-xl glass text-ink-muted hover:text-ink hover:bg-white/[0.08] transition-colors"
         >
           <ChevronLeft size={16} />
-        </button>
+        </motion.button>
       </div>
 
       {/* Today button */}
-      {dateOffset !== 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex justify-center"
-        >
-          <button
-            onClick={() => { setDateOffset(0); setSelectedDate(format(new Date(), 'yyyy-MM-dd')) }}
-            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
+      <AnimatePresence>
+        {dateOffset !== 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.9 }}
+            className="flex justify-center"
           >
-            <Calendar size={12} /> חזרה להיום
-          </button>
-        </motion.div>
-      )}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => { setDateOffset(0); setSelectedDate(format(new Date(), 'yyyy-MM-dd')) }}
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-full glass"
+            >
+              <Calendar size={12} /> חזרה להיום
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Progress card */}
       {tasks.length > 0 && (
