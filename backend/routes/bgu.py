@@ -4,7 +4,18 @@ BGU Routes - חיבור לאתרי אוניברסיטת בן-גוריון
 import threading
 from flask import Blueprint, request, jsonify
 from services import bgu_scraper
-from config import BGU_USERNAME, BGU_PASSWORD
+from config import BGU_USERNAME, BGU_PASSWORD, IS_PRODUCTION
+
+ALLOWED_BGU_DOMAINS = ("moodle.bgu.ac.il", "my.bgu.ac.il", "bgu.ac.il")
+
+
+def _is_bgu_url(url: str) -> bool:
+    """Validate URL is a legitimate BGU domain (SSRF protection)."""
+    if not url or not url.startswith("https://"):
+        return False
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    return any(parsed.hostname and parsed.hostname.endswith(d) for d in ALLOWED_BGU_DOMAINS)
 
 bgu = Blueprint("bgu", __name__, url_prefix="/api/bgu")
 
@@ -152,7 +163,8 @@ def sync_all():
 
 @bgu.get("/debug")
 def debug_status():
-    """Full diagnostic — check Supabase connection, cookie store, and scraper."""
+    """Full diagnostic — check Supabase connection, cookie store, and scraper.
+    In production, only shows summary (no error details)."""
     info = {"is_server": bgu_scraper.IS_SERVER, "tables": {}, "cookies": {}, "errors": []}
 
     # Check Supabase tables
@@ -169,6 +181,10 @@ def debug_status():
     for site in ("moodle", "portal"):
         cookies = bgu_scraper._load_cookies_from_store(site)
         info["cookies"][site] = f"{len(cookies)} cookies" if cookies else "none"
+
+    # Hide error details in production
+    if IS_PRODUCTION:
+        info["errors"] = [f"error in {e.split(':')[0]}" for e in info["errors"]] if info["errors"] else []
 
     return jsonify(info)
 
@@ -193,6 +209,8 @@ def get_course_assignments():
     course_url = body.get("course_url", "")
     if not course_url:
         return jsonify({"error": "חסרה כתובת קורס"}), 400
+    if not _is_bgu_url(course_url):
+        return jsonify({"error": "כתובת URL חייבת להיות מאתר BGU"}), 400
     result = bgu_scraper.scrape_course_assignments(course_url)
     return jsonify(result)
 
@@ -203,5 +221,7 @@ def get_course_materials():
     course_url = body.get("course_url", "")
     if not course_url:
         return jsonify({"error": "חסרה כתובת קורס"}), 400
+    if not _is_bgu_url(course_url):
+        return jsonify({"error": "כתובת URL חייבת להיות מאתר BGU"}), 400
     result = bgu_scraper.scrape_course_materials(course_url)
     return jsonify(result)

@@ -2,6 +2,7 @@
 from flask_socketio import SocketIO, emit, join_room
 from orchestrator_wrapper import get_orchestrator
 from services import supabase_client as db
+from config import logger
 import uuid
 from datetime import datetime
 
@@ -24,10 +25,14 @@ def register_socket_events(socketio: SocketIO):
 
     @socketio.on("join")
     def on_join(data):
-        """Client joins with user_id + optional agent_type room."""
+        """Client joins with user_id + optional agent_type room.
+        user_id is validated but not fully verified over WebSocket
+        (JWT auth happens on HTTP requests; WS uses the ID for conversation routing)."""
         sid = _get_sid()
-        user_id = data.get("user_id", "anonymous")
+        user_id = str(data.get("user_id", "anonymous"))[:128]  # limit length
         agent_type = data.get("agent_type", "study_buddy")
+        if agent_type not in ("study_buddy", "academic"):
+            agent_type = "study_buddy"
         if sid in _sessions:
             _sessions[sid]["user_id"] = user_id
         join_room(f"{user_id}:{agent_type}")
@@ -48,9 +53,11 @@ def register_socket_events(socketio: SocketIO):
         sid = _get_sid()
         session = _sessions.get(sid, {})
         user_id = session.get("user_id", "anonymous")
-        question: str = data.get("text", "")
-        context: str = data.get("context", "")  # Optional lesson context
+        question: str = str(data.get("text", ""))[:5000]  # limit message length
+        context: str = str(data.get("context", ""))[:10000]
         agent_type: str = data.get("agent_type", "study_buddy")
+        if agent_type not in ("study_buddy", "academic"):
+            agent_type = "study_buddy"
 
         if not question.strip():
             return

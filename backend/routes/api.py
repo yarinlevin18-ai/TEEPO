@@ -1,9 +1,45 @@
 """REST API routes for the study platform."""
+import re
 from flask import Blueprint, request, jsonify
 from orchestrator_wrapper import get_orchestrator
 from services import supabase_client as db
 from config import logger
 import uuid
+
+# ── Input validation helpers ──────────────────────────────────────────
+MAX_TITLE = 500
+MAX_DESCRIPTION = 5000
+MAX_CONTENT = 50000
+ALLOWED_URL_SCHEMES = ("http://", "https://")
+
+
+def _validate_url(url: str) -> bool:
+    """Basic URL validation — must start with http(s) and have a domain."""
+    if not url or len(url) > 2000:
+        return False
+    if not any(url.startswith(s) for s in ALLOWED_URL_SCHEMES):
+        return False
+    # Block private/internal IPs
+    private_patterns = [
+        r'https?://localhost', r'https?://127\.', r'https?://0\.0\.0\.0',
+        r'https?://10\.', r'https?://172\.(1[6-9]|2\d|3[01])\.', r'https?://192\.168\.',
+        r'https?://\[::1\]',
+    ]
+    for pat in private_patterns:
+        if re.match(pat, url, re.I):
+            return False
+    return True
+
+
+def _clamp(val, min_val, max_val, default=None):
+    """Clamp a numeric value to a range, with optional default."""
+    try:
+        val = int(val) if val is not None else default
+        if val is None:
+            return default
+        return max(min_val, min(val, max_val))
+    except (TypeError, ValueError):
+        return default
 
 api = Blueprint("api", __name__, url_prefix="/api")
 
@@ -76,6 +112,8 @@ def extract_course():
     url = body.get("url", "")
     if not url:
         return jsonify({"error": "חסרה כתובת URL"}), 400
+    if not _validate_url(url):
+        return jsonify({"error": "כתובת URL לא תקינה"}), 400
 
     orch = get_orchestrator()
     result = orch.extract_course(url)
@@ -224,9 +262,9 @@ def breakdown_assignment():
 @api.post("/study-plan")
 def create_study_plan():
     body = request.get_json() or {}
-    courses = body.get("courses", [])
-    deadline = body.get("deadline", "")
-    hours_per_week = body.get("hours_per_week", 10)
+    courses = body.get("courses", [])[:20]  # max 20 courses
+    deadline = body.get("deadline", "")[:20]
+    hours_per_week = _clamp(body.get("hours_per_week"), 1, 80, default=10)
 
     orch = get_orchestrator()
     result = orch.create_study_plan(courses, deadline, hours_per_week)
@@ -256,8 +294,8 @@ def academic_advise():
 @api.post("/lessons/summarize")
 def summarize_lesson():
     body = request.get_json() or {}
-    content = body.get("content", "")
-    title = body.get("title", "")
+    content = body.get("content", "")[:MAX_CONTENT]
+    title = body.get("title", "")[:MAX_TITLE]
     if not content:
         return jsonify({"error": "חסר תוכן שיעור"}), 400
 
@@ -269,8 +307,8 @@ def summarize_lesson():
 @api.post("/lessons/quiz")
 def generate_quiz():
     body = request.get_json() or {}
-    lesson_text = body.get("content", "")
-    num_questions = body.get("num_questions", 10)
+    lesson_text = body.get("content", "")[:MAX_CONTENT]
+    num_questions = _clamp(body.get("num_questions"), 1, 50, default=10)
     if not lesson_text:
         return jsonify({"error": "חסר תוכן שיעור"}), 400
 

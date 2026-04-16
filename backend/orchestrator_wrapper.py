@@ -4,10 +4,35 @@ AI/Agents to add study-specific functionality with Hebrew prompts.
 """
 import sys
 import os
+import re
 from typing import Dict, Any, List, Optional
 
-from config import ORCHESTRATOR_PATH, CLAUDE_MODEL, ANTHROPIC_API_KEY
+from config import ORCHESTRATOR_PATH, CLAUDE_MODEL, ANTHROPIC_API_KEY, logger
 import anthropic
+
+# ── Input safety ──────────────────────────────────────────────────────
+MAX_CONTENT_LENGTH = 50_000  # ~50K chars max for lesson content
+MAX_TITLE_LENGTH = 500
+MAX_QUESTIONS = 50
+
+
+def _sanitize_for_prompt(text: str, max_len: int = MAX_CONTENT_LENGTH) -> str:
+    """Truncate and strip known prompt injection patterns from user input."""
+    if not text:
+        return ""
+    text = text[:max_len]
+    # Strip common injection markers (but preserve legitimate Hebrew/English content)
+    # These patterns try to override the system prompt
+    injection_patterns = [
+        r'(?i)ignore\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?)',
+        r'(?i)you\s+are\s+now\s+a',
+        r'(?i)new\s+instructions?\s*:',
+        r'(?i)system\s*:\s*',
+        r'(?i)forget\s+(everything|all|your)\s+(above|instructions?)',
+    ]
+    for pattern in injection_patterns:
+        text = re.sub(pattern, '[filtered]', text)
+    return text.strip()
 
 # Inject the existing orchestrator so we can reuse its agents
 sys.path.insert(0, ORCHESTRATOR_PATH)
@@ -112,6 +137,8 @@ class StudyOrchestrator:
 
     def summarize_lesson(self, content: str, lesson_title: str = "") -> Dict:
         """סיכום שיעור בעברית."""
+        content = _sanitize_for_prompt(content)
+        lesson_title = _sanitize_for_prompt(lesson_title, MAX_TITLE_LENGTH)
         prompt = f"""אתה עוזר לימוד אישי.
 {"שם השיעור: " + lesson_title if lesson_title else ""}
 תוכן השיעור:
@@ -125,6 +152,8 @@ class StudyOrchestrator:
 
     def generate_quiz(self, lesson_text: str, num_questions: int = 10) -> Dict:
         """יצירת שאלות קוויז מתוכן שיעור."""
+        lesson_text = _sanitize_for_prompt(lesson_text)
+        num_questions = max(1, min(num_questions, MAX_QUESTIONS))
         prompt = f"""אתה יוצר קוויזים חינוכיים.
 תוכן השיעור:
 {lesson_text}
@@ -145,7 +174,9 @@ class StudyOrchestrator:
 
     def answer_question(self, question: str, context: str = "", history: List = None) -> Dict:
         """עונה על שאלת לימוד בצ'אט אינטראקטיבי."""
-        messages = history or []
+        question = _sanitize_for_prompt(question, 5000)
+        context = _sanitize_for_prompt(context, 10000)
+        messages = history[-20:] if history else []  # limit history to last 20 messages
         messages.append({"role": "user", "content": question})
         system = (
             "אתה מנחה לימוד אישי שעונה בעברית בצורה ברורה וחינוכית. "

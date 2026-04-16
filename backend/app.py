@@ -15,8 +15,24 @@ from routes.websocket import register_socket_events
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET_KEY
 
-# Allow all origins — this is a personal app, no sensitive public data
-CORS(app, origins="*", supports_credentials=False)
+# CORS — restrict to known origins in production
+_allowed_origins = [
+    "https://bgu-study-organizer.vercel.app",
+    "https://*.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5000",
+]
+CORS(app, origins=_allowed_origins if FLASK_ENV == "production" else "*", supports_credentials=False)
+
+
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 socketio = SocketIO(
     app,
