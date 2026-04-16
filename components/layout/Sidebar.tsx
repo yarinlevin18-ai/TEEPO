@@ -11,7 +11,7 @@ import { useAuth } from '@/lib/auth-context'
 
 const NAV = [
   { href: '/dashboard',       icon: LayoutDashboard, label: 'לוח בקרה' },
-  { href: '/courses/extract', icon: BookOpen,         label: 'הקורסים שלי' },
+  { href: '/courses',         icon: BookOpen,         label: 'הקורסים שלי' },
   { href: '/tasks',           icon: CheckSquare,      label: 'משימות' },
   { href: '/assignments',     icon: FileText,         label: 'מטלות' },
   { href: '/study-buddy',     icon: MessageCircle,    label: 'עוזר הלימוד' },
