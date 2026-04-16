@@ -21,7 +21,19 @@ def register_socket_events(socketio: SocketIO):
     @socketio.on("disconnect")
     def on_disconnect():
         sid = _get_sid()
-        _sessions.pop(sid, None)
+        session = _sessions.pop(sid, None)
+
+        # Save session summary to global memory if meaningful conversation happened
+        if session and len(session.get("history", [])) >= 4:
+            try:
+                orch = get_orchestrator()
+                orch.save_session_summary(
+                    user_id=session.get("user_id", "anonymous"),
+                    messages=session["history"],
+                    course_name=session.get("course_name", ""),
+                )
+            except Exception as e:
+                logger.debug(f"Session summary save failed: {e}")
 
     @socketio.on("join")
     def on_join(data):
@@ -79,6 +91,7 @@ def register_socket_events(socketio: SocketIO):
         # Build course context if a course_id is provided
         course_context = ""
         notes_context = ""
+        course_name = ""
         if course_id:
             try:
                 client = db.get_client()
@@ -86,7 +99,11 @@ def register_socket_events(socketio: SocketIO):
                 cr = client.table("courses").select("title,description").eq("id", course_id).limit(1).execute()
                 if cr.data:
                     c = cr.data[0]
-                    course_context = f"קורס: {c.get('title', '')}\nתיאור: {c.get('description', '')}"
+                    course_name = c.get('title', '')
+                    course_context = f"קורס: {course_name}\nתיאור: {c.get('description', '')}"
+                    # Track course name in session for summary on disconnect
+                    if sid in _sessions:
+                        _sessions[sid]["course_name"] = course_name
 
                 # Get lessons
                 lr = client.table("lessons").select("title,content,ai_summary").eq("course_id", course_id).order("order_index").limit(20).execute()

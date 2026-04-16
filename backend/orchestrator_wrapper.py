@@ -1,6 +1,9 @@
 """
 Study Orchestrator - wraps and extends the existing orchestrator from
 AI/Agents to add study-specific functionality with Hebrew prompts.
+
+Now properly connected to the global memory system at ~/.claude/memory/
+for cross-session learning and persistent user knowledge.
 """
 import sys
 import os
@@ -21,8 +24,6 @@ def _sanitize_for_prompt(text: str, max_len: int = MAX_CONTENT_LENGTH) -> str:
     if not text:
         return ""
     text = text[:max_len]
-    # Strip common injection markers (but preserve legitimate Hebrew/English content)
-    # These patterns try to override the system prompt
     injection_patterns = [
         r'(?i)ignore\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?)',
         r'(?i)you\s+are\s+now\s+a',
@@ -34,7 +35,35 @@ def _sanitize_for_prompt(text: str, max_len: int = MAX_CONTENT_LENGTH) -> str:
         text = re.sub(pattern, '[filtered]', text)
     return text.strip()
 
-# Inject the existing orchestrator so we can reuse its agents
+
+# ── Connect to the real memory system ─────────────────────────────────
+_memory_available = False
+_memory_module = None
+
+# The real memory agent lives at ~/OneDrive/Desktop/AI/Agents/Memory/agents/
+MEMORY_AGENT_PATH = os.path.join(
+    os.path.expanduser("~"),
+    "OneDrive", "Desktop", "AI", "Agents", "Memory", "agents"
+)
+
+if os.path.isdir(MEMORY_AGENT_PATH):
+    sys.path.insert(0, MEMORY_AGENT_PATH)
+    try:
+        import memory_agent as _memory_module
+        _memory_available = True
+        info = _memory_module.agent_info()
+        logger.info(
+            f"Global memory system connected. "
+            f"{info.get('memory_count', 0)} memories in database. "
+            f"DB: {info.get('storage', {}).get('db', 'unknown')}"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to load global memory agent: {e}")
+else:
+    logger.info(f"Memory agent path not found: {MEMORY_AGENT_PATH}. Memory disabled.")
+
+
+# ── Connect to the real orchestrator ──────────────────────────────────
 if ORCHESTRATOR_PATH and os.path.isdir(ORCHESTRATOR_PATH):
     sys.path.insert(0, ORCHESTRATOR_PATH)
 
@@ -54,6 +83,12 @@ class StudyOrchestrator:
     """
     מארגן לימודים - משתמש בסוכנים הקיימים ומוסיף שיטות ייעודיות ללמידה.
     כל הבקשות לקלוד נשלחות בעברית.
+
+    Connected to:
+    - Global memory system (~/.claude/memory/memory.db)
+    - External agent registry (orchestrator/agents/)
+    - Local study-specific agents (backend/agents/)
+    - Web search (DuckDuckGo)
     """
 
     def __init__(self):
@@ -66,7 +101,10 @@ class StudyOrchestrator:
             try:
                 self.registry = AgentRegistry()
                 self._load_study_agents(agents_dir)
-                logger.info("Agent registry initialized with external orchestrator.")
+                logger.info(
+                    f"Agent registry initialized. "
+                    f"Available agents: {self.registry.list_agents() if hasattr(self.registry, 'list_agents') else 'unknown'}"
+                )
             except Exception as e:
                 logger.warning(f"Failed to init agent registry: {e}. Using local agents.")
                 self.registry = None
@@ -139,6 +177,174 @@ class StudyOrchestrator:
         return {"status": "success", "result": resp.content[0].text}
 
     # ------------------------------------------------------------------ #
+    #  Memory System — connected to ~/.claude/memory/memory.db             #
+    # ------------------------------------------------------------------ #
+
+    def save_memory(self, content: str, memory_type: str = "agent_output",
+                    source: str = "study_buddy", tags: str = None) -> Dict:
+        """Save to the global memory system."""
+        if not _memory_available or not _memory_module:
+            logger.debug("Memory system not available, skipping save.")
+            return {"status": "skipped", "reason": "memory not available"}
+        try:
+            result = _memory_module.save_memory(
+                type=memory_type,
+                content=content,
+                source_agent=source,
+                tags=tags,
+            )
+            logger.debug(f"[memory] Saved: type={memory_type} tags={tags} → {result.get('status')}")
+            return result
+        except Exception as e:
+            logger.warning(f"[memory] Save failed: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def get_memories(self, memory_type: str = None, limit: int = 10) -> Dict:
+        """Retrieve memories from global system."""
+        if not _memory_available or not _memory_module:
+            return {"status": "skipped", "memories": [], "count": 0}
+        try:
+            return _memory_module.get_memories(type=memory_type, limit=limit)
+        except Exception as e:
+            logger.warning(f"[memory] Get failed: {e}")
+            return {"status": "error", "memories": [], "count": 0}
+
+    def search_memories(self, query: str) -> Dict:
+        """Search memories by keyword."""
+        if not _memory_available or not _memory_module:
+            return {"status": "skipped", "memories": [], "count": 0}
+        try:
+            return _memory_module.search_memories(query)
+        except Exception as e:
+            logger.warning(f"[memory] Search failed: {e}")
+            return {"status": "error", "memories": [], "count": 0}
+
+    def _load_relevant_memories(self, question: str, course_name: str = "") -> str:
+        """Load memories relevant to the current question for context injection."""
+        if not _memory_available:
+            return ""
+
+        memory_parts = []
+
+        # 1. Get user preferences
+        prefs = self.get_memories(memory_type="preference", limit=5)
+        if prefs.get("memories"):
+            pref_text = "\n".join([m["content"] for m in prefs["memories"][:3]])
+            memory_parts.append(f"## העדפות הסטודנט:\n{pref_text}")
+
+        # 2. Search for topic-relevant memories
+        if question and len(question) > 10:
+            # Extract key terms for search
+            search_results = self.search_memories(question[:100])
+            if search_results.get("memories"):
+                relevant = search_results["memories"][:3]
+                rel_text = "\n".join([f"- {m['content'][:200]}" for m in relevant])
+                memory_parts.append(f"## זיכרון רלוונטי מפגישות קודמות:\n{rel_text}")
+
+        # 3. Search for course-specific memories
+        if course_name:
+            course_results = self.search_memories(course_name)
+            if course_results.get("memories"):
+                course_mems = course_results["memories"][:2]
+                c_text = "\n".join([f"- {m['content'][:200]}" for m in course_mems])
+                memory_parts.append(f"## זיכרון מהקורס:\n{c_text}")
+
+        # 4. Get recent session summaries
+        sessions = self.get_memories(memory_type="session", limit=3)
+        if sessions.get("memories"):
+            sess_text = "\n".join([f"- {m['content'][:150]}" for m in sessions["memories"][:2]])
+            memory_parts.append(f"## פגישות אחרונות:\n{sess_text}")
+
+        return "\n\n".join(memory_parts) if memory_parts else ""
+
+    def _log_interaction(self, question: str, answer: str, course_name: str = "",
+                         interaction_type: str = "chat") -> None:
+        """Log significant interactions to memory for future learning."""
+        if not _memory_available:
+            return
+
+        # Only save meaningful interactions (not greetings, short messages)
+        if len(question) < 20 or len(answer) < 50:
+            return
+
+        try:
+            # Save as agent_output with study-specific tags
+            tags_list = ["learning-platform", "study-buddy", interaction_type]
+            if course_name:
+                # Clean course name for tags
+                clean_name = re.sub(r'[^\w\s-]', '', course_name)[:50].strip()
+                if clean_name:
+                    tags_list.append(clean_name)
+
+            content = (
+                f"שאלה: {question[:200]}\n"
+                f"תשובה (תקציר): {answer[:300]}"
+            )
+
+            self.save_memory(
+                content=content,
+                memory_type="agent_output",
+                source="study_buddy",
+                tags=",".join(tags_list),
+            )
+        except Exception as e:
+            logger.debug(f"[memory] Interaction log failed: {e}")
+
+    def save_session_summary(self, user_id: str, messages: List, course_name: str = "") -> None:
+        """Summarize and save a study session to memory."""
+        if not _memory_available or not _memory_module:
+            return
+        if len(messages) < 4:  # Only summarize meaningful sessions
+            return
+
+        try:
+            # Build session data for summarization
+            session_text = "\n".join([
+                f"{'סטודנט' if m.get('role') == 'user' else 'AI'}: {m.get('content', '')[:100]}"
+                for m in messages[-20:]
+            ])
+
+            tags = "learning-platform,study-session"
+            if course_name:
+                tags += f",{course_name[:50]}"
+
+            # Use Claude to summarize the session
+            resp = self.client.messages.create(
+                model=self.model,
+                max_tokens=300,
+                messages=[{
+                    "role": "user",
+                    "content": (
+                        "סכם בקצרה (עד 100 מילים) את פגישת הלימוד הבאה. "
+                        "ציין: נושאים שנלמדו, שאלות שנשאלו, ונקודות חשובות. "
+                        "כתוב בעברית.\n\n"
+                        f"השיחה:\n{session_text}"
+                    ),
+                }],
+            )
+            summary = resp.content[0].text
+
+            self.save_memory(
+                content=summary,
+                memory_type="session",
+                source="study_buddy",
+                tags=tags,
+            )
+            logger.info(f"[memory] Session summary saved for user {user_id[:8]}...")
+
+        except Exception as e:
+            logger.warning(f"[memory] Session summary failed: {e}")
+
+    def save_student_preference(self, preference: str, source: str = "study_buddy") -> Dict:
+        """Save a learning preference (e.g., 'prefers examples', 'visual learner')."""
+        return self.save_memory(
+            content=preference,
+            memory_type="preference",
+            source=source,
+            tags="learning-platform,student-preference",
+        )
+
+    # ------------------------------------------------------------------ #
     #  Study-specific methods – all prompts in Hebrew                      #
     # ------------------------------------------------------------------ #
 
@@ -155,7 +361,20 @@ class StudyOrchestrator:
 1. נקודות עיקריות (בולטים)
 2. מושגים חשובים
 3. מה חשוב לזכור לבחינה"""
-        return self._execute_agent("analysis", {"findings": prompt, "topic": lesson_title or "שיעור"})
+
+        result = self._execute_agent("analysis", {"findings": prompt, "topic": lesson_title or "שיעור"})
+
+        # Log to memory
+        summary_text = result.get("result") or result.get("summary") or result.get("answer") or ""
+        if summary_text and lesson_title:
+            self.save_memory(
+                content=f"סיכום שיעור '{lesson_title}': {summary_text[:300]}",
+                memory_type="agent_output",
+                source="study_buddy",
+                tags=f"learning-platform,lesson-summary,{lesson_title[:50]}",
+            )
+
+        return result
 
     def generate_quiz(self, lesson_text: str, num_questions: int = 10) -> Dict:
         """יצירת שאלות קוויז מתוכן שיעור."""
@@ -200,6 +419,20 @@ class StudyOrchestrator:
         except Exception as e:
             logger.debug(f"[answer_question] web search skipped: {e}")
 
+        # Load memories relevant to this question
+        memory_context = ""
+        course_name = ""
+        if course_context:
+            # Extract course name from context
+            for line in course_context.split("\n"):
+                if line.startswith("קורס:"):
+                    course_name = line.replace("קורס:", "").strip()
+                    break
+        try:
+            memory_context = self._load_relevant_memories(question, course_name)
+        except Exception as e:
+            logger.debug(f"[answer_question] memory load skipped: {e}")
+
         system_parts = [
             "אתה עוזר לימוד אישי חכם ומדויק, בסגנון NotebookLM של Google. ",
             "אתה מתמחה בהוראה, סיכום, והסברת חומר אקדמי.",
@@ -215,6 +448,8 @@ class StudyOrchestrator:
             "- אם אתה לא בטוח — אמור זאת במפורש, אל תמציא.",
         ]
 
+        if memory_context:
+            system_parts.append(f"\n\n## מה שאני זוכר עליך מפגישות קודמות:\n{memory_context}")
         if course_context:
             system_parts.append(f"\n\n## הקשר הקורס הנוכחי:\n{course_context}")
         if notes_context:
@@ -235,6 +470,10 @@ class StudyOrchestrator:
         )
         answer = resp.content[0].text
         messages.append({"role": "assistant", "content": answer})
+
+        # Log interaction to memory for future learning
+        self._log_interaction(question, answer, course_name, "chat")
+
         return {"status": "success", "answer": answer, "history": messages}
 
     def create_study_plan(self, courses: List[Dict], deadline: str, hours_per_week: int = 10) -> Dict:
@@ -276,20 +515,6 @@ class StudyOrchestrator:
                 "your_courses": your_courses or [],
                 "action": "advise",
             },
-        )
-
-    def save_memory(self, content: str, memory_type: str, source: str = "study_buddy") -> Dict:
-        """שמירת מידע בזיכרון לטווח ארוך."""
-        return self._execute_agent(
-            "memory",
-            {"action": "save", "type": memory_type, "content": content, "source_agent": source},
-        )
-
-    def get_memories(self, query: str = "", memory_type: str = "") -> Dict:
-        """אחזור זיכרונות רלוונטיים."""
-        return self._execute_agent(
-            "memory",
-            {"action": "search" if query else "get", "query": query, "type": memory_type},
         )
 
 
