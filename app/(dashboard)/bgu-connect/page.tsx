@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, WifiOff, RefreshCw,
-  CheckCircle, Loader2, BookOpen, Calendar, Eye, EyeOff, Lock, User,
+  CheckCircle, Loader2, BookOpen, Calendar, ExternalLink, Puzzle,
 } from 'lucide-react'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
@@ -89,14 +89,36 @@ export default function BGUConnectPage() {
       </div>
 
       {/* How it works */}
-      <div className="glass p-5 text-sm space-y-1.5" style={{ borderColor: 'rgba(99,102,241,0.2)' }}>
-        <p className="font-semibold gradient-text">איך זה עובד?</p>
+      <div className="glass p-5 text-sm space-y-2" style={{ borderColor: 'rgba(99,102,241,0.2)' }}>
+        <p className="font-semibold gradient-text mb-3">איך זה עובד?</p>
         {serverMode ? (
-          <>
-            <p className="text-ink-muted">1. לחץ "התחבר" והזן מ.א. + סיסמה של BGU</p>
-            <p className="text-ink-muted">2. הכניסה מתבצעת בשרת — הפרטים לא נשמרים</p>
-            <p className="text-ink-muted">3. לחץ "סנכרן הכל" לייבוא קורסים ומטלות</p>
-          </>
+          <div className="space-y-2.5">
+            <div className="flex items-start gap-3">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>1</span>
+              <p className="text-ink-muted">לחץ <strong className="text-ink">"התחבר"</strong> — Moodle ייפתח בטאב חדש</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>2</span>
+              <p className="text-ink-muted">התחבר ל-Moodle <strong className="text-ink">בדפדפן שלך כרגיל</strong></p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>3</span>
+              <p className="text-ink-muted">לחץ על <strong className="text-ink">אייקון התוסף 🎓</strong> בסרגל הדפדפן ← "שלח Session"</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                    style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>4</span>
+              <p className="text-ink-muted">חזור לכאן ← <strong className="text-ink">סנכרן הכל</strong></p>
+            </div>
+            <div className="mt-3 pt-3 flex items-center gap-2 text-xs"
+                 style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: '#10b981' }}>
+              <span>🔒</span>
+              <span>הסיסמה שלך לא נגעת באפליקציה — רק ה-session cookies מועברים</span>
+            </div>
+          </div>
         ) : (
           <>
             <p className="text-ink-muted">1. לחץ "התחבר" — ייפתח חלון Chrome נפרד</p>
@@ -152,6 +174,11 @@ export default function BGUConnectPage() {
   )
 }
 
+const SITE_URLS: Record<string, string> = {
+  moodle: 'https://moodle.bgu.ac.il/moodle/my/',
+  portal: 'https://my.bgu.ac.il/',
+}
+
 function SiteCard({ site, name, description, url, connected, loginStatus, loading,
   onConnect, icon: Icon, color, serverMode }: {
   site: string; name: string; description: string; url: string
@@ -159,28 +186,22 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
   onConnect: (creds?: { username: string; password: string }) => void
   icon: React.ElementType; color: string; serverMode: boolean
 }) {
-  const [showForm, setShowForm] = useState(false)
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPass, setShowPass] = useState(false)
+  const [step, setStep] = useState<'idle' | 'waiting'>('idle')
 
-  const isFailed = loginStatus === 'failed'
-  const isConnecting = loginStatus === 'waiting_for_login' || loginStatus === 'opening'
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!username || !password) return
-    setShowForm(false)
-    onConnect(serverMode ? { username, password } : undefined)
-  }
-
-  const handleConnectClick = () => {
+  const handleConnect = () => {
     if (serverMode) {
-      setShowForm(true)
+      // Open the real site in a new tab — user logs in there
+      window.open(SITE_URLS[site], '_blank')
+      setStep('waiting')
     } else {
       onConnect()
     }
   }
+
+  // Reset step when connected
+  useEffect(() => {
+    if (connected) setStep('idle')
+  }, [connected])
 
   return (
     <div
@@ -211,40 +232,30 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
           </div>
           <p className="text-xs text-ink-muted mt-0.5">{description}</p>
           <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.2)' }} dir="ltr">{url}</p>
-          {isConnecting && (
-            <p className="text-xs mt-1 flex items-center gap-1 text-amber-400">
-              <Loader2 size={10} className="animate-spin" /> מתחבר לשרת...
-            </p>
-          )}
-          {isFailed && !showForm && (
-            <p className="text-xs mt-1 text-red-400 cursor-pointer hover:text-red-300"
-               onClick={() => setShowForm(true)}>
-              ההתחברות נכשלה — <span className="underline">נסה שוב</span>
-            </p>
-          )}
         </div>
 
-        <button
-          onClick={connected ? undefined : handleConnectClick}
-          disabled={loading || connected || isConnecting}
-          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex-shrink-0 ${
-            connected ? 'text-ink-muted cursor-default'
-            : isConnecting ? 'opacity-50 cursor-wait'
-            : 'btn-gradient shadow-glow-sm hover:opacity-90'
-          }`}
-          style={connected ? { background: 'rgba(255,255,255,0.05)' } : {}}
-        >
-          {loading || isConnecting
-            ? <Loader2 size={14} className="animate-spin" />
-            : connected ? 'מחובר ✓' : 'התחבר'}
-        </button>
+        {!connected && (
+          <button
+            onClick={handleConnect}
+            disabled={loading}
+            className="px-4 py-2 rounded-xl text-sm font-medium transition-all flex-shrink-0 btn-gradient shadow-glow-sm flex items-center gap-1.5"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+            התחבר
+          </button>
+        )}
+        {connected && (
+          <span className="px-4 py-2 rounded-xl text-sm flex-shrink-0 text-ink-muted"
+                style={{ background: 'rgba(255,255,255,0.05)' }}>
+            מחובר ✓
+          </span>
+        )}
       </div>
 
-      {/* Inline credentials form — slides in for server mode */}
+      {/* Waiting step — show after opening BGU site */}
       <AnimatePresence>
-        {showForm && !connected && (
-          <motion.form
-            onSubmit={handleSubmit}
+        {step === 'waiting' && !connected && (
+          <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -253,61 +264,52 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
           >
             <div className="px-5 pb-5 pt-1 space-y-3 border-t"
                  style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-              <p className="text-xs font-medium text-ink-muted pt-1">פרטי הכניסה ל-BGU</p>
 
-              {/* Username */}
-              <div className="relative">
-                <User size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="מ.א. BGU / אימייל / שם משתמש"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  autoFocus
-                  className="w-full input-dark pr-9 py-2.5 text-sm"
-                />
+              <div className="flex items-start gap-3 pt-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                     style={{ background: 'rgba(99,102,241,0.2)' }}>
+                  <span className="text-sm">1</span>
+                </div>
+                <p className="text-sm text-ink-muted pt-1">
+                  התחבר ל-{name} בטאב שנפתח עם שם המשתמש והסיסמה שלך
+                </p>
               </div>
 
-              {/* Password */}
-              <div className="relative">
-                <Lock size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  placeholder="סיסמה"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="w-full input-dark pr-9 pl-10 py-2.5 text-sm"
-                />
-                <button type="button" onClick={() => setShowPass(p => !p)}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink transition-colors">
-                  {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                     style={{ background: 'rgba(99,102,241,0.2)' }}>
+                  <span className="text-sm">2</span>
+                </div>
+                <div className="pt-1">
+                  <p className="text-sm text-ink-muted">
+                    לחץ על אייקון התוסף <span className="text-lg">🎓</span> בסרגל הדפדפן
+                  </p>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    לא רואה אותו? לחץ על <Puzzle size={11} className="inline" /> ← אתר את BGU Study Organizer ← נעץ אותו
+                  </p>
+                </div>
               </div>
 
-              {/* Buttons */}
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => { setShowForm(false); setUsername(''); setPassword('') }}
-                  className="flex-1 py-2 rounded-xl text-sm text-ink-muted transition-colors hover:text-ink"
-                  style={{ background: 'rgba(255,255,255,0.05)' }}
-                >
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                     style={{ background: 'rgba(99,102,241,0.2)' }}>
+                  <span className="text-sm">3</span>
+                </div>
+                <p className="text-sm text-ink-muted pt-1">
+                  לחץ <strong className="text-ink">"שלח Session ל-App"</strong> בתוסף — הסטטוס ישתנה לירוק
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <Loader2 size={13} className="animate-spin text-ink-muted" />
+                <p className="text-xs text-ink-muted">ממתין לחיבור...</p>
+                <button onClick={() => setStep('idle')}
+                        className="mr-auto text-xs text-ink-muted hover:text-ink underline">
                   ביטול
                 </button>
-                <button
-                  type="submit"
-                  disabled={!username || !password}
-                  className="flex-2 flex-grow py-2 rounded-xl text-sm font-medium btn-gradient shadow-glow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  כניסה
-                </button>
               </div>
-
-              <p className="text-xs text-ink-muted text-center">
-                🔒 הפרטים נשלחים ישירות לשרת BGU בלבד
-              </p>
             </div>
-          </motion.form>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
