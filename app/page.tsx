@@ -94,9 +94,9 @@ export default function LandingPage() {
 
             {/* Editorial headline — serif, mixed weights, one word colored */}
             <h1 className="display-serif text-5xl sm:text-6xl md:text-7xl text-paper mb-7">
-              ככה לומדים
+              ככה נראה <em>סדר</em>
               <br />
-              ב־<em className="whitespace-nowrap">בן־גוריון</em>
+              בלימודים,
               <br />
               <span className="hand-underline">בשנת 2026</span>.
             </h1>
