@@ -7,7 +7,7 @@ import {
   Target, Flame, Coffee, ChevronLeft, ChevronRight,
   Clock, BookOpen, Dumbbell, Star, Zap, Pencil,
 } from 'lucide-react'
-import { api } from '@/lib/api-client'
+import { useDB } from '@/lib/db-context'
 import Modal from '@/components/ui/Modal'
 import GlowCard from '@/components/ui/GlowCard'
 import ErrorAlert from '@/components/ui/ErrorAlert'
@@ -52,9 +52,12 @@ function getMotivation(completed: number, total: number): { text: string; icon: 
 }
 
 export default function TasksPage() {
+  const {
+    db, loading: dbLoading, ready: dbReady, error: dbError,
+    createTask, updateTask, deleteTask: dbDeleteTask,
+  } = useDB()
+
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [tasks, setTasks] = useState<StudyTask[]>([])
-  const [loading, setLoading] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newCategory, setNewCategory] = useState('study')
   const [addingTask, setAddingTask] = useState(false)
@@ -64,57 +67,41 @@ export default function TasksPage() {
   const [editForm, setEditForm] = useState({ title: '', category: 'study', duration_minutes: '' })
   const [saving, setSaving] = useState(false)
 
-  const loadTasks = async (date: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await api.tasks.list(date)
-      setTasks(data)
-    } catch (e: any) {
-      console.error(e)
-      setError('שגיאה בטעינת המשימות. נסה לרענן את העמוד.')
-    } finally { setLoading(false) }
-  }
+  const loading = dbLoading || !dbReady
+  const tasks = db.tasks.filter(t => t.scheduled_date === selectedDate)
 
-  useEffect(() => { loadTasks(selectedDate) }, [selectedDate])
+  useEffect(() => {
+    if (dbError) setError(dbError)
+  }, [dbError])
 
   const addTask = async () => {
     if (!newTitle.trim()) return
     setError(null)
     try {
-      const task = await api.tasks.create({
+      await createTask({
         title: newTitle.trim(),
         scheduled_date: selectedDate,
-        category: newCategory,
+        category: newCategory as StudyTask['category'],
       })
-      setTasks((prev) => [...prev, task])
       setNewTitle('')
       setAddingTask(false)
-    } catch (e: any) {
-      console.error(e)
+    } catch {
       setError('שגיאה בהוספת המשימה. נסה שוב.')
     }
   }
 
   const toggleTask = async (id: string, done: boolean) => {
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, is_completed: done } : t))
     try {
-      await api.tasks.update(id, { is_completed: done })
-    } catch (e: any) {
-      console.error(e)
-      setTasks((prev) => prev.map((t) => t.id === id ? { ...t, is_completed: !done } : t))
+      await updateTask(id, { is_completed: done })
+    } catch {
       setError('שגיאה בעדכון המשימה. נסה שוב.')
     }
   }
 
   const deleteTask = async (id: string) => {
-    const prev = tasks
-    setTasks((t) => t.filter((task) => task.id !== id))
     try {
-      await api.tasks.delete(id)
-    } catch (e: any) {
-      console.error(e)
-      setTasks(prev)
+      await dbDeleteTask(id)
+    } catch {
       setError('שגיאה במחיקת המשימה. נסה שוב.')
     }
   }
@@ -132,25 +119,13 @@ export default function TasksPage() {
     if (!editingTask) return
     setSaving(true)
     try {
-      const apiPayload = {
+      await updateTask(editingTask.id, {
         title: editForm.title,
-        category: editForm.category,
-        duration_minutes: editForm.duration_minutes ? parseInt(editForm.duration_minutes) : null,
-      }
-      await api.tasks.update(editingTask.id, apiPayload)
-      setTasks(prev => prev.map(t =>
-        t.id === editingTask.id
-          ? {
-              ...t,
-              title: editForm.title,
-              category: editForm.category as StudyTask['category'],
-              duration_minutes: editForm.duration_minutes ? parseInt(editForm.duration_minutes) : undefined,
-            }
-          : t
-      ))
+        category: editForm.category as StudyTask['category'],
+        duration_minutes: editForm.duration_minutes ? parseInt(editForm.duration_minutes) : undefined,
+      })
       setEditingTask(null)
-    } catch (e) {
-      console.error(e)
+    } catch {
       setError('שגיאה בשמירת השינויים. נסה שוב.')
     } finally {
       setSaving(false)

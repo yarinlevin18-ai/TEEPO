@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, CheckSquare,
-  FileText, MessageCircle, Wifi, Plus, LogOut, GraduationCap, Settings, StickyNote, X,
+  FileText, MessageCircle, Wifi, Plus, LogOut, GraduationCap, Settings, StickyNote, X, Sparkles, Building2,
 } from 'lucide-react'
 import Image from 'next/image'
 import { useAuth } from '@/lib/auth-context'
@@ -30,7 +30,9 @@ const NAV_GROUPS = [
     label: 'כלים',
     items: [
       { href: '/credits',      icon: GraduationCap,  label: "מעקב נק\"ז" },
+      { href: '/university',   icon: Building2,       label: 'על האוניברסיטה' },
       { href: '/study-buddy',  icon: MessageCircle,  label: 'SmartDesk AI' },
+      { href: '/ai-tools',     icon: Sparkles,        label: 'כלי AI' },
       { href: '/bgu-connect',  icon: Wifi,            label: 'חיבור BGU' },
     ],
   },

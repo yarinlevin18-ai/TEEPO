@@ -15,6 +15,8 @@ export interface Course {
   started_at?: string
   completed_at?: string
   created_at: string
+  semester?: 'א' | 'ב' | 'קיץ'
+  academic_year?: string
 }
 
 export interface LessonFile {
@@ -39,6 +41,7 @@ export interface Lesson {
 export interface StudyTask {
   id: string
   user_id: string
+  course_id?: string
   title: string
   description?: string
   scheduled_date?: string

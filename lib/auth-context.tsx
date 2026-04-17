@@ -13,8 +13,6 @@ interface AuthContextType {
   loading: boolean
   googleToken: string | null
   refreshGoogleToken: () => Promise<string | null>
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>
-  signUp: (email: string, password: string, displayName?: string) => Promise<{ error: string | null }>
   signInWithGoogle: () => Promise<{ error: string | null }>
   reconnectGoogle: () => Promise<void>
   clearGoogleToken: () => void
@@ -118,26 +116,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [persistGoogleToken, loadStoredGoogleToken])
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error: error?.message ?? null }
-  }
-
-  const signUp = async (email: string, password: string, displayName?: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: displayName ? { data: { display_name: displayName } } : undefined,
-    })
-    return { error: error?.message ?? null }
-  }
-
   const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/dashboard`,
-        scopes: 'https://www.googleapis.com/auth/calendar.readonly',
+        scopes: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.file',
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
@@ -147,17 +131,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message ?? null }
   }
 
-  // Reconnect Google (clear expired token + re-auth)
+  // Reconnect Google (clear expired token + re-auth).
+  // `prompt=consent` forces Google to re-ask for scopes (needed when the
+  // drive.file scope was added after the user's original consent).
+  // `include_granted_scopes=true` keeps previously-granted scopes alongside
+  // the new ones (incremental authorization).
   const reconnectGoogle = async () => {
     clearGoogleToken()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/dashboard`,
-        scopes: 'https://www.googleapis.com/auth/calendar.readonly',
+        scopes: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.file',
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
+          include_granted_scopes: 'true',
         },
       },
     })
@@ -173,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, session, loading, googleToken, refreshGoogleToken,
-      signIn, signUp, signInWithGoogle, reconnectGoogle, clearGoogleToken, signOut,
+      signInWithGoogle, reconnectGoogle, clearGoogleToken, signOut,
     }}>
       {children}
     </AuthContext.Provider>

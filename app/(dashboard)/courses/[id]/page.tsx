@@ -14,6 +14,8 @@ import {
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { api } from '@/lib/api-client'
+import { useDB, useCourse, useLessons } from '@/lib/db-context'
+import CourseTabs, { CourseTab, COURSE_TAB_META } from '@/components/course/CourseTabs'
 
 const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false })
 import ErrorAlert from '@/components/ui/ErrorAlert'
@@ -22,10 +24,6 @@ import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
 
 // ── Helpers ─────────────────────────────────────────────────
-
-interface CourseDetail extends Course {
-  lessons: Lesson[]
-}
 
 function fileIcon(type: string) {
   switch (type) {
@@ -54,9 +52,19 @@ export default function CourseDetailPage() {
   const params = useParams()
   const courseId = params.id as string
 
-  const [course, setCourse] = useState<CourseDetail | null>(null)
-  const [loading, setLoading] = useState(true)
+  const {
+    ready, loading, error: dbError,
+    createLesson: dbCreateLesson,
+    updateLesson: dbUpdateLesson,
+    deleteLesson: dbDeleteLesson,
+  } = useDB()
+  const course = useCourse(courseId)
+  const lessons = useLessons(courseId)
+
   const [error, setError] = useState<string | null>(null)
+
+  // Active workspace tab — 'lessons' is the default/existing view
+  const [activeTab, setActiveTab] = useState<'lessons' | CourseTab>('lessons')
 
   // Lesson management
   const [expandedLesson, setExpandedLesson] = useState<string | null>(null)
@@ -77,66 +85,38 @@ export default function CourseDetailPage() {
   const newLessonInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!courseId) return
-    const load = async () => {
-      try {
-        const courseData = await api.courses.get(courseId)
-        setCourse(courseData)
-      } catch {
-        setError('שגיאה בטעינת הקורס.')
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [courseId])
+    if (dbError) setError(dbError)
+  }, [dbError])
 
   // ── Create lesson ──
   const createLesson = useCallback(async () => {
     const title = newLessonTitle.trim()
     if (!title) return
     try {
-      const created = await api.lessons.create(courseId, { title })
-      setCourse(prev => prev ? { ...prev, lessons: [...prev.lessons, created] } : prev)
+      const created = await dbCreateLesson(courseId, { title })
       setNewLessonTitle('')
       setShowNewLesson(false)
-      // Auto-expand the new lesson
       setExpandedLesson(created.id)
     } catch {
       setError('שגיאה ביצירת שיעור.')
     }
-  }, [courseId, newLessonTitle])
+  }, [courseId, newLessonTitle, dbCreateLesson])
 
   // ── Delete lesson ──
   const deleteLesson = useCallback(async (lessonId: string) => {
-    const backup = course?.lessons.find(l => l.id === lessonId)
-    setCourse(prev => prev ? { ...prev, lessons: prev.lessons.filter(l => l.id !== lessonId) } : prev)
     try {
-      await api.lessons.delete(lessonId)
+      await dbDeleteLesson(lessonId)
     } catch {
-      if (backup) setCourse(prev => prev ? { ...prev, lessons: [...prev.lessons, backup] } : prev)
       setError('שגיאה במחיקת שיעור.')
     }
-  }, [course])
+  }, [dbDeleteLesson])
 
   // ── Toggle completion ──
   const toggleLesson = useCallback(async (lessonId: string) => {
-    const lesson = course?.lessons.find(l => l.id === lessonId)
+    const lesson = lessons.find(l => l.id === lessonId)
     if (!lesson) return
-    const newVal = !lesson.is_completed
-    setCourse(prev => prev ? {
-      ...prev,
-      lessons: prev.lessons.map(l => l.id === lessonId ? { ...l, is_completed: newVal } : l),
-    } : prev)
-    try {
-      await api.lessons.update(lessonId, { is_completed: newVal })
-    } catch {
-      setCourse(prev => prev ? {
-        ...prev,
-        lessons: prev.lessons.map(l => l.id === lessonId ? { ...l, is_completed: !newVal } : l),
-      } : prev)
-    }
-  }, [course])
+    await dbUpdateLesson(lessonId, { is_completed: !lesson.is_completed })
+  }, [lessons, dbUpdateLesson])
 
   // ── Start editing notes for a lesson ──
   const startEditing = useCallback((lesson: Lesson) => {
@@ -148,18 +128,14 @@ export default function CourseDetailPage() {
   const saveLessonContent = useCallback(async (lessonId: string) => {
     setSavingLesson(true)
     try {
-      await api.lessons.update(lessonId, { content: lessonContent })
-      setCourse(prev => prev ? {
-        ...prev,
-        lessons: prev.lessons.map(l => l.id === lessonId ? { ...l, content: lessonContent } : l),
-      } : prev)
+      await dbUpdateLesson(lessonId, { content: lessonContent })
       setEditingLessonId(null)
     } catch {
       setError('שגיאה בשמירת הסיכום.')
     } finally {
       setSavingLesson(false)
     }
-  }, [lessonContent])
+  }, [lessonContent, dbUpdateLesson])
 
   // ── AI summarize lesson content ──
   const handleSummarize = useCallback(async (lesson: Lesson) => {
@@ -169,17 +145,13 @@ export default function CourseDetailPage() {
     try {
       const result = await api.lessons.summarize(text, lesson.title)
       const summary = result.result || result.summary || result.answer
-      await api.lessons.update(lesson.id, { ai_summary: summary })
-      setCourse(prev => prev ? {
-        ...prev,
-        lessons: prev.lessons.map(l => l.id === lesson.id ? { ...l, ai_summary: summary } : l),
-      } : prev)
+      await dbUpdateLesson(lesson.id, { ai_summary: summary })
     } catch {
       setError('שגיאה ביצירת סיכום.')
     } finally {
       setSummarizing(null)
     }
-  }, [])
+  }, [dbUpdateLesson])
 
   // ── Add file link to lesson ──
   const addFileToLesson = useCallback(async (lessonId: string) => {
@@ -187,53 +159,30 @@ export default function CourseDetailPage() {
     const url = newFileUrl.trim()
     if (!name || !url) return
     const file: LessonFile = { name, url, type: guessFileType(name, url) }
-    const lesson = course?.lessons.find(l => l.id === lessonId)
+    const lesson = lessons.find(l => l.id === lessonId)
     const updatedFiles = [...(lesson?.files || []), file]
 
-    // Optimistic update
-    setCourse(prev => prev ? {
-      ...prev,
-      lessons: prev.lessons.map(l => l.id === lessonId ? { ...l, files: updatedFiles } : l),
-    } : prev)
     setNewFileName('')
     setNewFileUrl('')
     setAddingFileToLesson(null)
 
     try {
-      await api.lessons.update(lessonId, { files: updatedFiles })
+      await dbUpdateLesson(lessonId, { files: updatedFiles })
     } catch {
-      // Revert
-      setCourse(prev => prev ? {
-        ...prev,
-        lessons: prev.lessons.map(l => l.id === lessonId ? { ...l, files: lesson?.files || [] } : l),
-      } : prev)
       setError('שגיאה בהוספת קובץ.')
     }
-  }, [newFileName, newFileUrl, course])
+  }, [newFileName, newFileUrl, lessons, dbUpdateLesson])
 
   // ── Remove file from lesson ──
   const removeFile = useCallback(async (lessonId: string, fileIndex: number) => {
-    const lesson = course?.lessons.find(l => l.id === lessonId)
+    const lesson = lessons.find(l => l.id === lessonId)
     if (!lesson) return
     const updatedFiles = (lesson.files || []).filter((_, i) => i !== fileIndex)
-
-    setCourse(prev => prev ? {
-      ...prev,
-      lessons: prev.lessons.map(l => l.id === lessonId ? { ...l, files: updatedFiles } : l),
-    } : prev)
-
-    try {
-      await api.lessons.update(lessonId, { files: updatedFiles })
-    } catch {
-      setCourse(prev => prev ? {
-        ...prev,
-        lessons: prev.lessons.map(l => l.id === lessonId ? { ...l, files: lesson.files } : l),
-      } : prev)
-    }
-  }, [course])
+    await dbUpdateLesson(lessonId, { files: updatedFiles })
+  }, [lessons, dbUpdateLesson])
 
   // ── Loading ──
-  if (loading) {
+  if (loading || !ready) {
     return (
       <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6 animate-fade-in">
         <div className="h-8 w-64 shimmer rounded-lg" />
@@ -256,9 +205,9 @@ export default function CourseDetailPage() {
     )
   }
 
-  const completedLessons = course.lessons.filter(l => l.is_completed).length
-  const progress = course.lessons.length > 0
-    ? Math.round((completedLessons / course.lessons.length) * 100)
+  const completedLessons = lessons.filter(l => l.is_completed).length
+  const progress = lessons.length > 0
+    ? Math.round((completedLessons / lessons.length) * 100)
     : 0
 
   return (
@@ -296,18 +245,18 @@ export default function CourseDetailPage() {
                 </a>
               )}
               <span className="text-xs text-ink-muted">
-                {course.lessons.length} שיעורים
+                {lessons.length} שיעורים
               </span>
             </div>
           </div>
         </div>
 
         {/* Progress */}
-        {course.lessons.length > 0 && (
+        {lessons.length > 0 && (
           <div className="mt-5">
             <div className="flex justify-between text-xs text-ink-muted mb-2">
               <span>התקדמות</span>
-              <span>{completedLessons}/{course.lessons.length} ({progress}%)</span>
+              <span>{completedLessons}/{lessons.length} ({progress}%)</span>
             </div>
             <div className="w-full h-2 rounded-full bg-white/5">
               <motion.div
@@ -322,6 +271,61 @@ export default function CourseDetailPage() {
         )}
       </div>
 
+      {/* ── Workspace Tab Bar ── */}
+      <div className="glass rounded-xl p-1.5 flex items-center gap-1 overflow-x-auto">
+        {/* Lessons tab (default) */}
+        <button
+          onClick={() => setActiveTab('lessons')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-shrink-0 ${
+            activeTab === 'lessons'
+              ? 'bg-gradient-to-r from-indigo-500/20 to-violet-500/20 text-ink shadow-inner'
+              : 'text-ink-muted hover:text-ink hover:bg-white/5'
+          }`}
+        >
+          <StickyNote size={15} />
+          שיעורים
+          {lessons.length > 0 && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+              activeTab === 'lessons' ? 'bg-indigo-500/30 text-indigo-200' : 'bg-white/5 text-ink-subtle'
+            }`}>
+              {lessons.length}
+            </span>
+          )}
+        </button>
+
+        {/* Workspace tabs */}
+        {COURSE_TAB_META.map(tab => {
+          const Icon = tab.icon
+          const isActive = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-shrink-0 ${
+                isActive
+                  ? 'bg-gradient-to-r from-indigo-500/20 to-violet-500/20 text-ink shadow-inner'
+                  : 'text-ink-muted hover:text-ink hover:bg-white/5'
+              }`}
+            >
+              <Icon size={15} />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── Non-lesson workspace panels ── */}
+      {activeTab !== 'lessons' && (
+        <CourseTabs
+          courseId={courseId}
+          activeTab={activeTab}
+          courseTitle={course.title}
+        />
+      )}
+
+      {/* ── Lessons Section (only when tab = 'lessons') ── */}
+      {activeTab === 'lessons' && (
+      <>
       {/* ── Lessons Header ── */}
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-ink flex items-center gap-2">
@@ -365,7 +369,7 @@ export default function CourseDetailPage() {
       </AnimatePresence>
 
       {/* ── Lessons List ── */}
-      {course.lessons.length === 0 && !showNewLesson ? (
+      {lessons.length === 0 && !showNewLesson ? (
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
           className="glass rounded-2xl p-10 text-center relative overflow-hidden">
           <div className="absolute inset-0 opacity-30">
@@ -390,7 +394,7 @@ export default function CourseDetailPage() {
         </motion.div>
       ) : (
         <div className="space-y-2">
-          {course.lessons.map((lesson, index) => {
+          {lessons.map((lesson, index) => {
             const isExpanded = expandedLesson === lesson.id
             const isEditing = editingLessonId === lesson.id
             const files = lesson.files || []
@@ -649,6 +653,8 @@ export default function CourseDetailPage() {
             )
           })}
         </div>
+      )}
+      </>
       )}
     </div>
   )

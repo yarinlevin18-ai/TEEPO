@@ -1,0 +1,91 @@
+{
+  "student_ai_toolkit": {
+    "metadata": {
+      "target_audience": "University Students",
+      "institution_context": "Ben-Gurion University of the Negev",
+      "version": "1.0",
+      "last_updated": "2026-04-17"
+    },
+    "categories": [
+      {
+        "category_name": "חיפוש מאמרים וסקירה אקדמית",
+        "tools": [
+          {
+            "name": "Consensus",
+            "use_case": "חיפוש תשובות מבוססות ראיות מתוך מאמרים מדעיים בלבד.",
+            "pro_tip": "מעולה לבדיקת טענות בעבודות סמינריוניות.",
+            "url": "https://consensus.app"
+          },
+          {
+            "name": "Elicit",
+            "use_case": "ניתוח והשוואה בין מאמרים בטבלה חכמה.",
+            "pro_tip": "חוסך שעות של קריאת תקצירים (Abstracts).",
+            "url": "https://elicit.com"
+          },
+          {
+            "name": "ChatPDF / Scite.ai",
+            "use_case": "תשאול קבצי PDF והבנת מתודולוגיות מורכבות.",
+            "pro_tip": "ניתן להעלות את הסילבוס של הקורס ולשאול מתי המבחן.",
+            "url": "https://www.chatpdf.com"
+          }
+        ]
+      },
+      {
+        "category_name": "בניית מצגות ועיצוב",
+        "tools": [
+          {
+            "name": "Gamma.app",
+            "use_case": "יצירת מצגת שלמה (עיצוב + תוכן) מטקסט חופשי.",
+            "pro_tip": "מתאים במיוחד להצגת רעיונות לפרויקטים חברתיים כמו 'שוברים שורות'.",
+            "url": "https://gamma.app"
+          },
+          {
+            "name": "Canva Magic Design",
+            "use_case": "הפיכת ראשי פרקים למצגת מעוצבת לפי מותג.",
+            "pro_tip": "שימושי ליצירת חומרים שיווקיים למותג N1cares.",
+            "url": "https://www.canva.com/magic-design"
+          }
+        ]
+      },
+      {
+        "category_name": "כתיבת עבודות וניסוח",
+        "tools": [
+          {
+            "name": "Claude / Gemini / ChatGPT",
+            "use_case": "בניית ראשי פרקים, סיעור מוחות ושיפור שפה אקדמית.",
+            "pro_tip": "בקש מה-AI לבקר את הטקסט שלך כדי למצוא חורים לוגיים.",
+            "url": "https://claude.ai"
+          },
+          {
+            "name": "Wordtune",
+            "use_case": "ניסוח מחדש של משפטים לשיפור הזרימה והמשלב הלשוני.",
+            "pro_tip": "אידיאלי לכתיבת מיילים רשמיים למרצים או למזכירות.",
+            "url": "https://www.wordtune.com"
+          }
+        ]
+      },
+      {
+        "category_name": "ניהול זמן ופרודוקטיביות",
+        "tools": [
+          {
+            "name": "Notion AI",
+            "use_case": "סיכום הערות מהרצאות וניהול משימות.",
+            "pro_tip": "בנה דף מרכז לכל הקורסים בסימסטר עם קישורים לזום ולמטלות.",
+            "url": "https://www.notion.so/product/ai"
+          },
+          {
+            "name": "Otter.ai",
+            "use_case": "תמלול וסיכום אוטומטי של הרצאות מוקלטות.",
+            "pro_tip": "חוסך את הצורך לסכם בזמן אמת ומאפשר להתרכז בהסברים.",
+            "url": "https://otter.ai"
+          }
+        ]
+      }
+    ],
+    "general_guidelines": [
+      "תמיד לבצע אימות (Fact-check) למידע עובדתי שה-AI מייצר.",
+      "שימוש ב-AI לכתיבה אקדמית דורש בדיקה מול נהלי האתיקה של המחלקה.",
+      "מומלץ להשתמש ב-Prompts מפורטים הכוללים את הקשר הקורס והדרישות."
+    ]
+  }
+}

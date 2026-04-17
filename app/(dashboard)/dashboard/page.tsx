@@ -15,6 +15,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
+import { useDB } from '@/lib/db-context'
 import { supabase } from '@/lib/supabase'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import GlowCard from '@/components/ui/GlowCard'
@@ -30,6 +31,8 @@ import {
 } from '@/lib/google-calendar'
 import { useNotifications } from '@/lib/use-notifications'
 import NotificationCenter from '@/components/NotificationCenter'
+import SemesterCard from '@/components/SemesterCard'
+import { getSemesterStatus } from '@/lib/academic-calendar'
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -43,12 +46,6 @@ function getGreeting(): string {
   return 'לילה טוב'
 }
 
-function getCurrentSemester(): string {
-  const m = new Date().getMonth() + 1
-  if (m >= 10 || m <= 2) return "סמסטר א'"
-  if (m >= 3 && m <= 7) return "סמסטר ב'"
-  return 'קיץ'
-}
 
 function matchEventToCourse(event: GoogleCalendarEvent, courses: Course[]): Course | null {
   const summary = (event.summary || '').toLowerCase()
@@ -108,14 +105,18 @@ interface CreditsInfo {
 
 export default function DashboardPage() {
   const { user, googleToken, clearGoogleToken, refreshGoogleToken } = useAuth()
-  const [courses, setCourses] = useState<Course[]>([])
-  const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [tasks, setTasks] = useState<StudyTask[]>([])
+  const {
+    db, ready: dbReady, loading: dbLoading,
+    createTask: dbCreateTask, updateTask: dbUpdateTask, deleteTask: dbDeleteTask,
+  } = useDB()
+  const courses = db.courses
+  const assignments = db.assignments
+  const tasks = db.tasks
   const [grades, setGrades] = useState<BGUGrade[]>([])
   const [gradesAvg, setGradesAvg] = useState<number | null>(null)
   const [credits, setCredits] = useState<CreditsInfo | null>(null)
   const [bguConnected, setBguConnected] = useState<boolean>(false)
-  const [zone1Loading, setZone1Loading] = useState(true)
+  const zone1Loading = dbLoading || !dbReady
   const [zone2Loading, setZone2Loading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -129,26 +130,7 @@ export default function DashboardPage() {
   const providerToken = googleToken
   const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || ''
 
-  // ── Zone 1: Load courses, assignments, tasks ───────────────
-  useEffect(() => {
-    async function loadZone1() {
-      try {
-        const [c, a, t] = await Promise.all([
-          api.courses.list().catch(() => []),
-          api.assignments.list().catch(() => []),
-          api.tasks.list().catch(() => []),
-        ])
-        setCourses(c)
-        setAssignments(a)
-        setTasks(t)
-      } catch {
-        setError('שגיאה בטעינת הנתונים')
-      } finally {
-        setZone1Loading(false)
-      }
-    }
-    loadZone1()
-  }, [])
+  // Zone 1 (courses/assignments/tasks) now comes from DB context automatically
 
   // ── Zone 2: Load BGU status, grades, credits (independent) ─
   useEffect(() => {
@@ -224,47 +206,20 @@ export default function DashboardPage() {
 
   // ── Toggle task completion ─────────────────────────────────
   const toggleTask = useCallback(async (taskId: string, isCompleted: boolean) => {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, is_completed: !isCompleted } : t))
-    try {
-      await api.tasks.update(taskId, { is_completed: !isCompleted })
-    } catch {
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, is_completed: isCompleted } : t))
-    }
-  }, [])
+    await dbUpdateTask(taskId, { is_completed: !isCompleted })
+  }, [dbUpdateTask])
 
   // ── Todo popup state ──────────────────────────────────────
   const [todoOpen, setTodoOpen] = useState(false)
 
   const addTask = useCallback(async (title: string) => {
-    const tempId = `temp-${Date.now()}`
     const today = format(new Date(), 'yyyy-MM-dd')
-    const optimistic: StudyTask = {
-      id: tempId,
-      title,
-      is_completed: false,
-      scheduled_date: today,
-      category: 'study',
-      user_id: '',
-      created_at: new Date().toISOString(),
-    }
-    setTasks(prev => [optimistic, ...prev])
-    try {
-      const created = await api.tasks.create({ title, scheduled_date: today })
-      setTasks(prev => prev.map(t => t.id === tempId ? { ...created, id: created.id } : t))
-    } catch {
-      setTasks(prev => prev.filter(t => t.id !== tempId))
-    }
-  }, [])
+    await dbCreateTask({ title, scheduled_date: today })
+  }, [dbCreateTask])
 
   const deleteTask = useCallback(async (taskId: string) => {
-    const backup = tasks.find(t => t.id === taskId)
-    setTasks(prev => prev.filter(t => t.id !== taskId))
-    try {
-      await api.tasks.delete(taskId)
-    } catch {
-      if (backup) setTasks(prev => [...prev, backup])
-    }
-  }, [tasks])
+    await dbDeleteTask(taskId)
+  }, [dbDeleteTask])
 
   // ── Computed data ──────────────────────────────────────────
   const todayData = weekDays[selectedDay]
@@ -338,7 +293,7 @@ export default function DashboardPage() {
             <span className="gradient-text">{displayName}</span>
           </h1>
           <p className="text-sm text-ink-muted mt-1">
-            {getCurrentSemester()} &middot; {format(new Date(), 'EEEE, d בMMMM', { locale: he })}
+            {getSemesterStatus().label} &middot; {format(new Date(), 'EEEE, d בMMMM', { locale: he })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -357,6 +312,9 @@ export default function DashboardPage() {
           </span>
         </div>
       </motion.div>
+
+      {/* ── Live semester card ── */}
+      <SemesterCard />
 
       {/* ── Onboarding (when no data yet) ── */}
       {!zone1Loading && !hasData && (
@@ -430,10 +388,23 @@ export default function DashboardPage() {
                 {urgentAssignments.length > 0 ? 'מטלות דחופות' : 'אין דחופות'}
               </p>
             </div>
-            <div className="glass-sm rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-ink">{todayData?.events?.length || 0}</p>
-              <p className="text-xs text-ink-muted mt-0.5">שיעורים היום</p>
-            </div>
+            {(() => {
+              const s = getSemesterStatus()
+              const num = s.daysRemaining ?? s.daysUntilNext ?? null
+              const label = s.daysRemaining != null
+                ? 'ימים לסוף הסמסטר'
+                : s.daysUntilNext != null
+                  ? `עד פתיחת ${s.nextLabel}`
+                  : 'חופשה'
+              return (
+                <div className="glass-sm rounded-xl p-3 text-center">
+                  <p className="text-2xl font-bold gradient-text">
+                    {num ?? '—'}
+                  </p>
+                  <p className="text-xs text-ink-muted mt-0.5">{label}</p>
+                </div>
+              )
+            })()}
           </div>
         </motion.div>
       )}

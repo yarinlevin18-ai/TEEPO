@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, FileText, ChevronDown, Loader2, Sparkles, Search, Pencil } from 'lucide-react'
 import { api } from '@/lib/api-client'
+import { useDB } from '@/lib/db-context'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import GlowCard from '@/components/ui/GlowCard'
 import Modal from '@/components/ui/Modal'
@@ -16,8 +17,14 @@ type PriorityFilter = 'all' | 'high' | 'medium' | 'low'
 type SortOption = 'deadline' | 'priority' | 'name' | 'progress'
 
 export default function AssignmentsPage() {
-  const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [loading, setLoading] = useState(true)
+  const {
+    db, loading: dbLoading, ready: dbReady, error: dbError,
+    createAssignment, updateAssignment,
+  } = useDB()
+
+  const assignments = db.assignments
+  const loading = dbLoading || !dbReady
+
   const [showAdd, setShowAdd] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [breaking, setBreaking] = useState(false)
@@ -34,44 +41,42 @@ export default function AssignmentsPage() {
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    api.assignments.list()
-      .then(setAssignments)
-      .catch((e) => {
-        console.error(e)
-        setError('שגיאה בטעינת המטלות. נסה לרענן את העמוד.')
-      })
-      .finally(() => setLoading(false))
-  }, [])
+    if (dbError) setError(dbError)
+  }, [dbError])
 
   const breakdownAssignment = async () => {
     if (!form.title) return
     setBreaking(true)
     try {
-      const result = await api.assignments.breakdown(form.title, form.description, form.deadline)
-      const newAssignment: Assignment = {
-        id: result.assignment_id,
-        user_id: '',
+      // Call AI backend to break down the assignment into subtasks
+      let subtasks: any[] = []
+      try {
+        const result = await api.assignments.breakdown(form.title, form.description, form.deadline)
+        subtasks = result?.tasks || []
+      } catch {
+        // AI unavailable — create without breakdown
+      }
+
+      const created = await createAssignment({
         title: form.title,
         description: form.description,
         deadline: form.deadline,
         status: 'todo',
         priority: 'medium',
-        assignment_tasks: result.tasks?.map((t: any, i: number) => ({
-          id: `temp-${i}`,
-          assignment_id: result.assignment_id,
+        assignment_tasks: subtasks.map((t: any, i: number) => ({
+          id: `at_${Date.now()}_${i}`,
+          assignment_id: '', // filled in below
           title: t.title,
           description: t.description,
           order_index: t.order || i + 1,
           is_completed: false,
           estimated_hours: t.estimated_hours,
         })),
-      }
-      setAssignments((prev) => [newAssignment, ...prev])
+      })
       setForm({ title: '', description: '', deadline: '' })
       setShowAdd(false)
-      setExpanded(newAssignment.id)
-    } catch (e: any) {
-      console.error(e)
+      setExpanded(created.id)
+    } catch {
       setError('שגיאה בפירוק המטלה. נסה שוב.')
     } finally {
       setBreaking(false)
@@ -93,28 +98,15 @@ export default function AssignmentsPage() {
     if (!editingAssignment) return
     setSaving(true)
     try {
-      await api.assignments.update(editingAssignment.id, {
+      await updateAssignment(editingAssignment.id, {
         title: editForm.title,
         description: editForm.description,
-        deadline: editForm.deadline || null,
-        status: editForm.status,
-        priority: editForm.priority,
+        deadline: editForm.deadline || undefined,
+        status: editForm.status as Assignment['status'],
+        priority: editForm.priority as Assignment['priority'],
       })
-      setAssignments(prev => prev.map(a =>
-        a.id === editingAssignment.id
-          ? {
-              ...a,
-              title: editForm.title,
-              description: editForm.description,
-              deadline: editForm.deadline,
-              status: editForm.status as Assignment['status'],
-              priority: editForm.priority as Assignment['priority'],
-            }
-          : a
-      ))
       setEditingAssignment(null)
-    } catch (e) {
-      console.error(e)
+    } catch {
       setError('שגיאה בשמירת השינויים. נסה שוב.')
     } finally {
       setSaving(false)

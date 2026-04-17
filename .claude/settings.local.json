@@ -7,7 +7,30 @@
       "Bash(python3 -m json.tool)",
       "Bash(curl -s \"https://bgu-study-organizer.onrender.com/health\")",
       "Bash(curl -s \"https://bgu-study-backend.onrender.com/health\")",
-      "Bash(curl -s \"https://bgu-study-backend.onrender.com/api/bgu/debug\")"
+      "Bash(curl -s \"https://bgu-study-backend.onrender.com/api/bgu/debug\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(taskkill //F //IM node.exe)",
+      "WebFetch(domain:bgu-study-organizer.vercel.app)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:bgu-study-organizer-5mnokd2og-yarinlevin18-6288s-projects.vercel.app)",
+      "Bash(xargs -I{} gh api {} --jq '.[0].state')",
+      "Bash(python3 -m py_compile agents/*.py)",
+      "Read(//mnt/c/Users/משתמש/OneDrive/Desktop/AI/Agents/Agents/orchestrator/orchestrator/**)",
+      "Bash(cmd.exe /c \"dir C:\\\\\\\\Users\\\\\\\\משתמש\\\\\\\\OneDrive\\\\\\\\Desktop\\\\\\\\AI\\\\\\\\Agents\\\\\\\\Agents\\\\\\\\orchestrator\\\\\\\\orchestrator\\\\\\\\agents\\\\\\\\\")",
+      "Bash(ls -d \"C:/Users/משתמש/OneDrive/Desktop/AI/Agents/\"*/)",
+      "Bash(python -c ':*)",
+      "Bash(python -m orchestrator.main list)",
+      "Bash(python -m orchestrator.main direct file --input \"{\\\\\"operation\\\\\":\\\\\"list\\\\\",\\\\\"path\\\\\":\\\\\".\\\\\"}\" --json)",
+      "Bash(python -m orchestrator.main direct file \"file+planner\" --input \"{\\\\\"operation\\\\\":\\\\\"exists\\\\\",\\\\\"path\\\\\":\\\\\".\\\\\",\\\\\"goal\\\\\":\\\\\"test parallel CLI\\\\\"}\")",
+      "Bash(wc -l \"C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Learning platform and bot/app/\\(dashboard\\)\"*/*.tsx)",
+      "Bash(powershell -Command \"Get-Content 'C:\\\\Users\\\\D0AF~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-------OneDrive-Desktop-Learning-platform-and-bot\\\\dfb5f03d-b032-458b-ac51-14e54d413234\\\\tasks\\\\af39b248fc4527a0b.output' -TotalCount 100\")",
+      "Bash(powershell -Command \"Get-Content 'C:\\\\Users\\\\D0AF~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-------OneDrive-Desktop-Learning-platform-and-bot\\\\dfb5f03d-b032-458b-ac51-14e54d413234\\\\tasks\\\\af39b248fc4527a0b.output' -Tail 100\")",
+      "Bash(powershell -Command \"Get-Content 'C:\\\\Users\\\\D0AF~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-------OneDrive-Desktop-Learning-platform-and-bot\\\\dfb5f03d-b032-458b-ac51-14e54d413234\\\\tasks\\\\a8dd307bab02f7874.output' -Tail 100\")",
+      "Bash(powershell -Command \"\\(Get-Content 'C:\\\\Users\\\\D0AF~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-------OneDrive-Desktop-Learning-platform-and-bot\\\\dfb5f03d-b032-458b-ac51-14e54d413234\\\\tasks\\\\af39b248fc4527a0b.output' -Tail 5\\)\")",
+      "Bash(powershell -Command \"\\(Get-Content 'C:\\\\Users\\\\D0AF~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-------OneDrive-Desktop-Learning-platform-and-bot\\\\dfb5f03d-b032-458b-ac51-14e54d413234\\\\tasks\\\\a8dd307bab02f7874.output' -Tail 5\\)\")",
+      "Bash(powershell -Command \"\\(Get-Item 'C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Learning platform and bot\\\\app\\\\\\(dashboard\\)\\\\study-buddy\\\\page.tsx'\\).Length\")",
+      "Bash(powershell -Command \"\\(Get-Item 'C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Learning platform and bot\\\\app\\\\\\(dashboard\\)\\\\credits\\\\page.tsx'\\).Length\")",
+      "Bash(grep -E \"\\\\.tsx$|^d\")"
     ]
   }
 }

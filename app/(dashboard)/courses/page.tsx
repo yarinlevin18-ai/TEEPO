@@ -7,7 +7,7 @@ import {
   Calendar, Tag, Pencil, Search, LayoutGrid,
 } from 'lucide-react'
 import Link from 'next/link'
-import { api } from '@/lib/api-client'
+import { useDB, useCourses } from '@/lib/db-context'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import GlowCard from '@/components/ui/GlowCard'
 import Modal from '@/components/ui/Modal'
@@ -95,8 +95,18 @@ interface CourseWithMeta extends Course {
 // ── Main Component ──────────────────────────────────────────────────
 
 export default function CoursesPage() {
-  const [courses, setCourses] = useState<CourseWithMeta[]>([])
-  const [loading, setLoading] = useState(true)
+  const rawCourses = useCourses()
+  const { ready, loading, error: dbError, updateCourse } = useDB()
+
+  const courses = useMemo<CourseWithMeta[]>(() => rawCourses.map(c => {
+    const guess = guessSemesterFromTitle(c.title)
+    return {
+      ...c,
+      semester: c.semester || guess.semester,
+      year: c.academic_year || guess.year,
+    }
+  }), [rawCourses])
+
   const [error, setError] = useState<string | null>(null)
   const [editingCourse, setEditingCourse] = useState<CourseWithMeta | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
@@ -106,30 +116,9 @@ export default function CoursesPage() {
 
   const yearOptions = useMemo(() => guessYearOptions(), [])
 
-  // Load courses — semester/year now come from Supabase columns
   useEffect(() => {
-    const load = async () => {
-      try {
-        const data: Course[] = await api.courses.list()
-
-        const enriched: CourseWithMeta[] = data.map((c) => {
-          const guess = guessSemesterFromTitle(c.title)
-          return {
-            ...c,
-            semester: (c as any).semester || guess.semester,
-            year: (c as any).academic_year || guess.year,
-          }
-        })
-        setCourses(enriched)
-      } catch (e: any) {
-        console.error(e)
-        setError('שגיאה בטעינת הקורסים. נסה לרענן.')
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [])
+    if (dbError) setError(dbError)
+  }, [dbError])
 
   const handleEditSave = async (updates: {
     title: string
@@ -139,21 +128,12 @@ export default function CoursesPage() {
   }) => {
     if (!editingCourse) return
     const id = editingCourse.id
-    // Update local state immediately
-    setCourses((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? { ...c, title: updates.title, semester: updates.semester, year: updates.year, status: updates.status }
-          : c
-      )
-    )
     setEditingCourse(null)
-    // Persist to Supabase
     try {
-      await api.courses.update(id, {
+      await updateCourse(id, {
         title: updates.title,
-        semester: updates.semester || null,
-        academic_year: updates.year || null,
+        semester: updates.semester,
+        academic_year: updates.year,
         status: updates.status,
       })
     } catch (e) {
@@ -309,35 +289,6 @@ export default function CoursesPage() {
             dir="rtl"
           />
         </div>
-      )}
-
-      {/* Department chips */}
-      {courses.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {ALL_DEPARTMENTS.map((dept) => {
-            const isActive = activeDepartment === dept
-            return (
-              <button
-                key={dept}
-                onClick={() => setActiveDepartment(dept)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  isActive
-                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                    : 'bg-white/5 text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
-                }`}
-              >
-                {dept}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Result count */}
-      {courses.length > 0 && (searchQuery || activeDepartment !== 'הכל') && (
-        <p className="text-xs text-ink-muted">
-          מציג {filteredCourses.length} קורסים
-        </p>
       )}
 
       {courses.length === 0 ? (
@@ -675,61 +626,64 @@ function CourseCard({
   onEdit: () => void
 }) {
   return (
-    <GlowCard className="group hover:scale-[1.01] transition-transform">
-      <div className="p-4 space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium text-ink leading-snug line-clamp-2 flex-1">
-            {course.title}
-          </p>
-          <button
-            onClick={onEdit}
-            className="p-1.5 rounded-lg hover:bg-white/5 text-ink-subtle hover:text-indigo-400 transition-colors flex-shrink-0"
-            title="ערוך קורס"
-          >
-            <Pencil size={14} />
-          </button>
-        </div>
-
-        {/* Source badge + link */}
-        <div className="flex items-center gap-2">
-          <span className={`text-xs px-2 py-0.5 rounded-full ${
-            course.source === 'bgu'
-              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-              : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-          }`}>
-            {course.source === 'bgu' ? 'BGU' : course.source}
-          </span>
-          {course.source_url && (
-            <a
-              href={course.source_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-ink-subtle hover:text-indigo-400 transition-colors"
+    <Link href={`/courses/${course.id}`} className="block group">
+      <GlowCard className="group-hover:scale-[1.01] transition-transform cursor-pointer">
+        <div className="p-4 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium text-ink leading-snug line-clamp-2 flex-1 group-hover:text-indigo-300 transition-colors">
+              {course.title}
+            </p>
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit() }}
+              className="p-1.5 rounded-lg hover:bg-white/5 text-ink-subtle hover:text-indigo-400 transition-colors flex-shrink-0"
+              title="ערוך קורס"
             >
-              <ExternalLink size={12} />
-            </a>
+              <Pencil size={14} />
+            </button>
+          </div>
+
+          {/* Source badge + link */}
+          <div className="flex items-center gap-2">
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              course.source === 'bgu'
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+            }`}>
+              {course.source === 'bgu' ? 'BGU' : course.source}
+            </span>
+            {course.source_url && (
+              <a
+                href={course.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-ink-subtle hover:text-indigo-400 transition-colors"
+              >
+                <ExternalLink size={12} />
+              </a>
+            )}
+          </div>
+
+          {/* Progress */}
+          {course.progress_percentage > 0 && (
+            <div>
+              <div className="flex justify-between text-xs text-ink-muted mb-1">
+                <span>התקדמות</span>
+                <span>{Math.round(course.progress_percentage)}%</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-white/5">
+                <div
+                  className="h-1.5 rounded-full transition-all"
+                  style={{
+                    width: `${course.progress_percentage}%`,
+                    background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+                  }}
+                />
+              </div>
+            </div>
           )}
         </div>
-
-        {/* Progress */}
-        {course.progress_percentage > 0 && (
-          <div>
-            <div className="flex justify-between text-xs text-ink-muted mb-1">
-              <span>התקדמות</span>
-              <span>{Math.round(course.progress_percentage)}%</span>
-            </div>
-            <div className="w-full h-1.5 rounded-full bg-white/5">
-              <div
-                className="h-1.5 rounded-full transition-all"
-                style={{
-                  width: `${course.progress_percentage}%`,
-                  background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
-                }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-    </GlowCard>
+      </GlowCard>
+    </Link>
   )
 }
