@@ -25,17 +25,18 @@ interface Conversation {
 
 const AGENT_CONFIG: Record<AgentType, { label: string; icon: React.ElementType; placeholder: string; color: string }> = {
   study_buddy: {
-    label: 'עוזר הלימוד',
+    label: 'SmartDesk AI',
     icon: Bot,
-    placeholder: 'שאל אותי כל שאלה בלימודים...',
+    placeholder: 'שאל אותי כל שאלה...',
     color: 'primary',
   },
 }
 
 const SUGGESTION_CHIPS = [
-  'הסבר לי מה זה רקורסיה',
-  'עזור לי להתכונן למבחן',
-  'תן לי טיפים ללמידה יעילה',
+  'מה זה רקורסיה? תסביר בקצרה',
+  'תעזור לי להבין Big O notation',
+  'איך ניגשים לפתרון בעיות DP',
+  'טיפים ללמידה לפני מבחן',
 ]
 
 function generateId() {
@@ -171,7 +172,7 @@ export default function StudyBuddyPage() {
         if (prev.length === 0) {
           return [{
             role: 'assistant',
-            content: 'שלום! אני עוזר הלימוד שלך. שאל אותי כל שאלה בלימודים ואשמח לעזור! 😊',
+            content: 'היי, מה נלמד היום? אפשר לשאול אותי כל שאלה, לבקש הסבר על נושא, או עזרה בתרגיל.',
             timestamp: new Date().toISOString(),
           }]
         }
@@ -485,7 +486,7 @@ export default function StudyBuddyPage() {
 
           <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
             <Bot size={16} />
-            עוזר הלימוד
+            SmartDesk AI
           </div>
 
           <div className="mr-auto flex items-center gap-2 sm:gap-3">

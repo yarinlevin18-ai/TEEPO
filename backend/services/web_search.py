@@ -39,40 +39,56 @@ def format_search_results(results: list[dict], max_chars: int = 3000) -> str:
 
 
 def should_search(question: str) -> bool:
-    """Heuristic: decide if a question needs web search.
+    """Decide if a question needs web search.
 
     Returns True for questions that likely need current/external info.
-    Returns False for simple conversational/personal questions.
+    Returns False for simple conversational/personal messages.
     """
     q = question.lower().strip()
 
-    # Skip search for very short or conversational messages
-    if len(q) < 10:
+    # Skip search for very short messages
+    if len(q) < 8:
         return False
 
+    # Skip greetings and short conversational messages
     skip_patterns = [
         'שלום', 'היי', 'תודה', 'ביי', 'מה שלומך', 'בוקר טוב',
-        'hello', 'hi', 'thanks', 'bye',
+        'ערב טוב', 'לילה טוב', 'מה נשמע', 'אוקיי', 'בסדר',
+        'hello', 'hi', 'thanks', 'bye', 'ok', 'sure', 'yes', 'no',
+        'כן', 'לא', 'סבבה', 'יופי', 'תמשיך', 'עוד',
     ]
     for pattern in skip_patterns:
+        if q.startswith(pattern) or q == pattern:
+            return False
+
+    # Skip task-management type messages (not knowledge questions)
+    task_patterns = [
+        'תזכיר לי', 'תוסיף משימה', 'מה המשימות', 'מה יש לי',
+    ]
+    for pattern in task_patterns:
         if q.startswith(pattern):
             return False
 
-    # Search for academic/knowledge questions
+    # Always search for explicit knowledge questions
     search_indicators = [
-        'מה זה', 'מהו', 'מהי', 'הסבר', 'הגדרה', 'למה', 'איך',
-        'what is', 'how does', 'explain', 'define', 'why',
-        'אלגוריתם', 'נוסחה', 'תיאוריה', 'חוק', 'עקרון',
-        'algorithm', 'formula', 'theorem', 'principle',
-        'דוגמה', 'example', 'השווה', 'compare',
-        'מחקר', 'research', 'מאמר', 'paper',
+        'מה זה', 'מהו', 'מהי', 'מה ה', 'הסבר', 'הגדרה', 'למה',
+        'איך', 'מתי', 'כמה', 'האם', 'מי', 'איפה', 'איזה',
+        'what is', 'how does', 'explain', 'define', 'why', 'when',
+        'who', 'where', 'which', 'how to', 'how many',
+        'אלגוריתם', 'נוסחה', 'תיאוריה', 'חוק', 'עקרון', 'מושג',
+        'algorithm', 'formula', 'theorem', 'principle', 'concept',
+        'דוגמה', 'example', 'השווה', 'compare', 'הבדל', 'difference',
+        'מחקר', 'research', 'מאמר', 'paper', 'פתרון', 'solution',
+        'python', 'java', 'code', 'קוד', 'תכנות', 'programming',
+        'סיבוכיות', 'complexity', 'big o', 'ביג או',
+        'הוכחה', 'proof', 'משפט', 'theorem', 'למה', 'lemma',
     ]
     for indicator in search_indicators:
         if indicator in q:
             return True
 
-    # Search if question is long enough (likely academic)
-    if len(q) > 30:
+    # Search if question is moderately long (likely academic)
+    if len(q) > 20:
         return True
 
     return False

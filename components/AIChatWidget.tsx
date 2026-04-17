@@ -59,8 +59,8 @@ export default function AIChatWidget() {
     socket.on('connected', () => {
       if (messages.length === 0) {
         const greeting = isOnCoursePage
-          ? 'שלום! אני עוזר הלימוד שלך 📚\nאני רואה שאתה בדף קורס — אני מכיר את החומר שלך. שאל אותי כל שאלה!'
-          : 'שלום! אני עוזר הלימוד שלך 📚\nשאל אותי כל שאלה בלימודים, בקש סיכום, או הסבר על נושא.'
+          ? 'היי, אני רואה שאתה בדף קורס. אני מכיר את החומר שלך, אז תשאל כל שאלה.'
+          : 'היי, מה נלמד? אפשר לשאול שאלות, לבקש הסבר על נושא, או עזרה בתרגיל.'
         setMessages([{ role: 'assistant', content: greeting }])
       }
     })
@@ -188,7 +188,7 @@ export default function AIChatWidget() {
                 <Bot size={18} className="text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-ink">עוזר הלימוד</h3>
+                <h3 className="text-sm font-semibold text-ink">SmartDesk AI</h3>
                 <div className="flex items-center gap-2">
                   <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-white/20'}`} />
                   <span className="text-[10px] text-ink-muted">

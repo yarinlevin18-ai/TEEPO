@@ -18,7 +18,7 @@ const NAV = [
   { href: '/assignments',     icon: FileText,         label: 'מטלות' },
   { href: '/notes',           icon: StickyNote,       label: 'הסיכומים שלי' },
   { href: '/credits',         icon: GraduationCap,    label: "מעקב נק\"ז" },
-  { href: '/study-buddy',     icon: MessageCircle,    label: 'עוזר הלימוד' },
+  { href: '/study-buddy',     icon: MessageCircle,    label: 'SmartDesk AI' },
   { href: '/bgu-connect',     icon: Wifi,             label: 'חיבור BGU' },
 ]
 

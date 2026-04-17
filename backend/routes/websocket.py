@@ -16,7 +16,7 @@ def register_socket_events(socketio: SocketIO):
     def on_connect():
         sid = _get_sid()
         _sessions[sid] = {"history": [], "conv_id": None, "user_id": None}
-        emit("connected", {"message": "מחובר לעוזר הלימוד"})
+        emit("connected", {"message": "מחובר"})
 
     @socketio.on("disconnect")
     def on_disconnect():
