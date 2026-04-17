@@ -12,6 +12,7 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   googleToken: string | null
+  refreshGoogleToken: () => Promise<string | null>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signUp: (email: string, password: string, displayName?: string) => Promise<{ error: string | null }>
   signInWithGoogle: () => Promise<{ error: string | null }>
@@ -59,18 +60,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setGoogleToken(null)
   }, [])
 
+  // Ask Supabase to refresh the session (which also refreshes the Google provider token)
+  const refreshGoogleToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase.auth.refreshSession()
+      if (!error && data?.session?.provider_token) {
+        persistGoogleToken(data.session.provider_token, data.session.provider_refresh_token)
+        return data.session.provider_token
+      }
+    } catch {}
+    // Supabase refresh didn't give us a provider token — return whatever is stored
+    return loadStoredGoogleToken()
+  }, [persistGoogleToken, loadStoredGoogleToken])
+
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
 
-      // Persist Google token if available on session (right after OAuth)
       if (session?.provider_token) {
+        // Right after OAuth redirect — fresh token on the session
         persistGoogleToken(session.provider_token, session.provider_refresh_token)
-      } else {
-        // Fall back to localStorage
-        loadStoredGoogleToken()
+      } else if (session) {
+        // Returning user — session exists but no provider token.
+        // Ask Supabase to refresh (it will refresh the Google token too if it has a refresh_token).
+        try {
+          const { data } = await supabase.auth.refreshSession()
+          if (data?.session?.provider_token) {
+            persistGoogleToken(data.session.provider_token, data.session.provider_refresh_token)
+          } else {
+            // Supabase couldn't refresh provider token — fall back to localStorage
+            loadStoredGoogleToken()
+          }
+        } catch {
+          loadStoredGoogleToken()
+        }
       }
 
       setLoading(false)
@@ -82,7 +107,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session)
         setUser(session?.user ?? null)
 
-        // When provider_token is available (right after OAuth), persist it
         if (session?.provider_token) {
           persistGoogleToken(session.provider_token, session.provider_refresh_token)
         }
@@ -148,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user, session, loading, googleToken,
+      user, session, loading, googleToken, refreshGoogleToken,
       signIn, signUp, signInWithGoogle, reconnectGoogle, clearGoogleToken, signOut,
     }}>
       {children}

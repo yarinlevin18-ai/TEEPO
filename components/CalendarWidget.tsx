@@ -22,7 +22,7 @@ interface DayEvents {
 }
 
 export default function CalendarWidget() {
-  const { googleToken, clearGoogleToken } = useAuth()
+  const { googleToken, clearGoogleToken, refreshGoogleToken } = useAuth()
   const [weekEvents, setWeekEvents] = useState<DayEvents[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -59,6 +59,7 @@ export default function CalendarWidget() {
         providerToken!,
         sunday.toISOString(),
         saturday.toISOString(),
+        refreshGoogleToken,
       )
 
       // Group events by day

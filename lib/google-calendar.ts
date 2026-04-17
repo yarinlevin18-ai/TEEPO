@@ -17,12 +17,15 @@ export interface GoogleCalendarEvent {
 const CALENDAR_API = 'https://www.googleapis.com/calendar/v3'
 
 /**
- * Fetch events from Google Calendar for a given time range
+ * Fetch events from Google Calendar for a given time range.
+ * If a refreshToken callback is provided and the token is expired (401),
+ * it will try to refresh and retry once before throwing.
  */
 export async function fetchCalendarEvents(
   providerToken: string,
   timeMin: string,
   timeMax: string,
+  refreshToken?: () => Promise<string | null>,
 ): Promise<GoogleCalendarEvent[]> {
   const params = new URLSearchParams({
     timeMin,
@@ -32,17 +35,34 @@ export async function fetchCalendarEvents(
     maxResults: '50',
   })
 
-  const res = await fetch(`${CALENDAR_API}/calendars/primary/events?${params}`, {
+  const url = `${CALENDAR_API}/calendars/primary/events?${params}`
+
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${providerToken}` },
   })
 
-  if (!res.ok) {
-    if (res.status === 401) throw new Error('TOKEN_EXPIRED')
-    throw new Error(`Calendar API error: ${res.status}`)
+  if (res.ok) {
+    const data = await res.json()
+    return data.items || []
   }
 
-  const data = await res.json()
-  return data.items || []
+  // Token expired — try to refresh and retry once
+  if (res.status === 401 && refreshToken) {
+    const freshToken = await refreshToken()
+    if (freshToken && freshToken !== providerToken) {
+      const retry = await fetch(url, {
+        headers: { Authorization: `Bearer ${freshToken}` },
+      })
+      if (retry.ok) {
+        const data = await retry.json()
+        return data.items || []
+      }
+    }
+    throw new Error('TOKEN_EXPIRED')
+  }
+
+  if (res.status === 401) throw new Error('TOKEN_EXPIRED')
+  throw new Error(`Calendar API error: ${res.status}`)
 }
 
 /**

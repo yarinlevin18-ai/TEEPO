@@ -105,7 +105,7 @@ interface CreditsInfo {
 }
 
 export default function DashboardPage() {
-  const { user, googleToken, clearGoogleToken } = useAuth()
+  const { user, googleToken, clearGoogleToken, refreshGoogleToken } = useAuth()
   const [courses, setCourses] = useState<Course[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [tasks, setTasks] = useState<StudyTask[]>([])
@@ -193,7 +193,7 @@ export default function DashboardPage() {
       saturday.setDate(sunday.getDate() + 6)
       saturday.setHours(23, 59, 59, 999)
 
-      const events = await fetchCalendarEvents(googleToken, sunday.toISOString(), saturday.toISOString())
+      const events = await fetchCalendarEvents(googleToken, sunday.toISOString(), saturday.toISOString(), refreshGoogleToken)
       const today = new Date(); today.setHours(0, 0, 0, 0)
 
       const days: DayData[] = Array.from({ length: 7 }, (_, i) => {
