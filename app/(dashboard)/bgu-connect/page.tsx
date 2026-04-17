@@ -24,7 +24,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 type Status = { moodle: boolean; portal: boolean; login_status: Record<string, string> }
 
 export default function BGUConnectPage() {
-  const { db, ready, createCourse } = useDB()
+  const { db, ready, createCourse, updateCourse } = useDB()
   const [status, setStatus] = useState<Status>({ moodle: false, portal: false, login_status: {} })
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const [syncing, setSyncing] = useState(false)
@@ -133,18 +133,22 @@ export default function BGUConnectPage() {
         category_name?: string
       }> = coursesData.courses || []
 
-      // Dedupe against existing courses by source_url (fall back to exact title).
-      const existingUrls = new Set(db.courses.map(c => c.source_url).filter(Boolean) as string[])
-      const existingTitles = new Set(db.courses.map(c => c.title))
+      // Match existing courses by source_url first, then by exact title.
+      const byUrl = new Map<string, string>() // source_url → course.id
+      const byTitle = new Map<string, string>() // title → course.id
+      for (const c of db.courses) {
+        if (c.source_url) byUrl.set(c.source_url, c.id)
+        byTitle.set(c.title, c.id)
+      }
       // Pull degree start from settings so we can compute year-of-study per course
       const degreeStart = (db.settings?.degree_start_year && db.settings?.degree_start_month)
         ? { year: db.settings.degree_start_year, month: db.settings.degree_start_month }
         : null
+
       let added = 0
+      let updated = 0
       for (const c of scraped) {
         if (!c.title) continue
-        if (c.url && existingUrls.has(c.url)) continue
-        if (!c.url && existingTitles.has(c.title)) continue
 
         // Classify semester + academic year from Moodle metadata
         const cls = classifyCourse({
@@ -157,26 +161,51 @@ export default function BGUConnectPage() {
           ? computeYearOfStudy(degreeStart, parseInt(cls.academic_year, 10))
           : undefined
 
-        await createCourse({
-          title: c.title,
-          source: 'bgu',
-          source_url: c.url,
-          description: c.moodle_id ? `Moodle ID: ${c.moodle_id}` : undefined,
-          shortname: c.shortname,
-          moodle_startdate: c.startdate || undefined,
-          moodle_enddate: c.enddate || undefined,
-          category_name: c.category_name,
-          semester: cls.semester,
-          academic_year: cls.academic_year,
-          year_of_study: yearOfStudy,
-        })
-        added++
+        // Find existing — prefer URL match, fall back to title.
+        const existingId = (c.url && byUrl.get(c.url)) || byTitle.get(c.title)
+
+        if (existingId) {
+          // Update existing course with fresh metadata + classification.
+          // Respect manual classification: don't overwrite semester/year if user set them.
+          const existing = db.courses.find(x => x.id === existingId)
+          const isManual = existing?.classified_manually === true
+
+          await updateCourse(existingId, {
+            source: 'bgu',
+            source_url: c.url || existing?.source_url,
+            shortname: c.shortname,
+            moodle_startdate: c.startdate || undefined,
+            moodle_enddate: c.enddate || undefined,
+            category_name: c.category_name,
+            ...(isManual ? {} : {
+              semester: cls.semester,
+              academic_year: cls.academic_year,
+              year_of_study: yearOfStudy,
+            }),
+          })
+          updated++
+        } else {
+          await createCourse({
+            title: c.title,
+            source: 'bgu',
+            source_url: c.url,
+            description: c.moodle_id ? `Moodle ID: ${c.moodle_id}` : undefined,
+            shortname: c.shortname,
+            moodle_startdate: c.startdate || undefined,
+            moodle_enddate: c.enddate || undefined,
+            category_name: c.category_name,
+            semester: cls.semester,
+            academic_year: cls.academic_year,
+            year_of_study: yearOfStudy,
+          })
+          added++
+        }
       }
-      setSyncResult(
-        added > 0
-          ? `נוספו ${added} קורסים חדשים (סה״כ נמשכו ${scraped.length}) ✓`
-          : `הסנכרון הושלם — כל ${scraped.length} הקורסים כבר קיימים ✓`,
-      )
+      const parts: string[] = []
+      if (added > 0) parts.push(`${added} נוספו`)
+      if (updated > 0) parts.push(`${updated} עודכנו`)
+      if (parts.length === 0) parts.push('לא נמצאו שינויים')
+      setSyncResult(`סנכרון הושלם: ${parts.join(', ')} (סה״כ נמשכו ${scraped.length}) ✓`)
     } catch (e: any) {
       if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
         setSyncResult('השרת לא הגיב — נסה שוב בעוד דקה')
