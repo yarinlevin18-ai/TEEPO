@@ -253,9 +253,15 @@ export default function DashboardPage() {
     dayEvents.some(e => matchEventToCourse(e, [c]) !== null)
   )
 
+  const completedCourses = courses.filter(c => c.status === 'completed')
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
+
+      {/* ══════════════════════════════════════════════════════════
+          ZONE 1: מה קורה עכשיו — What's Happening Now
+          ══════════════════════════════════════════════════════════ */}
 
       {/* ── Header ── */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -284,60 +290,30 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* ── Quick Stats ── */}
+      {/* ── "היום" Mini-Stats Row ── */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className={`grid grid-cols-1 sm:grid-cols-2 ${credits ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}
       >
-        <StatCard
-          icon={<BookOpen size={18} />}
-          iconColor="#818cf8"
-          iconBg="rgba(99,102,241,0.15)"
-          label="קורסים פעילים"
-          value={activeCourses.length}
-          sub={`${Math.round(overallProgress)}% ממוצע התקדמות`}
-          subColor={overallProgress >= 60 ? '#10b981' : '#f59e0b'}
-        />
-        <StatCard
-          icon={<ListTodo size={18} />}
-          iconColor="#3b82f6"
-          iconBg="rgba(59,130,246,0.15)"
-          label="משימות היום"
-          value={`${completedTodayTasks.length}/${todayTasks.length}`}
-          sub={todayTasks.length === 0 ? 'אין משימות' : completedTodayTasks.length === todayTasks.length ? 'הכל בוצע!' : `${todayTasks.length - completedTodayTasks.length} נותרו`}
-          subColor={completedTodayTasks.length === todayTasks.length && todayTasks.length > 0 ? '#10b981' : '#64748b'}
-        />
-        <StatCard
-          icon={<AlertTriangle size={18} />}
-          iconColor={urgentAssignments.length > 0 ? '#f59e0b' : '#10b981'}
-          iconBg={urgentAssignments.length > 0 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)'}
-          label="מטלות להגשה"
-          value={pendingAssignments.length}
-          sub={urgentAssignments.length > 0 ? `${urgentAssignments.length} דחופות!` : 'אין דחופות'}
-          subColor={urgentAssignments.length > 0 ? '#f59e0b' : '#10b981'}
-        />
-        <StatCard
-          icon={<Award size={18} />}
-          iconColor={avgGrade !== null ? getGradeColor(avgGrade) : '#64748b'}
-          iconBg={avgGrade !== null ? `${getGradeColor(avgGrade)}20` : 'rgba(100,116,139,0.15)'}
-          label="ממוצע ציונים"
-          value={avgGrade !== null ? avgGrade.toFixed(1) : '—'}
-          sub={grades.length > 0 ? `${grades.length} קורסים` : 'לא זמין'}
-          subColor="#64748b"
-        />
-        {credits && (
-          <StatCard
-            icon={<GraduationCap size={18} />}
-            iconColor="#a78bfa"
-            iconBg="rgba(167,139,250,0.15)"
-            label="נק״ז"
-            value={`${credits.completed}/${credits.required}`}
-            sub={`${credits.recommended_per_semester} מומלץ/סמסטר`}
-            subColor="#a78bfa"
-          />
-        )}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="glass-sm rounded-xl p-3 text-center">
+            <p className="text-2xl font-bold text-ink">{completedTodayTasks.length}/{todayTasks.length}</p>
+            <p className="text-xs text-ink-muted mt-0.5">משימות היום</p>
+          </div>
+          <div className="glass-sm rounded-xl p-3 text-center">
+            <p className="text-2xl font-bold" style={{ color: urgentAssignments.length > 0 ? '#f59e0b' : '#10b981' }}>
+              {urgentAssignments.length > 0 ? urgentAssignments.length : '0'}
+            </p>
+            <p className="text-xs text-ink-muted mt-0.5">
+              {urgentAssignments.length > 0 ? 'מטלות דחופות' : 'אין דחופות'}
+            </p>
+          </div>
+          <div className="glass-sm rounded-xl p-3 text-center">
+            <p className="text-2xl font-bold text-ink">{todayData?.events?.length || 0}</p>
+            <p className="text-xs text-ink-muted mt-0.5">שיעורים היום</p>
+          </div>
+        </div>
       </motion.div>
 
       {/* ── Calendar Strip ── */}
@@ -425,7 +401,7 @@ export default function DashboardPage() {
       </GlowCard>
       </motion.div>
 
-      {/* ── Main Content Grid ── */}
+      {/* ── Zone 1 Main Content Grid (3/5 + 2/5) ── */}
       <div className="grid lg:grid-cols-5 gap-4 sm:gap-6">
 
         {/* ── Left Column (3/5): Schedule + Subjects ── */}
@@ -477,7 +453,7 @@ export default function DashboardPage() {
           </motion.div>
         </div>
 
-        {/* ── Right Column (2/5): Tasks + Assignments + Grades ── */}
+        {/* ── Right Column (2/5): Tasks + Assignments ── */}
         <div className="lg:col-span-2 space-y-4 sm:space-y-6">
 
           {/* Tasks */}
@@ -525,47 +501,125 @@ export default function DashboardPage() {
             </div>
             <AssignmentsSection assignments={pendingAssignments} courses={courses} loading={loading} />
           </motion.div>
-
-          {/* Credits Progress — only when user configured degree settings */}
-          {credits ? (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(167,139,250,0.15)' }}>
-                  <GraduationCap size={14} style={{ color: '#a78bfa' }} />
-                </div>
-                <h2 className="font-semibold text-ink">התקדמות תואר</h2>
-              </div>
-              <AnimatedBorder speed={4}>
-                <CreditsSection credits={credits} />
-              </AnimatedBorder>
-            </motion.div>
-          ) : (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
-              <DegreeSetupPrompt />
-            </motion.div>
-          )}
-
-          {/* Grades */}
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: avgGrade !== null ? `${getGradeColor(avgGrade)}20` : 'rgba(100,116,139,0.15)' }}>
-                  <BarChart3 size={14} style={{ color: avgGrade !== null ? getGradeColor(avgGrade) : '#64748b' }} />
-                </div>
-                <h2 className="font-semibold text-ink">ציונים</h2>
-              </div>
-              {!bguConnected && (
-                <Link href="/bgu-connect">
-                  <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
-                    חבר BGU <ArrowLeft size={12} />
-                  </button>
-                </Link>
-              )}
-            </div>
-            <GradesSection grades={grades} bguConnected={bguConnected} avgGrade={avgGrade} loading={loading} />
-          </motion.div>
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════
+          VISUAL SEPARATOR
+          ══════════════════════════════════════════════════════════ */}
+      <div className="relative py-4">
+        <div className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-l from-transparent via-white/10 to-transparent" />
+        <div className="relative flex justify-center">
+          <span className="px-4 py-1.5 rounded-full text-xs font-medium text-ink-muted"
+            style={{ background: '#0f1117', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <TrendingUp size={12} className="inline ml-1.5" style={{ color: '#818cf8' }} />
+            תמונת מצב כללית
+          </span>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════
+          ZONE 2: תמונת מצב כללית — Overall Academic Status
+          ══════════════════════════════════════════════════════════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="rounded-2xl p-4 sm:p-6 space-y-4 sm:space-y-6"
+        style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        {/* ── Zone 2 Stats Row ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+        >
+          <StatCard
+            icon={<BookOpen size={18} />}
+            iconColor="#818cf8"
+            iconBg="rgba(99,102,241,0.15)"
+            label="קורסים פעילים"
+            value={activeCourses.length}
+            sub={`${Math.round(overallProgress)}% ממוצע התקדמות`}
+            subColor={overallProgress >= 60 ? '#10b981' : '#f59e0b'}
+          />
+          <StatCard
+            icon={<Award size={18} />}
+            iconColor={avgGrade !== null ? getGradeColor(avgGrade) : '#64748b'}
+            iconBg={avgGrade !== null ? `${getGradeColor(avgGrade)}20` : 'rgba(100,116,139,0.15)'}
+            label="ממוצע ציונים"
+            value={avgGrade !== null ? avgGrade.toFixed(1) : '—'}
+            sub={grades.length > 0 ? `${grades.length} קורסים` : 'לא זמין'}
+            subColor="#64748b"
+          />
+          <StatCard
+            icon={<GraduationCap size={18} />}
+            iconColor="#a78bfa"
+            iconBg="rgba(167,139,250,0.15)"
+            label="נק״ז"
+            value={credits ? `${credits.completed}/${credits.required}` : '—'}
+            sub={credits ? `${credits.recommended_per_semester} מומלץ/סמסטר` : 'לא הוגדר'}
+            subColor="#a78bfa"
+          />
+          <StatCard
+            icon={<CheckCircle2 size={18} />}
+            iconColor="#10b981"
+            iconBg="rgba(16,185,129,0.15)"
+            label="קורסים שהושלמו"
+            value={completedCourses.length}
+            sub={completedCourses.length > 0 ? `מתוך ${courses.length} קורסים` : 'טרם הושלמו'}
+            subColor={completedCourses.length > 0 ? '#10b981' : '#64748b'}
+          />
+        </motion.div>
+
+        {/* ── Zone 2 Content Grid (1/2 + 1/2) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+
+          {/* ── Left: Credits / Degree Progress ── */}
+          <div>
+            {credits ? (
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(167,139,250,0.15)' }}>
+                    <GraduationCap size={14} style={{ color: '#a78bfa' }} />
+                  </div>
+                  <h2 className="font-semibold text-ink">התקדמות תואר</h2>
+                </div>
+                <AnimatedBorder speed={4}>
+                  <CreditsSection credits={credits} />
+                </AnimatedBorder>
+              </motion.div>
+            ) : (
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+                <DegreeSetupPrompt />
+              </motion.div>
+            )}
+          </div>
+
+          {/* ── Right: Grades ── */}
+          <div>
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: avgGrade !== null ? `${getGradeColor(avgGrade)}20` : 'rgba(100,116,139,0.15)' }}>
+                    <BarChart3 size={14} style={{ color: avgGrade !== null ? getGradeColor(avgGrade) : '#64748b' }} />
+                  </div>
+                  <h2 className="font-semibold text-ink">ציונים</h2>
+                </div>
+                {!bguConnected && (
+                  <Link href="/bgu-connect">
+                    <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
+                      חבר BGU <ArrowLeft size={12} />
+                    </button>
+                  </Link>
+                )}
+              </div>
+              <GradesSection grades={grades} bguConnected={bguConnected} avgGrade={avgGrade} loading={loading} />
+            </motion.div>
+          </div>
+        </div>
+      </motion.div>
     </div>
   )
 }
