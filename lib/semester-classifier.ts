@@ -151,47 +151,44 @@ function academicYearFromHebrew(text: string): number | null {
 // ── Public API ────────────────────────────────────────────────────────────
 
 /** Pick the best classification from all available signals.
- *  Strategy: start with highest-confidence source, then backfill missing fields
- *  from lower-confidence sources (e.g. startdate gives year+semester, but if
- *  absent we can still combine shortname year + title semester). */
+ *  Priority order (most trustworthy first):
+ *    1. Explicit Hebrew text in the title — "סמסטר ב' תשפ"ה" is a human label
+ *       typed by the department secretary, so it beats any numeric encoding.
+ *    2. Moodle startdate — reliable when populated, but Moodle sometimes
+ *       inherits a default startdate from a parent category.
+ *    3. BGU shortname ("201-1-3301-25") — the digit is often wrong/default
+ *       when the same course runs in both semesters (reused shortname).
+ *    4. Partial fallback: combine whatever we got. */
 export function classifyCourse(input: ClassificationInput): Classification {
-  // High confidence: Moodle startdate gives us both semester and year
-  if (input.moodle_startdate && input.moodle_startdate > 0) {
-    const c = classifyFromDate(input.moodle_startdate)
-    return { ...c, confidence: 'high' }
+  // Gather each independent signal
+  const titleSem = input.title ? semesterFromText(input.title) : null
+  const titleYear = input.title ? academicYearFromHebrew(input.title) : null
+  const dateCls = (input.moodle_startdate && input.moodle_startdate > 0)
+    ? classifyFromDate(input.moodle_startdate)
+    : null
+  const shortSem = input.shortname ? semesterFromShortname(input.shortname) : null
+  const shortYear = input.shortname ? yearFromShortname(input.shortname) : null
+
+  // (1) Explicit title hints are king — if we have both sem+year spelled out
+  //     in Hebrew, trust the title even over startdate/shortname.
+  if (titleSem && titleYear) {
+    return { semester: titleSem, academic_year: String(titleYear), confidence: 'high' }
   }
 
-  let semester: Semester | undefined
-  let academicYear: string | undefined
-  let confidence: Classification['confidence'] = 'none'
+  // Build the result by layering: title > date > shortname
+  let semester: Semester | undefined = titleSem ?? undefined
+  let academicYear: string | undefined = titleYear ? String(titleYear) : undefined
+  let confidence: Classification['confidence'] =
+    (titleSem || titleYear) ? 'medium' : 'none'
 
-  // Medium: BGU shortname like "201-1-3301-25"
-  if (input.shortname) {
-    const sem = semesterFromShortname(input.shortname)
-    const year = yearFromShortname(input.shortname)
-    if (sem) { semester = sem; confidence = 'medium' }
-    if (year) { academicYear = String(year); confidence = 'medium' }
+  if (dateCls) {
+    if (!semester) semester = dateCls.semester
+    if (!academicYear) academicYear = dateCls.academic_year
+    if (confidence === 'none') confidence = 'high'
   }
 
-  // Low/medium: Hebrew text hints from title (works when Moodle didn't
-  // populate startdate/shortname — covers all titles in the real BGU sync)
-  if (input.title) {
-    if (!semester) {
-      const sem = semesterFromText(input.title)
-      if (sem) {
-        semester = sem
-        if (confidence === 'none') confidence = 'low'
-      }
-    }
-    if (!academicYear) {
-      const hebYear = academicYearFromHebrew(input.title)
-      if (hebYear) {
-        academicYear = String(hebYear)
-        // A Hebrew year tag is an explicit human label — bump to medium
-        confidence = 'medium'
-      }
-    }
-  }
+  if (shortSem && !semester) { semester = shortSem; if (confidence === 'none') confidence = 'medium' }
+  if (shortYear && !academicYear) { academicYear = String(shortYear); if (confidence === 'none') confidence = 'medium' }
 
   if (semester || academicYear) {
     return { semester, academic_year: academicYear, confidence }

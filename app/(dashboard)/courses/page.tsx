@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen, ChevronDown, ChevronUp, Plus, ExternalLink,
   Calendar, Tag, Pencil, Search, LayoutGrid, RefreshCw, FolderTree,
+  GripVertical, Sparkles, Trophy,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useDB, useCourses } from '@/lib/db-context'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import GlowCard from '@/components/ui/GlowCard'
@@ -232,6 +234,47 @@ export default function CoursesPage() {
     }
   }
 
+  // ── Drag and drop ──────────────────────────────────────────────────
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [hoverTarget, setHoverTarget] = useState<string | null>(null)
+  const [lastDropCelebration, setLastDropCelebration] = useState<{ x: number; y: number; key: number } | null>(null)
+
+  /** Compute what academic_year corresponds to a given year-of-study, using
+   *  the user's degree start. Returns undefined if degreeStart isn't set. */
+  const yosToAcademicYear = useCallback((yos: number): string | undefined => {
+    if (!degreeStart) return undefined
+    const firstAY = degreeStart.month >= 10 ? degreeStart.year : degreeStart.year - 1
+    return String(firstAY + yos - 1)
+  }, [degreeStart])
+
+  /** Drop a course into (year, semester) — marks classified_manually so
+   *  future auto-reclassify won't overwrite the user's choice. */
+  const handleDrop = useCallback(async (
+    courseId: string,
+    targetYos: 1 | 2 | 3 | 4 | null,
+    targetSem: Semester | null,
+    dropX?: number,
+    dropY?: number,
+  ) => {
+    try {
+      const ay = targetYos ? yosToAcademicYear(targetYos) : undefined
+      await updateCourse(courseId, {
+        year_of_study: targetYos ?? undefined,
+        semester: targetSem ?? undefined,
+        academic_year: ay,
+        classified_manually: true,
+      })
+      // Tiny celebration at the drop point
+      if (dropX != null && dropY != null) {
+        setLastDropCelebration({ x: dropX, y: dropY, key: Date.now() })
+        setTimeout(() => setLastDropCelebration(null), 800)
+      }
+    } catch (e) {
+      console.error('Failed to move course:', e)
+      setError('שגיאה בהזזת הקורס.')
+    }
+  }, [updateCourse, yosToAcademicYear])
+
   // ── Filter courses by search + department ─────────────────────────
   const filteredCourses = useMemo(() => {
     let result = courses
@@ -308,6 +351,16 @@ export default function CoursesPage() {
   const toggleGroup = (key: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }))
   }
+
+  // ── Classification progress (for the little game) ────────────────
+  const classifiedCount = useMemo(
+    () => courses.filter((c) => c.semester && c.derived_year_of_study).length,
+    [courses],
+  )
+  const progressPct = courses.length > 0
+    ? Math.round((classifiedCount / courses.length) * 100)
+    : 0
+  const isComplete = courses.length > 0 && classifiedCount === courses.length
 
   const semesterOrder: Record<string, number> = { 'א': 1, 'ב': 2, 'קיץ': 3, 'no-sem': 4 }
 
@@ -486,6 +539,34 @@ export default function CoursesPage() {
             />
           )}
 
+          {/* Progress meter — visual "game" of organizing courses */}
+          {courses.length > 0 && (
+            <ProgressMeter
+              classified={classifiedCount}
+              total={courses.length}
+              pct={progressPct}
+              isComplete={isComplete}
+            />
+          )}
+
+          {/* Quick palette — floating drop targets for every year × semester.
+              Expands into a grid while a card is being dragged so the user
+              can drop onto any bucket (even empty ones). */}
+          {courses.length > 0 && (
+            <QuickPalette
+              degreeStart={degreeStart}
+              isDragging={!!draggingId}
+              hoverTarget={hoverTarget}
+              setHoverTarget={setHoverTarget}
+              onDrop={(yos, sem, e) => {
+                if (!draggingId) return
+                handleDrop(draggingId, yos, sem, e.clientX, e.clientY)
+                setDraggingId(null)
+                setHoverTarget(null)
+              }}
+            />
+          )}
+
           {/* Grouped courses by year-of-study / semester */}
           {grouped.sortedYears.map((yearKey) => {
             const yearCollapsed = collapsedGroups[`year-${yearKey}`]
@@ -520,6 +601,10 @@ export default function CoursesPage() {
                 <AnimatePresence>
                   {!yearCollapsed && semesters.map((semKey) => {
                     const semCourses = grouped.map[yearKey][semKey]
+                    const targetYos = yearKey === 'no-year' ? null : (parseInt(yearKey.replace('year-', ''), 10) as 1 | 2 | 3 | 4)
+                    const targetSem = semKey === 'no-sem' ? null : (semKey as Semester)
+                    const dropKey = `drop-${yearKey}-${semKey}`
+                    const isHover = hoverTarget === dropKey
 
                     return (
                       <motion.div
@@ -529,7 +614,30 @@ export default function CoursesPage() {
                         exit={{ opacity: 0, height: 0 }}
                         className="overflow-hidden"
                       >
-                        <div className="mr-4 border-r border-white/5 pr-4 space-y-3 pb-2">
+                        <div
+                          className={`mr-4 border-r border-white/5 pr-4 space-y-3 pb-2 rounded-lg transition-all ${
+                            isHover ? 'bg-indigo-500/10 ring-2 ring-indigo-500/50' : ''
+                          } ${draggingId ? 'ring-1 ring-white/5' : ''}`}
+                          onDragOver={(e) => {
+                            if (!draggingId) return
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = 'move'
+                            setHoverTarget(dropKey)
+                          }}
+                          onDragLeave={(e) => {
+                            // Only clear when leaving the container itself, not children
+                            if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+                              setHoverTarget(prev => prev === dropKey ? null : prev)
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            if (!draggingId) return
+                            handleDrop(draggingId, targetYos, targetSem, e.clientX, e.clientY)
+                            setDraggingId(null)
+                            setHoverTarget(null)
+                          }}
+                        >
                           <div className="flex items-center gap-2">
                             <Tag size={14} className="text-violet-400" />
                             <h3 className="text-sm font-semibold text-ink-muted">{semLabelFromKey(semKey)}</h3>
@@ -540,6 +648,9 @@ export default function CoursesPage() {
                               <CourseCard
                                 key={course.id}
                                 course={course}
+                                isDragging={draggingId === course.id}
+                                onDragStart={() => setDraggingId(course.id)}
+                                onDragEnd={() => { setDraggingId(null); setHoverTarget(null) }}
                                 onEdit={() => setEditingCourse(course)}
                                 onReclassify={() => handleReclassify(course)}
                               />
@@ -554,31 +665,60 @@ export default function CoursesPage() {
             )
           })}
 
-          {/* Unassigned courses */}
-          {grouped.unassigned.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center">
-                  <BookOpen size={16} className="text-amber-400" />
+          {/* Unassigned courses — also a drop zone */}
+          {grouped.unassigned.length > 0 && (() => {
+            const dropKey = 'drop-unassigned'
+            const isHover = hoverTarget === dropKey
+            return (
+              <div
+                className={`space-y-3 rounded-lg transition-all p-3 -m-3 ${
+                  isHover ? 'bg-amber-500/10 ring-2 ring-amber-500/50' : ''
+                }`}
+                onDragOver={(e) => {
+                  if (!draggingId) return
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  setHoverTarget(dropKey)
+                }}
+                onDragLeave={(e) => {
+                  if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+                    setHoverTarget(prev => prev === dropKey ? null : prev)
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  if (!draggingId) return
+                  handleDrop(draggingId, null, null, e.clientX, e.clientY)
+                  setDraggingId(null)
+                  setHoverTarget(null)
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center">
+                    <BookOpen size={16} className="text-amber-400" />
+                  </div>
+                  <h2 className="text-lg font-bold text-ink">לא משויכים</h2>
+                  <span className="text-xs text-ink-muted">{grouped.unassigned.length} קורסים</span>
                 </div>
-                <h2 className="text-lg font-bold text-ink">לא משויכים</h2>
-                <span className="text-xs text-ink-muted">{grouped.unassigned.length} קורסים</span>
+                <p className="text-xs text-ink-subtle mr-11">
+                  גרור קורס לדלי אחר כדי לסווג, או לחץ על העיפרון לעריכה ידנית
+                </p>
+                <div className="grid sm:grid-cols-2 gap-3 mr-4">
+                  {grouped.unassigned.map((course) => (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                      isDragging={draggingId === course.id}
+                      onDragStart={() => setDraggingId(course.id)}
+                      onDragEnd={() => { setDraggingId(null); setHoverTarget(null) }}
+                      onEdit={() => setEditingCourse(course)}
+                      onReclassify={() => handleReclassify(course)}
+                    />
+                  ))}
+                </div>
               </div>
-              <p className="text-xs text-ink-subtle mr-11">
-                לחץ על העיפרון כדי לשייך קורס לשנה וסמסטר, או על &quot;סווג מחדש&quot; לסיווג אוטומטי
-              </p>
-              <div className="grid sm:grid-cols-2 gap-3 mr-4">
-                {grouped.unassigned.map((course) => (
-                  <CourseCard
-                    key={course.id}
-                    course={course}
-                    onEdit={() => setEditingCourse(course)}
-                    onReclassify={() => handleReclassify(course)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+            )
+          })()}
         </>
       ) : (
         <>
@@ -621,6 +761,9 @@ export default function CoursesPage() {
                           <CourseCard
                             key={course.id}
                             course={course}
+                            isDragging={draggingId === course.id}
+                            onDragStart={() => setDraggingId(course.id)}
+                            onDragEnd={() => { setDraggingId(null); setHoverTarget(null) }}
                             onEdit={() => setEditingCourse(course)}
                             onReclassify={() => handleReclassify(course)}
                           />
@@ -647,6 +790,22 @@ export default function CoursesPage() {
         yearOptions={yearOptions}
         degreeStart={degreeStart}
       />
+
+      {/* Drop celebration burst */}
+      <AnimatePresence>
+        {lastDropCelebration && (
+          <motion.div
+            key={lastDropCelebration.key}
+            initial={{ opacity: 1, scale: 0.6 }}
+            animate={{ opacity: 0, scale: 1.8, y: -40 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="fixed pointer-events-none z-50 text-2xl"
+            style={{ left: lastDropCelebration.x - 12, top: lastDropCelebration.y - 12 }}
+          >
+            ✨
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -847,21 +1006,57 @@ function CourseCard({
   course,
   onEdit,
   onReclassify,
+  isDragging,
+  onDragStart,
+  onDragEnd,
 }: {
   course: CourseWithMeta
   onEdit: () => void
   onReclassify?: () => void
+  isDragging?: boolean
+  onDragStart?: () => void
+  onDragEnd?: () => void
 }) {
+  const router = useRouter()
+
   // Show "סווג מחדש" only for unclassified courses that have metadata and no manual override
   const canAutoClassify =
     !course.classified_manually &&
     (course.moodle_startdate || course.shortname) &&
     (!course.semester || !course.academic_year)
 
+  // Click fires only if no drag happened (HTML5 DnD swallows clicks that ended as drops)
+  const handleClick = (e: React.MouseEvent) => {
+    // Ignore clicks originating from inside interactive children (links/buttons)
+    const target = e.target as HTMLElement
+    if (target.closest('button, a[href]')) return
+    router.push(`/courses/${course.id}`)
+  }
+
   return (
-    <Link href={`/courses/${course.id}`} className="block group">
-      <GlowCard className="group-hover:scale-[1.01] transition-transform cursor-pointer">
-        <div className="p-4 space-y-2">
+    <div
+      role="button"
+      tabIndex={0}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'move'
+        try { e.dataTransfer.setData('text/plain', course.id) } catch {}
+        onDragStart?.()
+      }}
+      onDragEnd={() => onDragEnd?.()}
+      onClick={handleClick}
+      onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/courses/${course.id}`) }}
+      className={`block group cursor-grab active:cursor-grabbing select-none transition-opacity ${
+        isDragging ? 'opacity-30' : 'opacity-100'
+      }`}
+    >
+      <GlowCard className="group-hover:scale-[1.01] transition-transform">
+        <div className="p-4 space-y-2 relative">
+          {/* Drag handle hint — visible on hover */}
+          <GripVertical
+            size={14}
+            className="absolute top-2 right-2 text-ink-subtle/30 group-hover:text-ink-subtle transition-colors pointer-events-none"
+          />
           <div className="flex items-start justify-between gap-2">
             <p className="text-sm font-medium text-ink leading-snug line-clamp-2 flex-1 group-hover:text-indigo-300 transition-colors">
               {course.title}
@@ -940,7 +1135,7 @@ function CourseCard({
           )}
         </div>
       </GlowCard>
-    </Link>
+    </div>
   )
 }
 
@@ -1038,5 +1233,170 @@ function DegreeStartBanner({
         </Link>
       </div>
     </div>
+  )
+}
+
+// ── Progress Meter ──────────────────────────────────────────────────
+// Shows "X/N מסווגים" with a gradient bar. Celebrates at 100%.
+
+function ProgressMeter({
+  classified,
+  total,
+  pct,
+  isComplete,
+}: {
+  classified: number
+  total: number
+  pct: number
+  isComplete: boolean
+}) {
+  return (
+    <div className={`rounded-xl p-3 border transition-colors ${
+      isComplete
+        ? 'bg-emerald-500/5 border-emerald-500/20'
+        : 'bg-white/[0.02] border-white/[0.06]'
+    }`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          {isComplete ? (
+            <Trophy size={16} className="text-emerald-400" />
+          ) : (
+            <Sparkles size={16} className="text-indigo-400" />
+          )}
+          <span className="text-sm text-ink">
+            {isComplete ? 'הכל מסודר! 🎉' : 'סידור קורסים'}
+          </span>
+        </div>
+        <span className={`text-xs tabular-nums ${
+          isComplete ? 'text-emerald-400' : 'text-ink-muted'
+        }`}>
+          {classified}/{total} מסווגים
+        </span>
+      </div>
+      <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
+        <motion.div
+          className="h-full rounded-full"
+          initial={false}
+          animate={{ width: `${pct}%` }}
+          transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+          style={{
+            background: isComplete
+              ? 'linear-gradient(90deg, #10b981, #34d399)'
+              : 'linear-gradient(90deg, #6366f1, #8b5cf6, #a78bfa)',
+          }}
+        />
+      </div>
+      {!isComplete && total > 0 && (
+        <p className="text-[11px] text-ink-subtle mt-1.5">
+          גרור קורס לדלי כדי לסווג אותו לשנה וסמסטר
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Quick Palette ───────────────────────────────────────────────────
+// Floating grid of drop targets for every year × semester combination.
+// Dormant (small pills) by default; expands to full grid while dragging
+// so the user can drop onto empty buckets that don't exist yet in the view.
+
+function QuickPalette({
+  degreeStart,
+  isDragging,
+  hoverTarget,
+  setHoverTarget,
+  onDrop,
+}: {
+  degreeStart: { year: number; month: number } | null
+  isDragging: boolean
+  hoverTarget: string | null
+  setHoverTarget: (k: string | null) => void
+  onDrop: (yos: 1 | 2 | 3 | 4 | null, sem: Semester | null, e: React.DragEvent) => void
+}) {
+  // Only show the expanded grid during a drag — otherwise it's just clutter
+  if (!isDragging) return null
+
+  const years: (1 | 2 | 3 | 4)[] = [1, 2, 3, 4]
+  const semesters: Semester[] = ['א', 'ב', 'קיץ']
+  const yearLabels = ['', "שנה א'", "שנה ב'", "שנה ג'", "שנה ד'"]
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      className="sticky top-2 z-40 rounded-2xl bg-bg-surface/95 backdrop-blur-xl border border-indigo-500/30 p-3 shadow-2xl shadow-indigo-500/10"
+    >
+      <p className="text-xs text-indigo-300 mb-2 flex items-center gap-1.5">
+        <Sparkles size={12} />
+        שחרר על דלי כדי לסווג
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        {years.map((yos) => (
+          <div key={yos} className="space-y-2">
+            <div className="text-[11px] text-ink-muted font-semibold">{yearLabels[yos]}</div>
+            <div className="grid grid-cols-3 gap-1">
+              {semesters.map((sem) => {
+                const key = `palette-${yos}-${sem}`
+                const isHover = hoverTarget === key
+                return (
+                  <button
+                    key={sem}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'move'
+                      setHoverTarget(key)
+                    }}
+                    onDragLeave={(e) => {
+                      if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+                        setHoverTarget(null)
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      onDrop(yos, sem, e)
+                    }}
+                    className={`text-xs py-2 rounded-lg border transition-all ${
+                      isHover
+                        ? 'bg-indigo-500/30 border-indigo-400 text-white scale-105 ring-2 ring-indigo-500/50'
+                        : 'bg-white/5 border-white/10 text-ink-muted hover:bg-white/10'
+                    }`}
+                    title={`${yearLabels[yos]} ${sem === 'קיץ' ? 'קיץ' : `סמסטר ${sem}'`}${
+                      !degreeStart ? ' (ללא שנה אקדמית כי לא הוגדר תאריך תחילת תואר)' : ''
+                    }`}
+                  >
+                    {sem === 'קיץ' ? '☀️' : sem === 'א' ? 'א' : 'ב'}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Unassigned row */}
+      <button
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          setHoverTarget('palette-none')
+        }}
+        onDragLeave={(e) => {
+          if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+            setHoverTarget(null)
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          onDrop(null, null, e)
+        }}
+        className={`mt-2 w-full text-xs py-1.5 rounded-lg border transition-all ${
+          hoverTarget === 'palette-none'
+            ? 'bg-amber-500/20 border-amber-400 text-amber-100'
+            : 'bg-white/5 border-white/10 text-ink-muted hover:bg-white/10'
+        }`}
+      >
+        לא משויכים (בטל סיווג)
+      </button>
+    </motion.div>
   )
 }
