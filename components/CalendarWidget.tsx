@@ -22,14 +22,14 @@ interface DayEvents {
 }
 
 export default function CalendarWidget() {
-  const { session } = useAuth()
+  const { googleToken, clearGoogleToken } = useAuth()
   const [weekEvents, setWeekEvents] = useState<DayEvents[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay())
   const [weekOffset, setWeekOffset] = useState(0)
 
-  const providerToken = session?.provider_token
+  const providerToken = googleToken
 
   useEffect(() => {
     if (!providerToken) {
@@ -85,6 +85,7 @@ export default function CalendarWidget() {
       setWeekEvents(days)
     } catch (e: any) {
       if (e.message === 'TOKEN_EXPIRED') {
+        clearGoogleToken()
         setError('TOKEN_EXPIRED')
       } else {
         setError('שגיאה בטעינת הלוח שנה')
@@ -121,6 +122,7 @@ export default function CalendarWidget() {
                 options: {
                   redirectTo: `${window.location.origin}/dashboard`,
                   scopes: 'https://www.googleapis.com/auth/calendar.readonly',
+                  queryParams: { access_type: 'offline', prompt: 'consent' },
                 },
               })
             }}
@@ -163,6 +165,7 @@ export default function CalendarWidget() {
                 options: {
                   redirectTo: `${window.location.origin}/dashboard`,
                   scopes: 'https://www.googleapis.com/auth/calendar.readonly',
+                  queryParams: { access_type: 'offline', prompt: 'consent' },
                 },
               })
             }}

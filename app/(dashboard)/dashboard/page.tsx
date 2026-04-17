@@ -104,7 +104,7 @@ interface CreditsInfo {
 }
 
 export default function DashboardPage() {
-  const { user, session } = useAuth()
+  const { user, googleToken, clearGoogleToken } = useAuth()
   const [courses, setCourses] = useState<Course[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [tasks, setTasks] = useState<StudyTask[]>([])
@@ -112,7 +112,8 @@ export default function DashboardPage() {
   const [gradesAvg, setGradesAvg] = useState<number | null>(null)
   const [credits, setCredits] = useState<CreditsInfo | null>(null)
   const [bguConnected, setBguConnected] = useState<boolean>(false)
-  const [loading, setLoading] = useState(true)
+  const [zone1Loading, setZone1Loading] = useState(true)
+  const [zone2Loading, setZone2Loading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   // Calendar state
@@ -122,12 +123,12 @@ export default function DashboardPage() {
   const [calLoading, setCalLoading] = useState(true)
   const [calError, setCalError] = useState<string | null>(null)
 
-  const providerToken = session?.provider_token
+  const providerToken = googleToken
   const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || ''
 
-  // ── Load ALL app data ──────────────────────────────────────
+  // ── Zone 1: Load courses, assignments, tasks ───────────────
   useEffect(() => {
-    async function loadAll() {
+    async function loadZone1() {
       try {
         const [c, a, t] = await Promise.all([
           api.courses.list().catch(() => []),
@@ -137,43 +138,49 @@ export default function DashboardPage() {
         setCourses(c)
         setAssignments(a)
         setTasks(t)
-
-        // Try loading BGU data (grades + credits)
-        try {
-          const statusRes = await api.bgu.status()
-          const isConnected = statusRes?.moodle || statusRes?.portal
-          setBguConnected(!!isConnected)
-
-          // Always try grades (they're persisted in DB even if not currently connected)
-          const [gradesRes, degreeRes] = await Promise.all([
-            api.bgu.grades().catch(() => ({ grades: [], average: null })),
-            api.bgu.degree().catch(() => ({ credits: null, settings: null })),
-          ])
-          setGrades(gradesRes?.grades || [])
-          setGradesAvg(gradesRes?.average ?? null)
-          // Only show credits if user configured degree settings
-          if (degreeRes?.settings && degreeRes?.credits) {
-            setCredits(degreeRes.credits)
-          }
-        } catch {
-          setBguConnected(false)
-        }
       } catch {
         setError('שגיאה בטעינת הנתונים')
       } finally {
-        setLoading(false)
+        setZone1Loading(false)
       }
     }
-    loadAll()
+    loadZone1()
+  }, [])
+
+  // ── Zone 2: Load BGU status, grades, credits (independent) ─
+  useEffect(() => {
+    async function loadZone2() {
+      try {
+        const [statusRes, gradesRes, degreeRes] = await Promise.all([
+          api.bgu.status().catch(() => null),
+          api.bgu.grades().catch(() => ({ grades: [], average: null })),
+          api.bgu.degree().catch(() => ({ credits: null, settings: null })),
+        ])
+
+        const isConnected = statusRes?.moodle || statusRes?.portal
+        setBguConnected(!!isConnected)
+        setGrades(gradesRes?.grades || [])
+        setGradesAvg(gradesRes?.average ?? null)
+        if (degreeRes?.settings && degreeRes?.credits) {
+          setCredits(degreeRes.credits)
+        }
+      } catch {
+        setBguConnected(false)
+      } finally {
+        setZone2Loading(false)
+      }
+    }
+    loadZone2()
   }, [])
 
   // ── Load calendar events ───────────────────────────────────
   useEffect(() => {
-    if (!providerToken) { setCalLoading(false); return }
+    if (!googleToken) { setCalLoading(false); return }
     loadCalendar()
-  }, [providerToken, weekOffset])
+  }, [googleToken, weekOffset])
 
   async function loadCalendar() {
+    if (!googleToken) return
     setCalLoading(true)
     setCalError(null)
     try {
@@ -185,7 +192,7 @@ export default function DashboardPage() {
       saturday.setDate(sunday.getDate() + 6)
       saturday.setHours(23, 59, 59, 999)
 
-      const events = await fetchCalendarEvents(providerToken!, sunday.toISOString(), saturday.toISOString())
+      const events = await fetchCalendarEvents(googleToken, sunday.toISOString(), saturday.toISOString())
       const today = new Date(); today.setHours(0, 0, 0, 0)
 
       const days: DayData[] = Array.from({ length: 7 }, (_, i) => {
@@ -201,7 +208,12 @@ export default function DashboardPage() {
       })
       setWeekDays(days)
     } catch (e: any) {
-      setCalError(e.message === 'TOKEN_EXPIRED' ? 'TOKEN_EXPIRED' : 'calendar_error')
+      if (e.message === 'TOKEN_EXPIRED') {
+        clearGoogleToken()
+        setCalError('TOKEN_EXPIRED')
+      } else {
+        setCalError('calendar_error')
+      }
     } finally {
       setCalLoading(false)
     }
@@ -373,26 +385,35 @@ export default function DashboardPage() {
           ))}
           {weekDays.length === 0 && !calLoading && (
             <div className="col-span-7 text-center py-4">
-              {!providerToken ? (
+              {calError === 'TOKEN_EXPIRED' ? (
                 <button
                   onClick={() => supabase.auth.signInWithOAuth({
                     provider: 'google',
-                    options: { redirectTo: `${window.location.origin}/dashboard`, scopes: 'https://www.googleapis.com/auth/calendar.readonly' },
+                    options: {
+                      redirectTo: `${window.location.origin}/dashboard`,
+                      scopes: 'https://www.googleapis.com/auth/calendar.readonly',
+                      queryParams: { access_type: 'offline', prompt: 'consent' },
+                    },
+                  })}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-colors"
+                  style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.2)' }}
+                >
+                  <RefreshCw size={12} /> חדש חיבור Google Calendar
+                </button>
+              ) : !providerToken ? (
+                <button
+                  onClick={() => supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                      redirectTo: `${window.location.origin}/dashboard`,
+                      scopes: 'https://www.googleapis.com/auth/calendar.readonly',
+                      queryParams: { access_type: 'offline', prompt: 'consent' },
+                    },
                   })}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                   style={{ background: 'rgba(66,133,244,0.15)', color: '#8ab4f8', border: '1px solid rgba(66,133,244,0.25)' }}
                 >
                   <Calendar size={14} /> חבר Google Calendar
-                </button>
-              ) : calError === 'TOKEN_EXPIRED' ? (
-                <button
-                  onClick={() => supabase.auth.signInWithOAuth({
-                    provider: 'google',
-                    options: { redirectTo: `${window.location.origin}/dashboard`, scopes: 'https://www.googleapis.com/auth/calendar.readonly' },
-                  })}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-accent-400"
-                >
-                  <RefreshCw size={12} /> התחבר מחדש ל-Google
                 </button>
               ) : null}
             </div>
@@ -423,6 +444,7 @@ export default function DashboardPage() {
             <ScheduleSection
               dayData={todayData}
               calLoading={calLoading}
+              calError={calError}
               courses={courses}
               assignments={assignments}
               providerToken={providerToken}
@@ -449,7 +471,7 @@ export default function DashboardPage() {
                 </button>
               </Link>
             </div>
-            <SubjectsSection courses={dayCourses} assignments={assignments} loading={loading} />
+            <SubjectsSection courses={dayCourses} assignments={assignments} loading={zone1Loading} />
           </motion.div>
         </div>
 
@@ -476,7 +498,7 @@ export default function DashboardPage() {
                 </button>
               </Link>
             </div>
-            <TasksSection tasks={tasks} todayStr={todayStr} onToggle={toggleTask} loading={loading} />
+            <TasksSection tasks={tasks} todayStr={todayStr} onToggle={toggleTask} loading={zone1Loading} />
           </motion.div>
 
           {/* Upcoming Assignments */}
@@ -499,7 +521,7 @@ export default function DashboardPage() {
                 </button>
               </Link>
             </div>
-            <AssignmentsSection assignments={pendingAssignments} courses={courses} loading={loading} />
+            <AssignmentsSection assignments={pendingAssignments} courses={courses} loading={zone1Loading} />
           </motion.div>
         </div>
       </div>
@@ -615,7 +637,7 @@ export default function DashboardPage() {
                   </Link>
                 )}
               </div>
-              <GradesSection grades={grades} bguConnected={bguConnected} avgGrade={avgGrade} loading={loading} />
+              <GradesSection grades={grades} bguConnected={bguConnected} avgGrade={avgGrade} loading={zone2Loading} />
             </motion.div>
           </div>
         </div>
@@ -679,11 +701,37 @@ function StatCard({ icon, iconColor, iconBg, label, value, sub, subColor }: {
 
 // ── Schedule Section ────────────────────────────────────────
 
-function ScheduleSection({ dayData, calLoading, courses, assignments, providerToken }: {
-  dayData?: DayData; calLoading: boolean; courses: Course[]; assignments: Assignment[]; providerToken?: string | null
+function ScheduleSection({ dayData, calLoading, calError, courses, assignments, providerToken }: {
+  dayData?: DayData; calLoading: boolean; calError?: string | null; courses: Course[]; assignments: Assignment[]; providerToken?: string | null
 }) {
   if (calLoading) {
     return <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl shimmer" />)}</div>
+  }
+
+  if (calError === 'TOKEN_EXPIRED') {
+    return (
+      <GlowCard className="text-center" glowColor="rgba(245,158,11,0.10)">
+        <div className="p-8">
+          <RefreshCw size={28} className="mx-auto mb-2" style={{ color: '#fbbf24' }} />
+          <p className="text-ink-muted text-sm mb-1">פג תוקף החיבור ל-Google</p>
+          <p className="text-ink-subtle text-xs mb-3">יש להתחבר מחדש כדי לראות את המערכת</p>
+          <button
+            onClick={() => supabase.auth.signInWithOAuth({
+              provider: 'google',
+              options: {
+                redirectTo: `${window.location.origin}/dashboard`,
+                scopes: 'https://www.googleapis.com/auth/calendar.readonly',
+                queryParams: { access_type: 'offline', prompt: 'consent' },
+              },
+            })}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+            style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.2)' }}
+          >
+            <RefreshCw size={14} /> חדש חיבור
+          </button>
+        </div>
+      </GlowCard>
+    )
   }
 
   if (!providerToken) {
