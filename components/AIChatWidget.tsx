@@ -213,15 +213,48 @@ export default function AIChatWidget() {
         }
       }
     } else {
+      // Authoritative header — tells the bot the context below is real data,
+      // not a description of what might exist.
+      parts.push(
+        `המידע להלן הוא נתונים אמיתיים מהחשבון של הסטודנט (מאוחסן ב-Google Drive). ` +
+        `אתה יכול להתייחס אליו כאל ידע ודאי.`,
+      )
+
+      parts.push(
+        `\nסיכום: ${db.courses.length} קורסים, ${db.lessons.length} שיעורים, ` +
+        `${db.notes.length} הערות, ${db.tasks.filter(t => !t.is_completed).length} משימות פתוחות, ` +
+        `${db.assignments.filter(a => a.status !== 'submitted').length} מטלות פתוחות.`,
+      )
+
       if (db.courses.length) {
-        parts.push(`קורסים פעילים (${db.courses.length}):`)
-        for (const c of db.courses.slice(0, 20)) {
-          parts.push(`- ${c.title}`)
+        parts.push(`\nקורסים:`)
+        for (const c of db.courses.slice(0, 25)) {
+          const lessonCount = db.lessons.filter(l => l.course_id === c.id).length
+          const noteCount = db.notes.filter(n => n.course_id === c.id).length
+          const suffix: string[] = []
+          if (lessonCount) suffix.push(`${lessonCount} שיעורים`)
+          if (noteCount) suffix.push(`${noteCount} הערות`)
+          parts.push(`- ${c.title}${suffix.length ? ` (${suffix.join(', ')})` : ''}`)
         }
       }
+
+      // Recent notes across all courses — signals to the bot that it CAN
+      // access content, not just titles.
+      const recentNotes = [...db.notes]
+        .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
+        .slice(0, 5)
+      if (recentNotes.length) {
+        parts.push(`\nהערות אחרונות:`)
+        for (const n of recentNotes) {
+          const course = db.courses.find(c => c.id === n.course_id)
+          const courseTag = course ? ` [${course.title}]` : ''
+          parts.push(`- ${n.title}${courseTag}: ${(n.content || '').slice(0, 150)}`)
+        }
+      }
+
       const openTasks = db.tasks.filter((t) => !t.is_completed).slice(0, 10)
       if (openTasks.length) {
-        parts.push(`\nמשימות פתוחות (${openTasks.length}):`)
+        parts.push(`\nמשימות פתוחות:`)
         for (const t of openTasks) {
           const due = t.scheduled_date ? ` (${t.scheduled_date})` : ''
           parts.push(`- ${t.title}${due}`)
@@ -231,12 +264,17 @@ export default function AIChatWidget() {
         .filter((a) => a.status !== 'submitted')
         .slice(0, 10)
       if (openAssignments.length) {
-        parts.push(`\nמטלות פתוחות (${openAssignments.length}):`)
+        parts.push(`\nמטלות פתוחות:`)
         for (const a of openAssignments) {
           const due = a.deadline ? ` (עד ${a.deadline})` : ''
           parts.push(`- ${a.title}${due}`)
         }
       }
+
+      parts.push(
+        `\nהערה: אם הסטודנט שואל על קורס ספציפי ולא שלחתי לך את השיעורים המלאים, ` +
+        `בקש ממנו להיכנס לדף הקורס (לחיצה על הקורס ברשימה) ואז הקונטקסט יתרחב אוטומטית.`,
+      )
     }
 
     return parts.join('\n').slice(0, 9000)
