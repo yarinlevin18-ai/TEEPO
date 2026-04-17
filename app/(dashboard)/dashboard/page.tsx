@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen, Clock, Calendar, ArrowLeft,
@@ -9,6 +9,7 @@ import {
   CheckCircle2, Circle, AlertTriangle, GraduationCap,
   Target, Award, ListTodo, Flame,
   CheckSquare, BarChart3, Sparkles, Wifi, WifiOff,
+  Plus, X, Trash2,
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -229,6 +230,40 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // ── Todo popup state ──────────────────────────────────────
+  const [todoOpen, setTodoOpen] = useState(false)
+
+  const addTask = useCallback(async (title: string) => {
+    const tempId = `temp-${Date.now()}`
+    const today = format(new Date(), 'yyyy-MM-dd')
+    const optimistic: StudyTask = {
+      id: tempId,
+      title,
+      is_completed: false,
+      scheduled_date: today,
+      category: 'study',
+      user_id: '',
+      created_at: new Date().toISOString(),
+    }
+    setTasks(prev => [optimistic, ...prev])
+    try {
+      const created = await api.tasks.create({ title, scheduled_date: today })
+      setTasks(prev => prev.map(t => t.id === tempId ? { ...created, id: created.id } : t))
+    } catch {
+      setTasks(prev => prev.filter(t => t.id !== tempId))
+    }
+  }, [])
+
+  const deleteTask = useCallback(async (taskId: string) => {
+    const backup = tasks.find(t => t.id === taskId)
+    setTasks(prev => prev.filter(t => t.id !== taskId))
+    try {
+      await api.tasks.delete(taskId)
+    } catch {
+      if (backup) setTasks(prev => [...prev, backup])
+    }
+  }, [tasks])
+
   // ── Computed data ──────────────────────────────────────────
   const todayData = weekDays[selectedDay]
   const activeCourses = courses.filter(c => c.status === 'active')
@@ -270,6 +305,17 @@ export default function DashboardPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
+
+      {/* Todo Popup */}
+      <TodoPopup
+        isOpen={todoOpen}
+        onClose={() => setTodoOpen(false)}
+        tasks={tasks}
+        onToggle={toggleTask}
+        onAdd={addTask}
+        onDelete={deleteTask}
+        todayStr={format(new Date(), 'yyyy-MM-dd')}
+      />
 
       {/* ══════════════════════════════════════════════════════════
           ZONE 1: מה קורה עכשיו — What's Happening Now
@@ -492,13 +538,22 @@ export default function DashboardPage() {
                   </span>
                 )}
               </div>
-              <Link href="/tasks">
-                <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
-                  הכל <ArrowLeft size={12} />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setTodoOpen(true)}
+                  className="w-6 h-6 rounded-lg flex items-center justify-center text-accent-400 hover:bg-accent-400/10 transition-colors"
+                  title="הוסף משימה"
+                >
+                  <Plus size={14} />
                 </button>
-              </Link>
+                <Link href="/tasks">
+                  <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
+                    הכל <ArrowLeft size={12} />
+                  </button>
+                </Link>
+              </div>
             </div>
-            <TasksSection tasks={tasks} todayStr={todayStr} onToggle={toggleTask} loading={zone1Loading} />
+            <TasksSection tasks={tasks} todayStr={todayStr} onToggle={toggleTask} loading={zone1Loading} onAddClick={() => setTodoOpen(true)} />
           </motion.div>
 
           {/* Upcoming Assignments */}
@@ -846,8 +901,8 @@ function ScheduleSection({ dayData, calLoading, calError, courses, assignments, 
 
 // ── Tasks Section ───────────────────────────────────────────
 
-function TasksSection({ tasks, todayStr, onToggle, loading }: {
-  tasks: StudyTask[]; todayStr: string; onToggle: (id: string, done: boolean) => void; loading: boolean
+function TasksSection({ tasks, todayStr, onToggle, loading, onAddClick }: {
+  tasks: StudyTask[]; todayStr: string; onToggle: (id: string, done: boolean) => void; loading: boolean; onAddClick?: () => void
 }) {
   if (loading) {
     return <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl shimmer" />)}</div>
@@ -868,9 +923,12 @@ function TasksSection({ tasks, todayStr, onToggle, loading }: {
         <div className="p-6">
           <Sparkles size={24} className="mx-auto mb-2" style={{ color: '#818cf8' }} />
           <p className="text-ink-muted text-sm">אין משימות</p>
-          <Link href="/tasks">
-            <button className="mt-2 text-xs text-accent-400 hover:text-accent transition-colors">הוסף משימה</button>
-          </Link>
+          <button
+            onClick={onAddClick}
+            className="mt-2 text-xs text-accent-400 hover:text-accent transition-colors"
+          >
+            הוסף משימה
+          </button>
         </div>
       </GlowCard>
     )
@@ -1386,5 +1444,256 @@ function SubjectsSection({ courses, assignments, loading }: {
         )
       })}
     </div>
+  )
+}
+
+// ── Todo Popup ─────────────────────────────────────────────
+
+function TodoPopup({ isOpen, onClose, tasks, onToggle, onAdd, onDelete, todayStr }: {
+  isOpen: boolean; onClose: () => void; tasks: StudyTask[]
+  onToggle: (id: string, done: boolean) => void
+  onAdd: (title: string) => Promise<void>
+  onDelete: (id: string) => void
+  todayStr: string
+}) {
+  const [newTask, setNewTask] = useState('')
+  const [adding, setAdding] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (isOpen) setTimeout(() => inputRef.current?.focus(), 100)
+  }, [isOpen])
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [isOpen, onClose])
+
+  const handleAdd = async () => {
+    if (!newTask.trim() || adding) return
+    setAdding(true)
+    await onAdd(newTask.trim())
+    setNewTask('')
+    setAdding(false)
+    inputRef.current?.focus()
+  }
+
+  const pending = tasks.filter(t => !t.is_completed)
+  const completed = tasks.filter(t => t.is_completed)
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            onClick={onClose}
+          />
+          {/* Popup */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.92, y: 20 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+          >
+            <div
+              className="w-full max-w-sm rounded-2xl overflow-hidden pointer-events-auto shadow-2xl"
+              style={{
+                background: 'rgba(22,27,39,0.98)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: '0 0 60px rgba(99,102,241,0.12), 0 25px 50px rgba(0,0,0,0.5)',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                    <ListTodo size={16} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-ink text-sm">המשימות שלי</h3>
+                    <p className="text-[10px] text-ink-subtle">
+                      {pending.length > 0 ? `${pending.length} ממתינות` : 'הכל הושלם!'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-lg hover:bg-white/5 text-ink-muted hover:text-ink transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Quick add input */}
+              <div className="px-4 pb-3">
+                <div className="flex gap-2">
+                  <input
+                    ref={inputRef}
+                    value={newTask}
+                    onChange={e => setNewTask(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                    placeholder="מה צריך לעשות?..."
+                    dir="rtl"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl text-sm text-ink placeholder:text-ink-subtle focus:outline-none transition-all"
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }}
+                    onFocus={e => {
+                      e.target.style.borderColor = 'rgba(99,102,241,0.4)'
+                      e.target.style.background = 'rgba(255,255,255,0.07)'
+                    }}
+                    onBlur={e => {
+                      e.target.style.borderColor = 'rgba(255,255,255,0.08)'
+                      e.target.style.background = 'rgba(255,255,255,0.05)'
+                    }}
+                  />
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleAdd}
+                    disabled={!newTask.trim() || adding}
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all disabled:opacity-30"
+                    style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+                  >
+                    {adding ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Plus size={18} />
+                    )}
+                  </motion.button>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+
+              {/* Task list */}
+              <div className="max-h-72 overflow-y-auto">
+                {pending.length === 0 && completed.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center"
+                      style={{ background: 'rgba(99,102,241,0.1)' }}>
+                      <Sparkles size={22} style={{ color: '#818cf8' }} />
+                    </div>
+                    <p className="text-ink-muted text-sm font-medium">הרשימה ריקה</p>
+                    <p className="text-ink-subtle text-xs mt-0.5">הוסף משימה חדשה למעלה</p>
+                  </div>
+                ) : (
+                  <>
+                    {pending.length > 0 && (
+                      <div className="px-4 pt-3 pb-1">
+                        <p className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wider">
+                          ממתינות · {pending.length}
+                        </p>
+                      </div>
+                    )}
+                    {pending.map((task, i) => (
+                      <TodoRow key={task.id} task={task} onToggle={onToggle} onDelete={onDelete} index={i} />
+                    ))}
+                    {completed.length > 0 && (
+                      <>
+                        <div className="px-4 pt-3 pb-1">
+                          <p className="text-[10px] font-semibold text-ink-subtle uppercase tracking-wider">
+                            הושלמו · {completed.length}
+                          </p>
+                        </div>
+                        {completed.slice(0, 5).map((task, i) => (
+                          <TodoRow key={task.id} task={task} onToggle={onToggle} onDelete={onDelete} index={pending.length + i} />
+                        ))}
+                        {completed.length > 5 && (
+                          <div className="px-4 py-2 text-center">
+                            <span className="text-[10px] text-ink-subtle">+{completed.length - 5} נוספות</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Footer */}
+              {(pending.length > 0 || completed.length > 0) && (
+                <div className="px-4 py-3 flex items-center justify-between" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  {/* Progress mini-bar */}
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                      <div
+                        className="h-1.5 rounded-full transition-all"
+                        style={{
+                          width: `${((completed.length) / (pending.length + completed.length)) * 100}%`,
+                          background: 'linear-gradient(90deg, #6366f1, #10b981)',
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-ink-subtle">
+                      {completed.length}/{pending.length + completed.length}
+                    </span>
+                  </div>
+                  <Link href="/tasks" onClick={onClose}>
+                    <button className="text-[10px] text-accent-400 hover:text-accent transition-colors flex items-center gap-1 font-medium">
+                      כל המשימות <ArrowLeft size={10} />
+                    </button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
+
+function TodoRow({ task, onToggle, onDelete, index }: {
+  task: StudyTask; onToggle: (id: string, done: boolean) => void; onDelete: (id: string) => void; index: number
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -6 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.02 }}
+      className="flex items-center gap-3 px-4 py-2.5 group hover:bg-white/[0.03] transition-colors"
+    >
+      <button
+        onClick={() => onToggle(task.id, task.is_completed)}
+        className="flex-shrink-0 transition-transform hover:scale-110"
+      >
+        {task.is_completed ? (
+          <CheckCircle2 size={18} style={{ color: '#10b981' }} />
+        ) : (
+          <Circle size={18} className="text-ink-subtle hover:text-accent-400 transition-colors" />
+        )}
+      </button>
+      <span
+        className={`flex-1 text-sm min-w-0 truncate transition-colors ${
+          task.is_completed ? 'line-through text-ink-subtle' : 'text-ink'
+        }`}
+      >
+        {task.title}
+      </span>
+      {task.scheduled_date && (
+        <span className="text-[10px] text-ink-subtle flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          {format(new Date(task.scheduled_date), 'd/M')}
+        </span>
+      )}
+      <button
+        onClick={() => onDelete(task.id)}
+        className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/10 text-ink-subtle hover:text-red-400 transition-all flex-shrink-0"
+      >
+        <Trash2 size={13} />
+      </button>
+    </motion.div>
   )
 }
