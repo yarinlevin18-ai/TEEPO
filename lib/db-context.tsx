@@ -16,6 +16,7 @@ import {
 import { useAuth } from './auth-context'
 import {
   DriveDB, DriveDBHandle, EMPTY_DB, loadDB, newId, saveDB, probeTokenScopes,
+  StudentProfile, StudentCourse,
 } from './drive-db'
 import { ensureCourseFolders, pathForCourse } from './drive-folders'
 import type { Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings } from '@/types'
@@ -60,6 +61,12 @@ interface DBContextType {
   updateSettings: (patch: Partial<UserSettings>) => Promise<void>
   /** Replace all courses at once (used by re-classifier to apply bulk updates efficiently) */
   replaceCourses: (courses: Course[]) => Promise<void>
+
+  // Student catalog (credits tracking)
+  setStudentProfile: (patch: Partial<StudentProfile> & { track_id: string; start_year: number; current_year: number }) => Promise<void>
+  upsertStudentCourse: (input: Partial<StudentCourse> & { course_id: string; course_name: string; credits: number }) => Promise<void>
+  upsertStudentCoursesBulk: (rows: Array<Partial<StudentCourse> & { course_id: string; course_name: string; credits: number }>) => Promise<void>
+  removeStudentCourse: (courseId: string) => Promise<void>
 
   // Drive folders (user-facing course hierarchy under SmartDesk/)
   /** Ensure one course has its Drive folder hierarchy; persists IDs back onto the course. */
@@ -382,6 +389,80 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     mutate(d => ({ ...d, courses }))
   }, [mutate])
 
+  // ── Student catalog ────────────────────────────────────────
+  const setStudentProfile = useCallback(async (
+    patch: Partial<StudentProfile> & { track_id: string; start_year: number; current_year: number },
+  ) => {
+    const now = new Date().toISOString()
+    mutate(d => ({
+      ...d,
+      student_profile: {
+        ...(d.student_profile || {}),
+        ...patch,
+        updated_at: now,
+      } as StudentProfile,
+    }))
+  }, [mutate])
+
+  const upsertStudentCourse = useCallback(async (
+    input: Partial<StudentCourse> & { course_id: string; course_name: string; credits: number },
+  ) => {
+    const now = new Date().toISOString()
+    mutate(d => {
+      const existing = d.student_courses || []
+      const idx = existing.findIndex(c => c.course_id === input.course_id)
+      const row: StudentCourse = {
+        id: existing[idx]?.id || newId('scourse'),
+        course_id: input.course_id,
+        course_name: input.course_name,
+        credits: input.credits,
+        status: input.status || 'completed',
+        grade: input.grade,
+        semester: input.semester,
+        academic_year: input.academic_year,
+        source: input.source || 'manual',
+        updated_at: now,
+      }
+      const next = idx >= 0
+        ? existing.map((c, i) => i === idx ? row : c)
+        : [...existing, row]
+      return { ...d, student_courses: next }
+    })
+  }, [mutate])
+
+  const upsertStudentCoursesBulk = useCallback(async (
+    rows: Array<Partial<StudentCourse> & { course_id: string; course_name: string; credits: number }>,
+  ) => {
+    const now = new Date().toISOString()
+    mutate(d => {
+      const existing = d.student_courses || []
+      const byCourseId = new Map(existing.map(c => [c.course_id, c]))
+      for (const r of rows) {
+        const prev = byCourseId.get(r.course_id)
+        byCourseId.set(r.course_id, {
+          id: prev?.id || newId('scourse'),
+          course_id: r.course_id,
+          course_name: r.course_name,
+          credits: r.credits,
+          status: r.status || 'completed',
+          grade: r.grade ?? prev?.grade,
+          semester: r.semester ?? prev?.semester,
+          academic_year: r.academic_year ?? prev?.academic_year,
+          source: r.source || 'catalog',
+          updated_at: now,
+        })
+      }
+      return { ...d, student_courses: Array.from(byCourseId.values()) }
+    })
+  }, [mutate])
+
+  const removeStudentCourse = useCallback(async (courseId: string) => {
+    mutate(d => ({
+      ...d,
+      student_courses: (d.student_courses || []).filter(c => c.course_id !== courseId),
+    }))
+  }, [mutate])
+
   // ── Drive folders ──────────────────────────────────────────
   const syncCourseFolders = useCallback(async (courseId: string) => {
     if (!handle) throw new Error('מסד הנתונים טרם נטען.')
@@ -475,6 +556,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createAssignment, updateAssignment, deleteAssignment,
     createNote, updateNote, deleteNote,
     updateSettings, replaceCourses,
+    setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
     syncCourseFolders, syncAllCourseFolders,
   }), [
     db, ready, loading, error, driveConnected, driveMissing, reload,
@@ -484,6 +566,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createAssignment, updateAssignment, deleteAssignment,
     createNote, updateNote, deleteNote,
     updateSettings, replaceCourses,
+    setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
     syncCourseFolders, syncAllCourseFolders,
   ])
 

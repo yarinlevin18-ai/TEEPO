@@ -10,6 +10,8 @@ import {
 } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
+import { useDB } from '@/lib/db-context'
+import { computeCreditSummary } from '@/lib/bgu-catalog'
 import GlowCard from '@/components/ui/GlowCard'
 import Modal from '@/components/ui/Modal'
 import ErrorAlert from '@/components/ui/ErrorAlert'
@@ -68,39 +70,27 @@ type CreditSummary = {
 
 export default function CreditsPage() {
   const { user } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [needsOnboarding, setNeedsOnboarding] = useState(false)
-  const [profile, setProfile] = useState<any>(null)
+  const { db, ready, loading: dbLoading } = useDB()
   const [track, setTrack] = useState<Track | null>(null)
+  const [trackLoading, setTrackLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const checkProfile = useCallback(async () => {
-    try {
-      setError(null)
-      // 20s timeout — Render free-tier can take up to ~30s to cold-start, but
-      // we'd rather fail fast and show the onboarding wizard than hang the skeleton.
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('השרת לא הגיב. ייתכן שהוא בהפעלה מחדש — נסה לרענן בעוד רגע.')), 20000)
-      )
-      const res: any = await Promise.race([api.catalog.profile(), timeout])
-      if (res.needs_onboarding) {
-        setNeedsOnboarding(true)
-      } else {
-        setProfile(res.profile)
-        setTrack(res.track)
-        setNeedsOnboarding(false)
-      }
-    } catch (err: any) {
-      setError(err?.message || 'שגיאה בטעינת הפרופיל')
-      setNeedsOnboarding(true)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const profile = db.student_profile || null
+  const needsOnboarding = ready && !profile
 
-  useEffect(() => { checkProfile() }, [checkProfile])
+  // Resolve track details from the bundled catalog whenever profile changes.
+  useEffect(() => {
+    if (!profile?.track_id) { setTrack(null); return }
+    let cancelled = false
+    setTrackLoading(true)
+    api.catalog.track(profile.track_id)
+      .then((res: any) => { if (!cancelled) setTrack(res.track as Track) })
+      .catch((err: any) => { if (!cancelled) setError(err?.message || 'שגיאה בטעינת המסלול') })
+      .finally(() => { if (!cancelled) setTrackLoading(false) })
+    return () => { cancelled = true }
+  }, [profile?.track_id])
 
-  if (loading) {
+  if (!ready || dbLoading || trackLoading) {
     return (
       <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 animate-fade-in" dir="rtl">
         <div className="h-8 w-48 shimmer rounded-lg" />
@@ -122,7 +112,7 @@ export default function CreditsPage() {
         <div className="max-w-2xl mx-auto px-4 pt-4">
           <ErrorAlert message={error} onDismiss={() => setError(null)} />
         </div>
-        <OnboardingWizard onComplete={() => { setNeedsOnboarding(false); checkProfile() }} />
+        <OnboardingWizard onComplete={() => setError(null)} />
       </div>
     )
   }
@@ -135,6 +125,7 @@ export default function CreditsPage() {
 // ══════════════════════════════════════════════════════════════
 
 function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
+  const { setStudentProfile, upsertStudentCoursesBulk } = useDB()
   const [step, setStep] = useState(1)
   const [tracks, setTracks] = useState<Track[]>([])
   const [tracksLoading, setTracksLoading] = useState(true)
@@ -169,7 +160,9 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
     try {
       const t = tracks.find(t => t.id === selectedTrack)
       const totalSemesters = t?.type === 'dual' ? 6 : 6
-      await api.catalog.saveProfile({
+
+      // Save profile to Drive DB
+      await setStudentProfile({
         track_id: selectedTrack,
         start_year: startYear,
         current_year: currentYear,
@@ -181,13 +174,13 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
         const trackData = await api.catalog.track(selectedTrack)
         const mandatory = (trackData.courses || []).filter((c: CatalogCourse) => c.type === 'mandatory')
         if (mandatory.length > 0) {
-          await api.catalog.addCoursesBulk(
+          await upsertStudentCoursesBulk(
             mandatory.map((c: CatalogCourse) => ({
               course_id: c.course_id,
               course_name: c.name,
               credits: c.credits,
-              status: 'planned',
-              source: 'catalog',
+              status: 'planned' as const,
+              source: 'catalog' as const,
             }))
           )
         }
@@ -195,7 +188,7 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
 
       onComplete()
     } catch (err: any) {
-      alert(err.message)
+      alert(err.message || 'שמירה נכשלה')
     } finally {
       setSaving(false)
     }
@@ -366,10 +359,11 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                       <select
                         value={startYear}
                         onChange={e => setStartYear(Number(e.target.value))}
+                        style={{ colorScheme: 'dark' }}
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-200 focus:border-indigo-500 focus:outline-none"
                       >
                         {Array.from({ length: 8 }, (_, i) => currentYearOptions - i).map(y => (
-                          <option key={y} value={y}>{y}</option>
+                          <option key={y} value={y} className="bg-slate-900 text-slate-100">{y}</option>
                         ))}
                       </select>
                     </div>
@@ -425,8 +419,9 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
 // ══════════════════════════════════════════════════════════════
 
 function CreditsDashboard({ profile, track }: { profile: any; track: Track | null }) {
+  const { db, setStudentProfile, upsertStudentCourse, removeStudentCourse } = useDB()
+  const myCourses = (db.student_courses || []) as StudentCourse[]
   const [credits, setCredits] = useState<CreditSummary | null>(null)
-  const [myCourses, setMyCourses] = useState<StudentCourse[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<CatalogCourse[]>([])
   const [searching, setSearching] = useState(false)
@@ -441,21 +436,15 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
   const [editCurrentYear, setEditCurrentYear] = useState<number>(profile?.current_year ?? 1)
   const [editSaving, setEditSaving] = useState(false)
 
-  const loadData = useCallback(async () => {
-    try {
-      setError(null)
-      const [creditsRes, coursesRes] = await Promise.all([
-        api.catalog.credits(),
-        api.catalog.myCourses(),
-      ])
-      if (creditsRes?.status === 'success') setCredits(creditsRes as CreditSummary)
-      setMyCourses(coursesRes)
-    } catch (err: any) {
-      setError(err?.message || 'שגיאה בטעינת נתוני הנק"ז')
-    }
-  }, [])
-
-  useEffect(() => { loadData() }, [loadData])
+  // Recompute credit summary whenever profile, track or courses change
+  useEffect(() => {
+    if (!profile?.track_id) { setCredits(null); return }
+    let cancelled = false
+    computeCreditSummary(profile.track_id, myCourses as any, profile.current_year)
+      .then(res => { if (!cancelled) setCredits(res as CreditSummary) })
+      .catch(err => { if (!cancelled) setError(err?.message || 'שגיאה בחישוב נק"ז') })
+    return () => { cancelled = true }
+  }, [profile?.track_id, profile?.current_year, myCourses])
 
   // Open the edit-profile modal: fetch tracks and pre-fill values
   const openEditProfile = async () => {
@@ -477,16 +466,17 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
     try {
       const t = editTracks.find(t => t.id === editTrackId)
       const totalSemesters = t?.type === 'dual' ? 6 : 6
-      await api.catalog.saveProfile({
+      await setStudentProfile({
         track_id: editTrackId,
         start_year: editStartYear,
         current_year: editCurrentYear,
         expected_end: editStartYear + Math.ceil(totalSemesters / 2),
       })
+      setEditOpen(false)
       // Reload to pick up the new track/profile
       window.location.reload()
     } catch (err: any) {
-      alert(err.message)
+      alert(err.message || 'שמירה נכשלה')
     } finally {
       setEditSaving(false)
     }
@@ -506,16 +496,15 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
     }
   }
 
-  const addCourse = async (course: CatalogCourse, status = 'completed') => {
+  const addCourse = async (course: CatalogCourse, status: 'completed' | 'in_progress' | 'planned' = 'completed') => {
     try {
-      await api.catalog.addCourse({
+      await upsertStudentCourse({
         course_id: course.course_id,
         course_name: course.name,
         credits: course.credits,
         status,
         source: 'catalog',
       })
-      loadData()
     } catch (err: any) {
       setError(err?.message || 'שגיאה בהוספת הקורס')
     }
@@ -523,24 +512,28 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
 
   const removeCourse = async (courseId: string) => {
     try {
-      await api.catalog.removeCourse(courseId)
-      loadData()
+      await removeStudentCourse(courseId)
     } catch (err: any) {
       setError(err?.message || 'שגיאה בהסרת הקורס')
     }
   }
 
   const toggleStatus = async (course: StudentCourse) => {
-    const nextStatus = course.status === 'completed' ? 'planned' : course.status === 'planned' ? 'in_progress' : 'completed'
+    const nextStatus: 'completed' | 'in_progress' | 'planned' = course.status === 'completed'
+      ? 'planned'
+      : course.status === 'planned'
+        ? 'in_progress'
+        : 'completed'
+    const src: 'manual' | 'catalog' | 'moodle' =
+      course.source === 'catalog' || course.source === 'moodle' ? course.source as any : 'manual'
     try {
-      await api.catalog.addCourse({
+      await upsertStudentCourse({
         course_id: course.course_id,
         course_name: course.course_name,
         credits: course.credits,
         status: nextStatus,
-        source: course.source,
+        source: src,
       })
-      loadData()
     } catch (err: any) {
       setError(err?.message || 'שגיאה בעדכון סטטוס הקורס')
     }
@@ -940,10 +933,11 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
             <select
               value={editStartYear}
               onChange={e => setEditStartYear(Number(e.target.value))}
+              style={{ colorScheme: 'dark' }}
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-200 focus:border-indigo-500 focus:outline-none"
             >
               {Array.from({ length: 8 }, (_, i) => editYearOptions - i).map(y => (
-                <option key={y} value={y}>{y}</option>
+                <option key={y} value={y} className="bg-slate-900 text-slate-100">{y}</option>
               ))}
             </select>
           </div>

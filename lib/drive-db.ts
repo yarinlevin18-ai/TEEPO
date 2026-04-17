@@ -19,6 +19,34 @@ const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
 const FOLDER_NAME = 'SmartDesk'
 const DB_FILE_NAME = 'db.json'
 
+// ── Student catalog (credits tracking) ────────────────────────────
+// These live in the per-user Drive DB now. The backend was supposed to
+// host them in Supabase, but the FK to bgu_tracks (which is empty) makes
+// saves fail with 500. Keeping this in Drive aligns with "Supabase is
+// auth-only" and makes the feature work offline too.
+export interface StudentProfile {
+  track_id: string
+  start_year: number
+  current_year: number
+  expected_end?: number
+  updated_at: string
+}
+
+export interface StudentCourse {
+  /** Internal row id — unique per DB entry */
+  id: string
+  /** Catalog course_id (e.g. "68110279") or synthesized "manual_<ts>" */
+  course_id: string
+  course_name: string
+  credits: number
+  status: 'completed' | 'in_progress' | 'planned'
+  grade?: number
+  semester?: string
+  academic_year?: string
+  source: 'manual' | 'catalog' | 'moodle'
+  updated_at: string
+}
+
 export interface DriveDB {
   version: number
   updated_at: string
@@ -28,6 +56,10 @@ export interface DriveDB {
   assignments: Assignment[]
   notes: CourseNote[]
   settings?: UserSettings
+  /** Student academic profile (track + year). Optional — missing = not onboarded. */
+  student_profile?: StudentProfile
+  /** Courses the student has taken / is taking / plans to take, for credits tracking. */
+  student_courses?: StudentCourse[]
 }
 
 export const EMPTY_DB: DriveDB = {
@@ -39,6 +71,7 @@ export const EMPTY_DB: DriveDB = {
   assignments: [],
   notes: [],
   settings: {},
+  student_courses: [],
 }
 
 // ── Drive REST helpers ────────────────────────────────────────
