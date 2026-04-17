@@ -718,40 +718,89 @@ body {
 }
 
 /* ══════════════════════════════════════════
-   LIGHT THEME OVERRIDES
+   LIGHT THEME — warm, tinted, soft shadows
    Applied when <html> has class "light".
-   First-pass coverage: backgrounds, glass cards, text, scrollbar,
-   inputs, modals, rich-text. Component-level polish can follow.
    ══════════════════════════════════════════ */
 html.light body {
-  background: #f5f6fa;
+  background:
+    radial-gradient(ellipse at 15% 0%, rgba(99,102,241,0.08) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 100%, rgba(167,139,250,0.07) 0%, transparent 55%),
+    linear-gradient(180deg, #eef0fa 0%, #e6e9f5 100%);
+  background-attachment: fixed;
   color: #1a1d28;
 }
 
-html.light ::-webkit-scrollbar-track { background: #e6e8ef; }
-html.light ::-webkit-scrollbar-thumb { background: #c5c9d4; }
-html.light ::-webkit-scrollbar-thumb:hover { background: #a0a5b3; }
+html.light ::-webkit-scrollbar-track { background: #dde0ec; }
+html.light ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #b8bdd0, #a8aec5);
+  border-radius: 99px;
+}
+html.light ::-webkit-scrollbar-thumb:hover { background: #8d93a8; }
 
-/* Glass cards invert: dark translucent on light bg */
+/* Glass cards: warm off-white with lavender rim + gradient border feel */
 html.light .glass {
-  background: rgba(255,255,255,0.75);
-  border: 1px solid rgba(15,17,23,0.08);
-  box-shadow: 0 1px 2px rgba(15,17,23,0.04);
+  background: linear-gradient(180deg, rgba(253,253,255,0.82) 0%, rgba(246,247,253,0.76) 100%);
+  border: 1px solid rgba(99,102,241,0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.7),
+    0 1px 2px rgba(15,17,23,0.04),
+    0 10px 28px -10px rgba(99,102,241,0.14);
 }
 html.light .glass:hover {
-  background: rgba(255,255,255,0.9);
+  background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(250,251,255,0.86) 100%);
+  border-color: rgba(99,102,241,0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.8),
+    0 1px 2px rgba(15,17,23,0.05),
+    0 14px 36px -12px rgba(99,102,241,0.2);
 }
 html.light .glass-sm {
-  background: rgba(255,255,255,0.7);
-  border: 1px solid rgba(15,17,23,0.07);
+  background: linear-gradient(180deg, rgba(253,253,255,0.8) 0%, rgba(246,247,253,0.74) 100%);
+  border: 1px solid rgba(99,102,241,0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.6),
+    0 1px 2px rgba(15,17,23,0.03);
 }
+
+/* Animated gradient border on glow cards — the "lively outline" */
 html.light .glow-card {
-  background: rgba(255,255,255,0.75);
-  border-color: rgba(15,17,23,0.08);
+  background: linear-gradient(180deg, rgba(253,253,255,0.82) 0%, rgba(246,247,253,0.76) 100%);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  position: relative;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.7),
+    0 1px 2px rgba(15,17,23,0.04),
+    0 10px 28px -10px rgba(99,102,241,0.14);
 }
+html.light .glow-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.35) 0%, rgba(167,139,250,0.2) 50%, rgba(6,182,212,0.2) 100%);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 0.3s ease;
+}
+html.light .glow-card:hover::before { opacity: 1; }
 html.light .glow-card:hover {
-  border-color: rgba(99,102,241,0.35);
-  box-shadow: 0 0 24px rgba(99,102,241,0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.8),
+    0 1px 2px rgba(15,17,23,0.05),
+    0 14px 36px -12px rgba(99,102,241,0.22);
+}
+
+/* AnimatedBorder inner surface */
+.animated-border-inner { background: #13171f; }
+html.light .animated-border-inner {
+  background: linear-gradient(180deg, #fafbff 0%, #f3f5fc 100%);
 }
 
 /* Gradient text — slightly darker for contrast on white */
@@ -880,8 +929,14 @@ html.light .bg-surface { background-color: #ffffff !important; }
 html.light .bg-surface\/50 { background-color: rgba(255,255,255,0.75) !important; }
 html.light .bg-surface\/60 { background-color: rgba(255,255,255,0.8) !important; }
 html.light .bg-surface\/80 { background-color: rgba(255,255,255,0.9) !important; }
-html.light .bg-white\/5 { background-color: rgba(15,17,23,0.04) !important; }
-html.light .bg-white\/10 { background-color: rgba(15,17,23,0.06) !important; }
+html.light .bg-white\/5 { background-color: rgba(99,102,241,0.05) !important; }
+html.light .bg-white\/10 { background-color: rgba(99,102,241,0.08) !important; }
+html.light .bg-white\/\[0\.02\] { background-color: rgba(99,102,241,0.04) !important; }
+html.light .bg-white\/\[0\.03\] { background-color: rgba(99,102,241,0.05) !important; }
+html.light .bg-white\/\[0\.04\] { background-color: rgba(99,102,241,0.06) !important; }
+html.light .bg-white\/\[0\.05\] { background-color: rgba(99,102,241,0.07) !important; }
+html.light .bg-white\/\[0\.06\] { background-color: rgba(99,102,241,0.08) !important; }
+html.light .bg-white\/\[0\.08\] { background-color: rgba(99,102,241,0.1) !important; }
 html.light .border-white\/5 { border-color: rgba(15,17,23,0.06) !important; }
 html.light .border-white\/10 { border-color: rgba(15,17,23,0.08) !important; }
 html.light .border-white\/20 { border-color: rgba(15,17,23,0.12) !important; }
@@ -904,12 +959,13 @@ html.light .text-paper-subtle { color: #64748b !important; }
 html.light .text-clay,
 html.light .text-clay-500 { color: #a88c52 !important; }
 
-html.light .bg-surface,
-html.light .bg-surface-50,
-html.light .bg-surface-100,
-html.light .bg-surface-200 { background-color: #ffffff !important; }
-html.light .bg-surface\/50 { background-color: rgba(255,255,255,0.75) !important; }
-html.light .bg-surface\/60 { background-color: rgba(255,255,255,0.8) !important; }
+html.light .bg-surface { background-color: #fafbff !important; }
+html.light .bg-surface-50 { background-color: #f5f6fc !important; }
+html.light .bg-surface-100 { background-color: #eef0f9 !important; }
+html.light .bg-surface-200 { background-color: #e4e7f2 !important; }
+html.light .bg-surface\/50 { background-color: rgba(250,251,255,0.72) !important; }
+html.light .bg-surface\/60 { background-color: rgba(250,251,255,0.8) !important; }
+html.light .bg-surface\/80 { background-color: rgba(250,251,255,0.9) !important; }
 
 html.light .border-ink-subtle\/20 { border-color: rgba(15,17,23,0.12) !important; }
 html.light .border-ink-subtle\/30 { border-color: rgba(15,17,23,0.18) !important; }
@@ -922,14 +978,15 @@ html.light .gradient-text-white {
   -webkit-text-fill-color: transparent;
 }
 
-/* Plain bg-white stays visibly distinct with a subtle shadow/border */
-html.light .bg-white { background-color: #ffffff !important; }
+/* Plain bg-white: soften so it doesn't clash with tinted body bg */
+html.light .bg-white { background-color: #fafbff !important; }
 html.light .bg-black\/20 { background-color: rgba(15,17,23,0.05) !important; }
 html.light .bg-black\/30 { background-color: rgba(15,17,23,0.08) !important; }
 html.light .bg-black\/40 { background-color: rgba(15,17,23,0.12) !important; }
 
-/* Sidebar: override hardcoded dark inline gradient */
+/* Sidebar: soft vertical gradient with lavender tint + lively gradient rim */
 html.light aside {
-  background: linear-gradient(180deg, #ffffff 0%, #f5f6fa 100%) !important;
-  border-left-color: rgba(15,17,23,0.08) !important;
+  background: linear-gradient(180deg, #fafbff 0%, #eef0f9 100%) !important;
+  border-left: 1px solid rgba(99,102,241,0.14) !important;
+  box-shadow: -1px 0 0 rgba(255,255,255,0.5) inset, 0 0 24px -8px rgba(99,102,241,0.08);
 }

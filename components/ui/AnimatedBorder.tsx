@@ -49,7 +49,7 @@ export default function AnimatedBorder({
       />
 
       {/* Inner card body */}
-      <div className="relative rounded-[15px] bg-[#13171f] overflow-hidden">
+      <div className="relative rounded-[15px] animated-border-inner overflow-hidden">
         {children}
       </div>
     </div>
