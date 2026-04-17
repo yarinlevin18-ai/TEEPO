@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { io, Socket } from 'socket.io-client'
 import { useAuth } from '@/lib/auth-context'
+import { useDB } from '@/lib/db-context'
 import { usePathname } from 'next/navigation'
 import type { ChatMessage } from '@/types'
 
@@ -25,6 +26,7 @@ const SOCKET_TIMEOUT = 60_000
  */
 export default function AIChatWidget() {
   const { user } = useAuth()
+  const { db, ready } = useDB()
   const pathname = usePathname()
 
   const [isOpen, setIsOpen] = useState(false)
@@ -169,6 +171,77 @@ export default function AIChatWidget() {
   // Don't render on the full study-buddy page (it has its own chat)
   if (isOnStudyBuddyPage) return null
 
+  /**
+   * Build a compact context string from the Drive DB so the backend bot
+   * actually knows what the user is studying. The backend accepts up to
+   * 10,000 chars in the `context` field; we stay well below that.
+   *
+   * On a course page → focus on that course (title, lessons, notes).
+   * Otherwise → list all courses + pending tasks/assignments briefly.
+   */
+  const buildContext = (): string => {
+    if (!ready) return ''
+    const parts: string[] = []
+
+    if (courseId) {
+      const course = db.courses.find((c) => c.id === courseId)
+      if (course) {
+        parts.push(`קורס נוכחי: ${course.title}`)
+        if (course.description) parts.push(`תיאור: ${course.description.slice(0, 400)}`)
+
+        const lessons = db.lessons
+          .filter((l) => l.course_id === courseId)
+          .sort((a, b) => a.order_index - b.order_index)
+          .slice(0, 20)
+        if (lessons.length) {
+          parts.push('שיעורים:')
+          for (const l of lessons) {
+            const summary = l.ai_summary ? `: ${l.ai_summary.slice(0, 200)}` : ''
+            parts.push(`- ${l.title}${summary}`)
+          }
+        }
+
+        const notes = db.notes
+          .filter((n) => n.course_id === courseId)
+          .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
+          .slice(0, 5)
+        if (notes.length) {
+          parts.push('\nהערות אישיות:')
+          for (const n of notes) {
+            parts.push(`**${n.title}**\n${(n.content || '').slice(0, 400)}`)
+          }
+        }
+      }
+    } else {
+      if (db.courses.length) {
+        parts.push(`קורסים פעילים (${db.courses.length}):`)
+        for (const c of db.courses.slice(0, 20)) {
+          parts.push(`- ${c.title}`)
+        }
+      }
+      const openTasks = db.tasks.filter((t) => !t.is_completed).slice(0, 10)
+      if (openTasks.length) {
+        parts.push(`\nמשימות פתוחות (${openTasks.length}):`)
+        for (const t of openTasks) {
+          const due = t.scheduled_date ? ` (${t.scheduled_date})` : ''
+          parts.push(`- ${t.title}${due}`)
+        }
+      }
+      const openAssignments = db.assignments
+        .filter((a) => a.status !== 'submitted')
+        .slice(0, 10)
+      if (openAssignments.length) {
+        parts.push(`\nמטלות פתוחות (${openAssignments.length}):`)
+        for (const a of openAssignments) {
+          const due = a.deadline ? ` (עד ${a.deadline})` : ''
+          parts.push(`- ${a.title}${due}`)
+        }
+      }
+    }
+
+    return parts.join('\n').slice(0, 9000)
+  }
+
   const sendMessage = () => {
     const text = input.trim()
     if (!text || !socketRef.current) return
@@ -177,6 +250,7 @@ export default function AIChatWidget() {
       text,
       agent_type: 'study_buddy',
       course_id: courseId,
+      context: buildContext(),
     })
     setInput('')
   }
@@ -387,6 +461,7 @@ export default function AIChatWidget() {
                           text: q,
                           agent_type: 'study_buddy',
                           course_id: courseId,
+                          context: buildContext(),
                         })
                       }, 100)
                     }}

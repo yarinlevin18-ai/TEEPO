@@ -6,6 +6,7 @@ import { Send, Bot, User, Trash2, Plus, Download, Copy, Check, RefreshCw, Messag
 import { io, Socket } from 'socket.io-client'
 import type { ChatMessage } from '@/types'
 import { useAuth } from '@/lib/auth-context'
+import { useDB } from '@/lib/db-context'
 import GlowCard from '@/components/ui/GlowCard'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
@@ -91,6 +92,7 @@ function saveConversations(convos: Conversation[]) {
 
 export default function StudyBuddyPage() {
   const { user } = useAuth()
+  const { db, ready: dbReady } = useDB()
   const [activeAgent] = useState<AgentType>('study_buddy')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -288,7 +290,34 @@ export default function StudyBuddyPage() {
 
     const newMsg: ChatMessage = { role: 'user', content: msg, timestamp: new Date().toISOString() }
     setMessages(prev => [...prev, newMsg])
-    socketRef.current.emit('message', { text: msg, agent_type: activeAgent })
+
+    // Build context from the Drive DB so the bot actually knows what the user
+    // is studying. The backend accepts up to 10,000 chars in `context`.
+    let context = ''
+    if (dbReady) {
+      const parts: string[] = []
+      if (db.courses.length) {
+        parts.push(`קורסים (${db.courses.length}):`)
+        for (const c of db.courses.slice(0, 20)) parts.push(`- ${c.title}`)
+      }
+      const openTasks = db.tasks.filter(t => !t.is_completed).slice(0, 10)
+      if (openTasks.length) {
+        parts.push(`\nמשימות פתוחות:`)
+        for (const t of openTasks) {
+          parts.push(`- ${t.title}${t.scheduled_date ? ` (${t.scheduled_date})` : ''}`)
+        }
+      }
+      const openAssigns = db.assignments.filter(a => a.status !== 'submitted').slice(0, 10)
+      if (openAssigns.length) {
+        parts.push(`\nמטלות פתוחות:`)
+        for (const a of openAssigns) {
+          parts.push(`- ${a.title}${a.deadline ? ` (עד ${a.deadline})` : ''}`)
+        }
+      }
+      context = parts.join('\n').slice(0, 9000)
+    }
+
+    socketRef.current.emit('message', { text: msg, agent_type: activeAgent, context })
     if (!text) setInput('')
   }
 
