@@ -128,7 +128,13 @@ export default function DashboardPage() {
   const [calError, setCalError] = useState<string | null>(null)
 
   const providerToken = googleToken
-  const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || ''
+  // Google OAuth populates metadata as full_name / name / first_name (not display_name).
+  // Prefer first name for a friendlier greeting, fall back through the chain,
+  // and only use the email local-part if nothing else is available.
+  const meta = user?.user_metadata || {}
+  const fullName = (meta.full_name || meta.name || '').trim()
+  const firstName = (meta.first_name || meta.given_name || fullName.split(/\s+/)[0] || '').trim()
+  const displayName = firstName || fullName || user?.email?.split('@')[0] || ''
 
   // Zone 1 (courses/assignments/tasks) now comes from DB context automatically
 
