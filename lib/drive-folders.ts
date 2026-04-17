@@ -50,21 +50,32 @@ async function driveFetch(token: string, url: string, init: RequestInit = {}): P
   return res
 }
 
+/** Read response body text once even when it's already consumed. */
+async function readErrorBody(res: Response): Promise<string> {
+  try { return await res.clone().text() } catch { return '' }
+}
+
 /** Find a folder by name within a specific parent. Returns first match. */
 async function findFolder(
   token: string,
   name: string,
   parentId: string,
 ): Promise<string | null> {
+  // Escape both single-quotes and backslashes for the Drive query DSL.
+  const safeName = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
   const q = [
-    `name = '${name.replace(/'/g, "\\'")}'`,
+    `name = '${safeName}'`,
     `mimeType = '${FOLDER_MIME}'`,
     `'${parentId}' in parents`,
     'trashed = false',
   ].join(' and ')
   const url = `${DRIVE_API}/files?q=${encodeURIComponent(q)}&fields=files(id,name)&spaces=drive`
   const res = await driveFetch(token, url)
-  if (!res.ok) throw new Error(`Folder search failed (${res.status})`)
+  if (!res.ok) {
+    const body = await readErrorBody(res)
+    console.error('[drive-folders] findFolder failed', res.status, name, body)
+    throw new Error(`Drive search ${res.status}: ${body.slice(0, 200)}`)
+  }
   const data = await res.json()
   return data.files?.[0]?.id ?? null
 }
@@ -79,8 +90,13 @@ async function createFolder(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
   })
-  if (!res.ok) throw new Error(`Folder create failed (${res.status})`)
+  if (!res.ok) {
+    const body = await readErrorBody(res)
+    console.error('[drive-folders] createFolder failed', res.status, name, body)
+    throw new Error(`Drive create ${res.status}: ${body.slice(0, 200)}`)
+  }
   const data = await res.json()
+  console.info('[drive-folders] created folder', { name, id: data.id, parent: parentId })
   return data.id
 }
 

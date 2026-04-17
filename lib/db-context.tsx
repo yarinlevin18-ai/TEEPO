@@ -402,17 +402,20 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const syncAllCourseFolders = useCallback(async (
     onProgress?: (done: number, total: number, title: string) => void,
   ) => {
-    if (!handle) throw new Error('מסד הנתונים טרם נטען.')
+    if (!handle) throw new Error('מסד הנתונים טרם נטען. רענן את הדף ונסה שוב.')
     const smartDeskId = handle.folderId
     const current = db.courses
     const total = current.length
+    if (total === 0) throw new Error('אין קורסים ליצור להם תיקיות.')
+
+    console.info('[syncAllCourseFolders] starting for', total, 'courses; SmartDesk folder id:', smartDeskId)
+
     let done = 0
     let created = 0
     let skipped = 0
     let failed = 0
+    let firstError: Error | null = null
 
-    // Build a fresh list where each course gets its folder IDs. We batch the
-    // state update at the end (single Drive save) so we don't thrash.
     const updates = new Map<string, { ids: ReturnType<typeof Object>; path: string }>()
     const cache = new Map<string, string>()
 
@@ -430,8 +433,10 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
         )
         updates.set(course.id, { ids, path: currentPath })
         created++
-      } catch (e) {
-        console.error(`[syncAllCourseFolders] ${course.title} failed:`, e)
+        console.info(`[syncAllCourseFolders] ✓ ${course.title} → ${currentPath}`)
+      } catch (e: any) {
+        console.error(`[syncAllCourseFolders] ✗ ${course.title}:`, e)
+        if (!firstError) firstError = e instanceof Error ? e : new Error(String(e))
         failed++
       }
       done++
@@ -447,6 +452,13 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           return { ...c, drive_folder_ids: u.ids as Course['drive_folder_ids'], drive_folder_path: u.path }
         }),
       }))
+    }
+
+    // If nothing worked at all, surface the real error so the UI can show it.
+    if (created === 0 && failed > 0 && firstError) {
+      throw new Error(
+        `כל יצירות התיקיות נכשלו (${failed}/${total}). שגיאה ראשונה: ${firstError.message}`,
+      )
     }
 
     return { created, skipped, failed }
