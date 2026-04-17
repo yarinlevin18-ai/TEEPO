@@ -10,8 +10,12 @@ import GlowCard from '@/components/ui/GlowCard'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 const STORAGE_KEY = 'smartdesk_conversations'
-const MAX_RETRIES = 3
-const RETRY_DELAYS = [1000, 2000, 4000]
+// Render free-tier sleeps after ~15min idle. A cold start is 30-60s, so
+// retry aggressively over ~2 minutes before giving up.
+const MAX_RETRIES = 6
+const RETRY_DELAYS = [2000, 5000, 10000, 20000, 30000, 45000]
+// Socket.io default connect timeout is ~20s; bump to 60s to cover a cold boot.
+const SOCKET_TIMEOUT = 60_000
 
 type AgentType = 'study_buddy'
 
@@ -138,13 +142,26 @@ export default function StudyBuddyPage() {
     })
   }, [messages, activeConvoId])
 
-  // Connect socket with retry logic
+  // Connect socket with retry logic. Wakes the Render container via a
+  // cheap HTTP ping first so the actual socket handshake doesn't race
+  // against the cold-start window.
   const connectSocket = useCallback(() => {
     if (socketRef.current?.connected) return
 
     socketRef.current?.disconnect()
 
-    const socket = io(BACKEND, { transports: ['websocket', 'polling'] })
+    // Fire-and-forget wake-up ping — Render routes this through the same
+    // container that will serve the socket, so by the time io() handshakes
+    // Python's running. Timeout so it doesn't block forever on failure.
+    try {
+      fetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(60_000) }).catch(() => {})
+    } catch { /* AbortSignal.timeout unsupported in very old browsers — ignore */ }
+
+    const socket = io(BACKEND, {
+      transports: ['polling', 'websocket'], // start with polling (more reliable for handshake), then upgrade
+      timeout: SOCKET_TIMEOUT,
+      reconnection: false, // we handle reconnection ourselves
+    })
     socketRef.current = socket
 
     socket.on('connect', () => {
@@ -210,17 +227,18 @@ export default function StudyBuddyPage() {
     return () => { socket?.disconnect() }
   }, [connectSocket])
 
-  // Auto-retry on disconnect with exponential backoff
+  // Auto-retry on disconnect / connect_error with exponential backoff.
+  // Unlike before we DO retry from the first failed attempt — needed because
+  // Render's cold-start routinely burns the initial 20s handshake timeout.
   useEffect(() => {
     if (connected || isRetrying) return
     if (retryCount >= MAX_RETRIES) return
-
-    // Only auto-retry if we previously had a connection (retryCount === 0 means first disconnect)
-    // The initial connection is handled by connectSocket, so we only auto-retry after first connect_error/disconnect
-    if (retryCount === 0 && !socketRef.current) return
+    // Don't start retrying until the initial connectSocket() has actually run
+    // (socketRef.current is set as soon as it does).
+    if (!socketRef.current) return
 
     setIsRetrying(true)
-    const delay = RETRY_DELAYS[retryCount] || 4000
+    const delay = RETRY_DELAYS[retryCount] ?? 30_000
     retryTimerRef.current = setTimeout(() => {
       setRetryCount(prev => prev + 1)
       connectSocket()
@@ -496,22 +514,23 @@ export default function StudyBuddyPage() {
                 <span className="w-2 h-2 rounded-full bg-green-400" />
                 מחובר
               </span>
-            ) : isRetrying ? (
-              <span className="flex items-center gap-1.5 text-xs text-amber-400">
-                <RefreshCw size={12} className="animate-spin" />
-                מנסה להתחבר מחדש...
-              </span>
             ) : retryCount >= MAX_RETRIES ? (
               <button
                 onClick={manualReconnect}
                 className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10"
+                title="לא הצלחנו להתחבר לשרת. נסה שוב."
               >
                 <RefreshCw size={12} />
                 התחבר מחדש
               </button>
+            ) : isRetrying || retryCount > 0 ? (
+              <span className="flex items-center gap-1.5 text-xs text-amber-400" title="Render ישן — הקפצת השרת לוקחת כדקה">
+                <RefreshCw size={12} className="animate-spin" />
+                מעיר את השרת... (עד דקה)
+              </span>
             ) : (
               <span className="flex items-center gap-1.5 text-xs text-ink-muted">
-                <span className="w-2 h-2 rounded-full bg-white/20" />
+                <span className="w-2 h-2 rounded-full bg-white/20 animate-pulse" />
                 מתחבר...
               </span>
             )}
