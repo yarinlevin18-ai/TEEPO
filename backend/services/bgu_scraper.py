@@ -414,11 +414,18 @@ def scrape_moodle_courses() -> dict:
 
             if isinstance(data, list) and data and data[0].get("error") is False:
                 for course in data[0].get("data", {}).get("courses", []):
+                    # Moodle gives us startdate/enddate as UNIX timestamps and
+                    # shortname/categoryname as strings — all useful for
+                    # classifying the course into year-of-study + semester.
                     courses.append({
                         "title": course.get("fullname", ""),
                         "url": course.get("viewurl", ""),
                         "moodle_id": str(course.get("id", "")),
                         "summary": course.get("summary", ""),
+                        "shortname": course.get("shortname", ""),
+                        "startdate": course.get("startdate") or None,
+                        "enddate": course.get("enddate") or None,
+                        "category_name": course.get("coursecategory") or "",
                     })
                 logger.debug(f"[BGU] AJAX API found {len(courses)} courses")
     except Exception as e:

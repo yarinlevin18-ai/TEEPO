@@ -9,6 +9,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import GlowCard from '@/components/ui/GlowCard'
 import { useDB } from '@/lib/db-context'
+import { classifyCourse, computeYearOfStudy } from '@/lib/semester-classifier'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -122,21 +123,52 @@ export default function BGUConnectPage() {
       if (coursesData.status === 'error') {
         throw new Error(coursesData.message || 'הסנכרון נכשל')
       }
-      const scraped: Array<{ title: string; url?: string; moodle_id?: string }> = coursesData.courses || []
+      const scraped: Array<{
+        title: string
+        url?: string
+        moodle_id?: string
+        shortname?: string
+        startdate?: number | null
+        enddate?: number | null
+        category_name?: string
+      }> = coursesData.courses || []
 
       // Dedupe against existing courses by source_url (fall back to exact title).
       const existingUrls = new Set(db.courses.map(c => c.source_url).filter(Boolean) as string[])
       const existingTitles = new Set(db.courses.map(c => c.title))
+      // Pull degree start from settings so we can compute year-of-study per course
+      const degreeStart = (db.settings?.degree_start_year && db.settings?.degree_start_month)
+        ? { year: db.settings.degree_start_year, month: db.settings.degree_start_month }
+        : null
       let added = 0
       for (const c of scraped) {
         if (!c.title) continue
         if (c.url && existingUrls.has(c.url)) continue
         if (!c.url && existingTitles.has(c.title)) continue
+
+        // Classify semester + academic year from Moodle metadata
+        const cls = classifyCourse({
+          title: c.title,
+          shortname: c.shortname,
+          moodle_startdate: c.startdate,
+          moodle_enddate: c.enddate,
+        })
+        const yearOfStudy = (degreeStart && cls.academic_year)
+          ? computeYearOfStudy(degreeStart, parseInt(cls.academic_year, 10))
+          : undefined
+
         await createCourse({
           title: c.title,
           source: 'bgu',
           source_url: c.url,
           description: c.moodle_id ? `Moodle ID: ${c.moodle_id}` : undefined,
+          shortname: c.shortname,
+          moodle_startdate: c.startdate || undefined,
+          moodle_enddate: c.enddate || undefined,
+          category_name: c.category_name,
+          semester: cls.semester,
+          academic_year: cls.academic_year,
+          year_of_study: yearOfStudy,
         })
         added++
       }

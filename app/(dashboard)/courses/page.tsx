@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen, ChevronDown, ChevronUp, Plus, ExternalLink,
-  Calendar, Tag, Pencil, Search, LayoutGrid,
+  Calendar, Tag, Pencil, Search, LayoutGrid, RefreshCw,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useDB, useCourses } from '@/lib/db-context'
@@ -12,6 +12,13 @@ import ErrorAlert from '@/components/ui/ErrorAlert'
 import GlowCard from '@/components/ui/GlowCard'
 import Modal from '@/components/ui/Modal'
 import type { Course } from '@/types'
+import {
+  classifyCourse,
+  computeYearOfStudy,
+  semesterLabel,
+  sortKey,
+  type Semester,
+} from '@/lib/semester-classifier'
 
 // ── Department detection ────────────────────────────────────────────
 
@@ -51,7 +58,7 @@ type ViewMode = 'year-semester' | 'department'
 
 // ── Semester / Year helpers ──────────────────────────────────────────
 
-type SemesterLabel = 'א' | 'ב' | 'קיץ'
+type SemesterLabel = Semester
 
 const SEMESTER_OPTIONS: { value: SemesterLabel; label: string }[] = [
   { value: 'א', label: "סמסטר א'" },
@@ -59,53 +66,45 @@ const SEMESTER_OPTIONS: { value: SemesterLabel; label: string }[] = [
   { value: 'קיץ', label: 'קיץ' },
 ]
 
-function guessYearOptions(): string[] {
+/** Generate academic-year options (single-year format, e.g. "2024" = תשפ"ה). */
+function guessYearOptions(): { value: string; label: string }[] {
   const now = new Date()
-  const y = now.getFullYear()
-  // Academic year: if we're before September, current year is y-1/y, else y/y+1
-  const options: string[] = []
-  for (let i = y + 1; i >= y - 4; i--) {
-    options.push(`${i - 1}/${i}`)
+  const currentAY = now.getMonth() + 1 >= 10 ? now.getFullYear() : now.getFullYear() - 1
+  const options: { value: string; label: string }[] = []
+  for (let i = currentAY + 1; i >= currentAY - 5; i--) {
+    options.push({ value: String(i), label: `${i}/${i + 1}` })
   }
   return options
 }
 
-function guessSemesterFromTitle(title: string): { semester?: SemesterLabel; year?: string } {
-  const result: { semester?: SemesterLabel; year?: string } = {}
-
-  // Look for "סמ 1" / "סמ 2" / "סמסטר א" / "S1" / "S2"
-  if (/סמ['\s]*1|סמסטר\s*א|sem(?:ester)?\s*1|\bS1\b/i.test(title)) {
-    result.semester = 'א'
-  } else if (/סמ['\s]*2|סמסטר\s*ב|sem(?:ester)?\s*2|\bS2\b/i.test(title)) {
-    result.semester = 'ב'
-  } else if (/קיץ|summer/i.test(title)) {
-    result.semester = 'קיץ'
-  }
-
-  return result
-}
-
-// ── Course with local semester/year ─────────────────────────────────
+// ── Course with derived metadata ─────────────────────────────────────
 
 interface CourseWithMeta extends Course {
-  semester?: SemesterLabel
-  year?: string
+  /** Year of study (1-4); may be inferred if degree_start is known */
+  derived_year_of_study?: 1 | 2 | 3 | 4
 }
 
 // ── Main Component ──────────────────────────────────────────────────
 
 export default function CoursesPage() {
   const rawCourses = useCourses()
-  const { ready, loading, error: dbError, updateCourse } = useDB()
+  const { db, ready, loading, error: dbError, updateCourse, replaceCourses } = useDB()
+
+  const degreeStart = useMemo(() => {
+    const y = db?.settings?.degree_start_year
+    const m = db?.settings?.degree_start_month
+    return y && m ? { year: y, month: m } : null
+  }, [db?.settings?.degree_start_year, db?.settings?.degree_start_month])
 
   const courses = useMemo<CourseWithMeta[]>(() => rawCourses.map(c => {
-    const guess = guessSemesterFromTitle(c.title)
-    return {
-      ...c,
-      semester: c.semester || guess.semester,
-      year: c.academic_year || guess.year,
+    // If course has a stored year_of_study use it. Otherwise try to derive from
+    // academic_year + user's degree_start.
+    let yos = c.year_of_study
+    if (!yos && c.academic_year && degreeStart) {
+      yos = computeYearOfStudy(degreeStart, parseInt(c.academic_year, 10))
     }
-  }), [rawCourses])
+    return { ...c, derived_year_of_study: yos }
+  }), [rawCourses, degreeStart])
 
   const [error, setError] = useState<string | null>(null)
   const [editingCourse, setEditingCourse] = useState<CourseWithMeta | null>(null)
@@ -123,8 +122,10 @@ export default function CoursesPage() {
   const handleEditSave = async (updates: {
     title: string
     semester?: SemesterLabel
-    year?: string
+    academic_year?: string
+    year_of_study?: 1 | 2 | 3 | 4
     status: 'active' | 'paused' | 'completed'
+    classified_manually: boolean
   }) => {
     if (!editingCourse) return
     const id = editingCourse.id
@@ -133,12 +134,73 @@ export default function CoursesPage() {
       await updateCourse(id, {
         title: updates.title,
         semester: updates.semester,
-        academic_year: updates.year,
+        academic_year: updates.academic_year,
+        year_of_study: updates.year_of_study,
         status: updates.status,
+        classified_manually: updates.classified_manually,
       })
     } catch (e) {
       console.error('Failed to save course:', e)
       setError('שגיאה בשמירת הקורס. נסה שוב.')
+    }
+  }
+
+  const [reclassifying, setReclassifying] = useState(false)
+
+  /** Bulk: re-run auto-classifier on every non-manually-classified course. */
+  const handleReclassifyAll = async () => {
+    if (reclassifying) return
+    if (!confirm('לסווג מחדש את כל הקורסים הלא-ידניים על פי המטא-דאטה מ-Moodle?')) return
+    setReclassifying(true)
+    try {
+      const next = rawCourses.map((c) => {
+        if (c.classified_manually) return c
+        const cls = classifyCourse({
+          title: c.title,
+          shortname: c.shortname,
+          moodle_startdate: c.moodle_startdate,
+          moodle_enddate: c.moodle_enddate,
+        })
+        const yos = (degreeStart && cls.academic_year)
+          ? computeYearOfStudy(degreeStart, parseInt(cls.academic_year, 10))
+          : undefined
+        return {
+          ...c,
+          semester: cls.semester ?? c.semester,
+          academic_year: cls.academic_year ?? c.academic_year,
+          year_of_study: yos ?? c.year_of_study,
+        }
+      })
+      await replaceCourses(next)
+    } catch (e) {
+      console.error('Failed to reclassify all:', e)
+      setError('שגיאה בסיווג מחדש של הקורסים.')
+    } finally {
+      setReclassifying(false)
+    }
+  }
+
+  /** Re-run the auto-classifier on a single course (ignores manual override). */
+  const handleReclassify = async (c: CourseWithMeta) => {
+    try {
+      const cls = classifyCourse({
+        title: c.title,
+        shortname: c.shortname,
+        moodle_startdate: c.moodle_startdate,
+        moodle_enddate: c.moodle_enddate,
+      })
+      const yos = (degreeStart && cls.academic_year)
+        ? computeYearOfStudy(degreeStart, parseInt(cls.academic_year, 10))
+        : undefined
+      await updateCourse(c.id, {
+        semester: cls.semester,
+        academic_year: cls.academic_year,
+        year_of_study: yos,
+        classified_manually: false,
+      })
+    } catch (e) {
+      console.error('Failed to reclassify course:', e)
+      setError('שגיאה בסיווג מחדש של הקורס.')
     }
   }
 
@@ -160,25 +222,32 @@ export default function CoursesPage() {
     return result
   }, [courses, searchQuery, activeDepartment])
 
-  // ── Group courses by year → semester ──────────────────────────────
+  // ── Group courses by year-of-study → semester ─────────────────────
   const grouped = useMemo(() => {
+    // yearKey → semKey → courses[]
     const map: Record<string, Record<string, CourseWithMeta[]>> = {}
     const unassigned: CourseWithMeta[] = []
 
     filteredCourses.forEach((c) => {
-      if (!c.year && !c.semester) {
+      const yos = c.derived_year_of_study
+      const sem = c.semester
+      if (!yos && !sem) {
         unassigned.push(c)
         return
       }
-      const yearKey = c.year || 'ללא שנה'
-      const semKey = c.semester || 'ללא סמסטר'
+      const yearKey = yos ? `year-${yos}` : 'no-year'
+      const semKey = sem || 'no-sem'
       if (!map[yearKey]) map[yearKey] = {}
       if (!map[yearKey][semKey]) map[yearKey][semKey] = []
       map[yearKey][semKey].push(c)
     })
 
-    // Sort years descending (newest first)
-    const sortedYears = Object.keys(map).sort((a, b) => b.localeCompare(a))
+    // Sort years ascending (year 1 → year 4 → no-year last), showing degree progression
+    const yearOrder = (k: string) => {
+      if (k === 'no-year') return 99
+      return parseInt(k.replace('year-', ''), 10)
+    }
+    const sortedYears = Object.keys(map).sort((a, b) => yearOrder(a) - yearOrder(b))
 
     return { sortedYears, map, unassigned }
   }, [filteredCourses])
@@ -212,7 +281,21 @@ export default function CoursesPage() {
     setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  const semesterOrder: Record<string, number> = { 'א': 1, 'ב': 2, 'קיץ': 3, 'ללא סמסטר': 4 }
+  const semesterOrder: Record<string, number> = { 'א': 1, 'ב': 2, 'קיץ': 3, 'no-sem': 4 }
+
+  // Map year-of-study key → Hebrew label
+  const yearLabel = (yearKey: string): string => {
+    if (yearKey === 'no-year') return 'ללא שנה'
+    const n = parseInt(yearKey.replace('year-', ''), 10)
+    const labels = ['', "שנה א'", "שנה ב'", "שנה ג'", "שנה ד'"]
+    return labels[n] || `שנה ${n}`
+  }
+
+  const semLabelFromKey = (semKey: string): string => {
+    if (semKey === 'no-sem') return 'ללא סמסטר'
+    if (semKey === 'קיץ') return 'קיץ'
+    return `סמסטר ${semKey}'`
+  }
 
   if (loading) {
     return (
@@ -238,7 +321,19 @@ export default function CoursesPage() {
             {courses.length} קורסים
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Reclassify all (only if we have BGU courses with metadata) */}
+          {courses.some((c) => c.source === 'bgu' && (c.moodle_startdate || c.shortname)) && (
+            <button
+              onClick={handleReclassifyAll}
+              disabled={reclassifying}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-white/10 text-ink-muted hover:text-ink hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="סווג מחדש את כל הקורסים הלא-ידניים לפי המטא-דאטה מ-Moodle"
+            >
+              <RefreshCw size={14} className={reclassifying ? 'animate-spin' : ''} />
+              {reclassifying ? 'מסווג...' : 'סווג הכל מחדש'}
+            </button>
+          )}
           {/* View mode toggle */}
           {courses.length > 0 && (
             <div className="flex items-center bg-white/5 border border-white/[0.08] rounded-lg p-0.5">
@@ -321,7 +416,22 @@ export default function CoursesPage() {
         </GlowCard>
       ) : viewMode === 'year-semester' ? (
         <>
-          {/* Grouped courses by year/semester */}
+          {/* Helper banner when degree start isn't set */}
+          {!degreeStart && courses.length > 0 && (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm text-amber-300/90 flex items-start gap-3">
+              <Calendar size={16} className="flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium">הגדר את תאריך תחילת התואר</p>
+                <p className="text-xs text-amber-300/70 mt-0.5">
+                  כדי שנוכל לסדר את הקורסים לפי שנת לימוד, עבור ל
+                  <Link href="/settings" className="underline hover:text-amber-200 mx-1">הגדרות</Link>
+                  והזן את שנת תחילת התואר.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Grouped courses by year-of-study / semester */}
           {grouped.sortedYears.map((yearKey) => {
             const yearCollapsed = collapsedGroups[`year-${yearKey}`]
             const semesters = Object.keys(grouped.map[yearKey]).sort(
@@ -342,7 +452,7 @@ export default function CoursesPage() {
                     <Calendar size={16} className="text-indigo-400" />
                   </div>
                   <div className="flex-1">
-                    <h2 className="text-lg font-bold text-ink">{yearKey}</h2>
+                    <h2 className="text-lg font-bold text-ink">{yearLabel(yearKey)}</h2>
                   </div>
                   <span className="text-xs text-ink-muted">{totalInYear} קורסים</span>
                   {yearCollapsed ? (
@@ -355,7 +465,6 @@ export default function CoursesPage() {
                 <AnimatePresence>
                   {!yearCollapsed && semesters.map((semKey) => {
                     const semCourses = grouped.map[yearKey][semKey]
-                    const semLabel = semKey === 'א' ? "סמסטר א'" : semKey === 'ב' ? "סמסטר ב'" : semKey === 'קיץ' ? 'קיץ' : semKey
 
                     return (
                       <motion.div
@@ -368,7 +477,7 @@ export default function CoursesPage() {
                         <div className="mr-4 border-r border-white/5 pr-4 space-y-3 pb-2">
                           <div className="flex items-center gap-2">
                             <Tag size={14} className="text-violet-400" />
-                            <h3 className="text-sm font-semibold text-ink-muted">{semLabel}</h3>
+                            <h3 className="text-sm font-semibold text-ink-muted">{semLabelFromKey(semKey)}</h3>
                             <span className="text-xs text-ink-subtle">({semCourses.length})</span>
                           </div>
                           <div className="grid sm:grid-cols-2 gap-3">
@@ -377,6 +486,7 @@ export default function CoursesPage() {
                                 key={course.id}
                                 course={course}
                                 onEdit={() => setEditingCourse(course)}
+                                onReclassify={() => handleReclassify(course)}
                               />
                             ))}
                           </div>
@@ -400,7 +510,7 @@ export default function CoursesPage() {
                 <span className="text-xs text-ink-muted">{grouped.unassigned.length} קורסים</span>
               </div>
               <p className="text-xs text-ink-subtle mr-11">
-                לחץ על העיפרון כדי לשייך קורס לשנה וסמסטר
+                לחץ על העיפרון כדי לשייך קורס לשנה וסמסטר, או על &quot;סווג מחדש&quot; לסיווג אוטומטי
               </p>
               <div className="grid sm:grid-cols-2 gap-3 mr-4">
                 {grouped.unassigned.map((course) => (
@@ -408,6 +518,7 @@ export default function CoursesPage() {
                     key={course.id}
                     course={course}
                     onEdit={() => setEditingCourse(course)}
+                    onReclassify={() => handleReclassify(course)}
                   />
                 ))}
               </div>
@@ -456,6 +567,7 @@ export default function CoursesPage() {
                             key={course.id}
                             course={course}
                             onEdit={() => setEditingCourse(course)}
+                            onReclassify={() => handleReclassify(course)}
                           />
                         ))}
                       </div>
@@ -473,7 +585,12 @@ export default function CoursesPage() {
         course={editingCourse}
         onClose={() => setEditingCourse(null)}
         onSave={handleEditSave}
+        onReclassify={async (c) => {
+          setEditingCourse(null)
+          await handleReclassify(c)
+        }}
         yearOptions={yearOptions}
+        degreeStart={degreeStart}
       />
     </div>
   )
@@ -491,16 +608,27 @@ function EditCourseModal({
   course,
   onClose,
   onSave,
+  onReclassify,
   yearOptions,
+  degreeStart,
 }: {
   course: CourseWithMeta | null
   onClose: () => void
-  onSave: (updates: { title: string; semester?: SemesterLabel; year?: string; status: 'active' | 'paused' | 'completed' }) => void
-  yearOptions: string[]
+  onSave: (updates: {
+    title: string
+    semester?: SemesterLabel
+    academic_year?: string
+    year_of_study?: 1 | 2 | 3 | 4
+    status: 'active' | 'paused' | 'completed'
+    classified_manually: boolean
+  }) => void
+  onReclassify: (c: CourseWithMeta) => Promise<void>
+  yearOptions: { value: string; label: string }[]
+  degreeStart: { year: number; month: number } | null
 }) {
   const [localTitle, setLocalTitle] = useState('')
   const [localSem, setLocalSem] = useState<SemesterLabel | ''>('')
-  const [localYear, setLocalYear] = useState('')
+  const [localAY, setLocalAY] = useState('')
   const [localStatus, setLocalStatus] = useState<'active' | 'paused' | 'completed'>('active')
 
   // Sync local state when a new course is opened for editing
@@ -508,17 +636,32 @@ function EditCourseModal({
     if (course) {
       setLocalTitle(course.title)
       setLocalSem(course.semester || '')
-      setLocalYear(course.year || '')
+      setLocalAY(course.academic_year || '')
       setLocalStatus(course.status || 'active')
     }
   }, [course])
 
   const handleSave = () => {
+    // Compute year_of_study from AY if possible
+    const yos = (degreeStart && localAY)
+      ? computeYearOfStudy(degreeStart, parseInt(localAY, 10))
+      : undefined
+
+    // If user changed semester or academic year from what classifier produced,
+    // mark as manual override so future auto-reclassify skips it.
+    const originalSem = course?.semester || ''
+    const originalAY = course?.academic_year || ''
+    const changedClassification =
+      (localSem || '') !== originalSem || (localAY || '') !== originalAY
+    const manual = course?.classified_manually || changedClassification
+
     onSave({
       title: localTitle,
       semester: localSem || undefined,
-      year: localYear || undefined,
+      academic_year: localAY || undefined,
+      year_of_study: yos,
       status: localStatus,
+      classified_manually: manual,
     })
   }
 
@@ -565,13 +708,13 @@ function EditCourseModal({
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-ink-muted">שנה אקדמית</label>
             <select
-              value={localYear}
-              onChange={(e) => setLocalYear(e.target.value)}
+              value={localAY}
+              onChange={(e) => setLocalAY(e.target.value)}
               className="w-full text-sm bg-[#1e2330] border border-white/10 rounded-lg px-3 py-2 text-ink focus:outline-none focus:border-indigo-500/50 transition-colors"
             >
               <option value="" className="bg-[#1e2330] text-gray-300">לא נבחר</option>
               {yearOptions.map((y) => (
-                <option key={y} value={y} className="bg-[#1e2330] text-gray-300">{y}</option>
+                <option key={y.value} value={y.value} className="bg-[#1e2330] text-gray-300">{y.label}</option>
               ))}
             </select>
           </div>
@@ -589,6 +732,33 @@ function EditCourseModal({
             </select>
           </div>
         </div>
+
+        {/* Year-of-study preview */}
+        {localAY && degreeStart && (() => {
+          const yos = computeYearOfStudy(degreeStart, parseInt(localAY, 10))
+          if (!yos) return null
+          return (
+            <p className="text-xs text-ink-subtle">
+              {semesterLabel(yos, localSem || undefined)}
+            </p>
+          )
+        })()}
+
+        {/* Re-classify button (only if we have metadata to classify from) */}
+        {course && (course.moodle_startdate || course.shortname) && (
+          <button
+            onClick={() => onReclassify(course)}
+            className="w-full text-xs px-3 py-2 rounded-lg border border-indigo-500/30 bg-indigo-500/5 text-indigo-300 hover:bg-indigo-500/10 transition-colors flex items-center justify-center gap-2"
+          >
+            <Calendar size={14} />
+            סווג מחדש אוטומטית ממטא-דאטה של מודל
+          </button>
+        )}
+        {course?.classified_manually && (
+          <p className="text-xs text-amber-400/80 text-center">
+            ⚠ סיווג ידני פעיל — סיווג אוטומטי יתעלם מקורס זה
+          </p>
+        )}
 
         {/* Status */}
         <div className="space-y-1.5">
@@ -621,10 +791,18 @@ function EditCourseModal({
 function CourseCard({
   course,
   onEdit,
+  onReclassify,
 }: {
   course: CourseWithMeta
   onEdit: () => void
+  onReclassify?: () => void
 }) {
+  // Show "סווג מחדש" only for unclassified courses that have metadata and no manual override
+  const canAutoClassify =
+    !course.classified_manually &&
+    (course.moodle_startdate || course.shortname) &&
+    (!course.semester || !course.academic_year)
+
   return (
     <Link href={`/courses/${course.id}`} className="block group">
       <GlowCard className="group-hover:scale-[1.01] transition-transform cursor-pointer">
@@ -633,13 +811,24 @@ function CourseCard({
             <p className="text-sm font-medium text-ink leading-snug line-clamp-2 flex-1 group-hover:text-indigo-300 transition-colors">
               {course.title}
             </p>
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit() }}
-              className="p-1.5 rounded-lg hover:bg-white/5 text-ink-subtle hover:text-indigo-400 transition-colors flex-shrink-0"
-              title="ערוך קורס"
-            >
-              <Pencil size={14} />
-            </button>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {canAutoClassify && onReclassify && (
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onReclassify() }}
+                  className="p-1.5 rounded-lg hover:bg-white/5 text-ink-subtle hover:text-indigo-400 transition-colors"
+                  title="סווג מחדש אוטומטית"
+                >
+                  <Calendar size={14} />
+                </button>
+              )}
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit() }}
+                className="p-1.5 rounded-lg hover:bg-white/5 text-ink-subtle hover:text-indigo-400 transition-colors"
+                title="ערוך קורס"
+              >
+                <Pencil size={14} />
+              </button>
+            </div>
           </div>
 
           {/* Source badge + link */}

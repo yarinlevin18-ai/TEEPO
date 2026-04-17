@@ -2,6 +2,16 @@
 // טיפוסי TypeScript לאפליקציית הלימודים
 // ============================================================
 
+/** Per-user app settings stored inside the Drive DB */
+export interface UserSettings {
+  /** Gregorian year the user started their degree (e.g. 2023) */
+  degree_start_year?: number
+  /** Month (1-12) the user started — normally 10 (October). Used to align year-of-study boundaries. */
+  degree_start_month?: number
+  /** True if the user does summer semesters (shows קיץ slots even if empty) */
+  takes_summer?: boolean
+}
+
 export interface Course {
   id: string
   user_id: string
@@ -16,7 +26,17 @@ export interface Course {
   completed_at?: string
   created_at: string
   semester?: 'א' | 'ב' | 'קיץ'
+  /** Gregorian year the academic year starts in (e.g. "2024" for תשפ"ה = Oct 2024–Sep 2025) */
   academic_year?: string
+  /** Year of study relative to the user's degree (1=א, 2=ב, 3=ג, 4=ד). Computed from academic_year + degree start. */
+  year_of_study?: 1 | 2 | 3 | 4
+  /** Raw Moodle metadata kept so we can re-classify on demand */
+  moodle_startdate?: number   // UNIX timestamp seconds
+  moodle_enddate?: number     // UNIX timestamp seconds
+  shortname?: string          // BGU short code, e.g. "201-1-3301-24"
+  category_name?: string      // Moodle category (department/semester grouping)
+  /** True if the user manually overrode semester/year — skip auto-reclassification */
+  classified_manually?: boolean
 }
 
 export interface LessonFile {

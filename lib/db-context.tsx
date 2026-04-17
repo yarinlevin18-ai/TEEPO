@@ -17,7 +17,7 @@ import { useAuth } from './auth-context'
 import {
   DriveDB, DriveDBHandle, EMPTY_DB, loadDB, newId, saveDB, probeTokenScopes,
 } from './drive-db'
-import type { Course, Lesson, StudyTask, Assignment, CourseNote } from '@/types'
+import type { Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings } from '@/types'
 
 interface DBContextType {
   db: DriveDB
@@ -54,6 +54,11 @@ interface DBContextType {
   createNote: (courseId: string, input: Partial<CourseNote> & { title: string; content: string }) => Promise<CourseNote>
   updateNote: (id: string, patch: Partial<CourseNote>) => Promise<void>
   deleteNote: (id: string) => Promise<void>
+
+  // Settings
+  updateSettings: (patch: Partial<UserSettings>) => Promise<void>
+  /** Replace all courses at once (used by re-classifier to apply bulk updates efficiently) */
+  replaceCourses: (courses: Course[]) => Promise<void>
 }
 
 const DBContext = createContext<DBContextType | undefined>(undefined)
@@ -359,6 +364,15 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     mutate(d => ({ ...d, notes: d.notes.filter(n => n.id !== id) }))
   }, [mutate])
 
+  // ── Settings ───────────────────────────────────────────────
+  const updateSettings = useCallback(async (patch: Partial<UserSettings>) => {
+    mutate(d => ({ ...d, settings: { ...(d.settings || {}), ...patch } }))
+  }, [mutate])
+
+  const replaceCourses = useCallback(async (courses: Course[]) => {
+    mutate(d => ({ ...d, courses }))
+  }, [mutate])
+
   const driveConnected = !!googleToken && ready && !error
   const driveMissing = !!user && !googleToken
 
@@ -369,6 +383,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createTask, updateTask, deleteTask,
     createAssignment, updateAssignment, deleteAssignment,
     createNote, updateNote, deleteNote,
+    updateSettings, replaceCourses,
   }), [
     db, ready, loading, error, driveConnected, driveMissing, reload,
     createCourse, updateCourse, deleteCourse,
@@ -376,6 +391,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createTask, updateTask, deleteTask,
     createAssignment, updateAssignment, deleteAssignment,
     createNote, updateNote, deleteNote,
+    updateSettings, replaceCourses,
   ])
 
   return <DBContext.Provider value={value}>{children}</DBContext.Provider>

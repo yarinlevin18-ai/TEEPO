@@ -2,19 +2,26 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, User, GraduationCap, Save, Check, AlertCircle, ArrowRight } from 'lucide-react'
+import { Settings, User, GraduationCap, Save, Check, AlertCircle, ArrowRight, CalendarDays } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
+import { useDB } from '@/lib/db-context'
 import Link from 'next/link'
 import GlowCard from '@/components/ui/GlowCard'
 
 export default function SettingsPage() {
   const { user } = useAuth()
+  const { db, ready, updateSettings } = useDB()
   const [displayName, setDisplayName] = useState('')
   const [originalName, setOriginalName] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  // Degree-start state (local; persisted to Drive settings on change)
+  const [degreeYear, setDegreeYear] = useState<string>('')
+  const [degreeMonth, setDegreeMonth] = useState<string>('10')
+  const [takesSummer, setTakesSummer] = useState<boolean>(false)
+  const [degreeSaved, setDegreeSaved] = useState(false)
 
   // Track info
   const [trackName, setTrackName] = useState<string | null>(null)
@@ -27,6 +34,40 @@ export default function SettingsPage() {
       setOriginalName(name)
     }
   }, [user])
+
+  // Hydrate degree-start fields from Drive DB once it's ready
+  useEffect(() => {
+    if (!ready) return
+    const s = db.settings || {}
+    if (s.degree_start_year) setDegreeYear(String(s.degree_start_year))
+    if (s.degree_start_month) setDegreeMonth(String(s.degree_start_month))
+    setTakesSummer(!!s.takes_summer)
+  }, [ready, db.settings])
+
+  const handleDegreeSave = async () => {
+    const y = parseInt(degreeYear, 10)
+    const m = parseInt(degreeMonth, 10)
+    if (!y || y < 2000 || y > 2100) {
+      setError('שנה לא תקינה')
+      return
+    }
+    if (!m || m < 1 || m > 12) {
+      setError('חודש לא תקין')
+      return
+    }
+    try {
+      await updateSettings({
+        degree_start_year: y,
+        degree_start_month: m,
+        takes_summer: takesSummer,
+      })
+      setDegreeSaved(true)
+      setError('')
+      setTimeout(() => setDegreeSaved(false), 3000)
+    } catch (e: any) {
+      setError(e.message || 'שמירה נכשלה')
+    }
+  }
 
   // Load academic profile info
   useEffect(() => {
@@ -263,6 +304,94 @@ export default function SettingsPage() {
               </Link>
             </div>
           )}
+        </div>
+        </GlowCard>
+        </motion.div>
+
+        {/* Degree Start Date — powers year-of-study classification */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+        >
+        <GlowCard glowColor="rgba(99,102,241,0.10)">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-2">
+            <CalendarDays size={18} style={{ color: '#818cf8' }} />
+            <h2 className="font-semibold text-white">תחילת התואר</h2>
+          </div>
+          <p className="text-xs text-ink-subtle mb-5">
+            משמש לחישוב לאיזו שנה (א/ב/ג/ד) וסמסטר (א/ב/קיץ) שייך כל קורס שמושך מ-Moodle.
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm text-ink-muted mb-1.5">חודש</label>
+              <select
+                value={degreeMonth}
+                onChange={(e) => setDegreeMonth(e.target.value)}
+                className="input-dark"
+                dir="rtl"
+              >
+                <option value="10">אוקטובר (רגיל)</option>
+                <option value="3">מרץ</option>
+                <option value="1">ינואר</option>
+                <option value="4">אפריל</option>
+                <option value="7">יולי</option>
+                <option value="11">נובמבר</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-ink-muted mb-1.5">שנה</label>
+              <input
+                type="number"
+                value={degreeYear}
+                onChange={(e) => setDegreeYear(e.target.value)}
+                placeholder="2023"
+                min={2000}
+                max={2100}
+                className="input-dark"
+                dir="ltr"
+              />
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 mt-4 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={takesSummer}
+              onChange={(e) => setTakesSummer(e.target.checked)}
+              className="w-4 h-4 accent-indigo-500"
+            />
+            <span className="text-sm text-ink-muted">
+              אני לומד גם בסמסטר קיץ (אופציונלי — מציג חריץ "קיץ" גם אם ריק)
+            </span>
+          </label>
+
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleDegreeSave}
+            className="mt-5 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold btn-gradient shadow-glow-sm"
+          >
+            <Save size={16} />
+            <span>שמור</span>
+          </motion.button>
+
+          <AnimatePresence>
+            {degreeSaved && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center gap-2 text-sm mt-3"
+                style={{ color: '#10b981' }}
+              >
+                <Check size={16} />
+                <span>נשמר — קורסים חדשים יסווגו אוטומטית</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         </GlowCard>
         </motion.div>
