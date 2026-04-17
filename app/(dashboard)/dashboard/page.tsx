@@ -301,9 +301,11 @@ export default function DashboardPage() {
   )
 
   const completedCourses = courses.filter(c => c.status === 'completed')
+  const hasData = courses.length > 0 || assignments.length > 0 || tasks.length > 0
+  const hasTodayData = todayTasks.length > 0 || urgentAssignments.length > 0 || (todayData?.events?.length || 0) > 0
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-5 animate-fade-in">
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {/* Todo Popup */}
@@ -317,23 +319,16 @@ export default function DashboardPage() {
         todayStr={format(new Date(), 'yyyy-MM-dd')}
       />
 
-      {/* ══════════════════════════════════════════════════════════
-          ZONE 1: מה קורה עכשיו — What's Happening Now
-          ══════════════════════════════════════════════════════════ */}
-
       {/* ── Header ── */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Image src="/logo-128.png" alt="SmartDesk" width={38} height={38} />
-          <div>
-            <h1 className="text-2xl font-extrabold">
-              <span className="text-ink">{getGreeting()}, </span>
-              <span className="gradient-text">{displayName}</span>
-            </h1>
-            <p className="text-xs text-ink-muted mt-0.5">
-              {getCurrentSemester()} &middot; {format(new Date(), 'EEEE, d בMMMM', { locale: he })}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-extrabold leading-tight">
+            <span className="text-ink">{getGreeting()}, </span>
+            <span className="gradient-text">{displayName}</span>
+          </h1>
+          <p className="text-sm text-ink-muted mt-1">
+            {getCurrentSemester()} &middot; {format(new Date(), 'EEEE, d בMMMM', { locale: he })}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg ${bguConnected ? 'text-emerald-400' : 'text-ink-subtle'}`}
@@ -341,38 +336,88 @@ export default function DashboardPage() {
             {bguConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
             BGU
           </span>
-          <span className="text-sm font-bold px-3 py-1.5 rounded-xl"
-            style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.2)' }}>
-            MyDesk
-          </span>
         </div>
       </motion.div>
 
-      {/* ── "היום" Mini-Stats Row ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-      >
-        <div className="grid grid-cols-3 gap-3">
-          <div className="glass-sm rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-ink">{completedTodayTasks.length}/{todayTasks.length}</p>
-            <p className="text-xs text-ink-muted mt-0.5">משימות היום</p>
+      {/* ── Onboarding (when no data yet) ── */}
+      {!zone1Loading && !hasData && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <div
+            className="rounded-2xl p-6 sm:p-8"
+            style={{
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.05))',
+              border: '1px solid rgba(99,102,241,0.15)',
+            }}
+          >
+            <h2 className="text-lg font-bold text-ink mb-1">ברוכים הבאים ל-SmartDesk</h2>
+            <p className="text-sm text-ink-muted mb-6">שלושה צעדים קטנים כדי להתחיל:</p>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <Link href="/courses/extract">
+                <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl cursor-pointer transition-colors hover:bg-white/[0.04]"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style={{ background: 'rgba(99,102,241,0.2)' }}>
+                    <BookOpen size={18} style={{ color: '#a5b4fc' }} />
+                  </div>
+                  <p className="text-sm font-semibold text-ink mb-0.5">הוסף קורס</p>
+                  <p className="text-xs text-ink-muted">הדבק לינק או הוסף ידנית</p>
+                </motion.div>
+              </Link>
+              <Link href="/bgu-connect">
+                <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl cursor-pointer transition-colors hover:bg-white/[0.04]"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style={{ background: 'rgba(16,185,129,0.2)' }}>
+                    <Wifi size={18} style={{ color: '#6ee7b7' }} />
+                  </div>
+                  <p className="text-sm font-semibold text-ink mb-0.5">חבר את BGU</p>
+                  <p className="text-xs text-ink-muted">סנכרן ציונים ומטלות</p>
+                </motion.div>
+              </Link>
+              <Link href="/study-buddy">
+                <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl cursor-pointer transition-colors hover:bg-white/[0.04]"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style={{ background: 'rgba(139,92,246,0.2)' }}>
+                    <Sparkles size={18} style={{ color: '#c4b5fd' }} />
+                  </div>
+                  <p className="text-sm font-semibold text-ink mb-0.5">שאל את ה-AI</p>
+                  <p className="text-xs text-ink-muted">עוזר לימוד חכם עם אינטרנט</p>
+                </motion.div>
+              </Link>
+            </div>
           </div>
-          <div className="glass-sm rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold" style={{ color: urgentAssignments.length > 0 ? '#f59e0b' : '#10b981' }}>
-              {urgentAssignments.length > 0 ? urgentAssignments.length : '0'}
-            </p>
-            <p className="text-xs text-ink-muted mt-0.5">
-              {urgentAssignments.length > 0 ? 'מטלות דחופות' : 'אין דחופות'}
-            </p>
+        </motion.div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════
+          ZONE 1: מה קורה עכשיו — What's Happening Now
+          ══════════════════════════════════════════════════════════ */}
+
+      {/* ── "היום" Mini-Stats Row (only when there's data) ── */}
+      {hasTodayData && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+        >
+          <div className="grid grid-cols-3 gap-3">
+            <div className="glass-sm rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-ink">{completedTodayTasks.length}/{todayTasks.length}</p>
+              <p className="text-xs text-ink-muted mt-0.5">משימות היום</p>
+            </div>
+            <div className="glass-sm rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold" style={{ color: urgentAssignments.length > 0 ? '#f59e0b' : '#10b981' }}>
+                {urgentAssignments.length}
+              </p>
+              <p className="text-xs text-ink-muted mt-0.5">
+                {urgentAssignments.length > 0 ? 'מטלות דחופות' : 'אין דחופות'}
+              </p>
+            </div>
+            <div className="glass-sm rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-ink">{todayData?.events?.length || 0}</p>
+              <p className="text-xs text-ink-muted mt-0.5">שיעורים היום</p>
+            </div>
           </div>
-          <div className="glass-sm rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-ink">{todayData?.events?.length || 0}</p>
-            <p className="text-xs text-ink-muted mt-0.5">שיעורים היום</p>
-          </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
 
       {/* ── Calendar Strip ── */}
       <motion.div
@@ -469,7 +514,7 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* ── Zone 1 Main Content Grid (3/5 + 2/5) ── */}
-      <div className="grid lg:grid-cols-5 gap-4 sm:gap-6">
+      <div className="grid lg:grid-cols-5 gap-4 sm:gap-5">
 
         {/* ── Left Column (3/5): Schedule + Subjects ── */}
         <div className="lg:col-span-3 space-y-4 sm:space-y-6">
@@ -582,30 +627,23 @@ export default function DashboardPage() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════
-          VISUAL SEPARATOR
-          ══════════════════════════════════════════════════════════ */}
-      <div className="relative py-4">
-        <div className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-l from-transparent via-white/10 to-transparent" />
-        <div className="relative flex justify-center">
-          <span className="px-4 py-1.5 rounded-full text-xs font-medium text-ink-muted"
-            style={{ background: '#0f1117', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <TrendingUp size={12} className="inline ml-1.5" style={{ color: '#818cf8' }} />
-            תמונת מצב כללית
-          </span>
-        </div>
-      </div>
-
-      {/* ══════════════════════════════════════════════════════════
           ZONE 2: תמונת מצב כללית — Overall Academic Status
           ══════════════════════════════════════════════════════════ */}
+      <div className="relative pt-2 pb-1">
+        <div className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-l from-transparent via-white/8 to-transparent" />
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="rounded-2xl p-4 sm:p-6 space-y-4 sm:space-y-6"
-        style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+        className="space-y-4"
       >
         {/* ── Zone 2 Stats Row ── */}
+        <div className="flex items-center gap-2 mb-1">
+          <TrendingUp size={14} style={{ color: '#818cf8' }} />
+          <h2 className="text-sm font-bold text-ink-muted">תמונת מצב כללית</h2>
+        </div>
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -651,7 +689,7 @@ export default function DashboardPage() {
         </motion.div>
 
         {/* ── Zone 2 Content Grid (1/2 + 1/2) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* ── Left: Credits / Degree Progress ── */}
           <div>

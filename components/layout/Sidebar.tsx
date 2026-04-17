@@ -11,15 +11,29 @@ import Image from 'next/image'
 import { useAuth } from '@/lib/auth-context'
 import { useEffect } from 'react'
 
-const NAV = [
-  { href: '/dashboard',       icon: LayoutDashboard, label: 'MyDesk' },
-  { href: '/courses',         icon: BookOpen,         label: 'הקורסים שלי' },
-  { href: '/tasks',           icon: CheckSquare,      label: 'משימות' },
-  { href: '/assignments',     icon: FileText,         label: 'מטלות' },
-  { href: '/notes',           icon: StickyNote,       label: 'הסיכומים שלי' },
-  { href: '/credits',         icon: GraduationCap,    label: "מעקב נק\"ז" },
-  { href: '/study-buddy',     icon: MessageCircle,    label: 'SmartDesk AI' },
-  { href: '/bgu-connect',     icon: Wifi,             label: 'חיבור BGU' },
+const NAV_GROUPS = [
+  {
+    items: [
+      { href: '/dashboard', icon: LayoutDashboard, label: 'MyDesk' },
+    ],
+  },
+  {
+    label: 'לימודים',
+    items: [
+      { href: '/courses',     icon: BookOpen,    label: 'הקורסים שלי' },
+      { href: '/tasks',       icon: CheckSquare, label: 'משימות' },
+      { href: '/assignments', icon: FileText,    label: 'מטלות' },
+      { href: '/notes',       icon: StickyNote,  label: 'הסיכומים שלי' },
+    ],
+  },
+  {
+    label: 'כלים',
+    items: [
+      { href: '/credits',      icon: GraduationCap,  label: "מעקב נק\"ז" },
+      { href: '/study-buddy',  icon: MessageCircle,  label: 'SmartDesk AI' },
+      { href: '/bgu-connect',  icon: Wifi,            label: 'חיבור BGU' },
+    ],
+  },
 ]
 
 interface SidebarProps {
@@ -72,38 +86,48 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
           </Link>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-2 space-y-0.5">
-          {NAV.map(({ href, icon: Icon, label }) => {
-            const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
-            return (
-              <Link key={href} href={href} onClick={onMobileClose}>
-                <motion.div
-                  whileHover={{ x: -2 }}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                    active ? 'text-white' : 'text-ink-muted hover:text-ink'
-                  }`}
-                  style={active ? {
-                    background: 'rgba(99,102,241,0.15)',
-                    borderRight: '2px solid #6366f1',
-                    boxShadow: '0 0 12px rgba(99,102,241,0.12)',
-                  } : {
-                    borderRight: '2px solid transparent',
-                  }}
-                >
-                  <Icon size={18} style={{ color: active ? '#818cf8' : undefined, flexShrink: 0 }} />
-                  <span>{label}</span>
-                  {active && (
-                    <motion.div
-                      layoutId="sidebar-dot"
-                      className="w-1.5 h-1.5 rounded-full mr-auto"
-                      style={{ background: '#818cf8' }}
-                    />
-                  )}
-                </motion.div>
-              </Link>
-            )
-          })}
+        {/* Nav — grouped */}
+        <nav className="flex-1 px-3 py-1 space-y-5 overflow-y-auto">
+          {NAV_GROUPS.map((group, gi) => (
+            <div key={gi}>
+              {group.label && (
+                <p className="px-3 mb-2 text-[10px] font-bold text-ink-subtle uppercase tracking-widest">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {group.items.map(({ href, icon: Icon, label }) => {
+                  const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+                  return (
+                    <Link key={href} href={href} onClick={onMobileClose}>
+                      <motion.div
+                        whileHover={{ x: -2 }}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                          active
+                            ? 'text-white'
+                            : 'text-ink-muted hover:text-ink hover:bg-white/[0.04]'
+                        }`}
+                        style={active ? {
+                          background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.10))',
+                          boxShadow: 'inset 0 0 0 1px rgba(99,102,241,0.18), 0 0 20px rgba(99,102,241,0.06)',
+                        } : undefined}
+                      >
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all"
+                          style={active ? {
+                            background: 'rgba(99,102,241,0.25)',
+                          } : undefined}
+                        >
+                          <Icon size={16} style={active ? { color: '#a5b4fc' } : undefined} />
+                        </div>
+                        <span>{label}</span>
+                      </motion.div>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* User & Footer */}
@@ -133,8 +157,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
             </div>
           )}
           <div className="text-center space-y-0.5">
-            <p className="text-xs gradient-text font-medium">SmartDesk</p>
-            <p className="text-[10px] text-ink-subtle">&copy; 2026 Yarin Levin. All rights reserved.</p>
+            <p className="text-[10px] text-ink-subtle">&copy; 2026 Yarin Levin</p>
           </div>
         </div>
       </>
