@@ -17,6 +17,7 @@ import { useAuth } from './auth-context'
 import {
   DriveDB, DriveDBHandle, EMPTY_DB, loadDB, newId, saveDB, probeTokenScopes,
 } from './drive-db'
+import { ensureCourseFolders, pathForCourse } from './drive-folders'
 import type { Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings } from '@/types'
 
 interface DBContextType {
@@ -59,6 +60,14 @@ interface DBContextType {
   updateSettings: (patch: Partial<UserSettings>) => Promise<void>
   /** Replace all courses at once (used by re-classifier to apply bulk updates efficiently) */
   replaceCourses: (courses: Course[]) => Promise<void>
+
+  // Drive folders (user-facing course hierarchy under SmartDesk/)
+  /** Ensure one course has its Drive folder hierarchy; persists IDs back onto the course. */
+  syncCourseFolders: (courseId: string) => Promise<void>
+  /** Ensure every course has its Drive folders. Accepts optional progress callback. */
+  syncAllCourseFolders: (
+    onProgress?: (done: number, total: number, title: string) => void,
+  ) => Promise<{ created: number; skipped: number; failed: number }>
 }
 
 const DBContext = createContext<DBContextType | undefined>(undefined)
@@ -373,6 +382,76 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     mutate(d => ({ ...d, courses }))
   }, [mutate])
 
+  // ── Drive folders ──────────────────────────────────────────
+  const syncCourseFolders = useCallback(async (courseId: string) => {
+    if (!handle) throw new Error('מסד הנתונים טרם נטען.')
+    const course = db.courses.find(c => c.id === courseId)
+    if (!course) throw new Error('קורס לא נמצא.')
+    const ids = await withToken(t => ensureCourseFolders(t, handle.folderId, course))
+    const pathStr = pathForCourse(course).join('/')
+    mutate(d => ({
+      ...d,
+      courses: d.courses.map(c =>
+        c.id === courseId
+          ? { ...c, drive_folder_ids: ids, drive_folder_path: pathStr }
+          : c,
+      ),
+    }))
+  }, [handle, db.courses, withToken, mutate])
+
+  const syncAllCourseFolders = useCallback(async (
+    onProgress?: (done: number, total: number, title: string) => void,
+  ) => {
+    if (!handle) throw new Error('מסד הנתונים טרם נטען.')
+    const smartDeskId = handle.folderId
+    const current = db.courses
+    const total = current.length
+    let done = 0
+    let created = 0
+    let skipped = 0
+    let failed = 0
+
+    // Build a fresh list where each course gets its folder IDs. We batch the
+    // state update at the end (single Drive save) so we don't thrash.
+    const updates = new Map<string, { ids: ReturnType<typeof Object>; path: string }>()
+    const cache = new Map<string, string>()
+
+    for (const course of current) {
+      const currentPath = pathForCourse(course).join('/')
+      if (course.drive_folder_ids && course.drive_folder_path === currentPath) {
+        skipped++
+        done++
+        onProgress?.(done, total, course.title)
+        continue
+      }
+      try {
+        const ids = await withToken(t =>
+          ensureCourseFolders(t, smartDeskId, course, cache),
+        )
+        updates.set(course.id, { ids, path: currentPath })
+        created++
+      } catch (e) {
+        console.error(`[syncAllCourseFolders] ${course.title} failed:`, e)
+        failed++
+      }
+      done++
+      onProgress?.(done, total, course.title)
+    }
+
+    if (updates.size > 0) {
+      mutate(d => ({
+        ...d,
+        courses: d.courses.map(c => {
+          const u = updates.get(c.id)
+          if (!u) return c
+          return { ...c, drive_folder_ids: u.ids as Course['drive_folder_ids'], drive_folder_path: u.path }
+        }),
+      }))
+    }
+
+    return { created, skipped, failed }
+  }, [handle, db.courses, withToken, mutate])
+
   const driveConnected = !!googleToken && ready && !error
   const driveMissing = !!user && !googleToken
 
@@ -384,6 +463,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createAssignment, updateAssignment, deleteAssignment,
     createNote, updateNote, deleteNote,
     updateSettings, replaceCourses,
+    syncCourseFolders, syncAllCourseFolders,
   }), [
     db, ready, loading, error, driveConnected, driveMissing, reload,
     createCourse, updateCourse, deleteCourse,
@@ -392,6 +472,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createAssignment, updateAssignment, deleteAssignment,
     createNote, updateNote, deleteNote,
     updateSettings, replaceCourses,
+    syncCourseFolders, syncAllCourseFolders,
   ])
 
   return <DBContext.Provider value={value}>{children}</DBContext.Provider>

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen, ChevronDown, ChevronUp, Plus, ExternalLink,
-  Calendar, Tag, Pencil, Search, LayoutGrid, RefreshCw,
+  Calendar, Tag, Pencil, Search, LayoutGrid, RefreshCw, FolderTree,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useDB, useCourses } from '@/lib/db-context'
@@ -88,7 +88,7 @@ interface CourseWithMeta extends Course {
 
 export default function CoursesPage() {
   const rawCourses = useCourses()
-  const { db, ready, loading, error: dbError, updateCourse, replaceCourses } = useDB()
+  const { db, ready, loading, error: dbError, updateCourse, replaceCourses, syncAllCourseFolders } = useDB()
 
   const degreeStart = useMemo(() => {
     const y = db?.settings?.degree_start_year
@@ -146,6 +146,32 @@ export default function CoursesPage() {
   }
 
   const [reclassifying, setReclassifying] = useState(false)
+  const [syncingFolders, setSyncingFolders] = useState(false)
+  const [folderProgress, setFolderProgress] = useState<{ done: number; total: number } | null>(null)
+  const [folderResult, setFolderResult] = useState<string | null>(null)
+
+  /** Create/update Drive folder hierarchy for every course. */
+  const handleSyncFolders = async () => {
+    if (syncingFolders) return
+    if (!confirm('ליצור עץ תיקיות ב-Google Drive לכל הקורסים? (SmartDesk/תואר ראשון/שנה X/סמסטר Y/קורס/שיעורים|מטלות|סיכומים)')) return
+    setSyncingFolders(true)
+    setFolderResult(null)
+    setFolderProgress({ done: 0, total: courses.length })
+    try {
+      const result = await syncAllCourseFolders((done, total) => {
+        setFolderProgress({ done, total })
+      })
+      setFolderResult(
+        `הסתיים: ${result.created} נוצרו, ${result.skipped} דולגו, ${result.failed} כשלו`
+      )
+    } catch (e: any) {
+      console.error('Failed to sync folders:', e)
+      setError(e?.message || 'יצירת התיקיות ב-Drive נכשלה')
+    } finally {
+      setSyncingFolders(false)
+      setFolderProgress(null)
+    }
+  }
 
   /** Bulk: re-run auto-classifier on every non-manually-classified course. */
   const handleReclassifyAll = async () => {
@@ -322,6 +348,20 @@ export default function CoursesPage() {
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Create Drive folder hierarchy */}
+          {courses.length > 0 && (
+            <button
+              onClick={handleSyncFolders}
+              disabled={syncingFolders}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-white/10 text-ink-muted hover:text-ink hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="צור תיקיות ב-Google Drive לכל הקורסים, מחולקות לפי שנה וסמסטר"
+            >
+              <FolderTree size={14} className={syncingFolders ? 'animate-pulse' : ''} />
+              {syncingFolders && folderProgress
+                ? `${folderProgress.done}/${folderProgress.total}`
+                : 'צור תיקיות ב-Drive'}
+            </button>
+          )}
           {/* Reclassify all (only if we have BGU courses with metadata) */}
           {courses.some((c) => c.source === 'bgu' && (c.moodle_startdate || c.shortname)) && (
             <button
@@ -370,6 +410,22 @@ export default function CoursesPage() {
       </div>
 
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
+
+      {/* Folder sync result banner */}
+      {folderResult && (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm text-emerald-300/90 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <FolderTree size={16} />
+            <span>{folderResult}</span>
+          </div>
+          <button
+            onClick={() => setFolderResult(null)}
+            className="text-xs text-emerald-300/70 hover:text-emerald-200"
+          >
+            סגור
+          </button>
+        </div>
+      )}
 
       {/* Search bar */}
       {courses.length > 0 && (
@@ -812,6 +868,18 @@ function CourseCard({
               {course.title}
             </p>
             <div className="flex items-center gap-1 flex-shrink-0">
+              {course.drive_folder_ids?.course && (
+                <a
+                  href={`https://drive.google.com/drive/folders/${course.drive_folder_ids.course}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(`https://drive.google.com/drive/folders/${course.drive_folder_ids!.course}`, '_blank', 'noopener,noreferrer') }}
+                  className="p-1.5 rounded-lg hover:bg-white/5 text-ink-subtle hover:text-indigo-400 transition-colors"
+                  title="פתח את תיקיית הקורס ב-Drive"
+                >
+                  <FolderTree size={14} />
+                </a>
+              )}
               {canAutoClassify && onReclassify && (
                 <button
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onReclassify() }}

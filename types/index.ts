@@ -37,6 +37,16 @@ export interface Course {
   category_name?: string      // Moodle category (department/semester grouping)
   /** True if the user manually overrode semester/year — skip auto-reclassification */
   classified_manually?: boolean
+  /** Google Drive folder IDs for this course's user-facing files (lazily populated). */
+  drive_folder_ids?: {
+    course: string
+    lessons: string
+    assignments: string
+    notes: string
+  }
+  /** The classification (year+semester) we used last time we created/verified the Drive folders.
+   *  If this drifts from current year_of_study+semester, the folder is stale and may need to move. */
+  drive_folder_path?: string
 }
 
 export interface LessonFile {
