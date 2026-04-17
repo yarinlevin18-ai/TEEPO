@@ -90,47 +90,112 @@ function semesterFromShortname(shortname: string): Semester | null {
   }
 }
 
-/** Try to extract "סמ 1|2|ק" or "סמסטר א|ב|קיץ" hints from free text */
+/** Try to extract "סמ 1|2|ק" or "סמסטר א|ב|קיץ" hints from free text.
+ *  Works for patterns seen in real BGU Moodle titles:
+ *    "סכנות גלובליות לדמוקרטיה סמ 1"
+ *    "שיווק ואסטרטגיה סמ 2"
+ *    "ניתוח נתונים למנהלים סמסטר ב' תשפ"ה"
+ *    "- א סמ 1" / "- ב סמ 2"
+ *  Note: ASCII `\b` doesn't work next to Hebrew letters (both sides non-word),
+ *  so we use explicit non-letter/non-digit lookaheads instead. */
 function semesterFromText(text: string): Semester | null {
   const t = text.replace(/\s+/g, ' ')
-  if (/סמ(?:סטר)?\s*ק(?:יץ)?/i.test(t) || /\bקיץ\b/.test(t)) return 'קיץ'
-  if (/סמ(?:סטר)?\s*[בb2]\b/i.test(t)) return 'ב'
-  if (/סמ(?:סטר)?\s*[אa1]\b/i.test(t)) return 'א'
+  // Summer: "סמ ק", "סמסטר ק", "סמ קיץ", or standalone "קיץ"
+  if (/סמ(?:סטר)?\s*ק(?:יץ)?(?![א-ת])/i.test(t) || /(?:^|[^א-ת])קיץ(?![א-ת])/.test(t)) return 'קיץ'
+  // Semester ב: "סמ 2", "סמ ב", "סמסטר ב", "סמסטר ב'"
+  // After the letter/digit, require a non-letter & non-digit (end, space, quote, apostrophe, gershayim)
+  if (/סמ(?:סטר)?\s*(?:ב|2)(?![א-תa-z0-9])/i.test(t)) return 'ב'
+  // Semester א: "סמ 1", "סמ א", "סמסטר א", "סמסטר א'"
+  if (/סמ(?:סטר)?\s*(?:א|1)(?![א-תa-z0-9])/i.test(t)) return 'א'
+  return null
+}
+
+/**
+ * Extract academic year from Hebrew year codes.
+ * Hebrew year 5780+N (תש + פ + letter) corresponds to academic year 2019+N.
+ *   תשפ"א = 5781 = AY 2020 (Oct 2020 – Sep 2021)
+ *   תשפ"ב = 5782 = AY 2021
+ *   תשפ"ג = 5783 = AY 2022
+ *   תשפ"ד = 5784 = AY 2023
+ *   תשפ"ה = 5785 = AY 2024  ← current-ish year in BGU sync
+ *   תשפ"ו = 5786 = AY 2025
+ *   תשפ"ז = 5787 = AY 2026
+ *   תש"פ  = 5780 = AY 2019
+ * Supports optional gershayim (״), straight quote ("), apostrophe (') or none between decade & unit.
+ */
+function academicYearFromHebrew(text: string): number | null {
+  // Try the תש + decade-letter + unit-letter form first (5700-range)
+  // Decade letters (after ת×ש): 0=none (תש"פ only has unit), פ=80, ע=70, ק=100
+  // Matches תשפ"X, תשפX, תשפ״X
+  const decadeUnit = text.match(/תש([פעקרש])\s*["״']?\s*([א-ט])/)
+  if (decadeUnit) {
+    const decadeMap: Record<string, number> = { 'פ': 80, 'ע': 70, 'ק': 100, 'ר': 200, 'ש': 300 }
+    const unitMap: Record<string, number> = {
+      'א': 1, 'ב': 2, 'ג': 3, 'ד': 4, 'ה': 5, 'ו': 6, 'ז': 7, 'ח': 8, 'ט': 9,
+    }
+    const decade = decadeMap[decadeUnit[1]]
+    const unit = unitMap[decadeUnit[2]]
+    if (decade && unit) {
+      const hebrewYear = 5700 + decade + unit
+      return hebrewYear - 3761
+    }
+  }
+  // תש"פ / תש״פ = 5780 (no decade letter, just unit פ=80)
+  const shortForm = text.match(/תש\s*["״']?\s*פ(?![א-ת])/)
+  if (shortForm) {
+    return 5780 - 3761 // 2019
+  }
   return null
 }
 
 // ── Public API ────────────────────────────────────────────────────────────
 
-/** Pick the best classification from all available signals. */
+/** Pick the best classification from all available signals.
+ *  Strategy: start with highest-confidence source, then backfill missing fields
+ *  from lower-confidence sources (e.g. startdate gives year+semester, but if
+ *  absent we can still combine shortname year + title semester). */
 export function classifyCourse(input: ClassificationInput): Classification {
-  // High confidence: Moodle startdate
+  // High confidence: Moodle startdate gives us both semester and year
   if (input.moodle_startdate && input.moodle_startdate > 0) {
     const c = classifyFromDate(input.moodle_startdate)
     return { ...c, confidence: 'high' }
   }
 
-  // Medium confidence: parse from shortname
+  let semester: Semester | undefined
+  let academicYear: string | undefined
+  let confidence: Classification['confidence'] = 'none'
+
+  // Medium: BGU shortname like "201-1-3301-25"
   if (input.shortname) {
     const sem = semesterFromShortname(input.shortname)
     const year = yearFromShortname(input.shortname)
-    if (sem && year) {
-      return { semester: sem, academic_year: String(year), confidence: 'medium' }
+    if (sem) { semester = sem; confidence = 'medium' }
+    if (year) { academicYear = String(year); confidence = 'medium' }
+  }
+
+  // Low/medium: Hebrew text hints from title (works when Moodle didn't
+  // populate startdate/shortname — covers all titles in the real BGU sync)
+  if (input.title) {
+    if (!semester) {
+      const sem = semesterFromText(input.title)
+      if (sem) {
+        semester = sem
+        if (confidence === 'none') confidence = 'low'
+      }
     }
-    if (sem || year) {
-      return {
-        semester: sem || undefined,
-        academic_year: year ? String(year) : undefined,
-        confidence: 'medium',
+    if (!academicYear) {
+      const hebYear = academicYearFromHebrew(input.title)
+      if (hebYear) {
+        academicYear = String(hebYear)
+        // A Hebrew year tag is an explicit human label — bump to medium
+        confidence = 'medium'
       }
     }
   }
 
-  // Low confidence: parse Hebrew semester hint from title
-  if (input.title) {
-    const sem = semesterFromText(input.title)
-    if (sem) return { semester: sem, confidence: 'low' }
+  if (semester || academicYear) {
+    return { semester, academic_year: academicYear, confidence }
   }
-
   return { confidence: 'none' }
 }
 

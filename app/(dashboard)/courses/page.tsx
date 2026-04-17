@@ -88,7 +88,7 @@ interface CourseWithMeta extends Course {
 
 export default function CoursesPage() {
   const rawCourses = useCourses()
-  const { db, ready, loading, error: dbError, updateCourse, replaceCourses, syncAllCourseFolders } = useDB()
+  const { db, ready, loading, error: dbError, updateCourse, replaceCourses, updateSettings, syncAllCourseFolders } = useDB()
 
   const degreeStart = useMemo(() => {
     const y = db?.settings?.degree_start_year
@@ -174,9 +174,11 @@ export default function CoursesPage() {
   }
 
   /** Bulk: re-run auto-classifier on every non-manually-classified course. */
-  const handleReclassifyAll = async () => {
+  const handleReclassifyAll = async (skipConfirm: unknown = false) => {
     if (reclassifying) return
-    if (!confirm('לסווג מחדש את כל הקורסים הלא-ידניים על פי המטא-דאטה מ-Moodle?')) return
+    // `skipConfirm` is called with a MouseEvent when wired directly to onClick
+    // (instead of () => ...). Only treat strict boolean `true` as skip-intent.
+    if (skipConfirm !== true && !confirm('לסווג מחדש את כל הקורסים הלא-ידניים על פי המטא-דאטה מ-Moodle?')) return
     setReclassifying(true)
     try {
       const next = rawCourses.map((c) => {
@@ -472,19 +474,16 @@ export default function CoursesPage() {
         </GlowCard>
       ) : viewMode === 'year-semester' ? (
         <>
-          {/* Helper banner when degree start isn't set */}
+          {/* Inline degree-start setter when not configured */}
           {!degreeStart && courses.length > 0 && (
-            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm text-amber-300/90 flex items-start gap-3">
-              <Calendar size={16} className="flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="font-medium">הגדר את תאריך תחילת התואר</p>
-                <p className="text-xs text-amber-300/70 mt-0.5">
-                  כדי שנוכל לסדר את הקורסים לפי שנת לימוד, עבור ל
-                  <Link href="/settings" className="underline hover:text-amber-200 mx-1">הגדרות</Link>
-                  והזן את שנת תחילת התואר.
-                </p>
-              </div>
-            </div>
+            <DegreeStartBanner
+              onSave={async (year, month) => {
+                await updateSettings({ degree_start_year: year, degree_start_month: month })
+                // Auto-reclassify once the degree start is known so year-of-study
+                // gets computed for all existing courses in one click.
+                await handleReclassifyAll(true)
+              }}
+            />
           )}
 
           {/* Grouped courses by year-of-study / semester */}
@@ -942,5 +941,102 @@ function CourseCard({
         </div>
       </GlowCard>
     </Link>
+  )
+}
+
+// ── Degree Start Banner ─────────────────────────────────────────────
+// Inline setter for degree_start_year / degree_start_month. Shown at the top
+// of /courses when the user hasn't configured their degree start date yet.
+// Used so the user can turn the "לא משויכים" bucket into real year-of-study
+// buckets without leaving the page.
+
+function DegreeStartBanner({
+  onSave,
+}: {
+  onSave: (year: number, month: number) => Promise<void>
+}) {
+  const now = new Date()
+  // Default to the current academic year: if we're in Oct-Dec, current year;
+  // otherwise previous year. Default month = October.
+  const defaultYear = now.getMonth() + 1 >= 10 ? now.getFullYear() : now.getFullYear() - 1
+  const [year, setYear] = useState<number>(defaultYear)
+  const [month, setMonth] = useState<number>(10)
+  const [saving, setSaving] = useState(false)
+
+  const yearOptions: number[] = []
+  for (let y = defaultYear + 1; y >= defaultYear - 6; y--) yearOptions.push(y)
+
+  const monthOptions: { value: number; label: string }[] = [
+    { value: 10, label: 'אוקטובר (סמסטר א׳)' },
+    { value: 3, label: 'מרץ (סמסטר ב׳)' },
+    { value: 7, label: 'יולי (קיץ)' },
+  ]
+
+  const handleSave = async () => {
+    if (saving) return
+    setSaving(true)
+    try {
+      await onSave(year, month)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-300/90 space-y-3">
+      <div className="flex items-start gap-3">
+        <Calendar size={16} className="flex-shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <p className="font-medium">הגדר את תאריך תחילת התואר</p>
+          <p className="text-xs text-amber-300/70 mt-0.5">
+            כדי שנסדר את הקורסים לפי שנת לימוד (שנה א׳/ב׳/ג׳/ד׳). הזן את הסמסטר הראשון שלך בתואר:
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3 pr-7">
+        <div className="space-y-1">
+          <label className="text-xs text-amber-300/70">שנה</label>
+          <select
+            value={year}
+            onChange={(e) => setYear(parseInt(e.target.value, 10))}
+            className="w-full text-sm bg-[#1e2330] border border-white/10 rounded-lg px-3 py-2 text-ink focus:outline-none focus:border-amber-500/50"
+          >
+            {yearOptions.map((y) => (
+              <option key={y} value={y} className="bg-[#1e2330] text-gray-300">
+                {y}/{y + 1}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-amber-300/70">סמסטר התחלה</label>
+          <select
+            value={month}
+            onChange={(e) => setMonth(parseInt(e.target.value, 10))}
+            className="w-full text-sm bg-[#1e2330] border border-white/10 rounded-lg px-3 py-2 text-ink focus:outline-none focus:border-amber-500/50"
+          >
+            {monthOptions.map((m) => (
+              <option key={m.value} value={m.value} className="bg-[#1e2330] text-gray-300">
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-500/20 text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? 'שומר ומסווג...' : 'שמור וסווג קורסים'}
+        </button>
+        <Link
+          href="/settings"
+          className="text-xs text-amber-300/60 underline hover:text-amber-200 pb-2"
+        >
+          עריכה מפורטת
+        </Link>
+      </div>
+    </div>
   )
 }
