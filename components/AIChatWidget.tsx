@@ -147,15 +147,8 @@ export default function AIChatWidget() {
                 {unread}
               </span>
             )}
-            {/* Pulse ring */}
-            <motion.div
-              className="absolute inset-0 rounded-full border-2 border-indigo-400"
-              animate={{
-                scale: [1, 1.4],
-                opacity: [0.5, 0],
-              }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
-            />
+            {/* Pulse ring — pure CSS to avoid Framer Motion parent-child conflicts */}
+            <span className="absolute inset-0 rounded-full border-2 border-indigo-400 animate-[chat-ping_2s_ease-out_infinite]" />
           </motion.button>
         )}
       </AnimatePresence>
