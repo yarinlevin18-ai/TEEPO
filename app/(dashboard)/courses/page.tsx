@@ -4,13 +4,50 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen, ChevronDown, ChevronUp, Plus, ExternalLink,
-  Loader2, Calendar, Tag, Check, X, Pencil,
+  Calendar, Tag, Pencil, Search, LayoutGrid,
 } from 'lucide-react'
 import Link from 'next/link'
 import { api } from '@/lib/api-client'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import GlowCard from '@/components/ui/GlowCard'
+import Modal from '@/components/ui/Modal'
 import type { Course } from '@/types'
+
+// ── Department detection ────────────────────────────────────────────
+
+type DepartmentLabel =
+  | 'מדעי המחשב'
+  | 'מתמטיקה'
+  | 'אנגלית'
+  | 'פיזיקה'
+  | 'הנדסת חשמל'
+  | 'כללי'
+  | 'אחר'
+
+const DEPARTMENT_KEYWORDS: Record<Exclude<DepartmentLabel, 'אחר'>, string[]> = {
+  'מדעי המחשב': ['תכנות', 'אלגוריתם', 'מבני נתונים', 'מערכות הפעלה', 'רשתות', 'בסיסי נתונים', 'תוכנה', 'חישוב', 'לוגיקה'],
+  'מתמטיקה': ['חשבון', 'אלגברה', 'הסתברות', 'סטטיסטיקה', 'מתמטיקה', 'ליניארית'],
+  'אנגלית': ['אנגלית', 'english'],
+  'פיזיקה': ['פיזיקה', 'מכניקה', 'אלקטרו'],
+  'הנדסת חשמל': ['מעגלים', 'אותות', 'אלקטרוניקה', 'ספרתי'],
+  'כללי': ['מבוא', 'סמינר', 'פרויקט'],
+}
+
+const ALL_DEPARTMENTS: Array<'הכל' | DepartmentLabel> = [
+  'הכל', 'מדעי המחשב', 'מתמטיקה', 'אנגלית', 'פיזיקה', 'הנדסת חשמל', 'כללי', 'אחר',
+]
+
+function detectDepartment(title: string): DepartmentLabel {
+  const lower = title.toLowerCase()
+  for (const [dept, keywords] of Object.entries(DEPARTMENT_KEYWORDS) as [Exclude<DepartmentLabel, 'אחר'>, string[]][]) {
+    if (keywords.some((kw) => lower.includes(kw.toLowerCase()))) {
+      return dept
+    }
+  }
+  return 'אחר'
+}
+
+type ViewMode = 'year-semester' | 'department'
 
 // ── Semester / Year helpers ──────────────────────────────────────────
 
@@ -61,8 +98,11 @@ export default function CoursesPage() {
   const [courses, setCourses] = useState<CourseWithMeta[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingCourse, setEditingCourse] = useState<CourseWithMeta | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeDepartment, setActiveDepartment] = useState<'הכל' | DepartmentLabel>('הכל')
+  const [viewMode, setViewMode] = useState<ViewMode>('year-semester')
 
   const yearOptions = useMemo(() => guessYearOptions(), [])
 
@@ -91,24 +131,61 @@ export default function CoursesPage() {
     load()
   }, [])
 
-  const updateCourseMeta = (id: string, semester?: SemesterLabel, year?: string) => {
+  const handleEditSave = async (updates: {
+    title: string
+    semester?: SemesterLabel
+    year?: string
+    status: 'active' | 'paused' | 'completed'
+  }) => {
+    if (!editingCourse) return
+    const id = editingCourse.id
+    // Update local state immediately
     setCourses((prev) =>
-      prev.map((c) => c.id === id ? { ...c, semester, year } : c)
+      prev.map((c) =>
+        c.id === id
+          ? { ...c, title: updates.title, semester: updates.semester, year: updates.year, status: updates.status }
+          : c
+      )
     )
+    setEditingCourse(null)
     // Persist to Supabase
-    api.courses.update(id, { semester: semester || null, academic_year: year || null })
-      .catch((e) => {
-        console.error('Failed to save semester/year:', e)
-        setError('שגיאה בשמירת הסמסטר. נסה שוב.')
+    try {
+      await api.courses.update(id, {
+        title: updates.title,
+        semester: updates.semester || null,
+        academic_year: updates.year || null,
+        status: updates.status,
       })
+    } catch (e) {
+      console.error('Failed to save course:', e)
+      setError('שגיאה בשמירת הקורס. נסה שוב.')
+    }
   }
+
+  // ── Filter courses by search + department ─────────────────────────
+  const filteredCourses = useMemo(() => {
+    let result = courses
+
+    // Text search (case-insensitive, Hebrew-safe)
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase()
+      result = result.filter((c) => c.title.toLowerCase().includes(q))
+    }
+
+    // Department filter
+    if (activeDepartment !== 'הכל') {
+      result = result.filter((c) => detectDepartment(c.title) === activeDepartment)
+    }
+
+    return result
+  }, [courses, searchQuery, activeDepartment])
 
   // ── Group courses by year → semester ──────────────────────────────
   const grouped = useMemo(() => {
     const map: Record<string, Record<string, CourseWithMeta[]>> = {}
     const unassigned: CourseWithMeta[] = []
 
-    courses.forEach((c) => {
+    filteredCourses.forEach((c) => {
       if (!c.year && !c.semester) {
         unassigned.push(c)
         return
@@ -124,7 +201,32 @@ export default function CoursesPage() {
     const sortedYears = Object.keys(map).sort((a, b) => b.localeCompare(a))
 
     return { sortedYears, map, unassigned }
-  }, [courses])
+  }, [filteredCourses])
+
+  // ── Group courses by department ───────────────────────────────────
+  const groupedByDept = useMemo(() => {
+    const map: Record<DepartmentLabel, CourseWithMeta[]> = {
+      'מדעי המחשב': [],
+      'מתמטיקה': [],
+      'אנגלית': [],
+      'פיזיקה': [],
+      'הנדסת חשמל': [],
+      'כללי': [],
+      'אחר': [],
+    }
+
+    filteredCourses.forEach((c) => {
+      const dept = detectDepartment(c.title)
+      map[dept].push(c)
+    })
+
+    // Only return departments that have courses
+    const activeDepts = (Object.keys(map) as DepartmentLabel[]).filter(
+      (d) => map[d].length > 0
+    )
+
+    return { activeDepts, map }
+  }, [filteredCourses])
 
   const toggleGroup = (key: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -134,7 +236,7 @@ export default function CoursesPage() {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-4xl mx-auto space-y-4 animate-fade-in">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-4 animate-fade-in">
         <div className="h-8 w-48 shimmer rounded-lg" />
         <div className="h-4 w-64 shimmer rounded-lg" />
         <div className="grid sm:grid-cols-2 gap-4 mt-8">
@@ -147,28 +249,101 @@ export default function CoursesPage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6 animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-ink">הקורסים שלי</h1>
           <p className="text-ink-muted text-sm mt-1">
-            {courses.length} קורסים &middot; מסודרים לפי שנה וסמסטר
+            {courses.length} קורסים
           </p>
         </div>
-        <Link href="/courses/extract">
-          <button className="btn-gradient flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-opacity hover:opacity-90">
-            <Plus size={16} /> הוסף קורס
-          </button>
-        </Link>
+        <div className="flex items-center gap-3">
+          {/* View mode toggle */}
+          {courses.length > 0 && (
+            <div className="flex items-center bg-white/5 border border-white/[0.08] rounded-lg p-0.5">
+              <button
+                onClick={() => setViewMode('year-semester')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'year-semester'
+                    ? 'bg-indigo-500/20 text-indigo-300'
+                    : 'text-slate-400 hover:text-slate-300'
+                }`}
+                title="קיבוץ לפי שנה וסמסטר"
+              >
+                <Calendar size={14} />
+              </button>
+              <button
+                onClick={() => setViewMode('department')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  viewMode === 'department'
+                    ? 'bg-indigo-500/20 text-indigo-300'
+                    : 'text-slate-400 hover:text-slate-300'
+                }`}
+                title="קיבוץ לפי מחלקה"
+              >
+                <LayoutGrid size={14} />
+              </button>
+            </div>
+          )}
+          <Link href="/courses/extract">
+            <button className="btn-gradient flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-opacity hover:opacity-90">
+              <Plus size={16} /> הוסף קורס
+            </button>
+          </Link>
+        </div>
       </div>
 
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
+      {/* Search bar */}
+      {courses.length > 0 && (
+        <div className="relative">
+          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="חפש קורס..."
+            className="input-dark w-full pr-10"
+            dir="rtl"
+          />
+        </div>
+      )}
+
+      {/* Department chips */}
+      {courses.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {ALL_DEPARTMENTS.map((dept) => {
+            const isActive = activeDepartment === dept
+            return (
+              <button
+                key={dept}
+                onClick={() => setActiveDepartment(dept)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                    : 'bg-white/5 text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
+                }`}
+              >
+                {dept}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Result count */}
+      {courses.length > 0 && (searchQuery || activeDepartment !== 'הכל') && (
+        <p className="text-xs text-ink-muted">
+          מציג {filteredCourses.length} קורסים
+        </p>
+      )}
+
       {courses.length === 0 ? (
         <GlowCard className="text-center">
         <div className="p-12">
-          <BookOpen size={40} className="text-white/10 mx-auto mb-4" />
+          <BookOpen size={32} className="text-white/10 mx-auto mb-4" />
           <p className="text-ink-muted mb-2">עדיין לא הוספת קורסים</p>
           <p className="text-ink-subtle text-sm mb-4">חבר את חשבון BGU שלך או הוסף קורס מ-Udemy/Coursera</p>
           <div className="flex gap-3 justify-center">
@@ -185,9 +360,17 @@ export default function CoursesPage() {
           </div>
         </div>
         </GlowCard>
-      ) : (
+      ) : filteredCourses.length === 0 ? (
+        <GlowCard className="text-center">
+          <div className="p-12">
+            <Search size={32} className="text-white/10 mx-auto mb-4" />
+            <p className="text-ink-muted mb-2">לא נמצאו קורסים</p>
+            <p className="text-ink-subtle text-sm">נסה לשנות את החיפוש או הסינון</p>
+          </div>
+        </GlowCard>
+      ) : viewMode === 'year-semester' ? (
         <>
-          {/* Grouped courses */}
+          {/* Grouped courses by year/semester */}
           {grouped.sortedYears.map((yearKey) => {
             const yearCollapsed = collapsedGroups[`year-${yearKey}`]
             const semesters = Object.keys(grouped.map[yearKey]).sort(
@@ -242,10 +425,7 @@ export default function CoursesPage() {
                               <CourseCard
                                 key={course.id}
                                 course={course}
-                                editing={editingId === course.id}
-                                onEdit={() => setEditingId(editingId === course.id ? null : course.id)}
-                                onUpdate={updateCourseMeta}
-                                yearOptions={yearOptions}
+                                onEdit={() => setEditingCourse(course)}
                               />
                             ))}
                           </div>
@@ -276,18 +456,212 @@ export default function CoursesPage() {
                   <CourseCard
                     key={course.id}
                     course={course}
-                    editing={editingId === course.id}
-                    onEdit={() => setEditingId(editingId === course.id ? null : course.id)}
-                    onUpdate={updateCourseMeta}
-                    yearOptions={yearOptions}
+                    onEdit={() => setEditingCourse(course)}
                   />
                 ))}
               </div>
             </div>
           )}
         </>
+      ) : (
+        <>
+          {/* Grouped courses by department */}
+          {groupedByDept.activeDepts.map((deptKey) => {
+            const deptCollapsed = collapsedGroups[`dept-${deptKey}`]
+            const deptCourses = groupedByDept.map[deptKey]
+
+            return (
+              <div key={deptKey} className="space-y-3">
+                {/* Department header */}
+                <button
+                  onClick={() => toggleGroup(`dept-${deptKey}`)}
+                  className="flex items-center gap-3 w-full text-right group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center">
+                    <LayoutGrid size={16} className="text-indigo-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-lg font-bold text-ink">{deptKey}</h2>
+                  </div>
+                  <span className="text-xs text-ink-muted">{deptCourses.length} קורסים</span>
+                  {deptCollapsed ? (
+                    <ChevronDown size={16} className="text-ink-muted" />
+                  ) : (
+                    <ChevronUp size={16} className="text-ink-muted" />
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {!deptCollapsed && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="grid sm:grid-cols-2 gap-3 mr-4">
+                        {deptCourses.map((course) => (
+                          <CourseCard
+                            key={course.id}
+                            course={course}
+                            onEdit={() => setEditingCourse(course)}
+                          />
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )
+          })}
+        </>
       )}
+
+      {/* Edit Course Modal */}
+      <EditCourseModal
+        course={editingCourse}
+        onClose={() => setEditingCourse(null)}
+        onSave={handleEditSave}
+        yearOptions={yearOptions}
+      />
     </div>
+  )
+}
+
+// ── Edit Course Modal ───────────────────────────────────────────────
+
+const STATUS_OPTIONS: { value: 'active' | 'paused' | 'completed'; label: string; color: string }[] = [
+  { value: 'active', label: 'פעיל', color: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30' },
+  { value: 'paused', label: 'מושהה', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+  { value: 'completed', label: 'הושלם', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+]
+
+function EditCourseModal({
+  course,
+  onClose,
+  onSave,
+  yearOptions,
+}: {
+  course: CourseWithMeta | null
+  onClose: () => void
+  onSave: (updates: { title: string; semester?: SemesterLabel; year?: string; status: 'active' | 'paused' | 'completed' }) => void
+  yearOptions: string[]
+}) {
+  const [localTitle, setLocalTitle] = useState('')
+  const [localSem, setLocalSem] = useState<SemesterLabel | ''>('')
+  const [localYear, setLocalYear] = useState('')
+  const [localStatus, setLocalStatus] = useState<'active' | 'paused' | 'completed'>('active')
+
+  // Sync local state when a new course is opened for editing
+  useEffect(() => {
+    if (course) {
+      setLocalTitle(course.title)
+      setLocalSem(course.semester || '')
+      setLocalYear(course.year || '')
+      setLocalStatus(course.status || 'active')
+    }
+  }, [course])
+
+  const handleSave = () => {
+    onSave({
+      title: localTitle,
+      semester: localSem || undefined,
+      year: localYear || undefined,
+      status: localStatus,
+    })
+  }
+
+  const currentStatusOption = STATUS_OPTIONS.find((s) => s.value === localStatus)
+
+  return (
+    <Modal
+      open={!!course}
+      onClose={onClose}
+      title="עריכת קורס"
+      size="md"
+      footer={
+        <div className="flex items-center gap-3 justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-white/10 rounded-xl text-sm text-ink-muted hover:text-ink hover:border-white/15 transition-colors"
+          >
+            ביטול
+          </button>
+          <button
+            onClick={handleSave}
+            className="btn-gradient px-5 py-2 rounded-xl text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            שמור
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-5" dir="rtl">
+        {/* Title */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-ink-muted">שם הקורס</label>
+          <input
+            type="text"
+            value={localTitle}
+            onChange={(e) => setLocalTitle(e.target.value)}
+            className="input-dark w-full"
+            dir="rtl"
+          />
+        </div>
+
+        {/* Year + Semester row */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-ink-muted">שנה אקדמית</label>
+            <select
+              value={localYear}
+              onChange={(e) => setLocalYear(e.target.value)}
+              className="w-full text-sm bg-[#1e2330] border border-white/10 rounded-lg px-3 py-2 text-ink focus:outline-none focus:border-indigo-500/50 transition-colors"
+            >
+              <option value="" className="bg-[#1e2330] text-gray-300">לא נבחר</option>
+              {yearOptions.map((y) => (
+                <option key={y} value={y} className="bg-[#1e2330] text-gray-300">{y}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-ink-muted">סמסטר</label>
+            <select
+              value={localSem}
+              onChange={(e) => setLocalSem(e.target.value as SemesterLabel | '')}
+              className="w-full text-sm bg-[#1e2330] border border-white/10 rounded-lg px-3 py-2 text-ink focus:outline-none focus:border-indigo-500/50 transition-colors"
+            >
+              <option value="" className="bg-[#1e2330] text-gray-300">לא נבחר</option>
+              {SEMESTER_OPTIONS.map((s) => (
+                <option key={s.value} value={s.value} className="bg-[#1e2330] text-gray-300">{s.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Status */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-ink-muted">סטטוס</label>
+          <select
+            value={localStatus}
+            onChange={(e) => setLocalStatus(e.target.value as 'active' | 'paused' | 'completed')}
+            className="w-full text-sm bg-[#1e2330] border border-white/10 rounded-lg px-3 py-2 text-ink focus:outline-none focus:border-indigo-500/50 transition-colors"
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value} className="bg-[#1e2330] text-gray-300">{s.label}</option>
+            ))}
+          </select>
+          {/* Status badge preview */}
+          {currentStatusOption && (
+            <div className="mt-2">
+              <span className={`inline-block text-xs px-2.5 py-1 rounded-full border ${currentStatusOption.color}`}>
+                {currentStatusOption.label}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
   )
 }
 
@@ -295,31 +669,11 @@ export default function CoursesPage() {
 
 function CourseCard({
   course,
-  editing,
   onEdit,
-  onUpdate,
-  yearOptions,
 }: {
   course: CourseWithMeta
-  editing: boolean
   onEdit: () => void
-  onUpdate: (id: string, semester?: SemesterLabel, year?: string) => void
-  yearOptions: string[]
 }) {
-  const [localSem, setLocalSem] = useState<SemesterLabel | ''>(course.semester || '')
-  const [localYear, setLocalYear] = useState(course.year || '')
-
-  const handleSave = () => {
-    onUpdate(course.id, localSem || undefined, localYear || undefined)
-    onEdit() // close editor
-  }
-
-  const handleCancel = () => {
-    setLocalSem(course.semester || '')
-    setLocalYear(course.year || '')
-    onEdit()
-  }
-
   return (
     <GlowCard className="group hover:scale-[1.01] transition-transform">
       <div className="p-4 space-y-2">
@@ -330,7 +684,7 @@ function CourseCard({
           <button
             onClick={onEdit}
             className="p-1.5 rounded-lg hover:bg-white/5 text-ink-subtle hover:text-indigo-400 transition-colors flex-shrink-0"
-            title="ערוך שנה וסמסטר"
+            title="ערוך קורס"
           >
             <Pencil size={14} />
           </button>
@@ -376,57 +730,6 @@ function CourseCard({
           </div>
         )}
       </div>
-
-      {/* Semester/Year editor */}
-      <AnimatePresence>
-        {editing && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-t border-white/5"
-          >
-            <div className="p-3 space-y-2 bg-white/[0.02]">
-              <div className="flex gap-2">
-                <select
-                  value={localYear}
-                  onChange={(e) => setLocalYear(e.target.value)}
-                  className="flex-1 text-xs bg-[#1e2330] border border-white/10 rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-accent-500"
-                >
-                  <option value="" className="bg-[#1e2330] text-gray-300">שנה...</option>
-                  {yearOptions.map((y) => (
-                    <option key={y} value={y} className="bg-[#1e2330] text-gray-300">{y}</option>
-                  ))}
-                </select>
-                <select
-                  value={localSem}
-                  onChange={(e) => setLocalSem(e.target.value as SemesterLabel | '')}
-                  className="flex-1 text-xs bg-[#1e2330] border border-white/10 rounded-lg px-2 py-1.5 text-ink focus:outline-none focus:border-accent-500"
-                >
-                  <option value="" className="bg-[#1e2330] text-gray-300">סמסטר...</option>
-                  {SEMESTER_OPTIONS.map((s) => (
-                    <option key={s.value} value={s.value} className="bg-[#1e2330] text-gray-300">{s.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={handleCancel}
-                  className="p-1.5 rounded-lg hover:bg-white/5 text-ink-muted hover:text-ink transition-colors"
-                >
-                  <X size={14} />
-                </button>
-                <button
-                  onClick={handleSave}
-                  className="p-1.5 rounded-lg bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25 transition-colors"
-                >
-                  <Check size={14} />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </GlowCard>
   )
 }

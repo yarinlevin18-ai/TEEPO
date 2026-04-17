@@ -260,7 +260,7 @@ export default function CourseDetailPage() {
   // ── Loading skeleton ──
   if (loading) {
     return (
-      <div className="p-8 max-w-4xl mx-auto space-y-6 animate-fade-in">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6 animate-fade-in">
         <div className="h-8 w-64 shimmer rounded-lg" />
         <div className="h-4 w-48 shimmer rounded-lg" />
         <div className="space-y-3 mt-8">
@@ -274,7 +274,7 @@ export default function CourseDetailPage() {
 
   if (!course) {
     return (
-      <div className="p-8 max-w-4xl mx-auto animate-fade-in">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto animate-fade-in">
         <ErrorAlert message={error || 'הקורס לא נמצא'} />
         <Link href="/courses" className="mt-4 inline-flex items-center gap-2 text-sm text-accent-400 hover:text-accent-300 transition-colors">
           <ArrowRight size={14} /> חזרה לקורסים
@@ -289,7 +289,7 @@ export default function CourseDetailPage() {
     : 0
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6 animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6 animate-fade-in">
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {/* Back link */}

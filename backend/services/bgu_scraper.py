@@ -30,7 +30,8 @@ PORTAL_COOKIES_FILE = COOKIES_DIR / "portal_cookies.json"
 COOKIES_DIR.mkdir(exist_ok=True)
 
 MOODLE_URL = "https://moodle.bgu.ac.il/moodle"
-PORTAL_URL = "https://my.bgu.ac.il"
+PORTAL_URL = "https://bgu4u22.bgu.ac.il"
+PORTAL_URL_OLD = "https://my.bgu.ac.il"
 
 
 # --------------------------------------------------------------------------- #
@@ -859,8 +860,11 @@ def _scrape_portal_grades(cookies: list) -> list:
     session = _build_session(cookies)
     grades = []
 
-    # Try common BGU portal grade URLs
+    # Try common BGU portal grade URLs (APEX-based + legacy PL/SQL)
     grade_paths = [
+        "/apex/10g/r/f_kiosk1009/home",
+        "/apex/10g/r/f_kiosk1009/grades",
+        "/apex/10g/r/f_kiosk1009/transcript",
         "/pls/scwp/!scwp.grades",
         "/pls/scwp/!scwp.tziounim",
         "/pls/scwp/!scwp.student_grades",
@@ -871,7 +875,7 @@ def _scrape_portal_grades(cookies: list) -> list:
 
     # First: try loading the main portal page and find links to grades
     try:
-        main_resp = session.get(f"{PORTAL_URL}/pls/scwp/!scwp.main", timeout=15)
+        main_resp = session.get(f"{PORTAL_URL}/apex/10g/r/f_kiosk1009/home", timeout=15)
         if main_resp.status_code == 200:
             main_soup = BeautifulSoup(main_resp.text, "html.parser")
             # Find links that contain grade-related keywords

@@ -5,9 +5,10 @@ import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
 import {
   Plus, CheckSquare, Trash2, Calendar, Sparkles,
   Target, Flame, Coffee, ChevronLeft, ChevronRight,
-  Clock, BookOpen, Dumbbell, Star, Zap,
+  Clock, BookOpen, Dumbbell, Star, Zap, Pencil,
 } from 'lucide-react'
 import { api } from '@/lib/api-client'
+import Modal from '@/components/ui/Modal'
 import GlowCard from '@/components/ui/GlowCard'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { StudyTask } from '@/types'
@@ -59,6 +60,9 @@ export default function TasksPage() {
   const [addingTask, setAddingTask] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dateOffset, setDateOffset] = useState(0)
+  const [editingTask, setEditingTask] = useState<StudyTask | null>(null)
+  const [editForm, setEditForm] = useState({ title: '', category: 'study', duration_minutes: '' })
+  const [saving, setSaving] = useState(false)
 
   const loadTasks = async (date: string) => {
     setLoading(true)
@@ -115,6 +119,44 @@ export default function TasksPage() {
     }
   }
 
+  const openEdit = (task: StudyTask) => {
+    setEditForm({
+      title: task.title,
+      category: task.category || 'study',
+      duration_minutes: task.duration_minutes?.toString() || '',
+    })
+    setEditingTask(task)
+  }
+
+  const saveEdit = async () => {
+    if (!editingTask) return
+    setSaving(true)
+    try {
+      const apiPayload = {
+        title: editForm.title,
+        category: editForm.category,
+        duration_minutes: editForm.duration_minutes ? parseInt(editForm.duration_minutes) : null,
+      }
+      await api.tasks.update(editingTask.id, apiPayload)
+      setTasks(prev => prev.map(t =>
+        t.id === editingTask.id
+          ? {
+              ...t,
+              title: editForm.title,
+              category: editForm.category as StudyTask['category'],
+              duration_minutes: editForm.duration_minutes ? parseInt(editForm.duration_minutes) : undefined,
+            }
+          : t
+      ))
+      setEditingTask(null)
+    } catch (e) {
+      console.error(e)
+      setError('שגיאה בשמירת השינויים. נסה שוב.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // Build a 7-day strip
   const today = new Date()
   const baseDate = addDays(today, dateOffset)
@@ -134,7 +176,7 @@ export default function TasksPage() {
   const MotivIcon = motivation.icon
 
   return (
-    <div className="p-8 max-w-2xl mx-auto space-y-6 animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto space-y-6 animate-fade-in">
 
       {/* Page header */}
       <div className="flex items-center justify-between">
@@ -165,6 +207,7 @@ export default function TasksPage() {
           whileTap={{ scale: 0.9 }}
           onClick={() => setDateOffset(o => o - 7)}
           className="p-2.5 rounded-xl glass text-ink-muted hover:text-ink hover:bg-white/[0.08] transition-colors"
+          title="שבוע קודם"
         >
           <ChevronRight size={16} />
         </motion.button>
@@ -254,6 +297,7 @@ export default function TasksPage() {
           whileTap={{ scale: 0.9 }}
           onClick={() => setDateOffset(o => o + 7)}
           className="p-2.5 rounded-xl glass text-ink-muted hover:text-ink hover:bg-white/[0.08] transition-colors"
+          title="שבוע הבא"
         >
           <ChevronLeft size={16} />
         </motion.button>
@@ -273,6 +317,7 @@ export default function TasksPage() {
               whileTap={{ scale: 0.95 }}
               onClick={() => { setDateOffset(0); setSelectedDate(format(new Date(), 'yyyy-MM-dd')) }}
               className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-full glass"
+              title="חזרה להיום"
             >
               <Calendar size={12} /> חזרה להיום
             </motion.button>
@@ -363,6 +408,7 @@ export default function TasksPage() {
                   onKeyDown={(e) => { if (e.key === 'Enter') addTask(); if (e.key === 'Escape') setAddingTask(false) }}
                   placeholder="מה צריך לעשות?"
                   className="input-dark w-full text-sm"
+                  dir="rtl"
                 />
                 {/* Category picker */}
                 <div className="flex gap-2 flex-wrap">
@@ -389,7 +435,7 @@ export default function TasksPage() {
                 <div className="flex gap-2 justify-end">
                   <button
                     onClick={() => setAddingTask(false)}
-                    className="px-4 py-2 text-ink-muted hover:text-ink text-sm transition-colors rounded-lg"
+                    className="px-4 py-2 border border-white/10 rounded-xl text-sm text-ink-muted hover:text-ink hover:border-white/15 transition-colors"
                   >
                     ביטול
                   </button>
@@ -513,10 +559,20 @@ export default function TasksPage() {
                         </span>
                       )}
 
+                      {/* Edit */}
+                      <button
+                        onClick={() => openEdit(task)}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-ink-muted hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
+                        title="ערוך משימה"
+                      >
+                        <Pencil size={14} />
+                      </button>
+
                       {/* Delete */}
                       <button
                         onClick={() => deleteTask(task.id)}
                         className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-ink-muted hover:text-red-400 hover:bg-red-500/10 transition-all"
+                        title="מחק משימה"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -535,6 +591,80 @@ export default function TasksPage() {
           {completed} משימות הושלמו מתוך {tasks.length}
         </p>
       )}
+
+      {/* Quick-edit modal */}
+      <Modal
+        open={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        title="עריכת משימה"
+        size="sm"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setEditingTask(null)}
+              className="px-4 py-2 border border-white/10 rounded-xl text-sm text-ink-muted hover:text-ink hover:border-white/15 transition-colors"
+            >
+              ביטול
+            </button>
+            <button
+              onClick={saveEdit}
+              disabled={saving}
+              className="btn-gradient px-5 py-2 rounded-lg text-sm text-white font-medium disabled:opacity-50"
+            >
+              {saving ? 'שומר...' : 'שמור'}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4" dir="rtl">
+          <input
+            autoFocus
+            type="text"
+            value={editForm.title}
+            onChange={(e) => setEditForm(f => ({ ...f, title: e.target.value }))}
+            onKeyDown={(e) => { if (e.key === 'Enter') saveEdit() }}
+            placeholder="כותרת המשימה"
+            className="input-dark w-full text-sm"
+          />
+
+          <div className="space-y-1.5">
+            <label className="text-xs text-ink-muted">קטגוריה</label>
+            <div className="flex gap-2 flex-wrap">
+              {CATEGORIES.map(cat => (
+                <button
+                  key={cat.key}
+                  onClick={() => setEditForm(f => ({ ...f, category: cat.key }))}
+                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all ${
+                    editForm.category === cat.key
+                      ? 'ring-1 ring-offset-0'
+                      : 'opacity-60 hover:opacity-100'
+                  }`}
+                  style={{
+                    background: cat.bg,
+                    color: cat.color,
+                    ...(editForm.category === cat.key ? { ringColor: cat.color } : {}),
+                  }}
+                >
+                  <cat.icon size={12} />
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs text-ink-muted">משך (דקות)</label>
+            <input
+              type="number"
+              min="0"
+              placeholder="0"
+              value={editForm.duration_minutes}
+              onChange={(e) => setEditForm(f => ({ ...f, duration_minutes: e.target.value }))}
+              className="input-dark w-full text-sm"
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

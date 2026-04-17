@@ -63,6 +63,11 @@ export const api = {
 
   assignments: {
     list: () => request<any[]>('/api/assignments'),
+    update: (id: string, data: Record<string, any>) =>
+      request<any>(`/api/assignments/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     breakdown: (title: string, description: string, deadline: string) =>
       request<any>('/api/assignments/breakdown', {
         method: 'POST',

@@ -83,7 +83,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 md:p-10 max-w-2xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto animate-fade-in">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}

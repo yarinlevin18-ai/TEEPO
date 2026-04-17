@@ -7,9 +7,9 @@ const SITES = {
     indicator: 'data-userid',
   },
   portal: {
-    urls: ['https://my.bgu.ac.il/', 'https://bgu.ac.il/'],
-    checkUrl: 'https://my.bgu.ac.il/',
-    indicator: 'studentId',
+    urls: ['https://bgu4u22.bgu.ac.il/', 'https://my.bgu.ac.il/', 'https://bgu.ac.il/'],
+    checkUrl: 'https://bgu4u22.bgu.ac.il/',
+    indicator: 'apex',
   },
 }
 

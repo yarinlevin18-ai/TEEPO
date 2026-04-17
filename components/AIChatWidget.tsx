@@ -39,9 +39,6 @@ export default function AIChatWidget() {
   const isOnCoursePage = !!courseId
   const isOnStudyBuddyPage = pathname === '/study-buddy'
 
-  // Don't render on the full study-buddy page (it has its own chat)
-  if (isOnStudyBuddyPage) return null
-
   // Connect socket
   useEffect(() => {
     if (!isOpen) return
@@ -104,6 +101,9 @@ export default function AIChatWidget() {
       setUnread(0)
     }
   }, [isOpen])
+
+  // Don't render on the full study-buddy page (it has its own chat)
+  if (isOnStudyBuddyPage) return null
 
   const sendMessage = () => {
     const text = input.trim()

@@ -33,7 +33,7 @@ export default function ExtractCoursePage() {
   }
 
   return (
-    <div className="p-8 max-w-3xl mx-auto space-y-8 animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto space-y-8 animate-fade-in">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-ink">הוסף קורס חדש</h1>

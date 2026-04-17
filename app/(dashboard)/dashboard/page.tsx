@@ -254,11 +254,11 @@ export default function DashboardPage() {
   )
 
   return (
-    <div className="p-6 md:p-8 max-w-6xl mx-auto space-y-6 animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-4 sm:space-y-6 animate-fade-in">
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {/* ── Header ── */}
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Image src="/logo-128.png" alt="SmartDesk" width={38} height={38} />
           <div>
@@ -289,7 +289,7 @@ export default function DashboardPage() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className={`grid grid-cols-2 ${credits ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}
+        className={`grid grid-cols-1 sm:grid-cols-2 ${credits ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}
       >
         <StatCard
           icon={<BookOpen size={18} />}
@@ -358,14 +358,14 @@ export default function DashboardPage() {
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={() => setWeekOffset(w => w - 1)} className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/5 transition-colors">
+            <button onClick={() => setWeekOffset(w => w - 1)} className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/5 transition-colors" title="שבוע קודם">
               <ChevronRight size={16} />
             </button>
             <button onClick={() => { setWeekOffset(0); setSelectedDay(new Date().getDay()) }}
-              className="px-2.5 py-1 rounded-lg text-xs text-accent-400 hover:bg-white/5 transition-colors font-medium">
+              className="px-2.5 py-1 rounded-lg text-xs text-accent-400 hover:bg-white/5 transition-colors font-medium" title="חזרה להיום">
               היום
             </button>
-            <button onClick={() => setWeekOffset(w => w + 1)} className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/5 transition-colors">
+            <button onClick={() => setWeekOffset(w => w + 1)} className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-white/5 transition-colors" title="שבוע הבא">
               <ChevronLeft size={16} />
             </button>
           </div>
@@ -426,10 +426,10 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* ── Main Content Grid ── */}
-      <div className="grid lg:grid-cols-5 gap-6">
+      <div className="grid lg:grid-cols-5 gap-4 sm:gap-6">
 
         {/* ── Left Column (3/5): Schedule + Subjects ── */}
-        <div className="lg:col-span-3 space-y-6">
+        <div className="lg:col-span-3 space-y-4 sm:space-y-6">
 
           {/* Schedule */}
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
@@ -478,7 +478,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Right Column (2/5): Tasks + Assignments + Grades ── */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
 
           {/* Tasks */}
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>

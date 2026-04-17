@@ -1,15 +1,18 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, Search, Plus, Trash2, Check,
   ChevronRight, ChevronLeft, BookOpen, Target,
   TrendingUp, Award, Sparkles, X, Loader2,
+  AlertTriangle, Pencil,
 } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
 import GlowCard from '@/components/ui/GlowCard'
+import Modal from '@/components/ui/Modal'
+import ErrorAlert from '@/components/ui/ErrorAlert'
 
 // ── Types ──────────────────────────────────────────────────────
 type Track = {
@@ -69,9 +72,11 @@ export default function CreditsPage() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [profile, setProfile] = useState<any>(null)
   const [track, setTrack] = useState<Track | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const checkProfile = useCallback(async () => {
     try {
+      setError(null)
       const res = await api.catalog.profile()
       if (res.needs_onboarding) {
         setNeedsOnboarding(true)
@@ -80,7 +85,8 @@ export default function CreditsPage() {
         setTrack(res.track)
         setNeedsOnboarding(false)
       }
-    } catch {
+    } catch (err: any) {
+      setError(err?.message || 'שגיאה בטעינת הפרופיל')
       setNeedsOnboarding(true)
     } finally {
       setLoading(false)
@@ -91,14 +97,29 @@ export default function CreditsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 animate-fade-in" dir="rtl">
+        <div className="h-8 w-48 shimmer rounded-lg" />
+        <div className="h-4 w-64 shimmer rounded-lg" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-24 shimmer rounded-2xl" />
+          ))}
+        </div>
+        <div className="h-48 shimmer rounded-2xl" />
+        <div className="h-64 shimmer rounded-2xl" />
       </div>
     )
   }
 
   if (needsOnboarding) {
-    return <OnboardingWizard onComplete={() => { setNeedsOnboarding(false); checkProfile() }} />
+    return (
+      <div dir="rtl">
+        <div className="max-w-2xl mx-auto px-4 pt-4">
+          <ErrorAlert message={error} onDismiss={() => setError(null)} />
+        </div>
+        <OnboardingWizard onComplete={() => { setNeedsOnboarding(false); checkProfile() }} />
+      </div>
+    )
   }
 
   return <CreditsDashboard profile={profile} track={track} />
@@ -355,17 +376,66 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
   const [searchResults, setSearchResults] = useState<CatalogCourse[]>([])
   const [searching, setSearching] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // ── Edit Profile modal state ────────────────────────────────
+  const [editOpen, setEditOpen] = useState(false)
+  const [editTracks, setEditTracks] = useState<Track[]>([])
+  const [editTrackId, setEditTrackId] = useState(profile?.track_id ?? '')
+  const [editStartYear, setEditStartYear] = useState<number>(profile?.start_year ?? new Date().getFullYear())
+  const [editCurrentYear, setEditCurrentYear] = useState<number>(profile?.current_year ?? 1)
+  const [editSaving, setEditSaving] = useState(false)
 
   const loadData = useCallback(async () => {
-    const [creditsRes, coursesRes] = await Promise.all([
-      api.catalog.credits().catch(() => null),
-      api.catalog.myCourses().catch(() => []),
-    ])
-    if (creditsRes?.status === 'success') setCredits(creditsRes)
-    setMyCourses(coursesRes)
+    try {
+      setError(null)
+      const [creditsRes, coursesRes] = await Promise.all([
+        api.catalog.credits(),
+        api.catalog.myCourses(),
+      ])
+      if (creditsRes?.status === 'success') setCredits(creditsRes)
+      setMyCourses(coursesRes)
+    } catch (err: any) {
+      setError(err?.message || 'שגיאה בטעינת נתוני הנק"ז')
+    }
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // Open the edit-profile modal: fetch tracks and pre-fill values
+  const openEditProfile = async () => {
+    setEditTrackId(profile?.track_id ?? '')
+    setEditStartYear(profile?.start_year ?? new Date().getFullYear())
+    setEditCurrentYear(profile?.current_year ?? 1)
+    setEditOpen(true)
+    if (editTracks.length === 0) {
+      try {
+        const t = await api.catalog.tracks()
+        setEditTracks(t)
+      } catch { /* ignore */ }
+    }
+  }
+
+  const saveEditProfile = async () => {
+    if (!editTrackId) return
+    setEditSaving(true)
+    try {
+      const t = editTracks.find(t => t.id === editTrackId)
+      const totalSemesters = t?.type === 'dual' ? 6 : 6
+      await api.catalog.saveProfile({
+        track_id: editTrackId,
+        start_year: editStartYear,
+        current_year: editCurrentYear,
+        expected_end: editStartYear + Math.ceil(totalSemesters / 2),
+      })
+      // Reload to pick up the new track/profile
+      window.location.reload()
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setEditSaving(false)
+    }
+  }
 
   const handleSearch = async (q: string) => {
     setSearchQuery(q)
@@ -391,14 +461,18 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
         source: 'catalog',
       })
       loadData()
-    } catch {}
+    } catch (err: any) {
+      setError(err?.message || 'שגיאה בהוספת הקורס')
+    }
   }
 
   const removeCourse = async (courseId: string) => {
     try {
       await api.catalog.removeCourse(courseId)
       loadData()
-    } catch {}
+    } catch (err: any) {
+      setError(err?.message || 'שגיאה בהסרת הקורס')
+    }
   }
 
   const toggleStatus = async (course: StudentCourse) => {
@@ -412,24 +486,65 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
         source: course.source,
       })
       loadData()
-    } catch {}
+    } catch (err: any) {
+      setError(err?.message || 'שגיאה בעדכון סטטוס הקורס')
+    }
   }
 
   const completedCredits = credits?.completed_credits ?? 0
   const totalRequired = credits?.total_required ?? (track?.total_credits ?? 0)
   const progressPercent = totalRequired > 0 ? Math.min(100, (completedCredits / totalRequired) * 100) : 0
 
+  // ── Off-Track Warning calculation ────────────────────────────
+  const currentAcademicYear: number = profile?.current_year ?? 1
+  const recommendedPerSemester = credits?.recommended_per_semester ?? 0
+  const recommendedPerYear = recommendedPerSemester * 2
+  const expectedCredits = currentAcademicYear * recommendedPerYear
+  const isBehind = expectedCredits > 0 && completedCredits < expectedCredits * 0.8
+  const creditsBehind = Math.max(0, Math.round(expectedCredits - completedCredits))
+
+  // ── Semester Progress Breakdown ──────────────────────────────
+  const semesterBreakdown = useMemo(() => {
+    const map = new Map<string, { completed: number; inProgress: number; planned: number }>()
+    for (const c of myCourses) {
+      const semKey = c.semester && c.academic_year
+        ? `${c.academic_year} ${c.semester}`
+        : c.semester || 'ללא סמסטר'
+      if (!map.has(semKey)) map.set(semKey, { completed: 0, inProgress: 0, planned: 0 })
+      const entry = map.get(semKey)!
+      if (c.status === 'completed') entry.completed += c.credits
+      else if (c.status === 'in_progress') entry.inProgress += c.credits
+      else entry.planned += c.credits
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([semester, data]) => ({ semester, ...data }))
+  }, [myCourses])
+
+  const editYearOptions = new Date().getFullYear()
+
   return (
-    <div className="max-w-4xl mx-auto py-6 px-4 space-y-6" dir="rtl">
-      {/* Header */}
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 animate-fade-in" dir="rtl">
+      {/* Header + Edit Profile */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100">
-            מעקב נק"ז
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            {track?.name || 'מסלול לא מוגדר'}
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-100">
+              מעקב נק&quot;ז
+            </h1>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-sm text-slate-400">
+                {track?.name || 'מסלול לא מוגדר'}
+              </p>
+              <button
+                onClick={openEditProfile}
+                className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                <Pencil className="w-3 h-3" />
+                עריכת פרופיל
+              </button>
+            </div>
+          </div>
         </div>
         <button
           onClick={() => setShowSearch(!showSearch)}
@@ -440,8 +555,11 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
         </button>
       </div>
 
+      {/* Error Alert */}
+      <ErrorAlert message={error} onDismiss={() => setError(null)} />
+
       {/* Credit Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           icon={<Target className="w-5 h-5" />}
           label="הושלמו"
@@ -472,6 +590,33 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
         />
       </div>
 
+      {/* Off-Track Warning */}
+      <AnimatePresence>
+        {isBehind && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="rounded-xl p-4 flex items-start gap-3"
+            style={{
+              background: 'rgba(245,158,11,0.08)',
+              border: '1px solid rgba(245,158,11,0.2)',
+            }}
+          >
+            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-300">
+                שים לב! אתה מאחורי הקצב המומלץ
+              </p>
+              <p className="text-xs text-amber-400/80 mt-1">
+                לפי שנה {currentAcademicYear} היית אמור להשלים כ-{expectedCredits} נק&quot;ז,
+                אבל השלמת {completedCredits} בלבד. אתה מאחור ב-{creditsBehind} נק&quot;ז.
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Progress Bar */}
       <GlowCard>
         <div className="p-4">
@@ -488,11 +633,59 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
             />
           </div>
           <div className="flex justify-between mt-1 text-xs text-slate-500">
-            <span>{completedCredits} נק"ז</span>
-            <span>{totalRequired} נק"ז</span>
+            <span>{completedCredits} נק&quot;ז</span>
+            <span>{totalRequired} נק&quot;ז</span>
           </div>
         </div>
       </GlowCard>
+
+      {/* Semester Progress Breakdown */}
+      {semesterBreakdown.length > 0 && (
+        <GlowCard>
+          <div className="p-4">
+            <h2 className="text-lg font-semibold text-slate-200 mb-4">פירוט לפי סמסטר</h2>
+            <div className="space-y-3">
+              {semesterBreakdown.map(sem => {
+                const total = sem.completed + sem.inProgress + sem.planned
+                const completedPct = total > 0 ? (sem.completed / total) * 100 : 0
+                const inProgressPct = total > 0 ? (sem.inProgress / total) * 100 : 0
+                return (
+                  <div key={sem.semester} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-300 font-medium">{sem.semester}</span>
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                        {sem.completed > 0 && (
+                          <span className="text-emerald-400">{sem.completed} הושלמו</span>
+                        )}
+                        {sem.inProgress > 0 && (
+                          <span className="text-indigo-400">{sem.inProgress} בתהליך</span>
+                        )}
+                        {sem.planned > 0 && (
+                          <span className="text-slate-400">{sem.planned} מתוכנן</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden flex">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${completedPct}%` }}
+                        transition={{ duration: 0.6, ease: 'easeOut' }}
+                        className="h-full bg-emerald-500 rounded-r-full"
+                      />
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${inProgressPct}%` }}
+                        transition={{ duration: 0.6, ease: 'easeOut', delay: 0.1 }}
+                        className="h-full bg-indigo-500"
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </GlowCard>
+      )}
 
       {/* Course Search */}
       <AnimatePresence>
@@ -510,7 +703,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                 value={searchQuery}
                 onChange={e => handleSearch(e.target.value)}
                 placeholder="חפש קורס לפי שם או מספר..."
-                className="flex-1 bg-transparent border-none outline-none text-slate-200 placeholder:text-slate-600"
+                className="input-dark flex-1 text-sm"
                 autoFocus
               />
               <button onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults([]) }}>
@@ -530,7 +723,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                       <div className="flex-1 min-w-0">
                         <div className="text-sm text-slate-200 truncate">{c.name}</div>
                         <div className="text-xs text-slate-500">
-                          {c.course_id} | {c.credits} נק"ז
+                          {c.course_id} | {c.credits} נק&quot;ז
                           {c.type === 'mandatory' && <span className="text-indigo-400 mr-2">חובה</span>}
                         </div>
                       </div>
@@ -556,13 +749,13 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
         )}
       </AnimatePresence>
 
-      {/* My Courses */}
+      {/* My Courses — with color-coded status badges */}
       <GlowCard>
         <div className="p-4">
           <h2 className="text-lg font-semibold text-slate-200 mb-4">הקורסים שלי</h2>
           {myCourses.length === 0 ? (
             <p className="text-center text-slate-500 py-8">
-              עדיין לא נוספו קורסים. לחץ "הוסף קורס" למעלה
+              עדיין לא נוספו קורסים. לחץ &quot;הוסף קורס&quot; למעלה
             </p>
           ) : (
             <div className="space-y-1">
@@ -591,10 +784,35 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                       {c.course_name}
                     </div>
                     <div className="text-xs text-slate-500">
-                      {c.credits} נק"ז
+                      {c.credits} נק&quot;ז
                       {c.grade && <span className="text-emerald-400 mr-2">ציון: {c.grade}</span>}
                     </div>
                   </div>
+                  {/* Color-coded status badge */}
+                  <motion.button
+                    onClick={() => toggleStatus(c)}
+                    layout
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                      c.status === 'completed'
+                        ? 'bg-emerald-500/15 text-emerald-300'
+                        : c.status === 'in_progress'
+                        ? 'bg-indigo-500/15 text-indigo-300'
+                        : 'bg-white/[0.08] text-slate-400'
+                    }`}
+                    whileTap={{ scale: 0.92 }}
+                  >
+                    <AnimatePresence mode="wait">
+                      <motion.span
+                        key={c.status}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        {c.status === 'completed' ? 'הושלם' : c.status === 'in_progress' ? 'בתהליך' : 'מתוכנן'}
+                      </motion.span>
+                    </AnimatePresence>
+                  </motion.button>
                   <button
                     onClick={() => removeCourse(c.course_id)}
                     className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-500 hover:text-red-400 transition-all"
@@ -607,6 +825,95 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
           )}
         </div>
       </GlowCard>
+
+      {/* ── Edit Profile Modal ──────────────────────────────────── */}
+      <Modal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="עריכת פרופיל"
+        subtitle="עדכן את המסלול ושנת הלימודים"
+        size="md"
+        footer={
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={() => setEditOpen(false)}
+              className="px-4 py-2 rounded-xl border border-white/10 text-slate-400 hover:bg-white/5 text-sm transition-all"
+            >
+              ביטול
+            </button>
+            <button
+              onClick={saveEditProfile}
+              disabled={editSaving || !editTrackId}
+              className="px-6 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold disabled:opacity-40 hover:shadow-lg hover:shadow-indigo-500/25 transition-all"
+            >
+              {editSaving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'שמור'}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          {/* Track selection */}
+          <div>
+            <label className="block text-sm text-slate-400 mb-2">מסלול לימודים</label>
+            {editTracks.length === 0 ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {editTracks.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setEditTrackId(t.id)}
+                    className={`w-full text-right p-3 rounded-xl border transition-all text-sm ${
+                      editTrackId === t.id
+                        ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
+                        : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20'
+                    }`}
+                  >
+                    <span className="font-medium">{t.name}</span>
+                    <span className="text-slate-500 mr-2">{t.total_credits} נק&quot;ז</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Start year */}
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">שנת התחלה</label>
+            <select
+              value={editStartYear}
+              onChange={e => setEditStartYear(Number(e.target.value))}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-200 focus:border-indigo-500 focus:outline-none"
+            >
+              {Array.from({ length: 8 }, (_, i) => editYearOptions - i).map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Current year */}
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">באיזה שנה אתה עכשיו?</label>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4].map(y => (
+                <button
+                  key={y}
+                  onClick={() => setEditCurrentYear(y)}
+                  className={`flex-1 py-3 rounded-xl border font-medium transition-all text-sm ${
+                    editCurrentYear === y
+                      ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
+                      : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/20'
+                  }`}
+                >
+                  שנה {y === 1 ? "א'" : y === 2 ? "ב'" : y === 3 ? "ג'" : "ד'"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

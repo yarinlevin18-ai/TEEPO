@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify
 from services import bgu_scraper
 from config import BGU_USERNAME, BGU_PASSWORD, IS_PRODUCTION, logger
 
-ALLOWED_BGU_DOMAINS = ("moodle.bgu.ac.il", "my.bgu.ac.il", "bgu.ac.il")
+ALLOWED_BGU_DOMAINS = ("moodle.bgu.ac.il", "my.bgu.ac.il", "bgu4u22.bgu.ac.il", "bgu.ac.il")
 
 
 def _is_bgu_url(url: str) -> bool:
