@@ -17,6 +17,12 @@ export interface Course {
   created_at: string
 }
 
+export interface LessonFile {
+  name: string
+  url: string
+  type: 'pdf' | 'pptx' | 'doc' | 'image' | 'link' | 'gdrive' | 'other'
+}
+
 export interface Lesson {
   id: string
   course_id: string
@@ -27,6 +33,7 @@ export interface Lesson {
   order_index: number
   is_completed: boolean
   completed_at?: string
+  files?: LessonFile[]
 }
 
 export interface StudyTask {

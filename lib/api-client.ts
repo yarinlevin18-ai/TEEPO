@@ -116,10 +116,19 @@ export const api = {
   },
 
   lessons: {
+    create: (courseId: string, data: { title: string; content?: string; files?: any[] }) =>
+      request<any>(`/api/courses/${courseId}/lessons`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     update: (id: string, data: Record<string, any>) =>
       request<any>(`/api/lessons/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<any>(`/api/lessons/${id}`, {
+        method: 'DELETE',
       }),
     summarize: (content: string, title?: string) =>
       request<any>('/api/lessons/summarize', {

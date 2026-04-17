@@ -507,13 +507,81 @@ def summarize_note_content(course_id: str):
 #  Lesson toggle completion                                            #
 # ------------------------------------------------------------------ #
 
+@api.post("/courses/<course_id>/lessons")
+def create_lesson_for_course(course_id: str):
+    """Create a new user-defined lesson in a course."""
+    user_id = _user_id()
+    body = request.get_json() or {}
+    title = str(body.get("title", "")).strip()[:MAX_TITLE]
+    if not title:
+        return jsonify({"error": "חסר שם שיעור"}), 400
+
+    try:
+        client = db.get_client()
+        # Get next order_index
+        existing = client.table("lessons").select("order_index").eq("course_id", course_id).order("order_index", desc=True).limit(1).execute()
+        next_idx = (existing.data[0]["order_index"] + 1) if existing.data else 0
+
+        lesson = {
+            "id": str(uuid.uuid4()),
+            "course_id": course_id,
+            "title": title,
+            "content": body.get("content", ""),
+            "order_index": next_idx,
+            "is_completed": False,
+            "files": body.get("files", []),
+        }
+        result = client.table("lessons").insert(lesson).execute()
+        return jsonify(result.data[0] if result.data else lesson), 201
+    except Exception as e:
+        logger.warning(f"[create_lesson] error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@api.delete("/lessons/<lesson_id>")
+def delete_lesson(lesson_id: str):
+    """Delete a lesson and recalculate course progress."""
+    try:
+        client = db.get_client()
+        # Get lesson to find course_id before deleting
+        lesson_res = client.table("lessons").select("course_id").eq("id", lesson_id).limit(1).execute()
+        course_id = lesson_res.data[0]["course_id"] if lesson_res.data else None
+
+        client.table("lessons").delete().eq("id", lesson_id).execute()
+
+        # Recalculate course progress
+        if course_id:
+            all_lessons = client.table("lessons").select("is_completed").eq("course_id", course_id).execute()
+            if all_lessons.data:
+                total = len(all_lessons.data)
+                done = sum(1 for l in all_lessons.data if l.get("is_completed"))
+                progress = round((done / total) * 100) if total > 0 else 0
+                client.table("courses").update({"progress_percentage": progress}).eq("id", course_id).execute()
+            else:
+                client.table("courses").update({"progress_percentage": 0}).eq("id", course_id).execute()
+
+        return jsonify({"ok": True})
+    except Exception as e:
+        logger.warning(f"[delete_lesson] error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @api.patch("/lessons/<lesson_id>")
 def update_lesson(lesson_id: str):
-    """Toggle lesson completion and recalculate course progress."""
+    """Update lesson fields (title, content, files, completion)."""
     body = request.get_json() or {}
     try:
         client = db.get_client()
         update_data = {}
+
+        if "title" in body:
+            update_data["title"] = str(body["title"]).strip()[:MAX_TITLE]
+        if "content" in body:
+            update_data["content"] = str(body["content"])[:MAX_CONTENT]
+        if "files" in body:
+            update_data["files"] = body["files"]  # JSON array
+        if "ai_summary" in body:
+            update_data["ai_summary"] = str(body["ai_summary"])[:MAX_CONTENT]
         if "is_completed" in body:
             update_data["is_completed"] = bool(body["is_completed"])
             if body["is_completed"]:
@@ -529,16 +597,17 @@ def update_lesson(lesson_id: str):
         if not result.data:
             return jsonify({"error": "שיעור לא נמצא"}), 404
 
-        # Recalculate course progress
-        lesson = result.data[0]
-        course_id = lesson.get("course_id")
-        if course_id:
-            all_lessons = client.table("lessons").select("is_completed").eq("course_id", course_id).execute()
-            if all_lessons.data:
-                total = len(all_lessons.data)
-                done = sum(1 for l in all_lessons.data if l.get("is_completed"))
-                progress = round((done / total) * 100) if total > 0 else 0
-                client.table("courses").update({"progress_percentage": progress}).eq("id", course_id).execute()
+        # Recalculate course progress if completion changed
+        if "is_completed" in body:
+            lesson = result.data[0]
+            course_id = lesson.get("course_id")
+            if course_id:
+                all_lessons = client.table("lessons").select("is_completed").eq("course_id", course_id).execute()
+                if all_lessons.data:
+                    total = len(all_lessons.data)
+                    done = sum(1 for l in all_lessons.data if l.get("is_completed"))
+                    progress = round((done / total) * 100) if total > 0 else 0
+                    client.table("courses").update({"progress_percentage": progress}).eq("id", course_id).execute()
 
         return jsonify(result.data[0])
     except Exception as e:
