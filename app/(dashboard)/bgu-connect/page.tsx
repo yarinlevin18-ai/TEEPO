@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import GlowCard from '@/components/ui/GlowCard'
+import { useDB } from '@/lib/db-context'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -22,6 +23,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 type Status = { moodle: boolean; portal: boolean; login_status: Record<string, string> }
 
 export default function BGUConnectPage() {
+  const { db, ready, createCourse } = useDB()
   const [status, setStatus] = useState<Status>({ moodle: false, portal: false, login_status: {} })
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const [syncing, setSyncing] = useState(false)
@@ -80,6 +82,10 @@ export default function BGUConnectPage() {
   }
 
   const syncAll = async () => {
+    if (!ready) {
+      setSyncResult('מסד הנתונים עדיין נטען. נסה שוב עוד רגע.')
+      return
+    }
     setSyncing(true); setSyncResult('')
     try {
       // Wake up Render server first (free tier sleeps after inactivity)
@@ -88,20 +94,63 @@ export default function BGUConnectPage() {
         await fetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(60000) })
       } catch {}
 
-      setSyncResult('מסנכרן נתונים...')
+      // Kick off the backend sync (still writes legacy Supabase tables —
+      // fine for grades/etc., but we don't rely on it for courses).
+      setSyncResult('מסנכרן נתונים מ-BGU...')
       const headers = await authHeaders()
-      const res = await fetch(`${BACKEND}/api/bgu/sync`, {
-        method: 'POST',
+      try {
+        await fetch(`${BACKEND}/api/bgu/sync`, {
+          method: 'POST',
+          headers,
+          signal: AbortSignal.timeout(120000),
+        })
+      } catch {
+        // Even if the legacy sync endpoint fails we can still pull the live
+        // course list below, so don't abort on it.
+      }
+
+      // Pull live course list and merge into the user's Drive DB.
+      setSyncResult('מושך קורסים...')
+      const coursesRes = await fetch(`${BACKEND}/api/bgu/courses`, {
         headers,
-        signal: AbortSignal.timeout(120000), // 2 min for full sync
+        signal: AbortSignal.timeout(60000),
       })
-      const data = await res.json()
-      setSyncResult(data.message || 'הסנכרון הושלם ✓')
+      if (!coursesRes.ok) {
+        throw new Error(`Backend ${coursesRes.status}: ${await coursesRes.text().catch(() => '')}`)
+      }
+      const coursesData = await coursesRes.json()
+      if (coursesData.status === 'error') {
+        throw new Error(coursesData.message || 'הסנכרון נכשל')
+      }
+      const scraped: Array<{ title: string; url?: string; moodle_id?: string }> = coursesData.courses || []
+
+      // Dedupe against existing courses by source_url (fall back to exact title).
+      const existingUrls = new Set(db.courses.map(c => c.source_url).filter(Boolean) as string[])
+      const existingTitles = new Set(db.courses.map(c => c.title))
+      let added = 0
+      for (const c of scraped) {
+        if (!c.title) continue
+        if (c.url && existingUrls.has(c.url)) continue
+        if (!c.url && existingTitles.has(c.title)) continue
+        await createCourse({
+          title: c.title,
+          source: 'bgu',
+          source_url: c.url,
+          description: c.moodle_id ? `Moodle ID: ${c.moodle_id}` : undefined,
+        })
+        added++
+      }
+      setSyncResult(
+        added > 0
+          ? `נוספו ${added} קורסים חדשים (סה״כ נמשכו ${scraped.length}) ✓`
+          : `הסנכרון הושלם — כל ${scraped.length} הקורסים כבר קיימים ✓`,
+      )
     } catch (e: any) {
       if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
         setSyncResult('השרת לא הגיב — נסה שוב בעוד דקה')
       } else {
-        setSyncResult('שגיאה בסנכרון: ' + e.message)
+        console.error('[bgu-sync]', e)
+        setSyncResult('שגיאה בסנכרון: ' + (e?.message || e))
       }
     } finally {
       setSyncing(false)

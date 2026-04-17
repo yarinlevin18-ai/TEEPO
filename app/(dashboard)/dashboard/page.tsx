@@ -490,28 +490,6 @@ export default function DashboardPage() {
             />
           </motion.div>
 
-          {/* Subjects for selected day */}
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
-                  <BookOpen size={14} style={{ color: '#a78bfa' }} />
-                </div>
-                <h2 className="font-semibold text-ink">מקצועות היום</h2>
-                {dayCourses.length > 0 && (
-                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.12)', color: '#c4b5fd' }}>
-                    {dayCourses.length}
-                  </span>
-                )}
-              </div>
-              <Link href="/courses">
-                <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
-                  כל הקורסים <ArrowLeft size={12} />
-                </button>
-              </Link>
-            </div>
-            <SubjectsSection courses={dayCourses} assignments={assignments} loading={zone1Loading} />
-          </motion.div>
         </div>
 
         {/* ── Right Column (2/5): Tasks + Assignments ── */}
