@@ -316,54 +316,6 @@ export default function DashboardPage() {
       {/* ── Live semester card ── */}
       <SemesterCard />
 
-      {/* ── Onboarding (when no data yet) ── */}
-      {!zone1Loading && !hasData && (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <div
-            className="rounded-2xl p-6 sm:p-8"
-            style={{
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.05))',
-              border: '1px solid rgba(99,102,241,0.15)',
-            }}
-          >
-            <h2 className="text-lg font-bold text-ink mb-1">ברוכים הבאים ל-SmartDesk</h2>
-            <p className="text-sm text-ink-muted mb-6">שלושה צעדים קטנים כדי להתחיל:</p>
-            <div className="grid sm:grid-cols-3 gap-3">
-              <Link href="/courses/extract">
-                <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl cursor-pointer transition-colors hover:bg-white/[0.04]"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style={{ background: 'rgba(99,102,241,0.2)' }}>
-                    <BookOpen size={18} style={{ color: '#a5b4fc' }} />
-                  </div>
-                  <p className="text-sm font-semibold text-ink mb-0.5">הוסף קורס</p>
-                  <p className="text-xs text-ink-muted">הדבק לינק או הוסף ידנית</p>
-                </motion.div>
-              </Link>
-              <Link href="/bgu-connect">
-                <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl cursor-pointer transition-colors hover:bg-white/[0.04]"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style={{ background: 'rgba(16,185,129,0.2)' }}>
-                    <Wifi size={18} style={{ color: '#6ee7b7' }} />
-                  </div>
-                  <p className="text-sm font-semibold text-ink mb-0.5">חבר את BGU</p>
-                  <p className="text-xs text-ink-muted">סנכרן ציונים ומטלות</p>
-                </motion.div>
-              </Link>
-              <Link href="/study-buddy">
-                <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl cursor-pointer transition-colors hover:bg-white/[0.04]"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style={{ background: 'rgba(139,92,246,0.2)' }}>
-                    <Sparkles size={18} style={{ color: '#c4b5fd' }} />
-                  </div>
-                  <p className="text-sm font-semibold text-ink mb-0.5">שאל את ה-AI</p>
-                  <p className="text-xs text-ink-muted">עוזר לימוד חכם עם אינטרנט</p>
-                </motion.div>
-              </Link>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
       {/* ══════════════════════════════════════════════════════════
           ZONE 1: מה קורה עכשיו — What's Happening Now
           ══════════════════════════════════════════════════════════ */}

@@ -49,23 +49,32 @@ export default function BGUConnectPage() {
 
   const connect = async (site: 'moodle' | 'portal', creds?: { username: string; password: string }) => {
     setLoading(p => ({ ...p, [site]: true }))
+    setSyncResult('')
     try {
       const headers = { 'Content-Type': 'application/json', ...(await authHeaders()) }
-      await fetch(`${BACKEND}/api/bgu/connect/${site}`, {
+      const res = await fetch(`${BACKEND}/api/bgu/connect/${site}`, {
         method: 'POST',
         headers,
         body: JSON.stringify(creds || {}),
       })
+      if (!res.ok) {
+        throw new Error(`Backend ${res.status}: ${await res.text().catch(() => '')}`)
+      }
       pollRef.current = setInterval(async () => {
-        const res = await fetch(`${BACKEND}/api/bgu/connect/${site}/poll`)
-        const data = await res.json()
-        if (data.connected || data.status === 'failed') {
-          clearInterval(pollRef.current!)
-          setLoading(p => ({ ...p, [site]: false }))
-          fetchStatus()
-        }
+        try {
+          const r = await fetch(`${BACKEND}/api/bgu/connect/${site}/poll`)
+          if (!r.ok) return
+          const data = await r.json()
+          if (data.connected || data.status === 'failed') {
+            clearInterval(pollRef.current!)
+            setLoading(p => ({ ...p, [site]: false }))
+            fetchStatus()
+          }
+        } catch {}
       }, 2000)
-    } catch {
+    } catch (e: any) {
+      console.error('[bgu-connect]', e)
+      setSyncResult(`שגיאה: ${e?.message || 'החיבור לבקאנד נכשל'} (אם זה הריצה הראשונה — שרת Render ישן ולוקח 30-60 שניות להתעורר)`)
       setLoading(p => ({ ...p, [site]: false }))
     }
   }

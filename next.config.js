@@ -4,13 +4,36 @@
 // Note: Next.js in dev needs 'unsafe-eval'; we relax it only outside production.
 const isDev = process.env.NODE_ENV !== 'production'
 
+// Allow the configured Flask backend (Render) + any *.onrender.com fallback
+// so production fetches from the dashboard pages aren't blocked by CSP.
+const backendOrigin = (() => {
+  try {
+    if (process.env.NEXT_PUBLIC_BACKEND_URL) return new URL(process.env.NEXT_PUBLIC_BACKEND_URL).origin
+  } catch {}
+  return ''
+})()
+
+const connectSrc = [
+  "'self'",
+  backendOrigin,
+  'https://*.onrender.com',
+  'https://*.supabase.co',
+  'wss://*.supabase.co',
+  'https://accounts.google.com',
+  'https://oauth2.googleapis.com',
+  'https://www.googleapis.com',
+  'https://apis.google.com',
+  isDev ? 'http://localhost:5000' : '',
+  isDev ? 'ws://localhost:*' : '',
+].filter(Boolean).join(' ')
+
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval'" : ''} https://accounts.google.com https://apis.google.com`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://apis.google.com",
+  `connect-src ${connectSrc}`,
   "frame-src https://accounts.google.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
