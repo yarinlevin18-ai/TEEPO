@@ -283,7 +283,11 @@ export default function LandingPage() {
           <p className="text-xs text-paper-subtle max-w-xs leading-relaxed">
             לא קשור רשמית לאוניברסיטת בן־גוריון. פרויקט עצמאי.
             <br />
-            מקור פתוח · <Link href="/auth" className="text-paper-muted hover:text-clay border-b border-paper-subtle/30 pb-px">כניסה</Link>
+            <Link href="/legal/privacy-policy" className="text-paper-muted hover:text-clay border-b border-paper-subtle/30 pb-px">מדיניות פרטיות</Link>
+            {' · '}
+            <Link href="/legal/terms-of-service" className="text-paper-muted hover:text-clay border-b border-paper-subtle/30 pb-px">תנאי שימוש</Link>
+            {' · '}
+            <Link href="/legal/disclaimer" className="text-paper-muted hover:text-clay border-b border-paper-subtle/30 pb-px">כתב ויתור</Link>
           </p>
         </div>
       </footer>
