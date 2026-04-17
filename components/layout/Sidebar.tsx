@@ -5,10 +5,11 @@ import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, CheckSquare,
-  FileText, MessageCircle, Wifi, Plus, LogOut, GraduationCap, Settings, StickyNote, X, Sparkles, Building2,
+  FileText, MessageCircle, Wifi, LogOut, GraduationCap, Settings, StickyNote, X, Sparkles, Building2, Sun, Moon,
 } from 'lucide-react'
 import Image from 'next/image'
 import { useAuth } from '@/lib/auth-context'
+import { useTheme } from '@/lib/theme-context'
 import { useEffect } from 'react'
 
 const NAV_GROUPS = [
@@ -46,6 +47,7 @@ interface SidebarProps {
 export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname()
   const { user, signOut } = useAuth()
+  const { theme, toggleTheme } = useTheme()
 
   // Block body scroll when mobile drawer is open
   useEffect(() => {
@@ -74,22 +76,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
           </div>
         </div>
 
-        {/* Quick add */}
-        <div className="px-4 py-4">
-          <Link href="/courses/extract" onClick={onMobileClose}>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold btn-gradient shadow-glow-sm"
-            >
-              <Plus size={16} />
-              <span>הוסף קורס חדש</span>
-            </motion.button>
-          </Link>
-        </div>
-
         {/* Nav — grouped */}
-        <nav className="flex-1 px-3 py-1 space-y-5 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
           {NAV_GROUPS.map((group, gi) => (
             <div key={gi}>
               {group.label && (
@@ -141,6 +129,13 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                   {user.user_metadata?.display_name || user.email}
                 </p>
               </div>
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 rounded-lg hover:bg-white/5 text-ink-subtle hover:text-amber-400 transition-colors"
+                title={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}
+              >
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
               <Link href="/settings" onClick={onMobileClose}>
                 <button
                   className="p-1.5 rounded-lg hover:bg-white/5 text-ink-subtle hover:text-indigo-400 transition-colors"

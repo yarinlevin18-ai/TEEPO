@@ -33,7 +33,19 @@
       "Bash(grep -E \"\\\\.tsx$|^d\")",
       "Bash(mkdir -p \"C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Projects\\\\1-active\")",
       "Bash(mkdir -p \"C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Projects\\\\2-experimental\")",
-      "Bash(mkdir -p \"C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Projects\\\\3-archived\")"
+      "Bash(mkdir -p \"C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Projects\\\\3-archived\")",
+      "Bash(cp -r \"WhatsApp Bot\" \"Projects/1-active/whatsapp-bot\")",
+      "Bash(cp -r \"AI/parking-hunters-\" \"Projects/1-active/parking-hunters\")",
+      "Bash(cp -r \"AI/SmartCut\" \"Projects/1-active/smartcut\")",
+      "Bash(cp -r \"AI/Telegram Bot\" \"Projects/1-active/telegram-bot-parking\")",
+      "Bash(cp -r \"AI/Agents\" \"Projects/2-experimental/agents\")",
+      "Bash(cp -r \"AI/explorer_agent\" \"Projects/2-experimental/explorer_agent\")",
+      "Bash(cp -r \"AI/supervisor_agent\" \"Projects/2-experimental/supervisor_agent\")",
+      "Bash(cp -r \"AI/uiux_agent\" \"Projects/2-experimental/uiux_agent\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://localhost:53015/legal/privacy-policy\")",
+      "Bash(rm -rf \"C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Projects\\\\1-active\\\\smartcut\\\\.git\")",
+      "Bash(cp -r \"C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\" temp_git_backup)",
+      "Bash(gh repo *)"
     ]
   }
 }

@@ -716,3 +716,186 @@ body {
   color: #475569;
   font-style: italic;
 }
+
+/* ══════════════════════════════════════════
+   LIGHT THEME OVERRIDES
+   Applied when <html> has class "light".
+   First-pass coverage: backgrounds, glass cards, text, scrollbar,
+   inputs, modals, rich-text. Component-level polish can follow.
+   ══════════════════════════════════════════ */
+html.light body {
+  background: #f5f6fa;
+  color: #1a1d28;
+}
+
+html.light ::-webkit-scrollbar-track { background: #e6e8ef; }
+html.light ::-webkit-scrollbar-thumb { background: #c5c9d4; }
+html.light ::-webkit-scrollbar-thumb:hover { background: #a0a5b3; }
+
+/* Glass cards invert: dark translucent on light bg */
+html.light .glass {
+  background: rgba(255,255,255,0.75);
+  border: 1px solid rgba(15,17,23,0.08);
+  box-shadow: 0 1px 2px rgba(15,17,23,0.04);
+}
+html.light .glass:hover {
+  background: rgba(255,255,255,0.9);
+}
+html.light .glass-sm {
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(15,17,23,0.07);
+}
+html.light .glow-card {
+  background: rgba(255,255,255,0.75);
+  border-color: rgba(15,17,23,0.08);
+}
+html.light .glow-card:hover {
+  border-color: rgba(99,102,241,0.35);
+  box-shadow: 0 0 24px rgba(99,102,241,0.1);
+}
+
+/* Gradient text — slightly darker for contrast on white */
+html.light .gradient-text {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed, #8b5cf6);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+html.light .gradient-text-white {
+  background: linear-gradient(135deg, #1a1d28, #6d28d9);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Inputs */
+html.light .input-dark {
+  background: rgba(15,17,23,0.04);
+  border: 1px solid rgba(15,17,23,0.12);
+  color: #1a1d28;
+}
+html.light .input-dark::placeholder { color: #94a3b8; }
+html.light .input-dark:focus {
+  border-color: rgba(99,102,241,0.55);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.14);
+}
+
+/* Modals */
+html.light .modal-backdrop {
+  background: rgba(15,17,23,0.35);
+}
+html.light .modal-panel {
+  background: #ffffff;
+  border: 1px solid rgba(15,17,23,0.08);
+  box-shadow:
+    0 0 0 1px rgba(99,102,241,0.06),
+    0 20px 60px rgba(15,17,23,0.18);
+}
+html.light .modal-header,
+html.light .modal-footer {
+  border-color: rgba(15,17,23,0.07);
+}
+html.light .modal-close-btn {
+  background: rgba(15,17,23,0.04);
+  border: 1px solid rgba(15,17,23,0.08);
+  color: #475569;
+}
+html.light .modal-close-btn:hover {
+  background: rgba(15,17,23,0.08);
+  color: #1a1d28;
+}
+
+/* Shimmer */
+html.light .shimmer {
+  background: linear-gradient(90deg, #e5e7ef 0%, #f0f2f7 50%, #e5e7ef 100%);
+  background-size: 200% 100%;
+}
+
+/* Rich editor + note display */
+html.light .rich-editor-content,
+html.light .note-display {
+  color: #1a1d28;
+}
+html.light .rich-editor-content h1,
+html.light .note-display h1 { color: #0f1117; border-bottom-color: rgba(15,17,23,0.08); }
+html.light .rich-editor-content h2,
+html.light .note-display h2 { color: #1a1d28; }
+html.light .rich-editor-content h3,
+html.light .note-display h3 { color: #334155; }
+html.light .rich-editor-content strong,
+html.light .note-display strong { color: #0f1117; }
+html.light .rich-editor-content em,
+html.light .note-display em { color: #6d28d9; }
+html.light .rich-editor-content hr,
+html.light .note-display hr { border-top-color: rgba(15,17,23,0.08); }
+html.light .rich-editor-content blockquote,
+html.light .note-display blockquote { color: #475569; border-right-color: #6366f1; }
+html.light .rich-editor-content code,
+html.light .note-display code {
+  background: rgba(99,102,241,0.08);
+  color: #4f46e5;
+}
+html.light .rich-editor-content pre,
+html.light .note-display pre {
+  background: rgba(15,17,23,0.04);
+  border-color: rgba(15,17,23,0.08);
+}
+html.light .rich-editor-content p.is-editor-empty:first-child::before {
+  color: #94a3b8;
+}
+
+/* Legal doc */
+html.light .legal-doc { color: #334155; }
+html.light .legal-doc h1,
+html.light .legal-doc h2,
+html.light .legal-doc h3 { color: #0f1117; }
+html.light .legal-doc h2 { border-bottom-color: rgba(15,17,23,0.08); }
+html.light .legal-doc .meta { color: #64748b; border-bottom-color: rgba(15,17,23,0.08); }
+html.light .legal-doc strong { color: #0f1117; }
+html.light .legal-doc a { color: #6d28d9; }
+html.light .legal-doc a:hover { color: #4f46e5; }
+html.light .legal-doc th {
+  background: rgba(15,17,23,0.04);
+  color: #475569;
+  border-bottom-color: rgba(15,17,23,0.1);
+}
+html.light .legal-doc td { border-bottom-color: rgba(15,17,23,0.06); }
+html.light .legal-doc code {
+  background: rgba(15,17,23,0.04);
+  border-color: rgba(15,17,23,0.08);
+  color: #0891b2;
+}
+html.light .legal-doc .footnote { color: #64748b; border-top-color: rgba(15,17,23,0.07); }
+
+/* Grain overlay a touch softer on light */
+html.light .grain { opacity: 0.04; mix-blend-mode: multiply; }
+
+/* Aurora blobs slightly stronger so they still read on white */
+html.light .aurora-blob-1 { background: rgba(99, 102, 241, 0.10); }
+html.light .aurora-blob-2 { background: rgba(139, 92, 246, 0.08); }
+html.light .aurora-blob-3 { background: rgba(6, 182, 212, 0.06); }
+html.light .aurora-blob-4 { background: rgba(236, 72, 153, 0.05); }
+
+/* Tailwind utility overrides — high-traffic color classes used across the app */
+html.light .bg-base { background-color: #f5f6fa !important; }
+html.light .bg-surface { background-color: #ffffff !important; }
+html.light .bg-surface\/50 { background-color: rgba(255,255,255,0.75) !important; }
+html.light .bg-surface\/60 { background-color: rgba(255,255,255,0.8) !important; }
+html.light .bg-surface\/80 { background-color: rgba(255,255,255,0.9) !important; }
+html.light .bg-white\/5 { background-color: rgba(15,17,23,0.04) !important; }
+html.light .bg-white\/10 { background-color: rgba(15,17,23,0.06) !important; }
+html.light .border-white\/5 { border-color: rgba(15,17,23,0.06) !important; }
+html.light .border-white\/10 { border-color: rgba(15,17,23,0.08) !important; }
+html.light .border-white\/20 { border-color: rgba(15,17,23,0.12) !important; }
+
+html.light .text-white { color: #0f1117 !important; }
+html.light .text-slate-100,
+html.light .text-slate-200 { color: #1a1d28 !important; }
+html.light .text-slate-300 { color: #334155 !important; }
+html.light .text-slate-400 { color: #475569 !important; }
+html.light .text-slate-500 { color: #64748b !important; }
+html.light .text-slate-600 { color: #475569 !important; }
+
+/* Sidebar: override hardcoded dark inline gradient via data-attr-free fallback */
+html.light aside {
+  background: linear-gradient(180deg, #ffffff 0%, #f5f6fa 100%) !important;
+  border-left-color: rgba(15,17,23,0.08) !important;
+}
