@@ -28,6 +28,8 @@ import {
   formatEventTime,
   getEventColor,
 } from '@/lib/google-calendar'
+import { useNotifications } from '@/lib/use-notifications'
+import NotificationCenter from '@/components/NotificationCenter'
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -304,6 +306,15 @@ export default function DashboardPage() {
   const hasData = courses.length > 0 || assignments.length > 0 || tasks.length > 0
   const hasTodayData = todayTasks.length > 0 || urgentAssignments.length > 0 || (todayData?.events?.length || 0) > 0
 
+  // Collect all today's calendar events for notifications
+  const allTodayEvents: GoogleCalendarEvent[] = todayData?.events || []
+
+  // Notification system
+  const {
+    notifications, unreadCount, markRead, markAllRead,
+    requestPermission, hasPermission,
+  } = useNotifications(assignments, tasks, allTodayEvents)
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-5 animate-fade-in">
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
@@ -331,6 +342,14 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <NotificationCenter
+            notifications={notifications}
+            unreadCount={unreadCount}
+            onMarkRead={markRead}
+            onMarkAllRead={markAllRead}
+            onRequestPermission={requestPermission}
+            hasPermission={hasPermission}
+          />
           <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg ${bguConnected ? 'text-emerald-400' : 'text-ink-subtle'}`}
             style={{ background: bguConnected ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${bguConnected ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
             {bguConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
