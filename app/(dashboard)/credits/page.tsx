@@ -77,7 +77,12 @@ export default function CreditsPage() {
   const checkProfile = useCallback(async () => {
     try {
       setError(null)
-      const res = await api.catalog.profile()
+      // 20s timeout — Render free-tier can take up to ~30s to cold-start, but
+      // we'd rather fail fast and show the onboarding wizard than hang the skeleton.
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('השרת לא הגיב. ייתכן שהוא בהפעלה מחדש — נסה לרענן בעוד רגע.')), 20000)
+      )
+      const res: any = await Promise.race([api.catalog.profile(), timeout])
       if (res.needs_onboarding) {
         setNeedsOnboarding(true)
       } else {
@@ -132,14 +137,31 @@ export default function CreditsPage() {
 function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(1)
   const [tracks, setTracks] = useState<Track[]>([])
+  const [tracksLoading, setTracksLoading] = useState(true)
+  const [tracksError, setTracksError] = useState<string | null>(null)
   const [selectedTrack, setSelectedTrack] = useState<string>('')
   const [startYear, setStartYear] = useState(new Date().getFullYear())
   const [currentYear, setCurrentYear] = useState(1)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    api.catalog.tracks().then(setTracks).catch(() => {})
+  const loadTracks = useCallback(async () => {
+    setTracksLoading(true)
+    setTracksError(null)
+    try {
+      // 15s timeout so we don't hang forever when Render backend is asleep
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('השרת לא הגיב (ייתכן שהוא בהפעלה מחדש). נסה שוב בעוד רגע.')), 15000)
+      )
+      const result = await Promise.race([api.catalog.tracks(), timeout])
+      setTracks(result as Track[])
+    } catch (err: any) {
+      setTracksError(err?.message || 'לא הצלחנו לטעון את רשימת המסלולים')
+    } finally {
+      setTracksLoading(false)
+    }
   }, [])
+
+  useEffect(() => { loadTracks() }, [loadTracks])
 
   const handleSave = async () => {
     if (!selectedTrack) return
@@ -276,10 +298,43 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                     </>
                   )}
 
-                  {tracks.length === 0 && (
+                  {tracksLoading && tracks.length === 0 && !tracksError && (
                     <div className="text-center py-8 text-slate-500">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                       טוען מסלולים...
+                      <p className="text-xs text-slate-600 mt-2">
+                        השרת האחורי עלול להיות ישן (Render free-tier) — זה עלול לקחת עד 30 שניות בפעם הראשונה
+                      </p>
+                    </div>
+                  )}
+
+                  {tracksError && (
+                    <div
+                      className="rounded-xl p-4 mb-4 flex items-start gap-3"
+                      style={{
+                        background: 'rgba(239,68,68,0.08)',
+                        border: '1px solid rgba(239,68,68,0.25)',
+                      }}
+                    >
+                      <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-red-300 mb-1">
+                          לא הצלחנו לטעון את המסלולים
+                        </p>
+                        <p className="text-xs text-red-400/80 mb-3">{tracksError}</p>
+                        <button
+                          onClick={loadTracks}
+                          className="text-xs px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors"
+                        >
+                          נסה שוב
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!tracksLoading && !tracksError && tracks.length === 0 && (
+                    <div className="text-center py-8 text-slate-500 text-sm">
+                      אין מסלולים זמינים כרגע
                     </div>
                   )}
 
@@ -393,7 +448,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
         api.catalog.credits(),
         api.catalog.myCourses(),
       ])
-      if (creditsRes?.status === 'success') setCredits(creditsRes)
+      if (creditsRes?.status === 'success') setCredits(creditsRes as CreditSummary)
       setMyCourses(coursesRes)
     } catch (err: any) {
       setError(err?.message || 'שגיאה בטעינת נתוני הנק"ז')

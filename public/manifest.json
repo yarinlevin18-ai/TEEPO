@@ -1,0 +1,19 @@
+{
+  "name": "SmartDesk — מערכת הלימודים שלך",
+  "short_name": "SmartDesk",
+  "description": "פלטפורמת לימוד חכמה לסטודנטים",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1117",
+  "theme_color": "#6366f1",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

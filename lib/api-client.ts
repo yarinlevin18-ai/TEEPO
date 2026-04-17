@@ -2,6 +2,13 @@
  * API Client - תקשורת עם שרת ה-Flask Backend
  */
 import { supabase } from './supabase'
+import {
+  getTracks as _catalogTracks,
+  getTrackWithCourses as _catalogTrack,
+  getDepartments as _catalogDepartments,
+  searchCatalogCourses as _catalogSearch,
+  computeCreditSummary as _catalogCredits,
+} from './bgu-catalog'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -154,16 +161,16 @@ export const api = {
   },
 
   catalog: {
-    departments: () => request<any[]>('/api/catalog/departments'),
-    tracks: () => request<any[]>('/api/catalog/tracks'),
-    track: (id: string) => request<any>(`/api/catalog/tracks/${id}`),
-    searchCourses: (q: string, dept?: string, track?: string) => {
-      const params = new URLSearchParams()
-      if (q) params.set('q', q)
-      if (dept) params.set('dept', dept)
-      if (track) params.set('track', track)
-      return request<any[]>(`/api/catalog/courses?${params}`)
-    },
+    // ── Static catalog data (tracks/departments/course catalog) ──
+    // Served from /public/bgu-catalog.json — backend Supabase tables are empty,
+    // and this data is static BGU shnaton reference anyway.
+    departments: () => _catalogDepartments(),
+    tracks: () => _catalogTracks(),
+    track: (id: string) => _catalogTrack(id),
+    searchCourses: (q: string, dept?: string, track?: string) =>
+      _catalogSearch(q, dept, track),
+
+    // ── Per-user data (profile + my courses) — still backend ──
     profile: () => request<any>('/api/catalog/profile'),
     saveProfile: (data: Record<string, any>) =>
       request<any>('/api/catalog/profile', { method: 'POST', body: JSON.stringify(data) }),
@@ -174,6 +181,21 @@ export const api = {
       request<any>('/api/catalog/my-courses/bulk', { method: 'POST', body: JSON.stringify({ courses }) }),
     removeCourse: (courseId: string) =>
       request<any>(`/api/catalog/my-courses/${courseId}`, { method: 'DELETE' }),
-    credits: () => request<any>('/api/catalog/credits'),
+
+    // ── Credit summary — compute client-side from local catalog + backend my-courses
+    credits: async () => {
+      try {
+        const profileRes: any = await request<any>('/api/catalog/profile')
+        if (!profileRes?.profile?.track_id) return { status: 'no_profile' }
+        const myCourses = await request<any[]>('/api/catalog/my-courses').catch(() => [])
+        return await _catalogCredits(
+          profileRes.profile.track_id,
+          myCourses as any,
+          profileRes.profile.current_year,
+        )
+      } catch (err: any) {
+        return { status: 'error', message: err?.message || 'שגיאת חישוב נק״ז' }
+      }
+    },
   },
 }
