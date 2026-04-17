@@ -15,7 +15,7 @@ import {
 } from 'react'
 import { useAuth } from './auth-context'
 import {
-  DriveDB, DriveDBHandle, EMPTY_DB, loadDB, newId, saveDB,
+  DriveDB, DriveDBHandle, EMPTY_DB, loadDB, newId, saveDB, probeTokenScopes,
 } from './drive-db'
 import type { Course, Lesson, StudyTask, Assignment, CourseNote } from '@/types'
 
@@ -106,11 +106,26 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
       setHandle(h)
       setReady(true)
     } catch (e: any) {
-      setError(e?.message || 'טעינת מסד הנתונים נכשלה')
+      // If Drive rejected us, probe the token to give the user an accurate
+      // cause (scope missing vs API disabled vs expired) instead of a raw 403.
+      let message = e?.message || 'טעינת מסד הנתונים נכשלה'
+      try {
+        const token = googleToken || (await refreshGoogleToken())
+        if (token) {
+          const info = await probeTokenScopes(token)
+          console.info('[drive-db] token scopes:', info)
+          if (!info.hasDriveFile && !info.error) {
+            message = 'הטוקן מ-Google לא כולל את הרשאת drive.file. צא והתחבר מחדש — חשוב לאשר את תיבת "רואה, מעלה ומוריד קבצים שנוצרו ע"י SmartDesk".'
+          } else if (info.error) {
+            message = `הטוקן מ-Google לא תקף (${info.error}). לחץ "התחבר מחדש ל-Google".`
+          }
+        }
+      } catch {}
+      setError(message)
     } finally {
       setLoading(false)
     }
-  }, [user, withToken])
+  }, [user, withToken, googleToken, refreshGoogleToken])
 
   // Load once per (user, token) pair — don't retry in a loop on failure.
   const attemptedRef = useRef<string | null>(null)

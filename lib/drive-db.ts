@@ -42,10 +42,40 @@ export const EMPTY_DB: DriveDB = {
 // ── Drive REST helpers ────────────────────────────────────────
 
 export class DriveScopeError extends Error {
-  constructor(message = 'drive_scope_missing') {
-    super(message)
+  reason: 'scope_missing' | 'api_disabled' | 'token_invalid' | 'unknown'
+  googleMessage?: string
+  constructor(
+    reason: 'scope_missing' | 'api_disabled' | 'token_invalid' | 'unknown',
+    googleMessage?: string,
+  ) {
+    const hebrew =
+      reason === 'api_disabled'
+        ? 'Google Drive API לא מופעל בפרויקט Cloud המחובר. יש להפעיל אותו ב-Google Cloud Console.'
+        : reason === 'token_invalid'
+        ? 'ההתחברות ל-Google פגה. לחץ "התחבר מחדש ל-Google".'
+        : reason === 'scope_missing'
+        ? 'הרשאת drive.file לא ניתנה. לחץ "התחבר מחדש ל-Google" ואשר את ההרשאות בעת ההתחברות.'
+        : 'הגישה ל-Google Drive נחסמה. לחץ "התחבר מחדש ל-Google".'
+    super(hebrew)
     this.name = 'DriveScopeError'
+    this.reason = reason
+    this.googleMessage = googleMessage
   }
+}
+
+/** Classify a Google 401/403 body into something actionable. */
+function classify403(status: number, body: string): DriveScopeError {
+  const lower = body.toLowerCase()
+  if (status === 401) {
+    return new DriveScopeError('token_invalid', body)
+  }
+  if (/drive.*api.*(not|hasn).*(been )?used|drive api has not been enabled|accessnotconfigured/i.test(body)) {
+    return new DriveScopeError('api_disabled', body)
+  }
+  if (/insufficient.*scope|access_token_scope_insufficient|insufficientpermissions|scope/i.test(lower)) {
+    return new DriveScopeError('scope_missing', body)
+  }
+  return new DriveScopeError('unknown', body)
 }
 
 async function driveFetch(
@@ -60,19 +90,46 @@ async function driveFetch(
       ...(init.headers || {}),
     },
   })
-  // If the token exists but lacks drive.file scope, Google returns 403 with
-  // insufficient scope. Raise a typed error so the UI can prompt reconnect.
-  if (res.status === 403) {
-    const clone = res.clone()
+  if (res.status === 401 || res.status === 403) {
     let body = ''
-    try { body = await clone.text() } catch {}
-    if (/insufficient.*scope|ACCESS_TOKEN_SCOPE_INSUFFICIENT|insufficientPermissions/i.test(body)) {
-      throw new DriveScopeError(
-        'ההרשאה לגוגל דרייב חסרה. לחץ "התחבר מחדש ל-Google" כדי להעניק גישה.',
-      )
+    try { body = await res.clone().text() } catch {}
+    // Log the exact Google response so we can diagnose (scope vs API-disabled vs other)
+    if (typeof console !== 'undefined') {
+      console.error('[drive-db] Google returned', res.status, 'for', url, '\nbody:', body)
     }
+    throw classify403(res.status, body)
   }
   return res
+}
+
+/**
+ * Probe the current access token at Google's tokeninfo endpoint so we can see
+ * exactly which scopes were granted. Useful for diagnosing 403s without
+ * needing a real Drive call.
+ */
+export async function probeTokenScopes(token: string): Promise<{
+  scopes: string[]
+  hasDriveFile: boolean
+  expiresIn: number | null
+  error?: string
+}> {
+  try {
+    const res = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(token)}`,
+    )
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      return { scopes: [], hasDriveFile: false, expiresIn: null, error: data?.error_description || data?.error || `tokeninfo ${res.status}` }
+    }
+    const scopes: string[] = typeof data.scope === 'string' ? data.scope.split(' ') : []
+    return {
+      scopes,
+      hasDriveFile: scopes.includes('https://www.googleapis.com/auth/drive.file'),
+      expiresIn: data.expires_in ? Number(data.expires_in) : null,
+    }
+  } catch (e: any) {
+    return { scopes: [], hasDriveFile: false, expiresIn: null, error: e?.message || 'probe failed' }
+  }
 }
 
 /** Find a file/folder by exact name within an optional parent. Returns the first match. */
