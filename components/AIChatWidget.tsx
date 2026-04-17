@@ -13,6 +13,12 @@ import type { ChatMessage } from '@/types'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
+// Render free-tier sleeps after 15 min idle and takes 30-60s to cold-start.
+// We retry aggressively and show a helpful UI hint instead of silently failing.
+const MAX_RETRIES = 6
+const RETRY_DELAYS = [2000, 5000, 10000, 20000, 30000, 45000]
+const SOCKET_TIMEOUT = 60_000
+
 /**
  * Floating AI Chat Widget — available on every page.
  * Context-aware: detects current course from URL and passes it to the AI.
@@ -29,65 +35,123 @@ export default function AIChatWidget() {
   const [connected, setConnected] = useState(false)
   const [unread, setUnread] = useState(0)
   const [isSearching, setIsSearching] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+  const [isRetrying, setIsRetrying] = useState(false)
 
   const socketRef = useRef<Socket | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Extract course ID from URL if on a course page
   const courseId = pathname?.match(/\/courses\/([^/]+)/)?.[1] || ''
   const isOnCoursePage = !!courseId
   const isOnStudyBuddyPage = pathname === '/study-buddy'
 
-  // Connect socket
+  // Connect socket — with cold-start resilience (Render free-tier naps after 15 min)
   useEffect(() => {
     if (!isOpen) return
 
-    const socket = io(BACKEND, { transports: ['websocket', 'polling'] })
-    socketRef.current = socket
+    let cancelled = false
 
-    socket.on('connect', () => {
-      setConnected(true)
-      socket.emit('join', {
-        user_id: user?.id || 'anonymous',
-        agent_type: 'study_buddy',
+    const connect = async () => {
+      // Wake the server up first — Render's free tier needs a ping to start the container,
+      // and a plain HTTP request gets through faster than a websocket upgrade.
+      try {
+        fetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(60_000) }).catch(() => {})
+      } catch { /* AbortSignal.timeout may not exist on old browsers — safe to ignore */ }
+
+      if (cancelled) return
+
+      const socket = io(BACKEND, {
+        transports: ['polling', 'websocket'], // polling first — survives cold-start better
+        timeout: SOCKET_TIMEOUT,
+        reconnection: false, // we handle retries ourselves with visible UI feedback
       })
-    })
+      socketRef.current = socket
 
-    socket.on('disconnect', () => setConnected(false))
+      socket.on('connect', () => {
+        setConnected(true)
+        setIsRetrying(false)
+        setRetryCount(0)
+        socket.emit('join', {
+          user_id: user?.id || 'anonymous',
+          agent_type: 'study_buddy',
+        })
+      })
 
-    socket.on('connected', () => {
-      if (messages.length === 0) {
-        const greeting = isOnCoursePage
-          ? 'היי, אני רואה שאתה בדף קורס. אני מכיר את החומר שלך, אז תשאל כל שאלה.'
-          : 'היי, מה נלמד? אפשר לשאול שאלות, לבקש הסבר על נושא, או עזרה בתרגיל.'
-        setMessages([{ role: 'assistant', content: greeting }])
-      }
-    })
+      socket.on('connect_error', () => {
+        setConnected(false)
+        if (cancelled) return
+        // Kick off the next retry if we have budget left
+        setRetryCount((c) => {
+          if (c < MAX_RETRIES) {
+            setIsRetrying(true)
+            const delay = RETRY_DELAYS[c] ?? 45_000
+            retryTimerRef.current = setTimeout(() => {
+              if (cancelled) return
+              socket.disconnect()
+              connect()
+            }, delay)
+            return c + 1
+          }
+          setIsRetrying(false)
+          return c
+        })
+      })
 
-    socket.on('history_loaded', ({ messages: hist }) => {
-      if (hist && hist.length > 0) setMessages(hist)
-    })
+      socket.on('disconnect', () => setConnected(false))
 
-    socket.on('typing', () => setIsTyping(true))
+      socket.on('connected', () => {
+        if (messages.length === 0) {
+          const greeting = isOnCoursePage
+            ? 'היי, אני רואה שאתה בדף קורס. אני מכיר את החומר שלך, אז תשאל כל שאלה.'
+            : 'היי, מה נלמד? אפשר לשאול שאלות, לבקש הסבר על נושא, או עזרה בתרגיל.'
+          setMessages([{ role: 'assistant', content: greeting }])
+        }
+      })
 
-    socket.on('searching', () => setIsSearching(true))
+      socket.on('history_loaded', ({ messages: hist }) => {
+        if (hist && hist.length > 0) setMessages(hist)
+      })
 
-    socket.on('reply', ({ text }: { text: string }) => {
-      setIsTyping(false)
-      setIsSearching(false)
-      setMessages((prev) => [...prev, { role: 'assistant', content: text }])
-      if (!isOpen) setUnread((u) => u + 1)
-    })
+      socket.on('typing', () => setIsTyping(true))
+      socket.on('searching', () => setIsSearching(true))
 
-    socket.on('error', ({ message }: { message: string }) => {
-      setIsTyping(false)
-      setIsSearching(false)
-      setMessages((prev) => [...prev, { role: 'assistant', content: `❌ ${message}` }])
-    })
+      socket.on('reply', ({ text }: { text: string }) => {
+        setIsTyping(false)
+        setIsSearching(false)
+        setMessages((prev) => [...prev, { role: 'assistant', content: text }])
+        if (!isOpen) setUnread((u) => u + 1)
+      })
 
-    return () => { socket.disconnect() }
+      socket.on('error', ({ message }: { message: string }) => {
+        setIsTyping(false)
+        setIsSearching(false)
+        setMessages((prev) => [...prev, { role: 'assistant', content: `❌ ${message}` }])
+      })
+    }
+
+    connect()
+
+    return () => {
+      cancelled = true
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+      socketRef.current?.disconnect()
+      socketRef.current = null
+    }
   }, [isOpen])
+
+  // Manual reconnect — used after the retry budget is exhausted
+  const reconnect = () => {
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+    socketRef.current?.disconnect()
+    setRetryCount(0)
+    setIsRetrying(false)
+    // Toggle isOpen off→on to re-run the connect effect
+    setIsOpen(false)
+    setTimeout(() => setIsOpen(true), 50)
+  }
 
   // Auto-scroll
   useEffect(() => {
@@ -183,11 +247,33 @@ export default function AIChatWidget() {
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold text-ink">SmartDesk AI</h3>
                 <div className="flex items-center gap-2">
-                  <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-white/20'}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    connected
+                      ? 'bg-green-400'
+                      : isRetrying
+                      ? 'bg-amber-400 animate-pulse'
+                      : retryCount >= MAX_RETRIES
+                      ? 'bg-red-400'
+                      : 'bg-white/20'
+                  }`} />
                   <span className="text-[10px] text-ink-muted">
-                    {connected ? (isOnCoursePage ? 'מחובר · בהקשר קורס' : 'מחובר') : 'מתחבר...'}
+                    {connected
+                      ? (isOnCoursePage ? 'מחובר · בהקשר קורס' : 'מחובר')
+                      : retryCount >= MAX_RETRIES
+                      ? 'השרת לא זמין'
+                      : isRetrying
+                      ? `מעיר את השרת... (${retryCount}/${MAX_RETRIES})`
+                      : 'מתחבר...'}
                   </span>
-                  {isOnCoursePage && (
+                  {!connected && retryCount >= MAX_RETRIES && (
+                    <button
+                      onClick={reconnect}
+                      className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25 transition-colors"
+                    >
+                      נסה שוב
+                    </button>
+                  )}
+                  {isOnCoursePage && connected && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 flex items-center gap-1">
                       <BookOpen size={8} /> קורס
                     </span>
