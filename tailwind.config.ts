@@ -9,7 +9,9 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-heebo)', 'Heebo', 'system-ui', 'sans-serif'],
+        sans:    ['Heebo', 'system-ui', 'sans-serif'],
+        serif:   ['"Frank Ruhl Libre"', 'Georgia', 'serif'],
+        script:  ['Caveat', 'cursive'],
       },
       colors: {
         base: '#0f1117',
@@ -18,6 +20,19 @@ const config: Config = {
           50:  '#1e2535',
           100: '#252d40',
           200: '#2d3748',
+        },
+        /* Warm "paper" cream — for typography on dark */
+        paper: {
+          DEFAULT: '#f4ede0',
+          muted:   '#d4c9b4',
+          subtle:  '#8a8270',
+        },
+        /* Aged-gold editorial accent — replaces indigo→violet spam */
+        clay: {
+          DEFAULT: '#c8a96a',
+          400:     '#d4bd85',
+          500:     '#c8a96a',
+          600:     '#a88c52',
         },
         accent: {
           DEFAULT: '#6366f1',

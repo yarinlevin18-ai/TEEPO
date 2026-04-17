@@ -30,7 +30,10 @@
       "Bash(powershell -Command \"\\(Get-Content 'C:\\\\Users\\\\D0AF~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-------OneDrive-Desktop-Learning-platform-and-bot\\\\dfb5f03d-b032-458b-ac51-14e54d413234\\\\tasks\\\\a8dd307bab02f7874.output' -Tail 5\\)\")",
       "Bash(powershell -Command \"\\(Get-Item 'C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Learning platform and bot\\\\app\\\\\\(dashboard\\)\\\\study-buddy\\\\page.tsx'\\).Length\")",
       "Bash(powershell -Command \"\\(Get-Item 'C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Learning platform and bot\\\\app\\\\\\(dashboard\\)\\\\credits\\\\page.tsx'\\).Length\")",
-      "Bash(grep -E \"\\\\.tsx$|^d\")"
+      "Bash(grep -E \"\\\\.tsx$|^d\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Projects\\\\1-active\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Projects\\\\2-experimental\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\משתמש\\\\OneDrive\\\\Desktop\\\\Projects\\\\3-archived\")"
     ]
   }
 }
