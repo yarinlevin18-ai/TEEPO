@@ -894,7 +894,41 @@ html.light .text-slate-400 { color: #475569 !important; }
 html.light .text-slate-500 { color: #64748b !important; }
 html.light .text-slate-600 { color: #475569 !important; }
 
-/* Sidebar: override hardcoded dark inline gradient via data-attr-free fallback */
+/* Custom ink / paper / surface tokens (from tailwind.config.ts) — invert for light */
+html.light .text-ink { color: #0f1117 !important; }
+html.light .text-ink-muted { color: #475569 !important; }
+html.light .text-ink-subtle { color: #64748b !important; }
+html.light .text-paper { color: #1a1d28 !important; }
+html.light .text-paper-muted { color: #475569 !important; }
+html.light .text-paper-subtle { color: #64748b !important; }
+html.light .text-clay,
+html.light .text-clay-500 { color: #a88c52 !important; }
+
+html.light .bg-surface,
+html.light .bg-surface-50,
+html.light .bg-surface-100,
+html.light .bg-surface-200 { background-color: #ffffff !important; }
+html.light .bg-surface\/50 { background-color: rgba(255,255,255,0.75) !important; }
+html.light .bg-surface\/60 { background-color: rgba(255,255,255,0.8) !important; }
+
+html.light .border-ink-subtle\/20 { border-color: rgba(15,17,23,0.12) !important; }
+html.light .border-ink-subtle\/30 { border-color: rgba(15,17,23,0.18) !important; }
+
+/* Gradient "white" text: readable on light bg — switch to dark→violet */
+html.light .gradient-text-white {
+  background: linear-gradient(135deg, #0f1117, #6d28d9) !important;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Plain bg-white stays visibly distinct with a subtle shadow/border */
+html.light .bg-white { background-color: #ffffff !important; }
+html.light .bg-black\/20 { background-color: rgba(15,17,23,0.05) !important; }
+html.light .bg-black\/30 { background-color: rgba(15,17,23,0.08) !important; }
+html.light .bg-black\/40 { background-color: rgba(15,17,23,0.12) !important; }
+
+/* Sidebar: override hardcoded dark inline gradient */
 html.light aside {
   background: linear-gradient(180deg, #ffffff 0%, #f5f6fa 100%) !important;
   border-left-color: rgba(15,17,23,0.08) !important;
