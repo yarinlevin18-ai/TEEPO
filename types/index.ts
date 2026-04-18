@@ -143,6 +143,38 @@ export interface QuizQuestion {
   order_index: number
 }
 
+/** NotebookLM-style notebook — a collection of sources the AI can ground answers in. */
+export interface Notebook {
+  id: string
+  user_id: string
+  title: string
+  description?: string
+  /** Optional tie-in to a course — the AI gets that extra context too. */
+  course_id?: string
+  created_at: string
+  updated_at: string
+  /** Persistent chat history for this notebook. */
+  chat_history?: ChatMessage[]
+}
+
+export type NotebookSourceType = 'pdf' | 'text' | 'url' | 'lesson_ref'
+
+/** A single source (PDF, pasted text, URL, or reference to an existing lesson). */
+export interface NotebookSource {
+  id: string
+  notebook_id: string
+  type: NotebookSourceType
+  title: string
+  /** Extracted plaintext. Capped at ~200KB per source to keep the DB slim. */
+  content: string
+  file_name?: string
+  url?: string
+  lesson_id?: string
+  /** Approximate page/section count — just for display. */
+  meta?: { pages?: number; words?: number }
+  created_at: string
+}
+
 export interface BGUGrade {
   course_id: string
   course_name: string

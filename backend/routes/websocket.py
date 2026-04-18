@@ -66,7 +66,10 @@ def register_socket_events(socketio: SocketIO):
         session = _sessions.get(sid, {})
         user_id = session.get("user_id", "anonymous")
         question: str = str(data.get("text", ""))[:5000]
-        context: str = str(data.get("context", ""))[:10000]
+        # Bumped from 10k → 150k to support NotebookLM-style grounding where
+        # the client ships entire PDF text as context. Claude Sonnet 4.5 has
+        # a 200k context window so this is well within limits.
+        context: str = str(data.get("context", ""))[:150_000]
         agent_type: str = data.get("agent_type", "study_buddy")
         course_id: str = str(data.get("course_id", ""))[:64]
         if agent_type not in ("study_buddy", "academic"):

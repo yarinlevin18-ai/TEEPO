@@ -12,7 +12,7 @@
  * The whole DB is small enough to round-trip as one JSON file. If it grows
  * huge later, we can shard per-course.
  */
-import type { Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings } from '@/types'
+import type { Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings, Notebook, NotebookSource } from '@/types'
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3'
 const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
@@ -60,6 +60,10 @@ export interface DriveDB {
   student_profile?: StudentProfile
   /** Courses the student has taken / is taking / plans to take, for credits tracking. */
   student_courses?: StudentCourse[]
+  /** NotebookLM-style notebooks — grounded Q&A over uploaded sources. */
+  notebooks?: Notebook[]
+  /** Sources attached to notebooks (extracted plaintext of PDFs, pasted text, etc). */
+  notebook_sources?: NotebookSource[]
 }
 
 export const EMPTY_DB: DriveDB = {
@@ -72,6 +76,8 @@ export const EMPTY_DB: DriveDB = {
   notes: [],
   settings: {},
   student_courses: [],
+  notebooks: [],
+  notebook_sources: [],
 }
 
 // ── Drive REST helpers ────────────────────────────────────────

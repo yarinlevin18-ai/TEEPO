@@ -413,7 +413,9 @@ class StudyOrchestrator:
                         course_context: str = "", notes_context: str = "") -> Dict:
         """עונה על שאלת לימוד בצ'אט אינטראקטיבי — בסגנון NotebookLM."""
         question = _sanitize_for_prompt(question, 5000)
-        context = _sanitize_for_prompt(context, 10000)
+        # Bumped from 10k → 150k to accommodate NotebookLM-mode where the
+        # client ships extracted PDF/source text as grounding context.
+        context = _sanitize_for_prompt(context, 150_000)
         course_context = _sanitize_for_prompt(course_context, 15000)
         notes_context = _sanitize_for_prompt(notes_context, 15000)
         messages = history[-20:] if history else []
