@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, Upload, FileText, Type, Trash2, Send, Bot, User, Sparkles,
   Loader2, BookOpen, X, FileQuestion, FileCheck,
-  ListOrdered, Eraser, Copy, Check, Plus, Layers,
+  ListOrdered, Eraser, Copy, Check, Plus, Layers, GraduationCap, Download,
 } from 'lucide-react'
 import { io, Socket } from 'socket.io-client'
 import { useDB } from '@/lib/db-context'
@@ -65,13 +65,26 @@ export default function NotebookDetailPage() {
 
   // ── Source upload state ────────────────────────────────────
   const [showAddModal, setShowAddModal] = useState(false)
-  const [addMode, setAddMode] = useState<'pdf' | 'text' | 'lesson' | 'reuse'>('pdf')
+  const [addMode, setAddMode] = useState<'pdf' | 'text' | 'lesson' | 'reuse' | 'bgu'>('pdf')
   const [textTitle, setTextTitle] = useState('')
   const [textContent, setTextContent] = useState('')
   const [reuseQuery, setReuseQuery] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
+  const [bguIngesting, setBguIngesting] = useState(false)
+  const [bguResult, setBguResult] = useState<null | {
+    added: number
+    skipped: Array<{ title: string; reason: string }>
+    totalCandidates: number
+  }>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // BGU ingest is only available if the notebook is linked to a BGU course
+  // that carries a Moodle URL. We also need Moodle cookies on the backend —
+  // if the user never synced, the call will just return an error.
+  const canIngestFromBgu = Boolean(
+    course && course.source === 'bgu' && course.source_url,
+  )
 
   // Sources from other notebooks — used by the "reuse" tab.
   const reuseCandidates = (db.notebook_sources || []).filter(
@@ -377,6 +390,83 @@ export default function NotebookDetailPage() {
     setEditingTitle(false)
   }
 
+  // ── BGU auto-ingest ────────────────────────────────────────
+  // Pull every PDF material for the linked BGU course via the backend,
+  // then batch-create notebook sources from the extracted text. Existing
+  // titles are skipped so re-running doesn't duplicate sources.
+  const handleBguIngest = async () => {
+    if (!course?.source_url) return
+    setBguIngesting(true)
+    setBguResult(null)
+    setUploadProgress('מעיר את השרת...')
+    try {
+      // Wake Render (free tier sleeps). Don't await hard — a warm-up failure
+      // isn't fatal; the real call has its own timeout.
+      try { await fetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(60_000) }) } catch {}
+
+      setUploadProgress('שולף רשימת קבצים מ-Moodle...')
+      const res = await fetch(`${BACKEND}/api/bgu/course/ingest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ course_url: course.source_url, max_pdfs: 20 }),
+        signal: AbortSignal.timeout(180_000), // 3 min — PDF downloads can be slow
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`שרת BGU החזיר ${res.status}${text ? `: ${text.slice(0, 160)}` : ''}`)
+      }
+      const data = await res.json()
+      if (data.status === 'error') {
+        throw new Error(data.message || 'השרת החזיר שגיאה')
+      }
+      const fetched: Array<{
+        title: string
+        content: string
+        pages: number
+        url: string
+        bytes: number
+        section?: string
+      }> = data.sources || []
+      const skipped: Array<{ title: string; reason: string }> = data.skipped || []
+
+      // De-dupe against existing titles in this notebook.
+      const existingTitles = new Set(sources.map((s) => s.title))
+      let added = 0
+      for (let idx = 0; idx < fetched.length; idx++) {
+        const f = fetched[idx]
+        if (existingTitles.has(f.title)) continue
+        setUploadProgress(`שומר ${idx + 1}/${fetched.length}: ${f.title.slice(0, 40)}...`)
+        await addNotebookSource(params.id, {
+          type: 'pdf',
+          title: f.title,
+          content: f.content,
+          file_name: f.title.endsWith('.pdf') ? f.title : `${f.title}.pdf`,
+          url: f.url,
+          meta: {
+            pages: f.pages,
+            words: f.content.split(/\s+/).length,
+          },
+        })
+        added++
+      }
+
+      setBguResult({
+        added,
+        skipped,
+        totalCandidates: data.total_candidates ?? fetched.length + skipped.length,
+      })
+      setUploadProgress('')
+    } catch (e: any) {
+      const msg = e?.name === 'TimeoutError' || e?.name === 'AbortError'
+        ? 'השרת לא הגיב בזמן — נסה שוב'
+        : e?.message || 'הייבוא נכשל'
+      setBguResult({ added: 0, skipped: [{ title: 'שגיאה כללית', reason: msg }], totalCandidates: 0 })
+      setUploadProgress('')
+    } finally {
+      setBguIngesting(false)
+    }
+  }
+
   // ── Render guards ──────────────────────────────────────────
   if (!ready) {
     return <div className="p-8 text-center text-ink-muted">טוען...</div>
@@ -647,6 +737,7 @@ export default function NotebookDetailPage() {
                 { id: 'text' as const, label: 'טקסט', icon: Type },
                 { id: 'lesson' as const, label: 'שיעור', icon: BookOpen, disabled: courseLessons.length === 0 },
                 { id: 'reuse' as const, label: 'מחברת אחרת', icon: Layers, disabled: reuseCandidates.length === 0 },
+                { id: 'bgu' as const, label: 'מ-BGU', icon: GraduationCap, disabled: !canIngestFromBgu },
               ].map((t) => {
                 const Icon = t.icon
                 return (
@@ -812,6 +903,85 @@ export default function NotebookDetailPage() {
                     })
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* BGU auto-ingest */}
+            {addMode === 'bgu' && (
+              <div className="space-y-3">
+                {!canIngestFromBgu ? (
+                  <div className="text-center py-8 text-ink-muted text-sm">
+                    יבוא אוטומטי זמין רק למחברת המשויכת לקורס BGU.
+                  </div>
+                ) : (
+                  <>
+                    <div className="glass rounded-xl p-3 text-xs text-ink-muted space-y-1">
+                      <div className="flex items-center gap-2 text-ink">
+                        <GraduationCap size={14} className="text-indigo-400" />
+                        <span className="font-medium">{course?.title}</span>
+                      </div>
+                      <div>
+                        נמשוך עד 20 קבצי PDF מדף הקורס ב-Moodle, נחלץ טקסט ונוסיף כמקורות.
+                      </div>
+                      <div className="text-[11px]">
+                        דורש חיבור פעיל ל-Moodle מדף &quot;חיבור BGU&quot;. קבצים סרוקים (תמונה בלבד)
+                        יידלגו — אפשר להעלות אותם ידנית עם OCR.
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleBguIngest}
+                      disabled={bguIngesting}
+                      className="w-full rounded-xl p-4 flex items-center justify-center gap-2 text-white font-medium disabled:opacity-50 transition-transform hover:scale-[1.01]"
+                      style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+                    >
+                      {bguIngesting ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          <span>{uploadProgress || 'מייבא...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download size={18} />
+                          <span>ייבא PDFים מהקורס</span>
+                        </>
+                      )}
+                    </button>
+
+                    {bguResult && (
+                      <div className="space-y-2 text-xs">
+                        <div
+                          className={`glass rounded-xl p-3 ${
+                            bguResult.added > 0 ? 'border-emerald-500/30' : 'border-amber-500/30'
+                          }`}
+                        >
+                          <div className="font-medium text-ink">
+                            {bguResult.added > 0
+                              ? `נוספו ${bguResult.added} מקורות חדשים`
+                              : 'לא נוספו מקורות חדשים'}
+                          </div>
+                          <div className="text-ink-muted mt-1">
+                            סה״כ מועמדים שנמצאו: {bguResult.totalCandidates}
+                          </div>
+                        </div>
+                        {bguResult.skipped.length > 0 && (
+                          <div className="glass rounded-xl p-3 max-h-40 overflow-y-auto">
+                            <div className="font-medium text-ink mb-1">
+                              דולג ({bguResult.skipped.length}):
+                            </div>
+                            <ul className="space-y-0.5 text-ink-muted">
+                              {bguResult.skipped.map((s, i) => (
+                                <li key={i} className="truncate" title={`${s.title}: ${s.reason}`}>
+                                  • {s.title} — <span className="text-amber-400">{s.reason}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
 

@@ -745,6 +745,172 @@ def scrape_course_materials(course_url: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
+# Cap each extracted PDF at 200KB of text — same as the client-side pdfjs
+# extractor, so ingested sources don't blow out the Drive DB.
+_PDF_MAX_CHARS = 200_000
+# Skip PDFs bigger than 30MB — that's a textbook, not a slide deck, and
+# fetching them over a slow BGU connection is too fragile.
+_PDF_MAX_BYTES = 30 * 1024 * 1024
+
+
+def _extract_pdf_text(pdf_bytes: bytes) -> tuple[str, int]:
+    """Return (text, pages). Uses pypdf — fast enough for slide decks and
+    correctly decodes Hebrew from BGU lecture PDFs. Caller should handle
+    scanned PDFs separately (those return empty text here)."""
+    from io import BytesIO
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        # pypdf isn't installed yet on Render until redeploy picks up the
+        # updated requirements.txt. Fail soft so the rest of the ingest
+        # flow can still report back gracefully.
+        logger.warning("[BGU] pypdf not installed; skipping PDF text extraction")
+        return "", 0
+
+    reader = PdfReader(BytesIO(pdf_bytes))
+    pieces: list[str] = []
+    total = 0
+    for i, page in enumerate(reader.pages, start=1):
+        try:
+            page_text = (page.extract_text() or "").strip()
+        except Exception:
+            page_text = ""
+        chunk = f"\n\n--- עמוד {i} ---\n{page_text}"
+        if total + len(chunk) > _PDF_MAX_CHARS:
+            remaining = _PDF_MAX_CHARS - total
+            if remaining > 0:
+                pieces.append(chunk[:remaining])
+            break
+        pieces.append(chunk)
+        total += len(chunk)
+    return "".join(pieces), len(reader.pages)
+
+
+def ingest_course_materials(course_url: str, max_pdfs: int = 20) -> dict:
+    """
+    Fetch all PDF materials from a Moodle course page and extract their text.
+    Returns: {status, sources: [{title, content, pages, url, bytes}], skipped: [...]}
+
+    PDF discovery strategy:
+      1. AJAX core_course_get_contents to list modules with file info
+      2. For each module of type 'resource', the URL is a mod/resource/view.php
+         redirect — we need to follow it to hit the actual file stream.
+      3. pluginfile.php URLs (direct links) are downloaded directly.
+    """
+    cookies = _load_cookies_from_store("moodle")
+    if not cookies:
+        return {"status": "error", "message": "לא מחובר ל-Moodle"}
+
+    session = _build_session(cookies)
+
+    course_id_match = re.search(r"id=(\d+)", course_url)
+    if not course_id_match:
+        return {"status": "error", "message": "לא זוהה מזהה קורס ב-URL"}
+    cid = int(course_id_match.group(1))
+
+    sesskey = _get_sesskey(session)
+    if not sesskey:
+        return {"status": "error", "message": "לא נמצא sesskey — ייתכן שה-session פג תוקף"}
+
+    contents = _moodle_ajax(session, sesskey, "core_course_get_contents", {"courseid": cid})
+    if not contents:
+        return {"status": "error", "message": "שליפת תכני הקורס נכשלה"}
+
+    # Collect candidate PDF URLs. Moodle exposes `contents` on each module
+    # with `fileurl` pointing to pluginfile.php. That's the direct link.
+    candidates: list[dict] = []
+    for section in contents:
+        for module in section.get("modules", []):
+            modname = module.get("modname", "")
+            mod_title = module.get("name", "").strip() or "ללא כותרת"
+            # Direct files (resource / folder) expose `contents` array with fileurl.
+            for f in module.get("contents", []) or []:
+                mime = (f.get("mimetype") or "").lower()
+                fname = (f.get("filename") or "").lower()
+                fileurl = f.get("fileurl") or ""
+                if not fileurl:
+                    continue
+                if "pdf" in mime or fname.endswith(".pdf"):
+                    # pluginfile.php URLs need the sesskey appended as `token`
+                    # query param or the cookies alone suffice for the session.
+                    candidates.append({
+                        "title": f.get("filename") or mod_title,
+                        "url": fileurl,
+                        "section": section.get("name", ""),
+                        "module": mod_title,
+                        "filesize": f.get("filesize") or 0,
+                    })
+            # Also accept the module itself if it's a resource with no
+            # explicit `contents` payload — we'll probe mime via HEAD below.
+            if modname == "resource" and not module.get("contents"):
+                view_url = module.get("url", "")
+                if view_url:
+                    candidates.append({
+                        "title": mod_title,
+                        "url": view_url,
+                        "section": section.get("name", ""),
+                        "module": mod_title,
+                        "filesize": 0,
+                        "needs_probe": True,
+                    })
+
+    if not candidates:
+        return {"status": "success", "sources": [], "skipped": [], "total_candidates": 0}
+
+    candidates = candidates[:max_pdfs]
+
+    sources: list[dict] = []
+    skipped: list[dict] = []
+
+    for c in candidates:
+        title = c["title"]
+        url = c["url"]
+        try:
+            # For view.php links, follow redirects. Moodle hands us to the
+            # actual pluginfile stream after a 303.
+            resp = session.get(url, timeout=30, allow_redirects=True)
+            if resp.status_code != 200:
+                skipped.append({"title": title, "reason": f"HTTP {resp.status_code}"})
+                continue
+            ctype = (resp.headers.get("content-type") or "").lower()
+            if "pdf" not in ctype and not url.lower().endswith(".pdf"):
+                # Probably a page wrapper or non-PDF. Skip.
+                skipped.append({"title": title, "reason": "לא PDF"})
+                continue
+            pdf_bytes = resp.content
+            if len(pdf_bytes) > _PDF_MAX_BYTES:
+                skipped.append({
+                    "title": title,
+                    "reason": f"גדול מדי ({len(pdf_bytes)/1024/1024:.1f}MB)",
+                })
+                continue
+
+            text, pages = _extract_pdf_text(pdf_bytes)
+            if not text.strip():
+                # Likely scanned. The client will show this so the user knows
+                # to run OCR on their own machine if they want the text.
+                skipped.append({"title": title, "reason": "PDF סרוק — יש להעלות ידנית עם OCR"})
+                continue
+
+            sources.append({
+                "title": title.rsplit(".pdf", 1)[0],  # strip extension
+                "content": text,
+                "pages": pages,
+                "url": url,
+                "bytes": len(pdf_bytes),
+                "section": c.get("section"),
+            })
+        except Exception as e:
+            skipped.append({"title": title, "reason": str(e)[:120]})
+
+    return {
+        "status": "success",
+        "sources": sources,
+        "skipped": skipped,
+        "total_candidates": len(candidates),
+    }
+
+
 def _get_moodle_user_id(session: requests.Session) -> int | None:
     """Extract the Moodle numeric user ID from the dashboard page."""
     try:

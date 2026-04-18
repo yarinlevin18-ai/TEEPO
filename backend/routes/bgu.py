@@ -474,3 +474,28 @@ def get_all_assignments():
     except Exception as e:
         logger.error(f"Bulk assignment fetch failed: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@bgu.post("/course/ingest")
+def ingest_course():
+    """Download + extract text from all PDF materials in a BGU Moodle course.
+    Intended for the notebook auto-ingest flow: client posts the course URL,
+    we return ready-to-save source dicts that the client adds to a notebook.
+
+    Body: {course_url: str, max_pdfs?: int (default 20, hard cap 40)}
+    """
+    body = request.get_json() or {}
+    course_url = body.get("course_url", "")
+    max_pdfs = min(int(body.get("max_pdfs", 20) or 20), 40)
+
+    if not course_url:
+        return jsonify({"status": "error", "message": "חסרה כתובת קורס"}), 400
+    if not _is_bgu_url(course_url):
+        return jsonify({"status": "error", "message": "כתובת URL חייבת להיות מאתר BGU"}), 400
+
+    try:
+        result = bgu_scraper.ingest_course_materials(course_url, max_pdfs=max_pdfs)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"[BGU] Course ingest failed for {course_url}: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
