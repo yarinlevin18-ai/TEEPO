@@ -162,7 +162,10 @@ def extract_course():
     if result.get("status") != "success":
         return jsonify({"error": result.get("message", "שגיאה בחילוץ")}), 500
 
-    # Persist to Supabase
+    # Persist to Supabase. If the DB is unreachable, we still return the
+    # extracted result so the client can save it locally (Drive DB) — losing
+    # an expensive LLM extraction because of a transient DB hiccup is worse
+    # than a noisy 500.
     user_id = _user_id()
     course_data = {
         "id": str(uuid.uuid4()),
@@ -173,23 +176,32 @@ def extract_course():
         "description": result.get("description", ""),
         "status": "active",
     }
-    course_res = db.create_course(course_data)
-    course_id = course_res.data[0]["id"] if course_res.data else course_data["id"]
+    persisted = False
+    try:
+        course_res = db.create_course(course_data)
+        course_id = course_res.data[0]["id"] if course_res.data else course_data["id"]
 
-    # Save sections as lessons
-    lessons = []
-    for section in result.get("sections", []):
-        lessons.append({
-            "id": str(uuid.uuid4()),
-            "course_id": course_id,
-            "title": section.get("title", ""),
-            "order_index": section.get("order", 0),
-            "content": "",
-        })
-    if lessons:
-        db.bulk_create_lessons(lessons)
+        # Save sections as lessons
+        lessons = []
+        for section in result.get("sections", []):
+            lessons.append({
+                "id": str(uuid.uuid4()),
+                "course_id": course_id,
+                "title": section.get("title", ""),
+                "order_index": section.get("order", 0),
+                "content": "",
+            })
+        if lessons:
+            db.bulk_create_lessons(lessons)
+        persisted = True
+    except Exception as e:
+        logger.warning(f"[extract_course] Supabase persist failed (returning extraction anyway): {e}")
 
-    return jsonify({"course": course_data, "sections": result.get("sections", [])})
+    return jsonify({
+        "course": course_data,
+        "sections": result.get("sections", []),
+        "persisted": persisted,
+    })
 
 
 # ------------------------------------------------------------------ #
@@ -265,7 +277,8 @@ def breakdown_assignment():
     orch = get_orchestrator()
     result = orch.breakdown_assignment(title, description, deadline)
 
-    # Persist assignment + tasks
+    # Persist assignment + tasks. Same policy as /courses/extract: if the
+    # DB is down, return the breakdown anyway so the client can keep it.
     user_id = _user_id()
     assignment_id = str(uuid.uuid4())
     assignment_data = {
@@ -276,24 +289,29 @@ def breakdown_assignment():
         "deadline": deadline,
         "status": "todo",
     }
-    db.create_assignment(assignment_data)
+    persisted = False
+    try:
+        db.create_assignment(assignment_data)
 
-    tasks = result.get("tasks", [])
-    db_tasks = [
-        {
-            "id": str(uuid.uuid4()),
-            "assignment_id": assignment_id,
-            "title": t.get("title", ""),
-            "description": t.get("description", ""),
-            "order_index": t.get("order", i + 1),
-            "estimated_hours": t.get("estimated_hours", 1),
-        }
-        for i, t in enumerate(tasks)
-    ]
-    if db_tasks:
-        db.create_assignment_tasks(db_tasks)
+        tasks = result.get("tasks", [])
+        db_tasks = [
+            {
+                "id": str(uuid.uuid4()),
+                "assignment_id": assignment_id,
+                "title": t.get("title", ""),
+                "description": t.get("description", ""),
+                "order_index": t.get("order", i + 1),
+                "estimated_hours": t.get("estimated_hours", 1),
+            }
+            for i, t in enumerate(tasks)
+        ]
+        if db_tasks:
+            db.create_assignment_tasks(db_tasks)
+        persisted = True
+    except Exception as e:
+        logger.warning(f"[breakdown_assignment] Supabase persist failed (returning breakdown anyway): {e}")
 
-    return jsonify({**result, "assignment_id": assignment_id})
+    return jsonify({**result, "assignment_id": assignment_id, "persisted": persisted})
 
 
 # ------------------------------------------------------------------ #

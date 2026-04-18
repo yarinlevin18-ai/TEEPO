@@ -65,12 +65,23 @@ export default function NotebookDetailPage() {
 
   // ── Source upload state ────────────────────────────────────
   const [showAddModal, setShowAddModal] = useState(false)
-  const [addMode, setAddMode] = useState<'pdf' | 'text' | 'lesson'>('pdf')
+  const [addMode, setAddMode] = useState<'pdf' | 'text' | 'lesson' | 'reuse'>('pdf')
   const [textTitle, setTextTitle] = useState('')
   const [textContent, setTextContent] = useState('')
+  const [reuseQuery, setReuseQuery] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Sources from other notebooks — used by the "reuse" tab.
+  const reuseCandidates = (db.notebook_sources || []).filter(
+    (s) => s.notebook_id !== params.id,
+  )
+  const reuseFiltered = reuseQuery.trim()
+    ? reuseCandidates.filter((s) =>
+        s.title.toLowerCase().includes(reuseQuery.toLowerCase()),
+      )
+    : reuseCandidates
 
   // ── Edit title state ──────────────────────────────────────
   const [editingTitle, setEditingTitle] = useState(false)
@@ -219,6 +230,9 @@ export default function NotebookDetailPage() {
       agent_type: 'study_buddy',
       context,
       course_id: course?.id || '',
+      // Grounded-mode signal: backend skips DDG and swaps system prompt
+      // so the bot answers strictly from the sources we ship in `context`.
+      mode: 'notebook',
     })
     if (!text) setInput('')
   }
@@ -300,6 +314,26 @@ export default function NotebookDetailPage() {
     })
     setTextTitle('')
     setTextContent('')
+    setUploading(false)
+    setShowAddModal(false)
+  }
+
+  const handleReuseSource = async (sourceId: string) => {
+    const src = (db.notebook_sources || []).find((s) => s.id === sourceId)
+    if (!src) return
+    setUploading(true)
+    // Clone the content (by value) into this notebook. We intentionally
+    // don't share IDs — deleting the source here must not affect the
+    // original notebook's copy.
+    await addNotebookSource(params.id, {
+      type: src.type,
+      title: src.title,
+      content: src.content,
+      file_name: src.file_name,
+      url: src.url,
+      lesson_id: src.lesson_id,
+      meta: src.meta,
+    })
     setUploading(false)
     setShowAddModal(false)
   }
@@ -598,6 +632,7 @@ export default function NotebookDetailPage() {
                 { id: 'pdf' as const, label: 'PDF', icon: FileText },
                 { id: 'text' as const, label: 'טקסט', icon: Type },
                 { id: 'lesson' as const, label: 'שיעור', icon: BookOpen, disabled: courseLessons.length === 0 },
+                { id: 'reuse' as const, label: 'מחברת אחרת', icon: Layers, disabled: reuseCandidates.length === 0 },
               ].map((t) => {
                 const Icon = t.icon
                 return (
@@ -691,6 +726,76 @@ export default function NotebookDetailPage() {
                   >
                     הוסף
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Re-use source from another notebook */}
+            {addMode === 'reuse' && (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={reuseQuery}
+                  onChange={(e) => setReuseQuery(e.target.value)}
+                  placeholder="חפש לפי שם..."
+                  className="w-full text-sm rounded-xl px-3 py-2.5"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    color: '#f1f5f9',
+                    outline: 'none',
+                  }}
+                />
+                <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                  {reuseFiltered.length === 0 ? (
+                    <div className="text-center py-8 text-ink-muted text-sm">
+                      {reuseCandidates.length === 0
+                        ? 'אין מקורות במחברות אחרות עדיין.'
+                        : 'לא נמצאו מקורות שמתאימים לחיפוש.'}
+                    </div>
+                  ) : (
+                    reuseFiltered.map((s) => {
+                      const origin = (db.notebooks || []).find((n) => n.id === s.notebook_id)
+                      const alreadyAdded = sources.some(
+                        (x) => x.title === s.title && x.content === s.content,
+                      )
+                      const SIcon = s.type === 'pdf' ? FileText
+                        : s.type === 'text' ? Type
+                        : s.type === 'lesson_ref' ? BookOpen
+                        : FileText
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => !alreadyAdded && handleReuseSource(s.id)}
+                          disabled={alreadyAdded || uploading}
+                          className={`w-full text-right p-3 rounded-xl border transition-colors flex items-start gap-2 ${
+                            alreadyAdded
+                              ? 'bg-emerald-500/5 border-emerald-500/20 opacity-60'
+                              : 'bg-white/5 border-white/8 hover:bg-white/10 hover:border-indigo-400/30'
+                          }`}
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
+                            <SIcon size={13} className="text-indigo-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate flex items-center gap-1">
+                              {alreadyAdded && <Check size={12} className="text-emerald-400" />}
+                              {s.title}
+                            </div>
+                            <div className="text-[11px] text-ink-muted flex items-center gap-2 mt-0.5">
+                              {origin && (
+                                <span className="flex items-center gap-1 truncate">
+                                  <Layers size={10} /> {origin.title}
+                                </span>
+                              )}
+                              {s.meta?.pages && <span>· {s.meta.pages} עמ׳</span>}
+                              {s.meta?.words && <span>· {s.meta.words.toLocaleString()} מילים</span>}
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })
+                  )}
                 </div>
               </div>
             )}

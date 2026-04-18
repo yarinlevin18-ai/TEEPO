@@ -72,6 +72,10 @@ def register_socket_events(socketio: SocketIO):
         context: str = str(data.get("context", ""))[:150_000]
         agent_type: str = data.get("agent_type", "study_buddy")
         course_id: str = str(data.get("course_id", ""))[:64]
+        # Mode lets the client opt into strict grounded Q&A (NotebookLM).
+        # In "notebook" mode the backend skips web search and uses a
+        # system prompt that forbids inventing info outside the context.
+        mode: str = str(data.get("mode", ""))[:32]
         if agent_type not in ("study_buddy", "academic"):
             agent_type = "study_buddy"
 
@@ -81,21 +85,27 @@ def register_socket_events(socketio: SocketIO):
         # Emit typing indicator
         emit("typing", {"agent": agent_type})
 
-        # Check if web search will happen and notify client
-        try:
-            from services.web_search import should_search
-            if should_search(question):
-                emit("searching", {"agent": agent_type})
-        except Exception:
-            pass
+        # Check if web search will happen and notify client.
+        # Skip entirely in notebook mode — grounded answers must come
+        # only from the sources the user explicitly attached.
+        if mode != "notebook":
+            try:
+                from services.web_search import should_search
+                if should_search(question):
+                    emit("searching", {"agent": agent_type})
+            except Exception:
+                pass
 
         orch = get_orchestrator()
 
-        # Build course context if a course_id is provided
+        # Build course context if a course_id is provided.
+        # In notebook mode we skip this entirely — the client already
+        # ships the authoritative source text in `context`, and the
+        # legacy Supabase course tables are empty post-Drive-migration.
         course_context = ""
         notes_context = ""
         course_name = ""
-        if course_id:
+        if course_id and mode != "notebook":
             try:
                 client = db.get_client()
                 # Get course info
@@ -141,6 +151,7 @@ def register_socket_events(socketio: SocketIO):
                     history=list(session.get("history", [])),
                     course_context=course_context,
                     notes_context=notes_context,
+                    mode=mode,
                 )
                 answer = result.get("answer", "")
                 _sessions[sid]["history"] = result.get("history", [])

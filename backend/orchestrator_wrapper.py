@@ -410,8 +410,14 @@ class StudyOrchestrator:
         return self._execute_agent("content", {"topic": prompt, "type": "quiz"})
 
     def answer_question(self, question: str, context: str = "", history: List = None,
-                        course_context: str = "", notes_context: str = "") -> Dict:
-        """עונה על שאלת לימוד בצ'אט אינטראקטיבי — בסגנון NotebookLM."""
+                        course_context: str = "", notes_context: str = "",
+                        mode: str = "") -> Dict:
+        """עונה על שאלת לימוד בצ'אט אינטראקטיבי — בסגנון NotebookLM.
+
+        Args:
+            mode: "" (default) → free-form tutor with web search + course DB context.
+                  "notebook" → strict grounding; answers only from `context`, no web search.
+        """
         question = _sanitize_for_prompt(question, 5000)
         # Bumped from 10k → 150k to accommodate NotebookLM-mode where the
         # client ships extracted PDF/source text as grounding context.
@@ -421,18 +427,23 @@ class StudyOrchestrator:
         messages = history[-20:] if history else []
         messages.append({"role": "user", "content": question})
 
-        # Web search for relevant info
-        web_context = ""
-        try:
-            from services.web_search import should_search, search_web, format_search_results
-            if should_search(question):
-                results = search_web(question, max_results=4)
-                web_context = format_search_results(results)
-                logger.debug(f"[answer_question] web search returned {len(results)} results")
-        except Exception as e:
-            logger.debug(f"[answer_question] web search skipped: {e}")
+        is_notebook = mode == "notebook"
 
-        # Load memories relevant to this question
+        # Web search for relevant info — skipped in notebook mode so the
+        # bot can't drift from the user's sources.
+        web_context = ""
+        if not is_notebook:
+            try:
+                from services.web_search import should_search, search_web, format_search_results
+                if should_search(question):
+                    results = search_web(question, max_results=4)
+                    web_context = format_search_results(results)
+                    logger.debug(f"[answer_question] web search returned {len(results)} results")
+            except Exception as e:
+                logger.debug(f"[answer_question] web search skipped: {e}")
+
+        # Load memories relevant to this question — also skipped in notebook
+        # mode to keep answers strictly scoped to the attached sources.
         memory_context = ""
         course_name = ""
         if course_context:
@@ -441,33 +452,51 @@ class StudyOrchestrator:
                 if line.startswith("קורס:"):
                     course_name = line.replace("קורס:", "").strip()
                     break
-        try:
-            memory_context = self._load_relevant_memories(question, course_name)
-        except Exception as e:
-            logger.debug(f"[answer_question] memory load skipped: {e}")
+        if not is_notebook:
+            try:
+                memory_context = self._load_relevant_memories(question, course_name)
+            except Exception as e:
+                logger.debug(f"[answer_question] memory load skipped: {e}")
 
-        system_parts = [
-            "אתה SmartDesk — עוזר הלימודים האישי של הסטודנט.",
-            "אתה חלק מאפליקציית SmartDesk, פלטפורמת לימודים חכמה לסטודנטים באוניברסיטת בן-גוריון.",
-            "יש לך גישה לאינטרנט, לקורסים של הסטודנט, לסיכומים שלו, ולהיסטוריית הלימודים שלו.",
-            "\n\n## אישיות וסגנון:",
-            "- דבר כמו חבר חכם ללמידה — טבעי, חם, ישיר. לא רובוטי ולא פורמלי מדי.",
-            "- ענה תמיד בעברית. תהיה ברור ותכליתי.",
-            "- אל תשתמש באימוג'ים בכלל. אף פעם.",
-            "- אל תציג את עצמך ואל תגיד 'אני AI'. פשוט עזור.",
-            "- אל תגיד 'שאלה מצוינת!' או 'בטח!' — תכנס ישר לעניין.",
-            "- שמור על טון רגוע ובגובה העיניים, כמו חבר שיודע את החומר.",
-            "\n\n## איך לעזור:",
-            "- השתמש בפורמט מסודר כשצריך: כותרות, נקודות, מספור.",
-            "- כשמסביר מושג — תן דוגמה קונקרטית.",
-            "- כשמסכם — נקודות עיקריות, מושגים מפתח, ומה חשוב לבחינה.",
-            "- כשעוזר בתרגיל — הסבר צעד אחר צעד, אל תתן תשובה סופית מיד.",
-            "- אם הסטודנט טועה — הסבר למה בעדינות, ותן רמז לכיוון הנכון.",
-            "- התאם רמת הסבר: שאלה בסיסית — מהיסוד. שאלה מתקדמת — דלג על הבסיס.",
-            "- היה תמציתי אבל שלם. לא למלא טקסט מיותר, אבל לא לחסוך מידע חשוב.",
-            "- אם אתה לא בטוח — תגיד את זה, אל תמציא.",
-            "- כשיש לך מידע מחיפוש באינטרנט — השתמש בו בטבעיות, אפשר לציין מקור אם רלוונטי.",
-        ]
+        if is_notebook:
+            system_parts = [
+                "אתה SmartDesk NotebookLM — עוזר לימוד במצב מענה מבוסס-מקורות.",
+                "\n\n## כלל יסוד — מענה מעוגן במקורות בלבד:",
+                "- ענה אך ורק על סמך המקורות המופיעים תחת '## הקשר נוסף' בהודעת המערכת.",
+                "- אסור להשתמש בידע חיצוני, בידע כללי, או בניחושים כדי למלא פערים.",
+                "- אם המקורות לא מכילים תשובה לשאלה — אמור בפירוש: 'המידע הזה לא נמצא במקורות של המחברת הזו.'",
+                "- בכל טענה מהותית ציין את מקור התשובה בסוגריים מרובעים (למשל: [מקור 2], [מקור: הרצאה 3.pdf]).",
+                "- אל תמציא ציטוטים. אם אתה לא יכול להצביע על מקור קונקרטי — אל תכלול את הטענה.",
+                "\n\n## סגנון:",
+                "- ענה תמיד בעברית. תכליתי, ברור, חם.",
+                "- השתמש בפורמט מסודר: כותרות, נקודות, מספור.",
+                "- אל תשתמש באימוג'ים.",
+                "- אל תציג את עצמך ואל תגיד 'אני AI'. פשוט ענה.",
+                "- הימנע מפתיחות כמו 'שאלה מצוינת!'.",
+            ]
+        else:
+            system_parts = [
+                "אתה SmartDesk — עוזר הלימודים האישי של הסטודנט.",
+                "אתה חלק מאפליקציית SmartDesk, פלטפורמת לימודים חכמה לסטודנטים באוניברסיטת בן-גוריון.",
+                "יש לך גישה לאינטרנט, לקורסים של הסטודנט, לסיכומים שלו, ולהיסטוריית הלימודים שלו.",
+                "\n\n## אישיות וסגנון:",
+                "- דבר כמו חבר חכם ללמידה — טבעי, חם, ישיר. לא רובוטי ולא פורמלי מדי.",
+                "- ענה תמיד בעברית. תהיה ברור ותכליתי.",
+                "- אל תשתמש באימוג'ים בכלל. אף פעם.",
+                "- אל תציג את עצמך ואל תגיד 'אני AI'. פשוט עזור.",
+                "- אל תגיד 'שאלה מצוינת!' או 'בטח!' — תכנס ישר לעניין.",
+                "- שמור על טון רגוע ובגובה העיניים, כמו חבר שיודע את החומר.",
+                "\n\n## איך לעזור:",
+                "- השתמש בפורמט מסודר כשצריך: כותרות, נקודות, מספור.",
+                "- כשמסביר מושג — תן דוגמה קונקרטית.",
+                "- כשמסכם — נקודות עיקריות, מושגים מפתח, ומה חשוב לבחינה.",
+                "- כשעוזר בתרגיל — הסבר צעד אחר צעד, אל תתן תשובה סופית מיד.",
+                "- אם הסטודנט טועה — הסבר למה בעדינות, ותן רמז לכיוון הנכון.",
+                "- התאם רמת הסבר: שאלה בסיסית — מהיסוד. שאלה מתקדמת — דלג על הבסיס.",
+                "- היה תמציתי אבל שלם. לא למלא טקסט מיותר, אבל לא לחסוך מידע חשוב.",
+                "- אם אתה לא בטוח — תגיד את זה, אל תמציא.",
+                "- כשיש לך מידע מחיפוש באינטרנט — השתמש בו בטבעיות, אפשר לציין מקור אם רלוונטי.",
+            ]
 
         if memory_context:
             system_parts.append(f"\n\n## מה שאני זוכר עליך מפגישות קודמות:\n{memory_context}")

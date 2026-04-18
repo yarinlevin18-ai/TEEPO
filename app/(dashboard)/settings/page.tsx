@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, User, GraduationCap, Save, Check, AlertCircle, ArrowRight, CalendarDays } from 'lucide-react'
+import { Settings, User, GraduationCap, Save, Check, AlertCircle, ArrowRight, CalendarDays, Database } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 import { useDB } from '@/lib/db-context'
@@ -392,6 +392,120 @@ export default function SettingsPage() {
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
+        </GlowCard>
+        </motion.div>
+
+        {/* Drive Storage — how big is the user's db.json and where is the weight? */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.13 }}
+        >
+        <GlowCard glowColor="rgba(99,102,241,0.10)">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Database size={18} style={{ color: '#818cf8' }} />
+            <h2 className="font-semibold text-white">אחסון ב-Google Drive</h2>
+          </div>
+          <p className="text-xs text-ink-subtle mb-5">
+            כל הנתונים שלך (קורסים, סיכומים, מחברות) שמורים בקובץ אחד ב-Drive שלך.
+            ברגע שהקובץ מתקרב ל-10MB השמירות הופכות לאיטיות — מומלץ למחוק מקורות ישנים.
+          </p>
+          {(() => {
+            // Compute sizes client-side (free) — no extra Drive calls needed.
+            const bytes = (obj: unknown) => new Blob([JSON.stringify(obj ?? [])]).size
+            const fmt = (b: number) =>
+              b < 1024 ? `${b} B`
+              : b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB`
+              : `${(b / 1024 / 1024).toFixed(2)} MB`
+            const totalDb = bytes(db)
+            const sizeCourses = bytes(db.courses)
+            const sizeLessons = bytes(db.lessons)
+            const sizeNotes = bytes(db.notes)
+            const sizeSources = bytes(db.notebook_sources)
+            const sizeNotebooks = bytes(db.notebooks)
+            const warnLevel = totalDb > 10 * 1024 * 1024 ? 'danger'
+              : totalDb > 5 * 1024 * 1024 ? 'warn'
+              : 'ok'
+            const warnColor = warnLevel === 'danger' ? '#ef4444'
+              : warnLevel === 'warn' ? '#f59e0b'
+              : '#10b981'
+            const pct = Math.min((totalDb / (10 * 1024 * 1024)) * 100, 100)
+            const rows = [
+              { label: 'מקורות מחברות (PDF/טקסט)', size: sizeSources },
+              { label: 'שיעורים', size: sizeLessons },
+              { label: 'סיכומים', size: sizeNotes },
+              { label: 'קורסים', size: sizeCourses },
+              { label: 'מטא של מחברות + שיחות', size: sizeNotebooks },
+            ].sort((a, b) => b.size - a.size)
+            return (
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm text-ink-muted">סה״כ</span>
+                    <span className="text-sm font-medium" style={{ color: warnColor }}>
+                      {fmt(totalDb)} / 10 MB
+                    </span>
+                  </div>
+                  <div
+                    className="h-2 rounded-full overflow-hidden"
+                    style={{ background: 'rgba(255,255,255,0.06)' }}
+                  >
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.6 }}
+                      className="h-full rounded-full"
+                      style={{ background: warnColor }}
+                    />
+                  </div>
+                  {warnLevel === 'danger' && (
+                    <p className="text-xs mt-2" style={{ color: '#ef4444' }}>
+                      הקובץ גדול מאוד — השמירות ל-Drive יהיו איטיות. מומלץ למחוק מקורות
+                      ישנים מתוך "מחברות AI".
+                    </p>
+                  )}
+                  {warnLevel === 'warn' && (
+                    <p className="text-xs mt-2" style={{ color: '#f59e0b' }}>
+                      הקובץ מתחיל להיות גדול. שים לב כמה מקורות כבדים אתה מוסיף.
+                    </p>
+                  )}
+                </div>
+                <div
+                  className="pt-3 space-y-1.5"
+                  style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+                >
+                  {rows.map((r) => (
+                    <div key={r.label} className="flex items-center justify-between text-xs">
+                      <span className="text-ink-muted">{r.label}</span>
+                      <span className="text-ink-subtle font-mono" dir="ltr">{fmt(r.size)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="pt-3 grid grid-cols-3 gap-3 text-center"
+                  style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+                >
+                  <div>
+                    <div className="text-lg font-semibold text-white">{db.courses.length}</div>
+                    <div className="text-[11px] text-ink-muted">קורסים</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold text-white">
+                      {(db.notebooks || []).length}
+                    </div>
+                    <div className="text-[11px] text-ink-muted">מחברות</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold text-white">
+                      {(db.notebook_sources || []).length}
+                    </div>
+                    <div className="text-[11px] text-ink-muted">מקורות</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
         </div>
         </GlowCard>
         </motion.div>
