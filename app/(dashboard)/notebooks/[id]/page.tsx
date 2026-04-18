@@ -270,7 +270,18 @@ export default function NotebookDetailPage() {
       if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
         throw new Error('כרגע תומכים רק ב-PDF. לטקסט אחר — הדבק כטקסט.')
       }
-      const extracted = await extractPdfText(file)
+      const extracted = await extractPdfText(file, {
+        onProgress: (p) => {
+          if (p.phase === 'reading' && p.page && p.total) {
+            setUploadProgress(`קורא עמוד ${p.page}/${p.total}...`)
+          } else if (p.phase === 'ocr_init') {
+            // First OCR download is ~15MB of training data; warn the user.
+            setUploadProgress('הקובץ נראה סרוק — טוען OCR (פעם ראשונה: ~15MB)...')
+          } else if (p.phase === 'ocr_page') {
+            setUploadProgress(`OCR עמוד ${p.page}/${p.total} (כ-10 שניות לעמוד)...`)
+          }
+        },
+      })
       await addNotebookSource(params.id, {
         type: 'pdf',
         title: file.name.replace(/\.pdf$/i, ''),
@@ -279,10 +290,13 @@ export default function NotebookDetailPage() {
         meta: {
           pages: extracted.pages,
           words: extracted.text.split(/\s+/).length,
+          used_ocr: extracted.usedOcr,
         },
       })
       setUploadProgress(
-        `נקלט ${file.name} (${extracted.pages} עמודים${extracted.truncated ? ', קוצץ בגלל גודל' : ''})`,
+        `נקלט ${file.name} (${extracted.pages} עמודים` +
+        `${extracted.usedOcr ? ', OCR' : ''}` +
+        `${extracted.truncated ? ', קוצץ בגלל גודל' : ''})`,
       )
       setTimeout(() => {
         setUploading(false)
@@ -790,6 +804,7 @@ export default function NotebookDetailPage() {
                               )}
                               {s.meta?.pages && <span>· {s.meta.pages} עמ׳</span>}
                               {s.meta?.words && <span>· {s.meta.words.toLocaleString()} מילים</span>}
+                              {s.meta?.used_ocr && <span className="text-amber-400">· OCR</span>}
                             </div>
                           </div>
                         </button>
@@ -879,6 +894,7 @@ function SourceCard({
             {source.meta?.words
               ? `${source.meta.words.toLocaleString()} מילים`
               : `${source.content.length.toLocaleString()} תווים`}
+            {source.meta?.used_ocr && <span className="text-amber-400"> · OCR</span>}
           </div>
         </div>
         <button

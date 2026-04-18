@@ -171,7 +171,7 @@ export interface NotebookSource {
   url?: string
   lesson_id?: string
   /** Approximate page/section count — just for display. */
-  meta?: { pages?: number; words?: number }
+  meta?: { pages?: number; words?: number; used_ocr?: boolean }
   created_at: string
 }
 
