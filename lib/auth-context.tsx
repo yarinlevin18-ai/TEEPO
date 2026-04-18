@@ -1,11 +1,17 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from './supabase'
 import type { User, Session } from '@supabase/supabase-js'
 
 const GOOGLE_TOKEN_KEY = 'smartdesk_google_token'
 const GOOGLE_REFRESH_KEY = 'smartdesk_google_refresh_token'
+const GOOGLE_EXPIRY_KEY = 'smartdesk_google_token_expires_at' // unix ms
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+
+// Refresh when less than this many ms remain before expiry. 5 minutes keeps
+// us well clear of clock skew + API latency.
+const REFRESH_MARGIN_MS = 5 * 60 * 1000
 
 interface AuthContextType {
   user: User | null
@@ -21,22 +27,49 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+function readExpiry(): number | null {
+  try {
+    const raw = localStorage.getItem(GOOGLE_EXPIRY_KEY)
+    if (!raw) return null
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : null
+  } catch {
+    return null
+  }
+}
+
+function writeExpiry(expiresInSec: number | null | undefined) {
+  if (!expiresInSec) {
+    try { localStorage.removeItem(GOOGLE_EXPIRY_KEY) } catch {}
+    return
+  }
+  try {
+    localStorage.setItem(GOOGLE_EXPIRY_KEY, String(Date.now() + expiresInSec * 1000))
+  } catch {}
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [googleToken, setGoogleToken] = useState<string | null>(null)
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const refreshInFlightRef = useRef<Promise<string | null> | null>(null)
 
   // Persist Google token to localStorage
-  const persistGoogleToken = useCallback((token: string | null, refreshToken?: string | null) => {
-    if (token) {
-      try { localStorage.setItem(GOOGLE_TOKEN_KEY, token) } catch {}
-      setGoogleToken(token)
-    }
-    if (refreshToken) {
-      try { localStorage.setItem(GOOGLE_REFRESH_KEY, refreshToken) } catch {}
-    }
-  }, [])
+  const persistGoogleToken = useCallback(
+    (token: string | null, refreshToken?: string | null, expiresInSec?: number | null) => {
+      if (token) {
+        try { localStorage.setItem(GOOGLE_TOKEN_KEY, token) } catch {}
+        setGoogleToken(token)
+      }
+      if (refreshToken) {
+        try { localStorage.setItem(GOOGLE_REFRESH_KEY, refreshToken) } catch {}
+      }
+      if (expiresInSec !== undefined) writeExpiry(expiresInSec)
+    },
+    []
+  )
 
   // Load stored Google token from localStorage
   const loadStoredGoogleToken = useCallback(() => {
@@ -54,22 +87,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.removeItem(GOOGLE_TOKEN_KEY)
       localStorage.removeItem(GOOGLE_REFRESH_KEY)
+      localStorage.removeItem(GOOGLE_EXPIRY_KEY)
     } catch {}
     setGoogleToken(null)
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = null
+    }
   }, [])
 
-  // Ask Supabase to refresh the session (which also refreshes the Google provider token)
-  const refreshGoogleToken = useCallback(async (): Promise<string | null> => {
+  // Call our backend to exchange the refresh token for a fresh access token.
+  // Supabase does NOT rotate the Google provider_token on refreshSession(),
+  // so we talk to Google directly via the backend (which holds the client secret).
+  const refreshViaBackend = useCallback(async (): Promise<string | null> => {
+    let refreshToken: string | null = null
+    try { refreshToken = localStorage.getItem(GOOGLE_REFRESH_KEY) } catch {}
+    if (!refreshToken) return null
+
     try {
-      const { data, error } = await supabase.auth.refreshSession()
-      if (!error && data?.session?.provider_token) {
-        persistGoogleToken(data.session.provider_token, data.session.provider_refresh_token)
-        return data.session.provider_token
+      const res = await fetch(`${BACKEND}/api/auth/refresh-google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+        signal: AbortSignal.timeout(10000),
+      })
+      if (!res.ok) {
+        // 401 = refresh token invalid/revoked → user must sign in again.
+        if (res.status === 401) {
+          // Keep the stored access token (may still have a few seconds left),
+          // but drop the refresh token so callers know to force-reconnect.
+          try { localStorage.removeItem(GOOGLE_REFRESH_KEY) } catch {}
+        }
+        return null
       }
-    } catch {}
-    // Supabase refresh didn't give us a provider token — return whatever is stored
-    return loadStoredGoogleToken()
-  }, [persistGoogleToken, loadStoredGoogleToken])
+      const data = await res.json()
+      if (data?.access_token) {
+        persistGoogleToken(data.access_token, refreshToken, data.expires_in)
+        return data.access_token
+      }
+    } catch {
+      // Network error / CORS / backend cold-start — caller will fall back.
+    }
+    return null
+  }, [persistGoogleToken])
+
+  // Public refresh: backend first, Supabase fallback. Dedupe concurrent callers.
+  const refreshGoogleToken = useCallback(async (): Promise<string | null> => {
+    if (refreshInFlightRef.current) return refreshInFlightRef.current
+    const promise = (async () => {
+      // 1. Preferred: backend → Google token endpoint
+      const fromBackend = await refreshViaBackend()
+      if (fromBackend) return fromBackend
+      // 2. Fallback: ask Supabase to refresh the whole session
+      try {
+        const { data, error } = await supabase.auth.refreshSession()
+        if (!error && data?.session?.provider_token) {
+          // Supabase doesn't tell us expires_in for the provider token directly;
+          // assume 1h (Google default) and refresh early anyway.
+          persistGoogleToken(
+            data.session.provider_token,
+            data.session.provider_refresh_token ?? null,
+            3600
+          )
+          return data.session.provider_token
+        }
+      } catch {}
+      // 3. Nothing worked — return whatever we had stored.
+      return loadStoredGoogleToken()
+    })()
+    refreshInFlightRef.current = promise
+    try {
+      return await promise
+    } finally {
+      refreshInFlightRef.current = null
+    }
+  }, [refreshViaBackend, persistGoogleToken, loadStoredGoogleToken])
+
+  // Schedule the next proactive refresh so calls don't fail with 401.
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = null
+    }
+    const expiry = readExpiry()
+    if (!expiry) return
+    const delay = expiry - Date.now() - REFRESH_MARGIN_MS
+    const safeDelay = Math.max(delay, 5_000) // never sooner than 5s
+    refreshTimerRef.current = setTimeout(() => {
+      refreshGoogleToken().then(() => scheduleRefresh())
+    }, safeDelay)
+  }, [refreshGoogleToken])
 
   useEffect(() => {
     // Get initial session
@@ -78,24 +185,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
 
       if (session?.provider_token) {
-        // Right after OAuth redirect — fresh token on the session
-        persistGoogleToken(session.provider_token, session.provider_refresh_token)
+        // Right after OAuth redirect — fresh token on the session (assume 1h)
+        persistGoogleToken(session.provider_token, session.provider_refresh_token ?? null, 3600)
       } else if (session) {
-        // Returning user — session exists but no provider token.
-        // Ask Supabase to refresh (it will refresh the Google token too if it has a refresh_token).
-        try {
-          const { data } = await supabase.auth.refreshSession()
-          if (data?.session?.provider_token) {
-            persistGoogleToken(data.session.provider_token, data.session.provider_refresh_token)
-          } else {
-            // Supabase couldn't refresh provider token — fall back to localStorage
-            loadStoredGoogleToken()
-          }
-        } catch {
-          loadStoredGoogleToken()
+        // Returning user — see if stored token is still fresh, else refresh.
+        const stored = loadStoredGoogleToken()
+        const expiry = readExpiry()
+        const nearlyExpired = !expiry || Date.now() > expiry - REFRESH_MARGIN_MS
+        if (!stored || nearlyExpired) {
+          await refreshGoogleToken()
         }
       }
 
+      scheduleRefresh()
       setLoading(false)
     })
 
@@ -106,15 +208,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null)
 
         if (session?.provider_token) {
-          persistGoogleToken(session.provider_token, session.provider_refresh_token)
+          persistGoogleToken(
+            session.provider_token,
+            session.provider_refresh_token ?? null,
+            3600
+          )
+          scheduleRefresh()
         }
 
         setLoading(false)
       }
     )
 
-    return () => subscription.unsubscribe()
-  }, [persistGoogleToken, loadStoredGoogleToken])
+    return () => {
+      subscription.unsubscribe()
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({

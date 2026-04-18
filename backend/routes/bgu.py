@@ -19,8 +19,53 @@ def _is_bgu_url(url: str) -> bool:
 
 bgu = Blueprint("bgu", __name__, url_prefix="/api/bgu")
 
-# Track login progress
+# Track login progress (rehydrated from Supabase at import time — see _init_login_status below).
+# Render's free tier restarts drop in-memory state, so this dict is NOT the source of truth —
+# it's just a fast-path cache. Supabase `bgu_sessions` is canonical.
 _login_status: dict = {"moodle": "idle", "portal": "idle"}
+
+
+def _is_connected(site: str) -> bool:
+    """Return True if we have a valid session for `site`.
+    Source of truth is Supabase (survives Render restarts); in-memory dict is a cache.
+    """
+    # 1. In-memory fast-path (already verified this session)
+    if _login_status.get(site) == "connected":
+        return True
+    # 2. Supabase bgu_sessions (persists across restarts)
+    try:
+        from services.supabase_client import get_client
+        result = get_client().table("bgu_sessions").select("site").eq("site", site).execute()
+        if result.data:
+            _login_status[site] = "connected"
+            return True
+    except Exception as e:
+        logger.debug(f"bgu_sessions check failed for {site}: {e}")
+    # 3. Live cookie validation (slowest, last resort — also covers local-file cookies)
+    if bgu_scraper.is_session_valid(site):
+        _login_status[site] = "connected"
+        return True
+    return False
+
+
+def _init_login_status():
+    """Rehydrate _login_status from Supabase at module-import time so the first
+    /status call after a Render restart doesn't lie about being disconnected."""
+    try:
+        from services.supabase_client import get_client
+        result = get_client().table("bgu_sessions").select("site").execute()
+        if result.data:
+            for row in result.data:
+                site = row.get("site")
+                if site in _login_status:
+                    _login_status[site] = "connected"
+            logger.info(f"[BGU] Rehydrated login_status from Supabase: {_login_status}")
+    except Exception as e:
+        # Non-fatal: /status will re-check Supabase on demand.
+        logger.debug(f"[BGU] Could not rehydrate login_status at startup: {e}")
+
+
+_init_login_status()
 
 
 def _user_id():
@@ -36,22 +81,6 @@ def _user_id():
 @bgu.get("/status")
 def connection_status():
     """Check if sessions are still valid. Checks in-memory state, Supabase cookies, then live session."""
-    def _is_connected(site: str) -> bool:
-        # 1. In-memory (current server session)
-        if _login_status[site] == "connected":
-            return True
-        # 2. Supabase bgu_sessions table (persists across restarts)
-        try:
-            from services.supabase_client import get_client
-            result = get_client().table("bgu_sessions").select("site").eq("site", site).execute()
-            if result.data:
-                _login_status[site] = "connected"
-                return True
-        except Exception as e:
-            logger.debug(f"bgu_sessions check failed for {site}: {e}")
-        # 3. Live cookie validation (slowest, last resort)
-        return bgu_scraper.is_session_valid(site)
-
     moodle_ok = _is_connected("moodle")
     portal_ok = _is_connected("portal")
     return jsonify({
@@ -116,8 +145,15 @@ def get_mode():
 
 @bgu.get("/connect/<site>/poll")
 def poll_login(site: str):
-    """Frontend polls this to check if login completed."""
+    """Frontend polls this to check if login completed.
+    Also consults Supabase so a backend restart mid-poll doesn't flip to 'idle'."""
+    if site not in ("moodle", "portal"):
+        return jsonify({"status": "idle", "connected": False})
     status = _login_status.get(site, "idle")
+    # If in-memory says not connected, double-check Supabase (survives restarts).
+    if status != "connected" and status not in ("opening", "waiting_for_login"):
+        if _is_connected(site):
+            status = "connected"
     return jsonify({
         "status": status,
         "connected": status == "connected",

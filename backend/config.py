@@ -26,6 +26,11 @@ CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 BGU_USERNAME = os.getenv("BGU_USERNAME", "")
 BGU_PASSWORD = os.getenv("BGU_PASSWORD", "")
 
+# Google OAuth (used for refreshing the provider access_token that Supabase
+# surfaces once but never rotates — needed for Drive + Calendar persistence)
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
 # Path to the existing orchestrator agents (empty = use direct Claude calls)
 ORCHESTRATOR_PATH = os.getenv("ORCHESTRATOR_PATH", "")
 
