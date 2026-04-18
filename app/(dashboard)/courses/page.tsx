@@ -13,6 +13,8 @@ import { useDB, useCourses } from '@/lib/db-context'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import GlowCard from '@/components/ui/GlowCard'
 import Modal from '@/components/ui/Modal'
+import CourseSortingGame from '@/components/CourseSortingGame'
+import { Gamepad2 } from 'lucide-react'
 import type { Course } from '@/types'
 import {
   classifyCourse,
@@ -148,6 +150,7 @@ export default function CoursesPage() {
   }
 
   const [reclassifying, setReclassifying] = useState(false)
+  const [gameOpen, setGameOpen] = useState(false)
   const [syncingFolders, setSyncingFolders] = useState(false)
   const [folderProgress, setFolderProgress] = useState<{ done: number; total: number } | null>(null)
   const [folderResult, setFolderResult] = useState<string | null>(null)
@@ -427,6 +430,18 @@ export default function CoursesPage() {
             >
               <RefreshCw size={14} className={reclassifying ? 'animate-spin' : ''} />
               {reclassifying ? 'מסווג...' : 'סווג הכל מחדש'}
+            </button>
+          )}
+          {/* Sort-game: only surface if there are unclassified courses */}
+          {courses.some((c) => !c.classified_manually && (!c.semester || !c.academic_year)) && (
+            <button
+              onClick={() => setGameOpen(true)}
+              disabled={!degreeStart}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-violet-400/30 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20 hover:border-violet-400/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title={degreeStart ? 'סדר את הקורסים שלא סווגו אוטומטית' : 'הגדר תחילה מתי התחלת את התואר בהגדרות'}
+            >
+              <Gamepad2 size={14} />
+              סדר ידני (משחק)
             </button>
           )}
           {/* View mode toggle */}
@@ -804,6 +819,20 @@ export default function CoursesPage() {
           >
             ✨
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Manual sorting game */}
+      <AnimatePresence>
+        {gameOpen && (
+          <CourseSortingGame
+            courses={courses.filter(c => !c.classified_manually && (!c.semester || !c.academic_year))}
+            degreeStart={degreeStart}
+            onClose={() => setGameOpen(false)}
+            onClassify={async (id, updates) => {
+              await updateCourse(id, updates)
+            }}
+          />
         )}
       </AnimatePresence>
     </div>
