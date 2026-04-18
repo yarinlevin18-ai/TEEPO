@@ -186,8 +186,11 @@ export function useNotifications(
     const withRead = raw.map(n => ({ ...n, read: readIds.has(n.id) }))
     setNotifications(withRead)
 
-    // Fire browser notifications for critical/high unread items
-    if (typeof window !== 'undefined' && Notification.permission === 'granted') {
+    // Fire browser notifications for critical/high unread items.
+    // iOS Safari (and some in-app browsers) don't expose the Notification API at all —
+    // must check `'Notification' in window` before touching it, otherwise accessing
+    // Notification.permission throws ReferenceError and breaks the whole app.
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
       for (const n of withRead) {
         if (!n.read && (n.urgency === 'critical' || n.urgency === 'high') && !sentBrowserRef.current.has(n.id)) {
           sentBrowserRef.current.add(n.id)
