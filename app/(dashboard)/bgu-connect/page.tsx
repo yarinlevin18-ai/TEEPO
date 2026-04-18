@@ -266,6 +266,9 @@ export default function BGUConnectPage() {
               <span>🔒</span>
               <span>הסיסמה שלך לא נגעת באפליקציה — רק ה-session cookies מועברים</span>
             </div>
+            <div className="pt-2 text-xs" style={{ color: '#a5b4fc' }}>
+              📱 <strong>מחובר מהטלפון?</strong> לחץ "נייד? התחבר עם סיסמה" למטה — השרת מתחבר ל-Moodle לבד עם הפרטים שלך
+            </div>
           </div>
         ) : (
           <>
@@ -338,7 +341,9 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
   onConnect: (creds?: { username: string; password: string }) => void
   icon: React.ElementType; color: string; serverMode: boolean
 }) {
-  const [step, setStep] = useState<'idle' | 'waiting'>('idle')
+  const [step, setStep] = useState<'idle' | 'waiting' | 'creds'>('idle')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
 
   const handleConnect = () => {
     if (serverMode) {
@@ -350,9 +355,17 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
     }
   }
 
+  const handleCredsSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!username.trim() || !password.trim()) return
+    onConnect({ username: username.trim(), password })
+    // Clear password from state immediately after submit — it's already in flight.
+    setPassword('')
+  }
+
   // Reset step when connected
   useEffect(() => {
-    if (connected) setStep('idle')
+    if (connected) { setStep('idle'); setUsername(''); setPassword('') }
   }, [connected])
 
   return (
@@ -388,14 +401,25 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
         </div>
 
         {!connected && (
-          <button
-            onClick={handleConnect}
-            disabled={loading}
-            className="px-4 py-2 rounded-xl text-sm font-medium transition-all flex-shrink-0 btn-gradient shadow-glow-sm flex items-center gap-1.5"
-          >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
-            התחבר
-          </button>
+          <div className="flex flex-col gap-1.5 flex-shrink-0">
+            <button
+              onClick={handleConnect}
+              disabled={loading}
+              className="px-4 py-2 rounded-xl text-sm font-medium transition-all btn-gradient shadow-glow-sm flex items-center justify-center gap-1.5"
+            >
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+              התחבר
+            </button>
+            {serverMode && site === 'moodle' && (
+              <button
+                onClick={() => setStep(step === 'creds' ? 'idle' : 'creds')}
+                disabled={loading}
+                className="text-xs text-ink-muted hover:text-ink underline transition-colors"
+              >
+                {step === 'creds' ? 'ביטול' : 'נייד? התחבר עם סיסמה'}
+              </button>
+            )}
+          </div>
         )}
         {connected && (
           <span className="px-4 py-2 rounded-xl text-sm flex-shrink-0 text-ink-muted"
@@ -404,6 +428,69 @@ function SiteCard({ site, name, description, url, connected, loginStatus, loadin
           </span>
         )}
       </div>
+
+      {/* Credentials form — for mobile or anyone without the Chrome extension */}
+      <AnimatePresence>
+        {step === 'creds' && !connected && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <form
+              onSubmit={handleCredsSubmit}
+              className="px-5 pb-5 pt-4 space-y-3 border-t"
+              style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+            >
+              <div className="flex items-start gap-2 text-xs text-ink-muted">
+                <span>🔒</span>
+                <span>
+                  הפרטים נשלחים ב-HTTPS לשרת, משמשים פעם אחת לכניסה ל-Moodle
+                  ולא נשמרים. רק ה-session cookies שמורים בשרת.
+                </span>
+              </div>
+              <div>
+                <label className="text-xs text-ink-muted block mb-1">שם משתמש BGU</label>
+                <input
+                  type="text"
+                  autoComplete="username"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  placeholder="לדוגמה: yarinle"
+                  dir="ltr"
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 focus:border-indigo-400/50 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 text-ink"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs text-ink-muted block mb-1">סיסמה</label>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  dir="ltr"
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 focus:border-indigo-400/50 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 text-ink"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading || !username.trim() || !password.trim()}
+                className="w-full py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 transition-all btn-gradient shadow-glow-sm flex items-center justify-center gap-2"
+              >
+                {loading ? <Loader2 size={14} className="animate-spin" /> : null}
+                {loading ? 'מתחבר ל-Moodle...' : 'התחבר'}
+              </button>
+              <p className="text-xs text-ink-muted text-center">
+                הכניסה headless — לוקחת 10-20 שניות
+              </p>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Waiting step — show after opening BGU site */}
       <AnimatePresence>
