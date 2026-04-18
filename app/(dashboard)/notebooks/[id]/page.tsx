@@ -10,19 +10,19 @@
  * Quick actions generate summaries, FAQ cards, and study guides from all sources.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, Upload, FileText, Type, Trash2, Send, Bot, User, Sparkles,
-  Loader2, MessageSquare, RefreshCw, BookOpen, X, FileQuestion, FileCheck,
+  Loader2, BookOpen, X, FileQuestion, FileCheck,
   ListOrdered, Eraser, Copy, Check, Plus, Layers,
 } from 'lucide-react'
 import { io, Socket } from 'socket.io-client'
 import { useDB } from '@/lib/db-context'
 import { useAuth } from '@/lib/auth-context'
-import { extractPdfText } from '@/lib/pdf-extract'
+import { extractPdfText, PdfExtractionError } from '@/lib/pdf-extract'
 import type { ChatMessage, NotebookSource } from '@/types'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
@@ -257,9 +257,6 @@ export default function NotebookDetailPage() {
         throw new Error('כרגע תומכים רק ב-PDF. לטקסט אחר — הדבק כטקסט.')
       }
       const extracted = await extractPdfText(file)
-      if (!extracted.text.trim()) {
-        throw new Error('לא הצלחתי לחלץ טקסט מה-PDF. יתכן שהוא סרוק (תמונות) — נסה להריץ OCR קודם.')
-      }
       await addNotebookSource(params.id, {
         type: 'pdf',
         title: file.name.replace(/\.pdf$/i, ''),
@@ -279,11 +276,16 @@ export default function NotebookDetailPage() {
         setShowAddModal(false)
       }, 1200)
     } catch (e: any) {
-      setUploadProgress(`שגיאה: ${e.message || 'נכשל'}`)
+      // PdfExtractionError carries kind-specific Hebrew messages already.
+      // For anything else, fall back to the generic error text.
+      const msg = e instanceof PdfExtractionError
+        ? e.message
+        : (e?.message || 'נכשל בקריאת הקובץ')
+      setUploadProgress(`שגיאה: ${msg}`)
       setTimeout(() => {
         setUploading(false)
         setUploadProgress('')
-      }, 3000)
+      }, 4000)
     }
   }
 
