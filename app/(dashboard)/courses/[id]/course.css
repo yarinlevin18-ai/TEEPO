@@ -1,0 +1,838 @@
+/* ═══════════════════════════════════════════════════════════════
+   COURSE SCREEN — lifted from design_handoff_course_page/design_kit.html
+   Scoped under .course-scope so these don't leak into other pages.
+   Hi-fi per the handoff README: take layout/tokens/shadows exactly.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Compact hero — name + thin progress */
+.course-scope .c-hero {
+  padding: 28px 32px 24px;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #1e2433, #151a27);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow:
+    inset 2px 2px 3px rgba(255, 255, 255, 0.05),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.4),
+    8px 12px 28px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 22px;
+}
+.course-scope .c-hero::before {
+  content: '';
+  position: absolute;
+  top: -80px;
+  right: -80px;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(107, 91, 229, 0.22), transparent 65%);
+  filter: blur(50px);
+  pointer-events: none;
+}
+.course-scope .c-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 60%, rgba(107, 91, 229, 0.06));
+  pointer-events: none;
+}
+.course-scope .c-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  position: relative;
+  z-index: 1;
+}
+.course-scope .c-hero-l { flex: 1; min-width: 0; }
+.course-scope .c-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 10px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+}
+.course-scope .c-breadcrumb a { color: #8B8FA8; text-decoration: none; cursor: pointer; transition: color 0.15s; }
+.course-scope .c-breadcrumb a:hover { color: #B8A9FF; }
+.course-scope .c-breadcrumb .sep { color: #3b4155; font-size: 10px; }
+
+.course-scope .c-code {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #8B8FA8;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+  direction: ltr;
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: rgba(107, 91, 229, 0.1);
+  border: 1px solid rgba(107, 91, 229, 0.18);
+}
+.course-scope .c-title {
+  font-family: 'IBM Plex Sans Hebrew', 'Frank Ruhl Libre', sans-serif;
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  margin: 12px 0 10px;
+  text-wrap: pretty;
+  color: #f5f3ff;
+}
+.course-scope .c-title em {
+  font-style: normal;
+  font-weight: 700;
+  background: linear-gradient(135deg, #C9BFFF 0%, #8B7FF0 55%, #6B5BE5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  padding: 0 2px;
+}
+.course-scope .c-title .tag {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #B8A9FF;
+  background: rgba(107, 91, 229, 0.14);
+  border: 1px solid rgba(184, 169, 255, 0.25);
+  padding: 4px 10px;
+  border-radius: 8px;
+  letter-spacing: 0.08em;
+  direction: ltr;
+  vertical-align: middle;
+  margin-inline-start: 14px;
+  display: inline-block;
+  transform: translateY(-8px);
+}
+.course-scope .c-sub {
+  font-size: 14px;
+  color: #8B8FA8;
+  line-height: 1.6;
+  margin: 4px 0 0;
+  max-width: 560px;
+}
+.course-scope .c-meta-row { display: flex; gap: 18px; margin-top: 14px; flex-wrap: wrap; }
+.course-scope .c-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #8B8FA8;
+}
+.course-scope .c-meta svg { color: #B8A9FF; flex-shrink: 0; }
+.course-scope .c-meta b { color: #cbd5e1; font-weight: 600; }
+
+.course-scope .c-hero-r {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.course-scope .c-action-btn {
+  padding: 9px 16px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(107, 91, 229, 0.22), rgba(139, 124, 240, 0.1));
+  border: 1px solid rgba(184, 169, 255, 0.25);
+  color: #C9BFFF;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.18s;
+  box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.06);
+}
+.course-scope .c-action-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(184, 169, 255, 0.4);
+  color: #fff;
+}
+.course-scope .c-action-btn.primary {
+  background: linear-gradient(135deg, #6B5BE5, #8B7FF0);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(107, 91, 229, 0.35), inset 1px 1px 2px rgba(255, 255, 255, 0.2);
+}
+
+.course-scope .c-progress { margin-top: 22px; position: relative; z-index: 1; }
+.course-scope .c-progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #8B8FA8;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+.course-scope .c-progress-head .pct { color: #B8A9FF; font-size: 14px; font-weight: 700; direction: ltr; }
+.course-scope .c-progress-bar {
+  height: 5px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  position: relative;
+}
+.course-scope .c-progress-bar .f {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #6B5BE5, #B8A9FF);
+  box-shadow: 0 0 10px rgba(184, 169, 255, 0.5);
+  position: relative;
+  transition: width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.course-scope .c-progress-bar .f::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 4px;
+  background: #fff;
+  filter: blur(2px);
+  opacity: 0.8;
+}
+.course-scope .c-progress-milestones {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  color: #4b5568;
+  direction: ltr;
+}
+.course-scope .c-progress-milestones span.cur { color: #B8A9FF; font-weight: 700; }
+
+/* Section titling */
+.course-scope .c-sec-title {
+  font-family: 'IBM Plex Serif', 'Frank Ruhl Libre', serif;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  letter-spacing: -0.01em;
+  color: #f1f5f9;
+}
+.course-scope .c-sec-title .count {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+  margin-right: 8px;
+  letter-spacing: 0.05em;
+}
+.course-scope .c-sec-title .more {
+  font-family: inherit;
+  font-size: 12px;
+  color: #818cf8;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Two-column course layout */
+.course-scope .c-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+.course-scope .c-grid-full { margin-bottom: 22px; }
+@media (max-width: 900px) {
+  .course-scope .c-grid { grid-template-columns: 1fr; }
+}
+
+/* Card base */
+.course-scope .c-card {
+  padding: 22px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #1a1f2c, #131823);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow:
+    inset 1.5px 1.5px 2px rgba(255, 255, 255, 0.04),
+    inset -1.5px -1.5px 3px rgba(0, 0, 0, 0.35),
+    4px 8px 20px rgba(0, 0, 0, 0.28);
+  position: relative;
+}
+
+/* Tasks list for course */
+.course-scope .c-tasks { display: flex; flex-direction: column; }
+.course-scope .c-tasks .tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 3px;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.25);
+  width: fit-content;
+}
+.course-scope .c-tasks .tab {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8B8FA8;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  border: none;
+  background: transparent;
+}
+.course-scope .c-tasks .tab.on {
+  background: linear-gradient(135deg, rgba(107, 91, 229, 0.3), rgba(139, 124, 240, 0.15));
+  color: #fff;
+  box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.08);
+}
+.course-scope .c-tasks .tab .n {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  margin-right: 6px;
+  opacity: 0.7;
+  direction: ltr;
+}
+.course-scope .c-task {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.15s;
+  border-radius: 8px;
+  margin: 0 -8px;
+}
+.course-scope .c-task:hover { background: rgba(255, 255, 255, 0.015); }
+.course-scope .c-task:last-child { border-bottom: none; }
+.course-scope .c-task .tbox {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  background: transparent;
+}
+.course-scope .c-task .tbox:hover { border-color: #B8A9FF; }
+.course-scope .c-task .tbox.done {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  border-color: transparent;
+  color: #fff;
+}
+.course-scope .c-task-body { flex: 1; min-width: 0; }
+.course-scope .c-task-name {
+  font-size: 14px;
+  color: #e2e8f0;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.course-scope .c-task.done .c-task-name { color: #64748b; text-decoration: line-through; }
+.course-scope .c-task-meta {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 5px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.course-scope .c-task-meta .sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #3b4155;
+}
+.course-scope .c-task-grade {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #34d399;
+  min-width: 38px;
+  text-align: left;
+  direction: ltr;
+}
+.course-scope .c-task-grade.low { color: #fbbf24; }
+.course-scope .c-task-due {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f87171;
+  min-width: 60px;
+  text-align: left;
+  direction: ltr;
+}
+.course-scope .c-task-due.soon { color: #fbbf24; }
+.course-scope .c-task-due.far { color: #64748b; }
+
+/* Priority pills (shared with dashboard) */
+.course-scope .pri-h { background: rgba(239, 68, 68, 0.15); color: #f87171; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 600; }
+.course-scope .pri-m { background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 600; }
+.course-scope .pri-l { background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 600; }
+
+/* Lecturer card */
+.course-scope .c-prof { display: flex; flex-direction: column; gap: 14px; }
+.course-scope .c-prof-top { display: flex; align-items: center; gap: 14px; }
+.course-scope .c-prof-av {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #8B7FF0, #6B5BE5 55%, #4C3DB8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: 'IBM Plex Serif', 'Frank Ruhl Libre', serif;
+  font-weight: 700;
+  font-size: 22px;
+  flex-shrink: 0;
+  box-shadow: 0 6px 20px rgba(107, 91, 229, 0.35), inset 1px 1px 2px rgba(255, 255, 255, 0.2);
+}
+.course-scope .c-prof-info { flex: 1; min-width: 0; }
+.course-scope .c-prof-name {
+  font-family: 'IBM Plex Serif', 'Frank Ruhl Libre', serif;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #f1f5f9;
+}
+.course-scope .c-prof-role {
+  font-size: 11px;
+  color: #8B8FA8;
+  margin-top: 2px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.course-scope .c-prof-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.course-scope .c-prof-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+.course-scope .c-prof-row svg { color: #8B7FF0; flex-shrink: 0; }
+.course-scope .c-prof-row b { color: #fff; font-weight: 600; }
+.course-scope .c-prof-row .muted { color: #64748b; font-family: 'Inter', sans-serif; direction: ltr; font-size: 11px; }
+.course-scope .c-prof-hours { font-size: 12px; color: #8B8FA8; line-height: 1.6; }
+.course-scope .c-prof-hours b { color: #B8A9FF; font-weight: 600; }
+.course-scope .c-prof-actions { display: flex; gap: 8px; margin-top: 4px; }
+.course-scope .c-prof-actions .c-action-btn { flex: 1; justify-content: center; padding: 10px; font-size: 12px; }
+
+/* Lectures list */
+.course-scope .c-lec {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 12px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, rgba(30, 36, 51, 0.5), rgba(16, 20, 30, 0.3));
+  transition: all 0.18s;
+  cursor: pointer;
+  color: inherit;
+  text-decoration: none;
+}
+.course-scope .c-lec:hover {
+  border-color: rgba(184, 169, 255, 0.2);
+  transform: translateX(3px); /* RTL: positive translateX moves start-ward; design had -3px for LTR */
+  background: linear-gradient(135deg, rgba(30, 36, 51, 0.7), rgba(16, 20, 30, 0.5));
+}
+.course-scope .c-lec-num {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: linear-gradient(145deg, #242a3a, #181d29);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Inter', sans-serif;
+  box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.04), inset -1px -1px 2px rgba(0, 0, 0, 0.35);
+}
+.course-scope .c-lec-num .n { font-size: 16px; font-weight: 800; color: #e2e8f0; line-height: 1; }
+.course-scope .c-lec-num .lab {
+  font-size: 8px;
+  color: #64748b;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 1px;
+  font-weight: 600;
+}
+.course-scope .c-lec.done .c-lec-num {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(16, 185, 129, 0.08));
+  border-color: rgba(52, 211, 153, 0.25);
+}
+.course-scope .c-lec.done .c-lec-num .n { color: #34d399; }
+.course-scope .c-lec.current .c-lec-num {
+  background: linear-gradient(135deg, rgba(107, 91, 229, 0.3), rgba(139, 124, 240, 0.12));
+  border-color: rgba(184, 169, 255, 0.4);
+  box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.08), 0 0 14px rgba(107, 91, 229, 0.25);
+}
+.course-scope .c-lec.current .c-lec-num .n { color: #B8A9FF; }
+.course-scope .c-lec-body { flex: 1; min-width: 0; }
+.course-scope .c-lec-title { font-size: 14px; color: #e2e8f0; font-weight: 600; line-height: 1.3; }
+.course-scope .c-lec.done .c-lec-title { color: #8B8FA8; }
+.course-scope .c-lec-meta {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 4px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.course-scope .c-lec-meta .pill {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  font-family: inherit;
+}
+.course-scope .c-lec-meta .pill.read { background: rgba(184, 169, 255, 0.12); color: #B8A9FF; }
+.course-scope .c-lec-meta .pill.rec { background: rgba(239, 68, 68, 0.12); color: #f87171; }
+.course-scope .c-lec-meta .pill.sum { background: rgba(52, 211, 153, 0.12); color: #34d399; }
+.course-scope .c-lec-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.course-scope .c-lec-ico {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.course-scope .c-lec-ico:hover {
+  color: #B8A9FF;
+  border-color: rgba(184, 169, 255, 0.2);
+  background: rgba(107, 91, 229, 0.08);
+}
+
+/* Syllabus */
+.course-scope .c-syll { line-height: 1.75; font-size: 13.5px; color: #cbd5e1; }
+.course-scope .c-syll p { margin: 0 0 12px; }
+.course-scope .c-syll-topics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+@media (max-width: 700px) {
+  .course-scope .c-syll-topics { grid-template-columns: 1fr; }
+}
+.course-scope .c-syll-topic {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: #cbd5e1;
+}
+.course-scope .c-syll-topic .num {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  color: #8B7FF0;
+  background: rgba(107, 91, 229, 0.12);
+  border: 1px solid rgba(107, 91, 229, 0.18);
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  direction: ltr;
+}
+.course-scope .c-syll-topic.done .num {
+  background: rgba(52, 211, 153, 0.14);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.2);
+}
+.course-scope .c-syll-topic.done { color: #8B8FA8; }
+
+/* AI notebook — specialty card */
+.course-scope .c-ai {
+  background: linear-gradient(145deg, rgba(30, 26, 56, 0.85), rgba(20, 16, 40, 0.7));
+  border: 1px solid rgba(184, 169, 255, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+.course-scope .c-ai::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  left: -60px;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(184, 169, 255, 0.25), transparent 65%);
+  filter: blur(50px);
+  pointer-events: none;
+}
+.course-scope .c-ai-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  position: relative;
+}
+.course-scope .c-ai-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #8B7FF0, #6B5BE5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(107, 91, 229, 0.4), inset 1px 1px 2px rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+.course-scope .c-ai-title {
+  font-family: 'IBM Plex Serif', 'Frank Ruhl Libre', serif;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #f1f5f9;
+}
+.course-scope .c-ai-subtitle {
+  font-size: 11px;
+  color: #8B8FA8;
+  margin-top: 2px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+.course-scope .c-ai-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+  position: relative;
+}
+.course-scope .c-ai-stat {
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(184, 169, 255, 0.08);
+  text-align: center;
+}
+.course-scope .c-ai-stat .v {
+  font-family: 'Inter', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #C9BFFF, #8B7FF0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+}
+.course-scope .c-ai-stat .l {
+  font-size: 9.5px;
+  color: #64748b;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-top: 4px;
+  font-family: 'Inter', sans-serif;
+}
+.course-scope .c-ai-input {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(184, 169, 255, 0.18);
+  align-items: center;
+  position: relative;
+}
+.course-scope .c-ai-input input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.course-scope .c-ai-input input::placeholder { color: #64748b; }
+.course-scope .c-ai-send {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #8B7FF0, #6B5BE5);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+}
+.course-scope .c-ai-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  position: relative;
+}
+.course-scope .c-ai-chip {
+  font-size: 11px;
+  padding: 5px 11px;
+  border-radius: 99px;
+  background: rgba(184, 169, 255, 0.08);
+  border: 1px solid rgba(184, 169, 255, 0.15);
+  color: #B8A9FF;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.course-scope .c-ai-chip:hover { background: rgba(184, 169, 255, 0.16); color: #fff; }
+
+/* Weekly schedule */
+.course-scope .c-week {
+  display: grid;
+  grid-template-columns: 80px repeat(5, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+@media (max-width: 900px) {
+  .course-scope .c-week { grid-template-columns: 60px repeat(5, 1fr); }
+}
+.course-scope .c-week-hr {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  color: #4b5568;
+  letter-spacing: 0.05em;
+  direction: ltr;
+  font-weight: 600;
+  padding: 4px;
+  text-align: left;
+}
+.course-scope .c-week-day {
+  padding: 10px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  min-height: 70px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+.course-scope .c-week-day .day-lab {
+  font-size: 10px;
+  color: #64748b;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  text-align: center;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.course-scope .c-week-day.today .day-lab { color: #B8A9FF; }
+.course-scope .c-week-day.today {
+  border-color: rgba(184, 169, 255, 0.2);
+  background: linear-gradient(145deg, rgba(30, 26, 56, 0.6), rgba(20, 16, 40, 0.4));
+}
+.course-scope .c-week-evt {
+  padding: 6px 8px;
+  border-radius: 7px;
+  font-size: 10.5px;
+  line-height: 1.3;
+  background: linear-gradient(135deg, rgba(107, 91, 229, 0.22), rgba(139, 124, 240, 0.08));
+  border: 1px solid rgba(184, 169, 255, 0.2);
+  color: #e2e8f0;
+}
+.course-scope .c-week-evt.lab {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.18), rgba(16, 185, 129, 0.06));
+  border-color: rgba(52, 211, 153, 0.2);
+}
+.course-scope .c-week-evt.hof {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(217, 119, 6, 0.06));
+  border-color: rgba(245, 158, 11, 0.2);
+}
+.course-scope .c-week-evt .t {
+  font-family: 'Inter', sans-serif;
+  font-size: 9.5px;
+  color: #8B8FA8;
+  font-weight: 600;
+  direction: ltr;
+  margin-bottom: 1px;
+}
+.course-scope .c-week-evt .nm { color: #e2e8f0; font-weight: 500; }
+.course-scope .c-week-evt .loc { font-size: 9px; color: #64748b; margin-top: 1px; }
+
+/* Course switcher at top */
+.course-scope .c-switcher {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+.course-scope .c-switcher-pill {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  color: #8B8FA8;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.course-scope .c-switcher-pill:hover {
+  color: #cbd5e1;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.course-scope .c-switcher-pill.on {
+  background: linear-gradient(135deg, rgba(107, 91, 229, 0.22), rgba(139, 124, 240, 0.08));
+  color: #fff;
+  border-color: rgba(184, 169, 255, 0.25);
+}
+.course-scope .c-switcher-pill .code {
+  font-family: 'Inter', sans-serif;
+  font-size: 9.5px;
+  color: #64748b;
+  margin-left: 6px;
+  direction: ltr;
+  font-weight: 600;
+}
+.course-scope .c-switcher-pill.on .code { color: #B8A9FF; }
