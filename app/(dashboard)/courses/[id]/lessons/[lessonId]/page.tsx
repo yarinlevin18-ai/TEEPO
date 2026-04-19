@@ -27,8 +27,8 @@ import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, ChevronLeft, Loader2, FileDown,
-  CheckSquare, FileText, Calendar,
-  Trash2, ExternalLink, FileUp, Plus, Check, X,
+  FileText,
+  Trash2, FileUp, Plus, Check, X,
   BookOpen, FolderOpen, File as FileIcon, Presentation,
   Image as ImageIcon, Mic, Upload, StopCircle,
   ArrowLeft,
@@ -39,12 +39,10 @@ import {
 } from '@/lib/db-context'
 import { exportNoteToWord } from '@/lib/export-to-word'
 import { semesterLabel } from '@/lib/semester-classifier'
-import QuickAddInput from '@/components/course/QuickAddInput'
 import LessonNotebookChat from '@/components/course/LessonNotebookChat'
 import NotebookPaper, { type NotebookPrefs } from '@/components/course/NotebookPaper'
 import ErrorAlert from '@/components/ui/ErrorAlert'
-import type { StudyTask, Assignment, LessonFile } from '@/types'
-import { format } from 'date-fns'
+import type { LessonFile } from '@/types'
 
 function fileIcon(type: string) {
   switch (type) {
@@ -80,9 +78,6 @@ export default function LessonNotebookPage() {
   const {
     ready, loading, error: dbError,
     updateLesson,
-    createTask, updateTask, deleteTask,
-    createAssignment, updateAssignment, deleteAssignment,
-    db,
   } = useDB()
   const course = useCourse(courseId)
   const lessons = useLessons(courseId)
@@ -233,14 +228,6 @@ export default function LessonNotebookPage() {
     e.target.value = ''
     await uploadRecording(f, f.name)
   }
-
-  // Per-lesson tasks (now scoped by lesson_id)
-  const lessonTasks = db.tasks.filter(t => t.lesson_id === lessonId)
-  const pendingTasks = lessonTasks.filter(t => !t.is_completed)
-  const doneTasks = lessonTasks.filter(t => t.is_completed)
-
-  // Course-level assignments (read-only here)
-  const assignments = db.assignments.filter(a => a.course_id === courseId)
 
   // ── File management ──
   const [addingFile, setAddingFile] = useState(false)
@@ -578,122 +565,6 @@ export default function LessonNotebookPage() {
         ) : null}
       </motion.section>
 
-      {/* ── Bottom: Tasks + Assignments ── */}
-      <div className="grid gap-4 mt-4 md:grid-cols-2">
-        {/* Lesson tasks */}
-        <motion.section
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.22 }}
-          className="glass rounded-2xl p-3 space-y-2"
-        >
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
-              <CheckSquare size={14} className="text-indigo-400" />
-              משימות לשיעור
-              {pendingTasks.length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 font-medium">
-                  {pendingTasks.length}
-                </span>
-              )}
-            </h3>
-          </div>
-
-          <QuickAddInput
-            placeholder="משימה לשיעור, למשל: לפתור תרגיל 3…"
-            accent="indigo"
-            onAdd={text =>
-              createTask({
-                title: text,
-                course_id: courseId,
-                lesson_id: lessonId,
-                scheduled_date: format(new Date(), 'yyyy-MM-dd'),
-                category: 'study',
-              })
-            }
-          />
-
-          {lessonTasks.length === 0 ? (
-            <p className="text-[11px] text-ink-subtle text-center py-3">
-              אין משימות לשיעור הזה עדיין.
-            </p>
-          ) : (
-            <div className="space-y-1">
-              {pendingTasks.map(t => (
-                <LessonTaskRow key={t.id} task={t} onToggle={updateTask} onDelete={deleteTask} />
-              ))}
-              {doneTasks.length > 0 && (
-                <details className="pt-1">
-                  <summary className="text-[11px] text-ink-subtle cursor-pointer hover:text-ink px-1 py-1">
-                    הושלמו ({doneTasks.length})
-                  </summary>
-                  <div className="space-y-1 mt-1">
-                    {doneTasks.map(t => (
-                      <LessonTaskRow key={t.id} task={t} onToggle={updateTask} onDelete={deleteTask} />
-                    ))}
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
-        </motion.section>
-
-        {/* Course assignments — interactive add + list */}
-        <motion.section
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.28 }}
-          className="glass rounded-2xl p-3 space-y-2"
-        >
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
-              <FileText size={14} className="text-amber-400" />
-              מטלות הקורס
-              {assignments.length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-medium">
-                  {assignments.length}
-                </span>
-              )}
-            </h3>
-            <Link
-              href={`/courses/${courseId}`}
-              className="text-[11px] text-ink-subtle hover:text-ink inline-flex items-center gap-1"
-            >
-              פתח בקורס <ExternalLink size={10} />
-            </Link>
-          </div>
-
-          <QuickAddInput
-            placeholder='מטלה חדשה (למשל "תרגיל 3", "מבחן אמצע")…'
-            accent="amber"
-            onAdd={async text => {
-              await createAssignment({
-                title: text,
-                course_id: courseId,
-                priority: 'medium',
-              })
-            }}
-          />
-
-          {assignments.length === 0 ? (
-            <p className="text-[11px] text-ink-subtle text-center py-3">
-              תרגילים, מבחנים, פרויקטים…
-            </p>
-          ) : (
-            <div className="space-y-1">
-              {assignments.map(a => (
-                <InlineAssignmentRow
-                  key={a.id}
-                  a={a}
-                  onUpdate={updateAssignment}
-                  onDelete={deleteAssignment}
-                />
-              ))}
-            </div>
-          )}
-        </motion.section>
-      </div>
-
       {/* ── Transcript viewer ── */}
       {lesson.transcript && (
         <motion.section
@@ -782,80 +653,3 @@ function SaveIndicator({ state }: { state: SaveState }) {
   )
 }
 
-function LessonTaskRow({
-  task, onToggle, onDelete,
-}: {
-  task: StudyTask
-  onToggle: (id: string, patch: Partial<StudyTask>) => Promise<void>
-  onDelete: (id: string) => Promise<void>
-}) {
-  return (
-    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 group transition-colors">
-      <button
-        onClick={() => onToggle(task.id, { is_completed: !task.is_completed })}
-        className={`w-4 h-4 rounded-full border-2 flex-shrink-0 transition-all ${
-          task.is_completed ? 'bg-emerald-500/80 border-emerald-500' : 'border-white/15 hover:border-indigo-400'
-        }`}
-      />
-      <span className={`text-sm flex-1 truncate ${task.is_completed ? 'text-ink-muted line-through' : 'text-ink'}`}>
-        {task.title}
-      </span>
-      <button
-        onClick={() => onDelete(task.id)}
-        className="p-0.5 rounded text-ink-subtle hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
-      >
-        <Trash2 size={11} />
-      </button>
-    </div>
-  )
-}
-
-function InlineAssignmentRow({
-  a, onUpdate, onDelete,
-}: {
-  a: Assignment
-  onUpdate: (id: string, patch: Partial<Assignment>) => Promise<void>
-  onDelete: (id: string) => Promise<void>
-}) {
-  const priorityDot: Record<string, string> = {
-    high: '#ef4444',
-    medium: '#f59e0b',
-    low: '#10b981',
-  }
-  return (
-    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 group transition-colors">
-      <button
-        onClick={() => {
-          const next: Assignment['priority'] =
-            a.priority === 'high' ? 'medium' : a.priority === 'medium' ? 'low' : 'high'
-          onUpdate(a.id, { priority: next })
-        }}
-        className="w-2 h-2 rounded-full flex-shrink-0 cursor-pointer"
-        style={{ background: priorityDot[a.priority] }}
-        title={a.priority === 'high' ? 'דחוף' : a.priority === 'medium' ? 'בינוני' : 'רגיל'}
-      />
-      <span className="text-sm flex-1 truncate text-ink">{a.title}</span>
-      {a.deadline && (
-        <span className="text-[10px] text-ink-subtle flex items-center gap-0.5 flex-shrink-0">
-          <Calendar size={9} /> {a.deadline.slice(5)}
-        </span>
-      )}
-      <select
-        value={a.status}
-        onChange={e => onUpdate(a.id, { status: e.target.value as Assignment['status'] })}
-        className="text-[10px] bg-transparent border-0 cursor-pointer text-ink-muted hover:text-ink outline-none"
-      >
-        <option value="todo">לא התחיל</option>
-        <option value="in_progress">בתהליך</option>
-        <option value="submitted">הוגש</option>
-        <option value="graded">נבדק</option>
-      </select>
-      <button
-        onClick={() => onDelete(a.id)}
-        className="p-0.5 rounded text-ink-subtle hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
-      >
-        <Trash2 size={11} />
-      </button>
-    </div>
-  )
-}

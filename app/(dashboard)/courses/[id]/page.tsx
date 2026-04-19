@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useDB, useCourse, useLessons } from '@/lib/db-context'
-import { CourseWorkspace } from '@/components/course/CourseTabs'
+import { CourseWorkspace, TasksMini, AssignmentsMini } from '@/components/course/CourseTabs'
 import CourseNotebookStack from '@/components/course/CourseNotebookStack'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { semesterLabel } from '@/lib/semester-classifier'
@@ -180,6 +180,12 @@ export default function CourseDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Tasks + Assignments, embedded in the course header */}
+        <div className="mt-5 pt-5 border-t border-white/5 grid gap-4 md:grid-cols-2">
+          <TasksMini courseId={courseId} />
+          <AssignmentsMini courseId={courseId} />
+        </div>
       </div>
 
       {/* ── Workspace (Lessons + side panels) ── */}

@@ -57,6 +57,9 @@ export function CourseWorkspace({
   courseTitle: string
   lessonsSlot?: React.ReactNode
 }) {
+  // Tasks and Assignments now live inside the course header card on the
+  // parent page — the workspace keeps the lessons stack and only the AI
+  // helper in the right column.
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
       {/* LEFT — Lessons (each lesson holds its own summary) */}
@@ -64,10 +67,8 @@ export function CourseWorkspace({
         {lessonsSlot}
       </section>
 
-      {/* RIGHT — compact inline-add panels */}
+      {/* RIGHT — AI helper only */}
       <aside className="space-y-4 min-w-0">
-        <TasksMini courseId={courseId} />
-        <AssignmentsMini courseId={courseId} />
         <AIMini courseId={courseId} courseTitle={courseTitle} />
       </aside>
     </div>
@@ -78,7 +79,7 @@ export function CourseWorkspace({
 // TASKS MINI — inline quick-add, compact list
 // ═══════════════════════════════════════════════════════════════
 
-function TasksMini({ courseId }: { courseId: string }) {
+export function TasksMini({ courseId }: { courseId: string }) {
   const { db, createTask, updateTask, deleteTask } = useDB()
   const tasks = db.tasks.filter(t => t.course_id === courseId)
   const pending = tasks.filter(t => !t.is_completed)
@@ -166,7 +167,7 @@ function TaskRow({ task, onToggle, onDelete }: {
 // ASSIGNMENTS MINI
 // ═══════════════════════════════════════════════════════════════
 
-function AssignmentsMini({ courseId }: { courseId: string }) {
+export function AssignmentsMini({ courseId }: { courseId: string }) {
   const { db, createAssignment, updateAssignment, deleteAssignment } = useDB()
   const assignments = db.assignments.filter(a => a.course_id === courseId)
 
