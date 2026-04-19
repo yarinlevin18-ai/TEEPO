@@ -72,6 +72,8 @@ export interface StudyTask {
   id: string
   user_id: string
   course_id?: string
+  /** Optional per-lesson scoping — set when the task was created inside the lesson notebook. */
+  lesson_id?: string
   title: string
   description?: string
   scheduled_date?: string
