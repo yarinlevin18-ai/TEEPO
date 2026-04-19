@@ -1,380 +1,591 @@
 'use client'
 
 /**
- * Course page — shell that lists lessons and wraps them in CourseWorkspace.
+ * Course page — the notebook is the main surface.
  *
- * Clicking a lesson navigates to `/courses/[id]/lessons/[lessonId]` — the
- * "lesson notebook" — where all the heavy lifting (rich summary, AI
- * chat, files, per-lesson tasks) happens. This page stays intentionally
- * light: header, lesson list, and course-level side panels.
+ * Lessons are chapters inside the course notebook; AI is ambient (silent
+ * until opened); Moodle data sits at the bottom as a reference shelf. A
+ * recorder card above missions lets the user pipe a class recording or
+ * Zoom export through Whisper + Claude and insert the summary into the
+ * right chapter.
+ *
+ * Layout:
+ *   ┌──────────────────────────────────────────────────────────────┐
+ *   │ Header (course title, semester, year)                         │
+ *   ├────────┬──────────────────────────────────┬──────────────────┤
+ *   │ TOC    │   Focused chapter (paper)        │  AI panel        │
+ *   │ L1 ●   │   [ editor ]                     │  (silent default)│
+ *   │ L2 ←   │   [ mark done ] [ coach review ] │                  │
+ *   └────────┴──────────────────────────────────┴──────────────────┘
+ *   │ Lesson recorder (audio/Zoom → Whisper → summary)              │
+ *   │ Missions (synced: shown here + in /tasks)                     │
+ *   │ Course Knowledge (from Moodle)                                │
+ *   └───────────────────────────────────────────────────────────────┘
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  BookOpen, ExternalLink, ArrowRight, CheckCircle2,
-  Plus, X, StickyNote, ChevronLeft, FileUp, Sparkles,
-  Trash2,
+  ArrowRight, CheckCircle2, Circle, BookOpen, Sparkles, MessageSquare,
+  ChevronLeft, ChevronRight, Lightbulb, X, FileText, Calendar,
+  User, Megaphone, ExternalLink, Plus,
 } from 'lucide-react'
-import Link from 'next/link'
 import { useDB, useCourse, useLessons } from '@/lib/db-context'
-import { CourseWorkspace, TasksMini, AssignmentsMini } from '@/components/course/CourseTabs'
-import CourseNotebookStack from '@/components/course/CourseNotebookStack'
-import ErrorAlert from '@/components/ui/ErrorAlert'
-import { semesterLabel } from '@/lib/semester-classifier'
-import type { Lesson } from '@/types'
+import NotebookPaper, { type NotebookPrefs } from '@/components/course/NotebookPaper'
+import LessonNotebookChat from '@/components/course/LessonNotebookChat'
+import LessonRecorder from '@/components/course/LessonRecorder'
+import { TasksMini, AssignmentsMini } from '@/components/course/CourseTabs'
+import {
+  runNotebookAi,
+  promptContinue, promptSummarize, promptExpand, promptFix, promptToList,
+  promptImprove, promptShorten, promptExplain,
+} from '@/lib/notebook-ai-client'
+import type { AiActionsAPI, EditorStats } from '@/components/RichTextEditor'
 
-// ── Component ───────────────────────────────────────────────
+const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false })
 
-export default function CourseDetailPage() {
+const DEFAULT_PREFS: NotebookPrefs = {
+  paper: 'cream',
+  fontFamily: 'serif',
+  textSize: 'md',
+  lineGap: 'normal',
+  showLines: true,
+}
+
+export default function CoursePage() {
   const params = useParams()
   const router = useRouter()
   const courseId = params.id as string
 
-  const {
-    ready, loading, error: dbError,
-    createLesson: dbCreateLesson,
-    deleteLesson: dbDeleteLesson,
-    updateLesson: dbUpdateLesson,
-  } = useDB()
+  const { ready, updateLesson, createLesson: dbCreateLesson } = useDB()
   const course = useCourse(courseId)
   const lessons = useLessons(courseId)
 
-  const [error, setError] = useState<string | null>(null)
-  const [showNewLesson, setShowNewLesson] = useState(false)
-  const [newLessonTitle, setNewLessonTitle] = useState('')
-  const newLessonInputRef = useRef<HTMLInputElement>(null)
-
+  // ── Chapter selection ────────────────────────────────────
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const activeLesson = useMemo(
+    () => lessons.find(l => l.id === activeId) || lessons[0] || null,
+    [lessons, activeId],
+  )
   useEffect(() => {
-    if (dbError) setError(dbError)
-  }, [dbError])
+    if (!activeId && lessons.length > 0) setActiveId(lessons[0].id)
+  }, [lessons, activeId])
 
-  // ── Create lesson ──
-  const createLesson = useCallback(async () => {
-    const title = newLessonTitle.trim()
-    if (!title) return
+  // ── Notebook prefs (remembered per device) ───────────────
+  const [prefs, setPrefs] = useState<NotebookPrefs>(DEFAULT_PREFS)
+  useEffect(() => {
     try {
-      const created = await dbCreateLesson(courseId, { title })
-      setNewLessonTitle('')
-      setShowNewLesson(false)
-      // Jump straight into the notebook for the new lesson
-      router.push(`/courses/${courseId}/lessons/${created.id}`)
-    } catch {
-      setError('שגיאה ביצירת שיעור.')
-    }
-  }, [courseId, newLessonTitle, dbCreateLesson, router])
+      const s = localStorage.getItem('teepo.notebook.prefs')
+      if (s) setPrefs({ ...DEFAULT_PREFS, ...JSON.parse(s) })
+    } catch {}
+  }, [])
+  useEffect(() => {
+    try { localStorage.setItem('teepo.notebook.prefs', JSON.stringify(prefs)) } catch {}
+  }, [prefs])
 
-  const toggleLesson = useCallback(async (lesson: Lesson) => {
-    try {
-      await dbUpdateLesson(lesson.id, { is_completed: !lesson.is_completed })
-    } catch {
-      setError('שגיאה בעדכון השיעור.')
-    }
-  }, [dbUpdateLesson])
+  // ── AI panel state: silent by default, user opens when needed ────
+  const [aiOpen, setAiOpen] = useState(false)
 
-  const deleteLesson = useCallback(async (id: string) => {
-    if (!confirm('למחוק את השיעור?')) return
-    try {
-      await dbDeleteLesson(id)
-    } catch {
-      setError('שגיאה במחיקת שיעור.')
-    }
-  }, [dbDeleteLesson])
+  // ── Whisper (margin hint) — stub, shows up on long idle ─────────
+  const [whisperShown, setWhisperShown] = useState(false)
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const triggerIdle = () => {
+    if (idleTimer.current) clearTimeout(idleTimer.current)
+    idleTimer.current = setTimeout(() => setWhisperShown(true), 45_000)
+  }
+  useEffect(() => { triggerIdle(); return () => { if (idleTimer.current) clearTimeout(idleTimer.current) } }, [activeId])
 
-  // ── Loading ──
-  if (loading || !ready) {
-    return (
-      <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6 animate-fade-in">
-        <div className="h-8 w-64 shimmer rounded-lg" />
-        <div className="h-4 w-48 shimmer rounded-lg" />
-        <div className="space-y-3 mt-8">
-          {[1, 2, 3].map(i => <div key={i} className="h-20 shimmer rounded-xl" />)}
-        </div>
-      </div>
+  // ── End-of-chapter coach stub ────────────────────────────
+  const [coachMsg, setCoachMsg] = useState<string | null>(null)
+  const runCoach = () => {
+    setCoachMsg(
+      'זה סטאב של מאמן סוף פרק. בגרסה האמיתית, ה-AI יעבור על הסיכום ' +
+      'שלך, יציין שני דברים טובים וישאל על משהו אחד שחסר — בלי לשכתב לך.',
     )
   }
 
+  // ── Save state + editor stats (shown in the NotebookPaper footer) ──
+  const [saveState, setSaveState] = useState<'saving' | 'saved' | null>(null)
+  const [stats, setStats] = useState<EditorStats>({ words: 0, chars: 0 })
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Save editor content ──────────────────────────────────
+  const handleEdit = (html: string) => {
+    if (!activeLesson) return
+    updateLesson(activeLesson.id, { content: html })
+    setSaveState('saving')
+    if (savedTimer.current) clearTimeout(savedTimer.current)
+    savedTimer.current = setTimeout(() => {
+      setSaveState('saved')
+      // Hide "saved" after a moment so the footer returns to empty.
+      savedTimer.current = setTimeout(() => setSaveState(null), 1600)
+    }, 400)
+    triggerIdle()
+  }
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current) }, [])
+
+  // ── Insert AI summary from a lesson recording into the notebook body.
+  //    Parses the summary (which may be plain text, numbered sections, or
+  //    bullet lines) into lightweight HTML and appends it to the target
+  //    lesson's existing content. The editor auto-syncs via its content
+  //    prop effect, so the user sees the insertion immediately.
+  const handleInsertSummary = (targetLessonId: string, summary: string) => {
+    const target = lessons.find(l => l.id === targetLessonId)
+    if (!target) return
+    const dateLabel = new Date().toLocaleDateString('he-IL', {
+      day: 'numeric', month: 'numeric', year: 'numeric',
+    })
+    const block = summaryToHtml(summary, dateLabel)
+    const existing = target.content || ''
+    const separator = existing.trim() ? '<p></p>' : ''
+    updateLesson(targetLessonId, { content: existing + separator + block })
+    // If the user was looking at a different chapter, jump to the one we
+    // just updated so they see the inserted summary.
+    if (activeLesson?.id !== targetLessonId) setActiveId(targetLessonId)
+    setCoachMsg(`הסיכום של ההקלטה נוסף לפרק "${target.title}".`)
+  }
+
+  // ── AI actions — wire the inline editor affordances to the notebook
+  //    backend. Each handler returns { ok, text } or { ok:false, error }.
+  const aiActions: AiActionsAPI = useMemo(() => {
+    const run = (prompt: string, context: string) =>
+      runNotebookAi({ prompt, context, courseId })
+    return {
+      continue:  (ctx) => run(promptContinue(), ctx),
+      summarize: (ctx) => run(promptSummarize(), ctx),
+      expand:    (para, ctx) => run(promptExpand(para), ctx),
+      fix:       (para, ctx) => run(promptFix(para), ctx),
+      toList:    (para, ctx) => run(promptToList(para), ctx),
+      improve:   (sel, ctx)  => run(promptImprove(sel), ctx),
+      shorten:   (sel, ctx)  => run(promptShorten(sel), ctx),
+      explain:   (sel, ctx)  => run(promptExplain(sel), ctx),
+    }
+  }, [courseId])
+
+  const toggleDone = () => {
+    if (!activeLesson) return
+    updateLesson(activeLesson.id, { is_completed: !activeLesson.is_completed })
+  }
+
+  // ── Chapter navigation ───────────────────────────────────
+  const jumpBy = (delta: number) => {
+    if (!activeLesson) return
+    const idx = lessons.findIndex(l => l.id === activeLesson.id)
+    const next = lessons[idx + delta]
+    if (next) setActiveId(next.id)
+  }
+
+  // ── Add first chapter (shown when lesson list is empty) ──
+  const [creating, setCreating] = useState(false)
+  const addFirstChapter = async () => {
+    if (creating) return
+    setCreating(true)
+    try {
+      const created = await dbCreateLesson(courseId, { title: 'פרק 1' })
+      setActiveId(created.id)
+    } catch {
+      setCoachMsg('שגיאה ביצירת פרק. נסה שוב.')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  if (!ready) {
+    return <div className="p-10 text-center text-ink-muted">טוען...</div>
+  }
   if (!course) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto animate-fade-in">
-        <ErrorAlert message={error || 'הקורס לא נמצא'} />
-        <Link href="/courses" className="mt-4 inline-flex items-center gap-2 text-sm text-accent-400 hover:text-accent-300 transition-colors">
-          <ArrowRight size={14} /> חזרה לקורסים
-        </Link>
+      <div className="p-10 text-center">
+        <p className="text-ink-muted mb-3">הקורס לא נמצא.</p>
+        <button onClick={() => router.push('/courses')} className="text-indigo-400 hover:underline">
+          חזרה לרשימת הקורסים
+        </button>
       </div>
     )
   }
 
-  const completedLessons = lessons.filter(l => l.is_completed).length
-  const progress = lessons.length > 0
-    ? Math.round((completedLessons / lessons.length) * 100)
-    : 0
-
-  const crumbClass = course.year_of_study || course.semester
-    ? semesterLabel(course.year_of_study, course.semester)
-    : null
+  const completedCount = lessons.filter(l => l.is_completed).length
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-5 animate-fade-in">
-      <ErrorAlert message={error} onDismiss={() => setError(null)} />
-
-      {/* ── Breadcrumb ── */}
-      <div className="flex items-center gap-2 text-xs text-ink-muted flex-wrap">
-        <Link href="/courses" className="inline-flex items-center gap-1.5 hover:text-ink transition-colors">
-          <ChevronLeft size={14} /> חזרה לקורסים
-        </Link>
-        {crumbClass && (
-          <>
-            <span className="text-ink-subtle">·</span>
-            <span>{crumbClass}</span>
-          </>
-        )}
-      </div>
-
-      {/* ── Course Header ── */}
-      <div className="glass rounded-2xl p-5 sm:p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-xl bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
-            <BookOpen size={22} className="text-indigo-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-ink">{course.title}</h1>
-            {course.description && (
-              <p className="text-sm text-ink-muted mt-1 line-clamp-2">{course.description}</p>
-            )}
-            <div className="flex items-center gap-3 mt-3 flex-wrap">
-              <span className={`text-xs px-2.5 py-1 rounded-full ${
-                course.source === 'bgu'
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                  : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-              }`}>
-                {course.source === 'bgu' ? 'BGU Moodle' : course.source}
-              </span>
-              {course.source_url && (
-                <a href={course.source_url} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs text-accent-400 hover:text-accent-300 transition-colors">
-                  <ExternalLink size={12} /> פתח ב-Moodle
-                </a>
-              )}
-              <span className="text-xs text-ink-muted">{lessons.length} שיעורים</span>
-              <Link
-                href={`/courses/${courseId}/preview`}
-                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/20 hover:bg-violet-500/25 transition-colors"
-                title="תצוגה חדשה (ספייק) — מחברת כמרכז"
-              >
-                <Sparkles size={12} /> נסה תצוגה חדשה
-              </Link>
-            </div>
+    <div className="p-4 md:p-6 max-w-[1400px] mx-auto" style={{ direction: 'rtl' }}>
+      {/* ── Header ───────────────────────────────────── */}
+      <div className="flex items-center gap-3 mb-5">
+        <button
+          onClick={() => router.push('/courses')}
+          className="p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-white/5"
+          title="חזרה לרשימת הקורסים"
+        >
+          <ArrowRight size={18} />
+        </button>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl md:text-2xl font-bold truncate">{course.title}</h1>
+          <div className="text-xs text-ink-muted mt-0.5">
+            {course.academic_year && `שנת ${course.academic_year} · `}
+            {course.semester && `סמסטר ${course.semester} · `}
+            {completedCount} מתוך {lessons.length} פרקים הושלמו
           </div>
         </div>
+      </div>
 
-        {/* Progress */}
-        {lessons.length > 0 && (
-          <div className="mt-5">
-            <div className="flex justify-between text-xs text-ink-muted mb-2">
-              <span>התקדמות</span>
-              <span>{completedLessons}/{lessons.length} ({progress}%)</span>
-            </div>
-            <div className="w-full h-2 rounded-full bg-white/5">
-              <motion.div
-                className="h-2 rounded-full"
-                style={{ background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }}
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.6, ease: 'easeOut' }}
-              />
-            </div>
+      {/* ── Notebook (TOC + focused chapter + AI) ────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_auto] gap-4 mb-6">
+        {/* TOC */}
+        <aside className="glass rounded-2xl p-3 h-fit lg:sticky lg:top-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted px-2 pb-2 flex items-center gap-1.5">
+            <BookOpen size={12} /> פרקים
           </div>
-        )}
+          {lessons.length === 0 ? (
+            <div className="px-2 py-3 space-y-2">
+              <div className="text-xs text-ink-muted">
+                אין עדיין פרקים בקורס הזה.
+              </div>
+              <button
+                onClick={addFirstChapter}
+                disabled={creating}
+                className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs bg-indigo-500/15 text-indigo-300 border border-indigo-400/20 hover:bg-indigo-500/25 disabled:opacity-50"
+              >
+                <Plus size={12} /> צור פרק ראשון
+              </button>
+            </div>
+          ) : (
+            <>
+              <ul className="space-y-0.5">
+                {lessons.map((l, i) => (
+                  <li key={l.id}>
+                    <button
+                      onClick={() => setActiveId(l.id)}
+                      className={`w-full text-right flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
+                        activeLesson?.id === l.id
+                          ? 'bg-indigo-500/15 text-ink border border-indigo-400/20'
+                          : 'text-ink-muted hover:text-ink hover:bg-white/5 border border-transparent'
+                      }`}
+                    >
+                      {l.is_completed
+                        ? <CheckCircle2 size={12} className="text-emerald-400 flex-shrink-0" />
+                        : <Circle size={12} className="text-ink-muted/60 flex-shrink-0" />}
+                      <span className="flex-1 truncate">{i + 1}. {l.title}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={addFirstChapter}
+                disabled={creating}
+                className="mt-2 w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] text-ink-muted hover:text-ink hover:bg-white/5 border border-dashed border-white/10 disabled:opacity-50"
+              >
+                <Plus size={11} /> פרק חדש
+              </button>
+            </>
+          )}
+        </aside>
 
-        {/* Tasks + Assignments, embedded in the course header */}
-        <div className="mt-5 pt-5 border-t border-white/5 grid gap-4 md:grid-cols-2">
+        {/* Focused chapter */}
+        <div className="relative">
+          {activeLesson ? (
+            <NotebookPaper
+              {...prefs}
+              onChange={(patch) => setPrefs(p => ({ ...p, ...patch }))}
+              title={`פרק ${lessons.findIndex(l => l.id === activeLesson.id) + 1} · ${activeLesson.title}`}
+              stats={stats}
+              saveState={saveState}
+              headerRight={
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => jumpBy(-1)}
+                    disabled={lessons.findIndex(l => l.id === activeLesson.id) === 0}
+                    className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-white/10 disabled:opacity-30"
+                    title="פרק קודם"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                  <button
+                    onClick={() => jumpBy(1)}
+                    disabled={lessons.findIndex(l => l.id === activeLesson.id) === lessons.length - 1}
+                    className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-white/10 disabled:opacity-30"
+                    title="פרק הבא"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                </div>
+              }
+            >
+              <RichTextEditor
+                content={activeLesson.content || ''}
+                onChange={handleEdit}
+                placeholder="כתוב את הסיכום שלך כאן. ה-AI שקט אלא אם תבקש ממנו משהו. הקלד / לפעולות AI."
+                aiActions={aiActions}
+                onStats={setStats}
+              />
+            </NotebookPaper>
+          ) : (
+            <div className="glass rounded-2xl p-10 text-center text-ink-muted space-y-3">
+              <div>אין עדיין פרקים בקורס. צור פרק ראשון כדי להתחיל לכתוב.</div>
+              <button
+                onClick={addFirstChapter}
+                disabled={creating}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 hover:bg-indigo-500/30 disabled:opacity-50"
+              >
+                <Plus size={14} /> צור פרק ראשון
+              </button>
+            </div>
+          )}
+
+          {/* Chapter actions strip */}
+          {activeLesson && (
+            <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
+              <button
+                onClick={toggleDone}
+                className={`px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors ${
+                  activeLesson.is_completed
+                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20'
+                    : 'bg-white/5 text-ink-muted hover:text-ink border border-white/8'
+                }`}
+              >
+                {activeLesson.is_completed ? <CheckCircle2 size={13} /> : <Circle size={13} />}
+                {activeLesson.is_completed ? 'פרק הושלם' : 'סמן פרק כהושלם'}
+              </button>
+              <button
+                onClick={runCoach}
+                className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 bg-violet-500/15 text-violet-300 border border-violet-500/20 hover:bg-violet-500/25"
+                title="קבל משוב קצר על מה שכתבת"
+              >
+                <Sparkles size={13} /> קבל משוב על הפרק
+              </button>
+            </div>
+          )}
+
+          {/* Coach message (stub) */}
+          <AnimatePresence>
+            {coachMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className="mt-3 glass rounded-xl p-3 text-xs flex items-start gap-2 border border-violet-500/20"
+              >
+                <Sparkles size={14} className="text-violet-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">{coachMsg}</div>
+                <button onClick={() => setCoachMsg(null)} className="text-ink-muted hover:text-ink">
+                  <X size={13} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Margin whisper (stub — shows after idle) */}
+          <AnimatePresence>
+            {whisperShown && activeLesson && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="absolute -left-3 top-24 w-52 p-3 rounded-xl text-[11px] glass border border-amber-400/20 hidden xl:block"
+                style={{ background: 'rgba(251, 191, 36, 0.05)' }}
+              >
+                <div className="flex items-start gap-1.5">
+                  <Lightbulb size={12} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 text-amber-200/90">
+                    (סטאב לחישה) נראה שעצרת לרגע — תרצה שאסביר משהו?
+                  </div>
+                  <button onClick={() => setWhisperShown(false)} className="text-ink-muted hover:text-ink">
+                    <X size={11} />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* AI panel (silent until opened) */}
+        <aside className={`flex flex-col transition-all ${aiOpen ? 'w-full lg:w-[360px]' : 'w-full lg:w-12'}`}>
+          {aiOpen ? (
+            <div className="glass rounded-2xl overflow-hidden h-[640px] flex flex-col relative">
+              <button
+                onClick={() => setAiOpen(false)}
+                className="absolute top-2 left-2 z-10 p-1 rounded text-ink-muted hover:text-ink hover:bg-white/10"
+                title="כווץ"
+              >
+                <X size={13} />
+              </button>
+              {activeLesson && (
+                <LessonNotebookChat
+                  lesson={activeLesson}
+                  courseId={courseId}
+                  courseTitle={course.title}
+                />
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => setAiOpen(true)}
+              className="glass rounded-2xl p-3 hover:bg-white/5 transition-colors flex lg:flex-col items-center justify-center gap-2 text-ink-muted hover:text-ink group h-full min-h-[120px]"
+              title="פתח פנל AI"
+            >
+              <MessageSquare size={16} className="group-hover:text-violet-400 transition-colors" />
+              <span className="text-[10px] lg:[writing-mode:vertical-rl] lg:rotate-180 tracking-wider">
+                שאל את TEEPO
+              </span>
+            </button>
+          )}
+        </aside>
+      </div>
+
+      {/* ── Lesson recorder (audio/Zoom → Whisper → Claude summary) ── */}
+      {lessons.length > 0 && (
+        <div className="mb-6">
+          <LessonRecorder
+            lessons={lessons.map(l => ({ id: l.id, title: l.title }))}
+            defaultLessonId={activeLesson?.id || lessons[0]?.id}
+            onInsertSummary={handleInsertSummary}
+          />
+        </div>
+      )}
+
+      {/* ── Missions (synced view) ─────────────────────── */}
+      <div className="glass rounded-2xl p-5 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            <CheckCircle2 size={14} className="text-emerald-400" />
+            משימות ומטלות
+          </h2>
+          <span className="text-[10px] text-ink-muted">
+            מסתנכרן עם /tasks ועם כרטיס הקורס
+          </span>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
           <TasksMini courseId={courseId} />
           <AssignmentsMini courseId={courseId} />
         </div>
       </div>
 
-      {/* ── Workspace (Lessons + side panels) ── */}
-      <CourseWorkspace
-        courseId={courseId}
-        courseTitle={course.title}
-        lessonsSlot={
-          <>
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-ink flex items-center gap-2">
-                <StickyNote size={16} className="text-indigo-400" />
-                שיעורים
-              </h2>
-              <button
-                onClick={() => { setShowNewLesson(true); setTimeout(() => newLessonInputRef.current?.focus(), 100) }}
-                className="btn-gradient px-3.5 py-2 rounded-xl text-sm text-white font-medium flex items-center gap-1.5 shadow-lg shadow-indigo-500/20"
-              >
-                <Plus size={15} />
-                שיעור חדש
-              </button>
+      {/* ── Course Knowledge (Moodle layer) ────────────── */}
+      <div className="glass rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            <BookOpen size={14} className="text-indigo-400" />
+            על הקורס
+          </h2>
+          <span className="text-[10px] text-ink-muted">
+            {course.source === 'bgu' ? 'נשאב מ-Moodle' : 'הזנה ידנית'}
+          </span>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MoodleCard icon={FileText} title="קבצים רשמיים" hint="PDF מהקורס">
+            <StubList items={[
+              'הרצאה 1 — מבוא',
+              'הרצאה 2 — בסיסי',
+              'תרגול שבוע 1',
+            ]} emptyText="אין עדיין קבצים." />
+          </MoodleCard>
+
+          <MoodleCard icon={Calendar} title="סילבוס ולו״ז" hint="תאריכים מרכזיים">
+            <StubList items={[
+              'תחילת סמסטר: 27.10',
+              'תרגיל 1: 15.11',
+              'בחינת אמצע: 18.12',
+              'מבחן סופי: בתיאום',
+            ]} emptyText="אין עדיין תאריכים." />
+          </MoodleCard>
+
+          <MoodleCard icon={User} title="פרטי מרצה" hint="יצירת קשר">
+            <div className="text-xs space-y-1 text-ink-muted">
+              <div className="text-ink">(סטאב) ד״ר דוגמה</div>
+              <div>שעת קבלה: יום ג׳ 14:00</div>
+              <div className="flex items-center gap-1">
+                <ExternalLink size={10} />
+                <span>example@bgu.ac.il</span>
+              </div>
             </div>
+          </MoodleCard>
 
-            {/* New Lesson Input */}
-            <AnimatePresence>
-              {showNewLesson && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="glass rounded-xl p-4 flex items-center gap-3">
-                    <input
-                      ref={newLessonInputRef}
-                      type="text"
-                      value={newLessonTitle}
-                      onChange={e => setNewLessonTitle(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') createLesson()
-                        if (e.key === 'Escape') setShowNewLesson(false)
-                      }}
-                      placeholder='שם השיעור, למשל "שיעור 1 — מבוא"'
-                      className="input-dark flex-1 text-sm"
-                    />
-                    <button
-                      onClick={createLesson}
-                      disabled={!newLessonTitle.trim()}
-                      className="btn-gradient px-4 py-2 rounded-lg text-sm text-white font-medium disabled:opacity-40"
-                    >
-                      הוסף
-                    </button>
-                    <button
-                      onClick={() => { setShowNewLesson(false); setNewLessonTitle('') }}
-                      className="p-2 text-ink-muted hover:text-ink transition-colors"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+          <MoodleCard icon={Megaphone} title="הודעות מ-Moodle" hint="הכרזות מרצה">
+            <StubList items={[
+              '(סטאב) תרגיל 2 נדחה בשבוע',
+              'זום לתרגול שלישי: נפתח שעה מוקדם יותר',
+            ]} emptyText="אין הודעות חדשות." />
+          </MoodleCard>
+        </div>
 
-            {/* The chapters stack — unveil-style cascade */}
-            <CourseNotebookStack
-              courseId={courseId}
-              lessons={lessons}
-              onAddLesson={() => {
-                setShowNewLesson(true)
-                setTimeout(() => newLessonInputRef.current?.focus(), 100)
-              }}
-            />
-
-            {/* Compact linear index — power-user fallback under the stack */}
-            {lessons.length > 0 && (
-              <details className="mt-1">
-                <summary className="text-[11px] text-ink-subtle cursor-pointer hover:text-ink px-1 py-1">
-                  רשימה קומפקטית ({lessons.length})
-                </summary>
-                <div className="space-y-1 mt-2">
-                  {lessons.map((lesson, index) => (
-                    <LessonCard
-                      key={lesson.id}
-                      lesson={lesson}
-                      index={index}
-                      courseId={courseId}
-                      onToggleCompleted={() => toggleLesson(lesson)}
-                      onDelete={() => deleteLesson(lesson.id)}
-                    />
-                  ))}
-                </div>
-              </details>
-            )}
-          </>
-        }
-      />
+        <div className="mt-4 text-[11px] text-ink-muted border-t border-white/5 pt-3">
+          הנתונים למעלה נקראים מ-Moodle כשמריצים סנכרון, ומשמשים גם כמקורות
+          של עוזר ה-AI של הקורס (במקום פיצ׳ר /notebooks נפרד).
+        </div>
+      </div>
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// Lesson card — clickable row that navigates to the notebook
-// ─────────────────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────
 
-function LessonCard({
-  lesson, index, courseId, onToggleCompleted, onDelete,
+function MoodleCard({
+  icon: Icon, title, hint, children,
 }: {
-  lesson: Lesson
-  index: number
-  courseId: string
-  onToggleCompleted: () => void
-  onDelete: () => void
+  icon: any; title: string; hint: string; children: React.ReactNode
 }) {
-  const files = lesson.files || []
-  const hasContent = !!(lesson.content && lesson.content.replace(/<[^>]*>/g, '').trim())
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.03 }}
-      whileHover={{ scale: 1.005 }}
-      whileTap={{ scale: 0.995 }}
-      className="glass rounded-xl overflow-hidden group"
-    >
-      <Link
-        href={`/courses/${courseId}/lessons/${lesson.id}`}
-        className="flex items-center gap-3 p-4 hover:bg-white/[0.03] transition-colors"
-      >
-        {/* Completion circle */}
-        <span
-          onClick={e => { e.preventDefault(); e.stopPropagation(); onToggleCompleted() }}
-          className={`w-7 h-7 rounded-full text-xs flex items-center justify-center flex-shrink-0 font-medium cursor-pointer transition-all hover:scale-110 ${
-            lesson.is_completed
-              ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
-              : 'bg-white/5 text-ink-muted hover:bg-indigo-500/15 hover:text-indigo-400'
-          }`}
-          title={lesson.is_completed ? 'סמן כלא הושלם' : 'סמן כהושלם'}
-        >
-          {lesson.is_completed ? <CheckCircle2 size={14} /> : index + 1}
-        </span>
-
-        {/* Title */}
-        <span className={`text-sm flex-1 text-right font-medium truncate ${
-          lesson.is_completed ? 'text-ink-muted line-through' : 'text-ink'
-        }`}>
-          {lesson.title}
-        </span>
-
-        {/* Badges */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {files.length > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 inline-flex items-center gap-1">
-              <FileUp size={9} /> {files.length}
-            </span>
-          )}
-          {hasContent && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400">
-              סיכום
-            </span>
-          )}
-          {lesson.ai_summary && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 inline-flex items-center gap-1">
-              <Sparkles size={9} /> AI
-            </span>
-          )}
+    <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-7 h-7 rounded-lg bg-indigo-500/15 flex items-center justify-center">
+          <Icon size={13} className="text-indigo-400" />
         </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-semibold">{title}</div>
+          <div className="text-[10px] text-ink-muted">{hint}</div>
+        </div>
+      </div>
+      {children}
+    </div>
+  )
+}
 
-        {/* Delete (hidden until hover) */}
-        <button
-          onClick={e => { e.preventDefault(); e.stopPropagation(); onDelete() }}
-          className="p-1.5 rounded-lg text-ink-subtle hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
-          title="מחק שיעור"
-        >
-          <Trash2 size={11} />
-        </button>
+// ── summaryToHtml ────────────────────────────────────────────
+// Claude's summary comes back as Hebrew plain text that mixes numbered
+// section headers ("1. נקודות עיקריות"), bullet lines ("- foo") and plain
+// paragraphs. Convert that into lightweight HTML the TipTap editor will
+// round-trip cleanly, so inserting it "just looks right" in the notebook.
+function summaryToHtml(text: string, dateLabel: string): string {
+  const esc = (s: string) => s
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+  const lines = (text || '').split('\n')
+  let html = `<h3>🎤 סיכום הקלטת השיעור · ${esc(dateLabel)}</h3>`
+  let inList = false
+  const closeList = () => { if (inList) { html += '</ul>'; inList = false } }
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line) { closeList(); continue }
+    const bulletMatch = line.match(/^[-•·*]\s+(.*)$/)
+    const numberedMatch = line.match(/^\d+[.)]\s+(.*)$/)
+    if (bulletMatch) {
+      if (!inList) { html += '<ul>'; inList = true }
+      html += `<li>${esc(bulletMatch[1])}</li>`
+    } else if (numberedMatch) {
+      closeList()
+      html += `<p><strong>${esc(numberedMatch[1])}</strong></p>`
+    } else {
+      closeList()
+      html += `<p>${esc(line)}</p>`
+    }
+  }
+  closeList()
+  return html
+}
 
-        <ChevronLeft
-          size={14}
-          className="text-ink-subtle group-hover:text-indigo-400 group-hover:-translate-x-0.5 transition-all flex-shrink-0"
-        />
-      </Link>
-    </motion.div>
+function StubList({ items, emptyText }: { items: string[]; emptyText: string }) {
+  if (items.length === 0) {
+    return <div className="text-[11px] text-ink-muted">{emptyText}</div>
+  }
+  return (
+    <ul className="space-y-1">
+      {items.map((t, i) => (
+        <li key={i} className="text-[11px] text-ink-muted flex items-start gap-1.5">
+          <span className="text-indigo-400 mt-0.5">·</span>
+          <span className="flex-1">{t}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
