@@ -48,6 +48,29 @@ function writeExpiry(expiresInSec: number | null | undefined) {
   } catch {}
 }
 
+// Ask Google for the REAL remaining lifetime of a provider_token.
+// Supabase hands us the token without telling us when it expires, so without
+// this we have to guess (usually 3600s) — and if the token is already mid-life
+// or already dead, all Drive/Calendar calls silently start failing until the
+// next scheduled refresh (which we set based on our wrong guess).
+//
+// Returns the real expires_in in seconds, or null if the token is invalid/expired
+// or the endpoint is unreachable. Caller should treat null as "refresh now".
+async function fetchGoogleTokenInfo(accessToken: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null // 400 = expired/invalid
+    const data = await res.json()
+    const n = Number(data?.expires_in)
+    return Number.isFinite(n) && n > 0 ? n : null
+  } catch {
+    return null
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -142,12 +165,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data, error } = await supabase.auth.refreshSession()
         if (!error && data?.session?.provider_token) {
-          // Supabase doesn't tell us expires_in for the provider token directly;
-          // assume 1h (Google default) and refresh early anyway.
+          // Supabase doesn't tell us expires_in for the provider token directly,
+          // so ask Google. Fallback to 300s (forces quick re-refresh) if we can't.
+          const realExpiry = await fetchGoogleTokenInfo(data.session.provider_token)
           persistGoogleToken(
             data.session.provider_token,
             data.session.provider_refresh_token ?? null,
-            3600
+            realExpiry ?? 300
           )
           return data.session.provider_token
         }
@@ -185,8 +209,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
 
       if (session?.provider_token) {
-        // Right after OAuth redirect — fresh token on the session (assume 1h)
-        persistGoogleToken(session.provider_token, session.provider_refresh_token ?? null, 3600)
+        // We have a token — but it could be freshly-minted (just signed in) or
+        // stale (returning user, Supabase still holds the old one). Ask Google
+        // for the real remaining lifetime instead of guessing 3600s.
+        const realExpiry = await fetchGoogleTokenInfo(session.provider_token)
+        if (realExpiry === null) {
+          // Token is already dead (or tokeninfo unreachable). Persist anyway so
+          // callers have something to try, but mark as nearly-expired so the
+          // proactive refresh timer fires immediately.
+          persistGoogleToken(session.provider_token, session.provider_refresh_token ?? null, 60)
+          // Kick off an immediate refresh so the next API call has a real token.
+          await refreshGoogleToken()
+        } else {
+          persistGoogleToken(session.provider_token, session.provider_refresh_token ?? null, realExpiry)
+        }
       } else if (session) {
         // Returning user — see if stored token is still fresh, else refresh.
         const stored = loadStoredGoogleToken()
@@ -203,15 +239,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
 
         if (session?.provider_token) {
+          // Fresh OAuth redirects generally hand us a 3600s-old token, but
+          // TOKEN_REFRESHED events can fire with a provider_token that's already
+          // mid-life or stale. Always verify with Google.
+          const realExpiry = await fetchGoogleTokenInfo(session.provider_token)
           persistGoogleToken(
             session.provider_token,
             session.provider_refresh_token ?? null,
-            3600
+            realExpiry ?? 300
           )
           scheduleRefresh()
         }
