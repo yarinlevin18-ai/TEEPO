@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "SmartDesk",
+  "name": "TEEPO",
   "version": "1.1",
-  "description": "SmartDesk — מסנכרן את חשבון ה-BGU שלך עם מערכת הלימודים",
+  "description": "TEEPO — מסנכרן את חשבון ה-BGU שלך עם מערכת הלימודים",
   "permissions": ["cookies", "tabs", "storage", "scripting", "activeTab"],
   "host_permissions": [
     "<all_urls>"

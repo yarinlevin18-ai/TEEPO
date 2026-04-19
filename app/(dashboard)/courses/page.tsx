@@ -158,7 +158,7 @@ export default function CoursesPage() {
   /** Create/update Drive folder hierarchy for every course. */
   const handleSyncFolders = async () => {
     if (syncingFolders) return
-    if (!confirm('ליצור עץ תיקיות ב-Google Drive לכל הקורסים? (SmartDesk/תואר ראשון/שנה X/סמסטר Y/קורס/שיעורים|מטלות|סיכומים)')) return
+    if (!confirm('ליצור עץ תיקיות ב-Google Drive לכל הקורסים? (TEEPO/תואר ראשון/שנה X/סמסטר Y/קורס/שיעורים|מטלות|סיכומים)')) return
     setSyncingFolders(true)
     setFolderResult(null)
     setFolderProgress({ done: 0, total: courses.length })

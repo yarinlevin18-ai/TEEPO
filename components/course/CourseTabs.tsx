@@ -233,7 +233,7 @@ function AssignmentsPanel({ courseId }: { courseId: string }) {
       </AnimatePresence>
 
       {assignments.length === 0 ? (
-        <EmptyState icon={FileText} title="אין מטלות לקורס הזה" hint="הוסף תרגילים, מבחנים ופרויקטים — SmartDesk יזכיר לך לפני הדד-ליין." />
+        <EmptyState icon={FileText} title="אין מטלות לקורס הזה" hint="הוסף תרגילים, מבחנים ופרויקטים — TEEPO יזכיר לך לפני הדד-ליין." />
       ) : (
         <div className="space-y-2">
           {assignments.map(a => <AssignmentRow key={a.id} a={a} onUpdate={updateAssignment} onDelete={deleteAssignment} />)}
@@ -453,7 +453,7 @@ function AIPanel({ courseId, courseTitle }: { courseId: string; courseTitle: str
             <Sparkles size={14} className="text-white" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-ink">SmartDesk AI</p>
+            <p className="text-sm font-semibold text-ink">TEEPO AI</p>
             <p className="text-[10px] text-ink-muted">
               {connected ? 'מוכן לעזור' : 'מתחבר...'}
             </p>

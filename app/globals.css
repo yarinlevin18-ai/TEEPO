@@ -10,6 +10,136 @@
 
 * { box-sizing: border-box; }
 
+/* ══════════════════════════════════════════
+   TYPOGRAPHY SYSTEM — Formal type scale
+   Use these semantic classes for consistent hierarchy.
+   Tailwind fontSize tokens handle size + line-height + weight,
+   these classes add font-family and responsive sizing.
+   ══════════════════════════════════════════ */
+
+/* Display — Frank Ruhl Libre for hero/editorial headlines */
+.text-display-1 {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 4rem;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.text-display-2 {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 3rem;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+/* Headings — Heebo for UI hierarchy */
+.text-heading-1 {
+  font-family: var(--font-heebo), system-ui, sans-serif;
+  font-size: 2rem;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.text-heading-2 {
+  font-family: var(--font-heebo), system-ui, sans-serif;
+  font-size: 1.5rem;
+  line-height: 1.25;
+  font-weight: 700;
+}
+.text-heading-3 {
+  font-family: var(--font-heebo), system-ui, sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+/* Body */
+.text-body {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  font-weight: 400;
+}
+.text-body-sm {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+/* Caption & Overline */
+.text-caption {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.text-overline {
+  font-size: 0.625rem;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Responsive scaling for display text */
+@media (max-width: 768px) {
+  .text-display-1 { font-size: 2.5rem; }
+  .text-display-2 { font-size: 2rem; }
+  .text-heading-1 { font-size: 1.5rem; }
+  .text-heading-2 { font-size: 1.25rem; }
+}
+
+/* ── Clay editorial accents ── */
+.accent-clay {
+  color: #c8a96a;
+}
+.divider-clay {
+  height: 1px;
+  border: none;
+  background: linear-gradient(90deg, transparent, rgba(200,169,106,0.4), transparent);
+  margin: 1.5rem 0;
+}
+.badge-clay {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: rgba(200,169,106,0.12);
+  color: #d4bd85;
+  border: 1px solid rgba(200,169,106,0.2);
+}
+
+/* ── Status badges ── */
+.badge-success {
+  display: inline-flex; align-items: center;
+  padding: 2px 10px; border-radius: 99px;
+  font-size: 0.6875rem; font-weight: 600;
+  background: rgba(16,185,129,0.12); color: #34d399;
+  border: 1px solid rgba(16,185,129,0.2);
+}
+.badge-warning {
+  display: inline-flex; align-items: center;
+  padding: 2px 10px; border-radius: 99px;
+  font-size: 0.6875rem; font-weight: 600;
+  background: rgba(245,158,11,0.12); color: #fbbf24;
+  border: 1px solid rgba(245,158,11,0.2);
+}
+.badge-danger {
+  display: inline-flex; align-items: center;
+  padding: 2px 10px; border-radius: 99px;
+  font-size: 0.6875rem; font-weight: 600;
+  background: rgba(239,68,68,0.12); color: #f87171;
+  border: 1px solid rgba(239,68,68,0.2);
+}
+
+/* ── Task completion animation ── */
+.task-complete-strike {
+  text-decoration: line-through;
+  text-decoration-color: transparent;
+  animation: strike 0.3s ease-out forwards;
+}
+
 /* Force native dropdowns into dark color scheme so <option> isn't white-on-white */
 select { color-scheme: dark; }
 select option {
@@ -36,23 +166,37 @@ body {
 ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: #4a5568; }
 
-/* ── Glass card ── */
+/* ── Glass card — claymorphism treatment site-wide ──
+   Solid dark gradient + dual inner shadows (highlight + depth)
+   + soft outer drop + subtle indigo outer glow.
+   This is the primary surface class used across the entire app. */
 .glass {
-  background: rgba(255,255,255,0.05);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
+  background: linear-gradient(145deg, #1e2433, #151a27);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 18px;
+  box-shadow:
+    inset 2px 2px 3px rgba(255,255,255,0.05),
+    inset -2px -2px 4px rgba(0,0,0,0.4),
+    8px 10px 22px rgba(0,0,0,0.32),
+    -2px -2px 14px rgba(99,102,241,0.05);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 .glass:hover {
-  background: rgba(255,255,255,0.07);
+  transform: translateY(-2px);
+  box-shadow:
+    inset 2px 2px 3px rgba(255,255,255,0.07),
+    inset -2px -2px 4px rgba(0,0,0,0.4),
+    12px 14px 30px rgba(0,0,0,0.4),
+    -2px -2px 18px rgba(99,102,241,0.1);
 }
 .glass-sm {
-  background: rgba(255,255,255,0.04);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 10px;
+  background: linear-gradient(145deg, #1a1f2c, #131823);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 12px;
+  box-shadow:
+    inset 1.5px 1.5px 2px rgba(255,255,255,0.04),
+    inset -1.5px -1.5px 3px rgba(0,0,0,0.35),
+    4px 5px 12px rgba(0,0,0,0.25);
 }
 
 /* ── Gradient text ── */
@@ -69,7 +213,7 @@ body {
   background-clip: text;
 }
 
-/* ── Gradient button ── */
+/* ── Gradient button — clay-puffy treatment ── */
 .btn-gradient {
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: white;
@@ -77,12 +221,49 @@ body {
   transition: all 0.2s;
   position: relative;
   overflow: hidden;
+  box-shadow:
+    inset 1px 1px 2px rgba(255,255,255,0.25),
+    inset -1px -1px 2px rgba(0,0,0,0.2),
+    4px 6px 14px rgba(99,102,241,0.35),
+    -1px -1px 8px rgba(139,92,246,0.25);
 }
 .btn-gradient:hover {
-  box-shadow: 0 0 24px rgba(99,102,241,0.45);
+  box-shadow:
+    inset 1px 1px 2px rgba(255,255,255,0.3),
+    inset -1px -1px 2px rgba(0,0,0,0.2),
+    6px 10px 22px rgba(99,102,241,0.5),
+    -1px -1px 12px rgba(139,92,246,0.35);
   transform: translateY(-1px);
 }
-.btn-gradient:active { transform: translateY(0); }
+.btn-gradient:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 2px 2px 4px rgba(0,0,0,0.3),
+    inset -1px -1px 2px rgba(255,255,255,0.15),
+    2px 3px 6px rgba(99,102,241,0.25);
+}
+
+/* Shine sweep on hover */
+.btn-gradient::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255,255,255,0.2) 45%,
+    rgba(255,255,255,0.25) 50%,
+    rgba(255,255,255,0.2) 55%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.6s ease;
+  pointer-events: none;
+}
+.btn-gradient:hover::after {
+  transform: translateX(120%);
+}
 
 /* ── Shimmer loading ── */
 .shimmer {
@@ -272,6 +453,211 @@ body {
 }
 
 /* ══════════════════════════════════════════
+   CLAYMORPHISM — puffy pastel cards on dark theme
+   Dual inner shadows (top highlight + bottom shadow)
+   plus soft outer drop + tinted outer glow per color.
+   ══════════════════════════════════════════ */
+.clay {
+  position: relative;
+  border-radius: 28px;
+  background: linear-gradient(145deg, #1e2433, #151a27);
+  box-shadow:
+    inset 2px 2px 3px rgba(255,255,255,0.06),
+    inset -2px -2px 4px rgba(0,0,0,0.45),
+    10px 14px 28px rgba(0,0,0,0.38),
+    -4px -4px 16px rgba(99,102,241,0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.clay:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 2px 2px 3px rgba(255,255,255,0.08),
+    inset -2px -2px 4px rgba(0,0,0,0.45),
+    14px 18px 36px rgba(0,0,0,0.45),
+    -4px -4px 20px rgba(99,102,241,0.08);
+}
+
+/* Color variants — tinted inner highlight + colored outer glow */
+.clay-coral    { box-shadow: inset 2px 2px 3px rgba(251,113,133,0.18), inset -2px -2px 4px rgba(0,0,0,0.5),  10px 14px 28px rgba(0,0,0,0.4), -4px -4px 22px rgba(251,113,133,0.14); background: linear-gradient(145deg, #2a1a22, #181014); }
+.clay-mint     { box-shadow: inset 2px 2px 3px rgba(52,211,153,0.18),  inset -2px -2px 4px rgba(0,0,0,0.5),  10px 14px 28px rgba(0,0,0,0.4), -4px -4px 22px rgba(52,211,153,0.14);  background: linear-gradient(145deg, #152a24, #0f1a17); }
+.clay-sunny    { box-shadow: inset 2px 2px 3px rgba(251,191,36,0.22),  inset -2px -2px 4px rgba(0,0,0,0.5),  10px 14px 28px rgba(0,0,0,0.4), -4px -4px 22px rgba(251,191,36,0.14);  background: linear-gradient(145deg, #2a2516, #1a160f); }
+.clay-sky      { box-shadow: inset 2px 2px 3px rgba(96,165,250,0.22),  inset -2px -2px 4px rgba(0,0,0,0.5),  10px 14px 28px rgba(0,0,0,0.4), -4px -4px 22px rgba(96,165,250,0.14);  background: linear-gradient(145deg, #15202e, #0f1520); }
+.clay-lavender { box-shadow: inset 2px 2px 3px rgba(167,139,250,0.22), inset -2px -2px 4px rgba(0,0,0,0.5),  10px 14px 28px rgba(0,0,0,0.4), -4px -4px 22px rgba(167,139,250,0.16); background: linear-gradient(145deg, #201a2e, #141020); }
+.clay-peach    { box-shadow: inset 2px 2px 3px rgba(253,186,116,0.22), inset -2px -2px 4px rgba(0,0,0,0.5),  10px 14px 28px rgba(0,0,0,0.4), -4px -4px 22px rgba(253,186,116,0.14); background: linear-gradient(145deg, #2a1f18, #1a1410); }
+
+.clay:hover.clay-coral    { box-shadow: inset 2px 2px 3px rgba(251,113,133,0.22), inset -2px -2px 4px rgba(0,0,0,0.5),  14px 18px 36px rgba(0,0,0,0.45), -4px -4px 26px rgba(251,113,133,0.22); }
+.clay:hover.clay-mint     { box-shadow: inset 2px 2px 3px rgba(52,211,153,0.22),  inset -2px -2px 4px rgba(0,0,0,0.5),  14px 18px 36px rgba(0,0,0,0.45), -4px -4px 26px rgba(52,211,153,0.22);  }
+.clay:hover.clay-sunny    { box-shadow: inset 2px 2px 3px rgba(251,191,36,0.28),  inset -2px -2px 4px rgba(0,0,0,0.5),  14px 18px 36px rgba(0,0,0,0.45), -4px -4px 26px rgba(251,191,36,0.22);  }
+.clay:hover.clay-sky      { box-shadow: inset 2px 2px 3px rgba(96,165,250,0.28),  inset -2px -2px 4px rgba(0,0,0,0.5),  14px 18px 36px rgba(0,0,0,0.45), -4px -4px 26px rgba(96,165,250,0.22);  }
+.clay:hover.clay-lavender { box-shadow: inset 2px 2px 3px rgba(167,139,250,0.28), inset -2px -2px 4px rgba(0,0,0,0.5),  14px 18px 36px rgba(0,0,0,0.45), -4px -4px 26px rgba(167,139,250,0.26); }
+.clay:hover.clay-peach    { box-shadow: inset 2px 2px 3px rgba(253,186,116,0.28), inset -2px -2px 4px rgba(0,0,0,0.5),  14px 18px 36px rgba(0,0,0,0.45), -4px -4px 26px rgba(253,186,116,0.22); }
+
+/* Puffy icon pill — same clay treatment, small */
+.clay-icon {
+  width: 52px; height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 2px 2px 3px rgba(255,255,255,0.12),
+    inset -2px -2px 4px rgba(0,0,0,0.35),
+    4px 6px 14px rgba(0,0,0,0.3);
+}
+
+/* Clay progress bar — rounded inset track + rounded filled pill */
+.clay-progress-track {
+  height: 10px;
+  border-radius: 99px;
+  background: #0c1018;
+  box-shadow:
+    inset 2px 2px 4px rgba(0,0,0,0.6),
+    inset -1px -1px 2px rgba(255,255,255,0.04);
+  overflow: hidden;
+  position: relative;
+}
+.clay-progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  box-shadow:
+    inset 1px 1px 2px rgba(255,255,255,0.25),
+    inset -1px -1px 2px rgba(0,0,0,0.2);
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ══════════════════════════════════════════
+   LANDING BACKGROUND — dark flowing network + orb
+   Driver period: 8s. All animations are multiples.
+   Layers stack via z-index within the wrapper.
+   ══════════════════════════════════════════ */
+.landing-bg { isolation: isolate; }
+
+/* Spline scene fills its wrapper and doesn't exceed it */
+.spline-layer { width: 100%; height: 100%; }
+.spline-layer > * { width: 100% !important; height: 100% !important; }
+.spline-layer canvas { width: 100% !important; height: 100% !important; display: block; }
+
+/* — Layer 3: Data Orb — */
+.orb-wrap {
+  position: absolute;
+  top: 8%;
+  right: 6%;
+  width: 420px;
+  height: 420px;
+  pointer-events: none;
+  will-change: transform, opacity;
+  animation: orbPulse 8s ease-in-out infinite;
+}
+.orb-halo {
+  position: absolute;
+  inset: -18%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(139,92,246,0.32) 0%,
+    rgba(99,102,241,0.18) 35%,
+    transparent 70%);
+  filter: blur(40px);
+  will-change: opacity, transform;
+  animation: haloPulse 8s ease-in-out infinite;
+}
+.orb-core {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%,
+      rgba(224,231,255,0.95) 0%,
+      rgba(165,180,252,0.55) 12%,
+      rgba(129,140,248,0.32) 28%,
+      rgba(99,102,241,0.18) 50%,
+      rgba(76,29,149,0.1) 75%,
+      transparent 100%);
+  box-shadow:
+    inset 0 0 40px rgba(255,255,255,0.08),
+    inset 0 0 80px rgba(139,92,246,0.15),
+    0 0 60px rgba(99,102,241,0.25);
+}
+.orb-wire {
+  position: absolute;
+  inset: 0;
+  opacity: 0.8;
+  mix-blend-mode: screen;
+}
+
+@keyframes orbPulse {
+  0%, 100% { transform: scale(1); opacity: 0.95; }
+  50%      { transform: scale(1.035); opacity: 1; }
+}
+@keyframes haloPulse {
+  0%, 100% { opacity: 0.75; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.08); }
+}
+
+/* — Layer 4: Circuit grid — */
+.circuit-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.circuit-lines path {
+  will-change: opacity;
+  animation: pathBreathe 8s ease-in-out infinite;
+}
+.circuit-lines path:nth-child(2) { animation-delay: -2s; }
+.circuit-lines path:nth-child(3) { animation-delay: -4s; }
+.circuit-lines path:nth-child(4) { animation-delay: -1s; }
+.circuit-lines path:nth-child(5) { animation-delay: -3s; }
+.circuit-lines path:nth-child(6) { animation-delay: -5s; }
+.circuit-lines path:nth-child(7) { animation-delay: -6s; }
+
+@keyframes pathBreathe {
+  0%, 100% { opacity: 0.82; }
+  50%      { opacity: 1; }
+}
+
+.circuit-packets .packet {
+  stroke-dasharray: 2 220;
+  will-change: stroke-dashoffset;
+}
+.packet-a    { animation: packetFlow 16s linear infinite; animation-delay: 0s;  }
+.packet-b    { animation: packetFlow 16s linear infinite; animation-delay: -4s; }
+.packet-c    { animation: packetFlow 16s linear infinite; animation-delay: -2s; }
+.packet-cyan { animation: packetFlow 20s linear infinite; animation-delay: -6s; }
+
+@keyframes packetFlow {
+  from { stroke-dashoffset: 222; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* — Mobile degradation — fewer elements, smaller orb, no grain — */
+@media (max-width: 640px) {
+  .orb-wrap {
+    width: 260px;
+    height: 260px;
+    top: 4%;
+    right: -10%;
+  }
+  .circuit-lines path:nth-child(n+4) { display: none; }
+  .circuit-packets .packet-b,
+  .circuit-packets .packet-cyan { display: none; }
+  .landing-bg .grain { display: none; }
+}
+
+/* — Respect reduced-motion: freeze everything at mid-state — */
+@media (prefers-reduced-motion: reduce) {
+  .orb-wrap,
+  .orb-halo,
+  .circuit-lines path,
+  .circuit-packets .packet,
+  .aurora-blob {
+    animation: none !important;
+  }
+  .circuit-packets .packet { stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.5; }
+}
+
+/* ══════════════════════════════════════════
    GLOW CARD — cursor-following spotlight
    ══════════════════════════════════════════ */
 .glow-card {
@@ -343,21 +729,28 @@ body {
   100% { transform: scale(1.45); opacity: 0; }
 }
 
-/* ── Input dark ── */
+/* ── Input dark — clay-carved/inset feel ── */
 .input-dark {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: #0e121b;
+  border: 1px solid rgba(255,255,255,0.06);
   color: #f1f5f9;
-  border-radius: 10px;
-  padding: 10px 14px;
+  border-radius: 12px;
+  padding: 11px 14px;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
   width: 100%;
+  box-shadow:
+    inset 2px 2px 4px rgba(0,0,0,0.5),
+    inset -1px -1px 2px rgba(255,255,255,0.03);
 }
 .input-dark::placeholder { color: #475569; }
 .input-dark:focus {
-  border-color: rgba(99,102,241,0.6);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+  border-color: rgba(99,102,241,0.55);
+  box-shadow:
+    inset 2px 2px 4px rgba(0,0,0,0.5),
+    inset -1px -1px 2px rgba(255,255,255,0.03),
+    0 0 0 3px rgba(99,102,241,0.14),
+    0 0 16px rgba(99,102,241,0.15);
 }
 
 /* ── Priority strips ── */
@@ -526,13 +919,15 @@ body {
   max-height: calc(100vh - 2rem);
   display: flex;
   flex-direction: column;
-  border-radius: 16px;
-  background: #13171f;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  background: linear-gradient(145deg, #1e2433, #141824);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow:
+    inset 2px 2px 3px rgba(255,255,255,0.06),
+    inset -2px -2px 4px rgba(0,0,0,0.4),
     0 0 0 1px rgba(99, 102, 241, 0.08),
-    0 24px 80px rgba(0, 0, 0, 0.55),
-    0 0 40px rgba(99, 102, 241, 0.06);
+    0 24px 80px rgba(0, 0, 0, 0.6),
+    0 0 60px rgba(99, 102, 241, 0.1);
   outline: none;
   overflow: hidden;
 }
@@ -549,20 +944,31 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   color: #94a3b8;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(145deg, #1a1f2c, #131823);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   cursor: pointer;
   transition: all 0.15s;
   flex-shrink: 0;
+  box-shadow:
+    inset 1px 1px 2px rgba(255,255,255,0.06),
+    inset -1px -1px 2px rgba(0,0,0,0.4),
+    2px 3px 6px rgba(0,0,0,0.25);
 }
 .modal-close-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
   color: #f1f5f9;
-  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 1px 1px 2px rgba(255,255,255,0.1),
+    inset -1px -1px 2px rgba(0,0,0,0.4),
+    3px 4px 10px rgba(0,0,0,0.3);
+}
+.modal-close-btn:active {
+  box-shadow:
+    inset 2px 2px 3px rgba(0,0,0,0.4),
+    inset -1px -1px 2px rgba(255,255,255,0.05);
 }
 
 .modal-body {
@@ -996,4 +1402,35 @@ html.light aside {
   background: linear-gradient(180deg, #fafbff 0%, #eef0f9 100%) !important;
   border-left: 1px solid rgba(99,102,241,0.14) !important;
   box-shadow: -1px 0 0 rgba(255,255,255,0.5) inset, 0 0 24px -8px rgba(99,102,241,0.08);
+}
+
+/* ── Light theme: clay & badges ── */
+html.light .accent-clay { color: #a88c52; }
+html.light .divider-clay {
+  background: linear-gradient(90deg, transparent, rgba(168,140,82,0.35), transparent);
+}
+html.light .badge-clay {
+  background: rgba(168,140,82,0.1);
+  color: #8a7040;
+  border-color: rgba(168,140,82,0.2);
+}
+html.light .badge-success {
+  background: rgba(5,150,105,0.08);
+  color: #059669;
+  border-color: rgba(5,150,105,0.18);
+}
+html.light .badge-warning {
+  background: rgba(217,119,6,0.08);
+  color: #b45309;
+  border-color: rgba(217,119,6,0.18);
+}
+html.light .badge-danger {
+  background: rgba(220,38,38,0.08);
+  color: #dc2626;
+  border-color: rgba(220,38,38,0.18);
+}
+
+/* ── Reduced motion: disable new animations ── */
+@media (prefers-reduced-motion: reduce) {
+  .task-complete-strike { animation: none; text-decoration-color: currentColor; }
 }

@@ -5,7 +5,7 @@ argument-hint: (attach screenshot, optionally add notes)
 
 # Fix bug from screenshot
 
-The user has attached a screenshot showing a bug in SmartDesk (the Hebrew learning platform in this repo). Your job: diagnose and fix the actual bug shown.
+The user has attached a screenshot showing a bug in TEEPO (the Hebrew learning platform in this repo). Your job: diagnose and fix the actual bug shown.
 
 Additional user notes: $ARGUMENTS
 
@@ -41,7 +41,7 @@ Additional user notes: $ARGUMENTS
 
 - **Frontend:** Next.js 14 App Router, TypeScript, Tailwind. Hebrew RTL. Dark theme (`#0f1117` / indigo-violet gradients).
 - **Auth:** Supabase Auth with Google OAuth. Scopes: `calendar.readonly` + `drive.file`.
-- **Data:** Per-user database in the user's own Google Drive (`SmartDesk/db.json`). Accessed via `useDB()` / `useCourses()` / `useCourse()` / `useLessons()` hooks from `lib/db-context.tsx`. Supabase is auth-only now.
+- **Data:** Per-user database in the user's own Google Drive (`TEEPO/db.json`). Accessed via `useDB()` / `useCourses()` / `useCourse()` / `useLessons()` hooks from `lib/db-context.tsx`. Supabase is auth-only now.
 - **Backend:** Flask at `backend/` — mostly legacy (was Supabase-backed). Still used for BGU Moodle scraping, AI summaries/quizzes, and assignment breakdown. Not for CRUD anymore.
 - **Common migration gotchas:**
   - A page still importing `api.courses.*` / `api.tasks.*` / `api.assignments.*` for CRUD → should use `useDB()` instead.

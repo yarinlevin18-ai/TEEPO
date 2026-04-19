@@ -50,7 +50,7 @@ export default function ExtractCoursePage() {
       <div>
         <h1 className="text-2xl font-bold text-ink">הוסף קורס חדש</h1>
         <p className="text-ink-muted mt-1">
-          צור קורס חדש ב-SmartDesk. הקורס ישמר ב-Google Drive שלך.
+          צור קורס חדש ב-TEEPO. הקורס ישמר ב-Google Drive שלך.
         </p>
       </div>
 
@@ -63,7 +63,7 @@ export default function ExtractCoursePage() {
           <div className="text-sm text-ink-muted">
             <p className="text-ink font-medium mb-1">הקורסים שלך מאוחסנים אצלך</p>
             <p className="text-xs">
-              SmartDesk שומר את כל הקורסים, שיעורים וסיכומים ב-Google Drive הפרטי שלך.
+              TEEPO שומר את כל הקורסים, שיעורים וסיכומים ב-Google Drive הפרטי שלך.
               אף אחד אחר לא יכול לראות אותם — גם לא אנחנו.
             </p>
           </div>

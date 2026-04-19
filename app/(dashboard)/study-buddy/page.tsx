@@ -30,7 +30,7 @@ interface Conversation {
 
 const AGENT_CONFIG: Record<AgentType, { label: string; icon: React.ElementType; placeholder: string; color: string }> = {
   study_buddy: {
-    label: 'SmartDesk AI',
+    label: 'TEEPO AI',
     icon: Bot,
     placeholder: 'שאל אותי כל שאלה...',
     color: 'primary',
@@ -533,7 +533,7 @@ export default function StudyBuddyPage() {
 
           <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
             <Bot size={16} />
-            SmartDesk AI
+            TEEPO AI
           </div>
 
           <div className="mr-auto flex items-center gap-2 sm:gap-3">

@@ -357,7 +357,7 @@ export default function AIChatWidget() {
                 <Bot size={18} className="text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-ink">SmartDesk AI</h3>
+                <h3 className="text-sm font-semibold text-ink">TEEPO AI</h3>
                 <div className="flex items-center gap-2">
                   <span className={`w-1.5 h-1.5 rounded-full ${
                     connected

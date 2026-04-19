@@ -50,4 +50,9 @@ desktop.ini
 # Vercel
 .vercel
 
-.vercel
+# TypeScript build info
+*.tsbuildinfo
+
+# Claude local state
+.claude/scheduled_tasks.lock
+.claude/local-agent-mode-sessions/

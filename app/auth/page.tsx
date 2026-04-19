@@ -49,8 +49,8 @@ export default function AuthPage() {
       <div className="w-full max-w-md relative z-10">
         {/* Logo */}
         <div className="text-center mb-8">
-          <Image src="/logo-128.png" alt="SmartDesk" width={56} height={56} className="mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-ink">SmartDesk</h1>
+          <Image src="/logo-128.png" alt="TEEPO" width={56} height={56} className="mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-ink">TEEPO</h1>
           <p className="text-ink-muted text-sm mt-1">התחבר כדי להמשיך</p>
         </div>
 

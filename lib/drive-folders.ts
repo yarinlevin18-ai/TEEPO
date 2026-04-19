@@ -1,8 +1,8 @@
 /**
- * Drive Folders — User-facing folder hierarchy inside SmartDesk/
+ * Drive Folders — User-facing folder hierarchy inside TEEPO/
  *
  * Structure:
- *   SmartDesk/
+ *   TEEPO/
  *     db.json                          (the actual data — managed by drive-db.ts)
  *     תואר ראשון/
  *       שנה א׳/
@@ -174,9 +174,9 @@ export function sanitizeFolderName(name: string): string {
 }
 
 /**
- * Compute the path of folder names from SmartDesk/ down to the course folder.
+ * Compute the path of folder names from TEEPO/ down to the course folder.
  * e.g. ["תואר ראשון", "שנה א׳", "סמסטר א׳", "מבוא למדמ״ח"]
- * Unclassified courses go to SmartDesk/לא מסווגים/<title>/.
+ * Unclassified courses go to TEEPO/לא מסווגים/<title>/.
  */
 export function pathForCourse(course: Course): string[] {
   const title = sanitizeFolderName(course.title)

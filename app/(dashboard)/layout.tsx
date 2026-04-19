@@ -62,8 +62,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Menu size={20} />
           </button>
           <div className="flex items-center gap-2 mr-3">
-            <Image src="/logo-128.png" alt="SmartDesk" width={28} height={28} />
-            <span className="text-sm font-bold text-ink">SmartDesk</span>
+            <Image src="/logo-128.png" alt="TEEPO" width={28} height={28} />
+            <span className="text-sm font-bold text-ink">TEEPO</span>
           </div>
         </header>
 

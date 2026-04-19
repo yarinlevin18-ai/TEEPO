@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import './teepo.css'
 import { AuthProvider } from '@/lib/auth-context'
 import { ThemeProvider } from '@/lib/theme-context'
 import ErrorBoundary from '@/components/ErrorBoundary'
 
 export const metadata: Metadata = {
-  title: 'SmartDesk — מערכת לימודים חכמה',
-  description: 'SmartDesk — מארגן לימודים אישי עם בינה מלאכותית',
+  title: 'TEEPO — מערכת לימודים חכמה',
+  description: 'TEEPO — מארגן לימודים אישי עם בינה מלאכותית',
   manifest: '/manifest.json',
   icons: {
     icon: '/logo-48.png',

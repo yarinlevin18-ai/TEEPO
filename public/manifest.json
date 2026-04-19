@@ -1,6 +1,6 @@
 {
-  "name": "SmartDesk — מערכת הלימודים שלך",
-  "short_name": "SmartDesk",
+  "name": "TEEPO — מערכת הלימודים שלך",
+  "short_name": "TEEPO",
   "description": "פלטפורמת לימוד חכמה לסטודנטים",
   "start_url": "/dashboard",
   "display": "standalone",

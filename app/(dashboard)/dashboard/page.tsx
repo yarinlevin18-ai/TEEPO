@@ -277,7 +277,7 @@ export default function DashboardPage() {
   } = useNotifications(assignments, tasks, allTodayEvents)
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-5 animate-fade-in">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-5">
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {/* Todo Popup */}
@@ -294,9 +294,9 @@ export default function DashboardPage() {
       {/* ── Header ── */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-extrabold leading-tight">
+          <h1 className="text-heading-1 leading-tight">
             <span className="text-ink">{getGreeting()}, </span>
-            <span className="gradient-text">{displayName}</span>
+            <span className="gradient-text hand-underline">{displayName}</span>
           </h1>
           <p className="text-sm text-ink-muted mt-1">
             {getSemesterStatus().label} &middot; {format(new Date(), 'EEEE, d בMMMM', { locale: he })}
@@ -560,20 +560,23 @@ export default function DashboardPage() {
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: '-60px' }}
+        transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
         className="space-y-4"
       >
         {/* ── Zone 2 Stats Row ── */}
         <div className="flex items-center gap-2 mb-1">
-          <TrendingUp size={14} style={{ color: '#818cf8' }} />
+          <TrendingUp size={14} className="text-accent-400" />
           <h2 className="text-sm font-bold text-ink-muted">תמונת מצב כללית</h2>
+          <hr className="divider-clay flex-1" />
         </div>
         <motion.div
           initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-40px' }}
+          transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="grid grid-cols-2 sm:grid-cols-4 gap-3"
         >
           <StatCard
@@ -620,10 +623,10 @@ export default function DashboardPage() {
           {/* ── Left: Credits / Degree Progress ── */}
           <div>
             {credits ? (
-              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+              <motion.div initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4 }}>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(167,139,250,0.15)' }}>
-                    <GraduationCap size={14} style={{ color: '#a78bfa' }} />
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-violet-500/15">
+                    <GraduationCap size={14} className="text-violet-400" />
                   </div>
                   <h2 className="font-semibold text-ink">התקדמות תואר</h2>
                 </div>
@@ -632,7 +635,7 @@ export default function DashboardPage() {
                 </AnimatedBorder>
               </motion.div>
             ) : (
-              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+              <motion.div initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4 }}>
                 <DegreeSetupPrompt />
               </motion.div>
             )}
@@ -640,7 +643,7 @@ export default function DashboardPage() {
 
           {/* ── Right: Grades ── */}
           <div>
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+            <motion.div initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4, delay: 0.1 }}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: avgGrade !== null ? `${getGradeColor(avgGrade)}20` : 'rgba(100,116,139,0.15)' }}>
@@ -707,11 +710,11 @@ function StatCard({ icon, iconColor, iconBg, label, value, sub, subColor }: {
           {icon}
         </div>
         <div className="min-w-0">
-          <p className="text-xs text-ink-muted truncate">{label}</p>
+          <p className="text-caption text-ink-muted truncate">{label}</p>
           <p className="text-xl font-extrabold text-ink leading-tight">
             {isAnimatable ? <AnimatedNumber value={numericValue} /> : value}
           </p>
-          <p className="text-[10px] font-medium truncate" style={{ color: subColor }}>{sub}</p>
+          <p className="text-overline font-medium truncate" style={{ color: subColor }}>{sub}</p>
         </div>
       </div>
     </GlowCard>
@@ -933,23 +936,25 @@ function TaskRow({ task, onToggle, index, isToday }: {
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -8 }}
+      initial={{ opacity: 0, x: 8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.03 }}
       className="flex items-center gap-3 px-3 py-3 hover:bg-white/3 transition-colors"
     >
-      <button
+      <motion.button
         onClick={() => onToggle(task.id, task.is_completed)}
-        className="flex-shrink-0 transition-transform hover:scale-110"
+        className="flex-shrink-0"
+        whileTap={{ scale: 1.3 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 15 }}
       >
         {task.is_completed ? (
-          <CheckCircle2 size={18} style={{ color: '#10b981' }} />
+          <CheckCircle2 size={18} className="text-success" />
         ) : (
           <Circle size={18} style={{ color: priorityColors[task.category] || '#64748b' }} />
         )}
-      </button>
+      </motion.button>
       <div className="flex-1 min-w-0">
-        <p className={`text-sm truncate ${task.is_completed ? 'line-through text-ink-subtle' : 'text-ink'}`}>
+        <p className={`text-sm truncate transition-all ${task.is_completed ? 'line-through text-ink-subtle task-complete-strike' : 'text-ink'}`}>
           {task.title}
         </p>
         <div className="flex items-center gap-2 mt-0.5">
@@ -1002,7 +1007,7 @@ function AssignmentsSection({ assignments, courses, loading }: {
         return (
           <motion.div
             key={a.id}
-            initial={{ opacity: 0, x: -8 }}
+            initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.04 }}
           >
@@ -1625,21 +1630,23 @@ function TodoRow({ task, onToggle, onDelete, index }: {
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, x: -6 }}
+      initial={{ opacity: 0, x: 6 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.02 }}
       className="flex items-center gap-3 px-4 py-2.5 group hover:bg-white/[0.03] transition-colors"
     >
-      <button
+      <motion.button
         onClick={() => onToggle(task.id, task.is_completed)}
-        className="flex-shrink-0 transition-transform hover:scale-110"
+        className="flex-shrink-0"
+        whileTap={{ scale: 1.3 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 15 }}
       >
         {task.is_completed ? (
-          <CheckCircle2 size={18} style={{ color: '#10b981' }} />
+          <CheckCircle2 size={18} className="text-success" />
         ) : (
           <Circle size={18} className="text-ink-subtle hover:text-accent-400 transition-colors" />
         )}
-      </button>
+      </motion.button>
       <span
         className={`flex-1 text-sm min-w-0 truncate transition-colors ${
           task.is_completed ? 'line-through text-ink-subtle' : 'text-ink'

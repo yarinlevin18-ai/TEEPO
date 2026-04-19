@@ -83,7 +83,7 @@ interface DBContextType {
   appendNotebookChat: (notebookId: string, msg: ChatMessage) => Promise<void>
   clearNotebookChat: (notebookId: string) => Promise<void>
 
-  // Drive folders (user-facing course hierarchy under SmartDesk/)
+  // Drive folders (user-facing course hierarchy under TEEPO/)
   /** Ensure one course has its Drive folder hierarchy; persists IDs back onto the course. */
   syncCourseFolders: (courseId: string) => Promise<void>
   /** Ensure every course has its Drive folders. Accepts optional progress callback. */
@@ -151,7 +151,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           const info = await probeTokenScopes(token)
           console.info('[drive-db] token scopes:', info)
           if (!info.hasDriveFile && !info.error) {
-            message = 'הטוקן מ-Google לא כולל את הרשאת drive.file. צא והתחבר מחדש — חשוב לאשר את תיבת "רואה, מעלה ומוריד קבצים שנוצרו ע"י SmartDesk".'
+            message = 'הטוקן מ-Google לא כולל את הרשאת drive.file. צא והתחבר מחדש — חשוב לאשר את תיבת "רואה, מעלה ומוריד קבצים שנוצרו ע"י TEEPO".'
           } else if (info.error) {
             message = `הטוקן מ-Google לא תקף (${info.error}). לחץ "התחבר מחדש ל-Google".`
           }
@@ -590,7 +590,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     const total = current.length
     if (total === 0) throw new Error('אין קורסים ליצור להם תיקיות.')
 
-    console.info('[syncAllCourseFolders] starting for', total, 'courses; SmartDesk folder id:', smartDeskId)
+    console.info('[syncAllCourseFolders] starting for', total, 'courses; TEEPO folder id:', smartDeskId)
 
     let done = 0
     let created = 0

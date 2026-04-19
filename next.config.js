@@ -25,6 +25,9 @@ const connectSrc = [
   'https://apis.google.com',
   isDev ? 'http://localhost:5000' : '',
   isDev ? 'ws://localhost:*' : '',
+  'https://my.spline.design',
+  'https://prod.spline.design',
+  'https://*.spline.design',
 ].filter(Boolean).join(' ')
 
 const csp = [

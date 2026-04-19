@@ -1,19 +1,19 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'מדיניות פרטיות — SmartDesk',
+  title: 'מדיניות פרטיות — TEEPO',
 }
 
 export default function PrivacyPolicyPage() {
   return (
     <article className="legal-doc">
-      <h1>מדיניות פרטיות — SmartDesk</h1>
+      <h1>מדיניות פרטיות — TEEPO</h1>
       <p className="meta">תאריך עדכון אחרון: 17 באפריל 2026 · גרסה 1.0</p>
 
       <section>
         <h2>מבוא</h2>
         <p>
-          ברוכים הבאים ל-SmartDesk ("הפלטפורמה", "השירות", "אנחנו"). SmartDesk הוא כלי אקדמי עצמאי המיועד לסטודנטים
+          ברוכים הבאים ל-TEEPO ("הפלטפורמה", "השירות", "אנחנו"). TEEPO הוא כלי אקדמי עצמאי המיועד לסטודנטים
           באוניברסיטת בן-גוריון בנגב, המאפשר ניהול קורסים, מעקב אחר מטלות, כתיבת סיכומים ותקשורת עם מודל בינה מלאכותית.
         </p>
         <p>
@@ -30,7 +30,7 @@ export default function PrivacyPolicyPage() {
 
         <h3>1.1 חוק הגנת הפרטיות, תשמ"א-1981 (ישראל)</h3>
         <p>
-          SmartDesk פועל בהתאם להוראות חוק הגנת הפרטיות, תשמ"א-1981, ותקנות הגנת הפרטיות (אבטחת מידע), תשע"ז-2017.
+          TEEPO פועל בהתאם להוראות חוק הגנת הפרטיות, תשמ"א-1981, ותקנות הגנת הפרטיות (אבטחת מידע), תשע"ז-2017.
           על פי חוק זה, המשתמש זכאי לעיין במידע הנוגע אליו המוחזק על ידינו, לתקנו ולדרוש מחיקתו.
         </p>
 
@@ -51,13 +51,13 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2>2. מי אנחנו</h2>
         <p>
-          SmartDesk הוא פרויקט פרטי עצמאי שפיתח יריין לוין, סטודנט לפוליטיקה וחדשנות באוניברסיטת בן-גוריון בנגב.
+          TEEPO הוא פרויקט פרטי עצמאי שפיתח יריין לוין, סטודנט לפוליטיקה וחדשנות באוניברסיטת בן-גוריון בנגב.
           הפלטפורמה <strong>אינה</strong> גוף רשמי של האוניברסיטה ואינה קשורה אליה מוסדית.
         </p>
         <p><strong>יצירת קשר בנושאי פרטיות:</strong></p>
         <ul>
           <li>דוא"ל: yarinlevin18@gmail.com</li>
-          <li>לפניות לגבי נתונים אישיים, יש לציין בשורת הנושא: "בקשת פרטיות — SmartDesk"</li>
+          <li>לפניות לגבי נתונים אישיים, יש לציין בשורת הנושא: "בקשת פרטיות — TEEPO"</li>
         </ul>
       </section>
 
@@ -87,7 +87,7 @@ export default function PrivacyPolicyPage() {
         <h3>3.2 Google Drive</h3>
         <p>
           הפלטפורמה מבקשת גישה לסקופ <code>drive.file</code>, המאפשר יצירה, קריאה ועדכון של קבצים
-          בתיקיית SmartDesk ב-Drive שלך בלבד — אנו לא ניגשים לשאר קבצי ה-Drive שלך.
+          בתיקיית TEEPO ב-Drive שלך בלבד — אנו לא ניגשים לשאר קבצי ה-Drive שלך.
         </p>
         <p><strong>מה מאוחסן ב-Drive שלך:</strong></p>
         <ul>
@@ -129,12 +129,12 @@ export default function PrivacyPolicyPage() {
         </p>
 
         <h3>3.6 תוסף כרום (Chrome Extension)</h3>
-        <p>תוסף הכרום של SmartDesk פועל בדפדפן שלך ומאפשר:</p>
+        <p>תוסף הכרום של TEEPO פועל בדפדפן שלך ומאפשר:</p>
         <p><strong>מה התוסף עושה:</strong></p>
         <ul>
           <li>ניגש לדפי Moodle ולפורטל BGU כשהינך מחובר אליהם</li>
           <li>קורא מידע על קורסים, מטלות ולוחות זמנים מהדפים הפתוחים</li>
-          <li>שולח את המידע לשרת SmartDesk לצורך עיבוד ושמירה ב-Drive שלך</li>
+          <li>שולח את המידע לשרת TEEPO לצורך עיבוד ושמירה ב-Drive שלך</li>
           <li>ניגש לעוגיות (cookies) של אתרי BGU לצורך אימות הסשן האקדמי</li>
         </ul>
         <p><strong>הרשאות שהתוסף מבקש:</strong></p>
@@ -224,7 +224,7 @@ export default function PrivacyPolicyPage() {
           </a>.
         </p>
         <p className="callout">
-          <strong>הצהרת Google API:</strong> השימוש של SmartDesk במידע שהתקבל מ-Google APIs מציית
+          <strong>הצהרת Google API:</strong> השימוש של TEEPO במידע שהתקבל מ-Google APIs מציית
           למדיניות נתוני משתמשי Google API Services, לרבות דרישות השימוש המוגבל. המידע אינו משמש
           לפיתוח מודלי AI/ML, אינו מועבר לצדדים שלישיים לצורך פרסום, ואינו נמכר.
         </p>
@@ -244,7 +244,7 @@ export default function PrivacyPolicyPage() {
         </p>
 
         <h3>6.4 Render Inc.</h3>
-        <p>שרת הצד-שרת (Backend) של SmartDesk מתארח ב-Render.com ומעבד לוגים וטראפיק נכנס.</p>
+        <p>שרת הצד-שרת (Backend) של TEEPO מתארח ב-Render.com ומעבד לוגים וטראפיק נכנס.</p>
 
         <h3>6.5 אין שיתוף נוסף</h3>
         <p>
@@ -278,7 +278,7 @@ export default function PrivacyPolicyPage() {
         <ol>
           <li>פנה אלינו בדוא"ל עם בקשת מחיקה</li>
           <li>תוך 30 יום נמחק את נתוני חשבונך ממסד הנתונים</li>
-          <li>נתוני ה-Drive שלך — בשליטתך; מחיקת תיקיית SmartDesk מוחקת את כל הנתונים האקדמיים</li>
+          <li>נתוני ה-Drive שלך — בשליטתך; מחיקת תיקיית TEEPO מוחקת את כל הנתונים האקדמיים</li>
         </ol>
       </section>
 
@@ -318,7 +318,7 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2>12. יצירת קשר ותלונות</h2>
         <p>
-          <strong>לפניות בנושאי פרטיות:</strong> yarinlevin18@gmail.com — נושא: "בקשת פרטיות — SmartDesk"
+          <strong>לפניות בנושאי פרטיות:</strong> yarinlevin18@gmail.com — נושא: "בקשת פרטיות — TEEPO"
         </p>
         <p>
           אם אינך שבע רצון מתגובתנו, ניתן לפנות לרשות להגנת הפרטיות בישראל:{' '}

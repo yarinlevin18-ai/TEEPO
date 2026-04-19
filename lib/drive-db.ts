@@ -1,12 +1,12 @@
 /**
  * Drive DB — Per-user database stored in the user's own Google Drive.
  *
- * Uses the `drive.file` OAuth scope (app-created files only), so SmartDesk can
+ * Uses the `drive.file` OAuth scope (app-created files only), so TEEPO can
  * only see files it creates. All user data lives in a single JSON blob inside
- * a `SmartDesk/` folder in the user's Drive — no shared backend database.
+ * a `TEEPO/` folder in the user's Drive — no shared backend database.
  *
  * Layout:
- *   SmartDesk/
+ *   TEEPO/
  *     db.json        ← single source of truth (courses, lessons, tasks, ...)
  *
  * The whole DB is small enough to round-trip as one JSON file. If it grows
@@ -16,7 +16,7 @@ import type { Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings, N
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3'
 const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
-const FOLDER_NAME = 'SmartDesk'
+const FOLDER_NAME = 'TEEPO'
 const DB_FILE_NAME = 'db.json'
 
 // ── Student catalog (credits tracking) ────────────────────────────
@@ -191,8 +191,8 @@ async function findByName(
   return data.files?.[0] ?? null
 }
 
-/** Get or create the SmartDesk/ folder in the user's Drive root. Returns folder id. */
-export async function getOrCreateSmartDeskFolder(token: string): Promise<string> {
+/** Get or create the TEEPO/ folder in the user's Drive root. Returns folder id. */
+export async function getOrCreateTEEPOFolder(token: string): Promise<string> {
   const existing = await findByName(token, FOLDER_NAME, 'application/vnd.google-apps.folder')
   if (existing) return existing.id
 
@@ -204,12 +204,12 @@ export async function getOrCreateSmartDeskFolder(token: string): Promise<string>
       mimeType: 'application/vnd.google-apps.folder',
     }),
   })
-  if (!res.ok) throw new Error(`Failed to create SmartDesk folder: ${res.status}`)
+  if (!res.ok) throw new Error(`Failed to create TEEPO folder: ${res.status}`)
   const data = await res.json()
   return data.id
 }
 
-/** Get the db.json fileId inside the SmartDesk folder, or null if not yet created. */
+/** Get the db.json fileId inside the TEEPO folder, or null if not yet created. */
 async function findDBFile(token: string, folderId: string): Promise<string | null> {
   const file = await findByName(token, DB_FILE_NAME, 'application/json', folderId)
   return file?.id ?? null
@@ -290,7 +290,7 @@ export interface DriveDBHandle {
 export async function loadDB(
   token: string,
 ): Promise<{ db: DriveDB; handle: DriveDBHandle }> {
-  const folderId = await getOrCreateSmartDeskFolder(token)
+  const folderId = await getOrCreateTEEPOFolder(token)
   let fileId = await findDBFile(token, folderId)
   let db: DriveDB
 

@@ -1,0 +1,220 @@
+/* ── TEEPO mascot — all states & animations ── */
+
+.teepo {
+  --teepo-size: 140px;
+  width: var(--teepo-size);
+  height: var(--teepo-size);
+  position: relative;
+  animation: tFloat 4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.teepo svg { width: 100%; height: 100%; overflow: visible; display: block; }
+
+/* elements */
+.t-body  { filter: drop-shadow(0 15px 30px rgba(107,91,229,0.45)); }
+.t-face  { fill: #0A0A15; }
+.t-eye   {
+  fill: #B8A9FF;
+  filter: drop-shadow(0 0 6px rgba(184,169,255,0.7));
+  transform-origin: center; transform-box: fill-box;
+  animation: tBlink 5s infinite;
+}
+.t-mouth {
+  fill: none; stroke: #B8A9FF; stroke-width: 2.5; stroke-linecap: round;
+  filter: drop-shadow(0 0 3px rgba(184,169,255,0.5));
+}
+.t-cheek        { fill: #8B7FF0; opacity: .4; }
+.t-ant-stick    { stroke: rgba(255,255,255,0.25); stroke-width: 2.5; stroke-linecap: round; fill: none; }
+.t-ant-tip      {
+  fill: #B8A9FF;
+  filter: drop-shadow(0 0 10px #B8A9FF);
+  animation: tAntPulse 2.2s ease-in-out infinite;
+  transform-origin: center; transform-box: fill-box;
+}
+.t-eyes-error   { display: none; }
+.t-think-dots   { opacity: 0; }
+.t-zzz          { opacity: 0; }
+.t-confetti     { opacity: 0; }
+
+/* ── base animations ── */
+@keyframes tFloat    { 0%,100%{transform:translateY(0)}        50%{transform:translateY(-12px)} }
+@keyframes tBlink    { 0%,46%,50%,92%,96%,100%{transform:scaleY(1)} 48%,94%{transform:scaleY(0.1)} }
+@keyframes tAntPulse { 0%,100%{opacity:.8} 50%{opacity:1} }
+
+/* ── IDLE (default) ── already covered by base .teepo */
+
+/* ── HAPPY ── */
+.teepo[data-state="happy"] { animation: tHappyBounce .8s ease-in-out infinite; }
+@keyframes tHappyBounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-18px)} }
+.teepo[data-state="happy"] .t-eye   { animation: none; transform: scaleY(0.3); }
+.teepo[data-state="happy"] .t-mouth { d: path("M 35 62 Q 50 75 65 62"); }
+
+/* ── THINKING ── */
+.teepo[data-state="thinking"] { animation: tFloat 4s ease-in-out infinite; }
+.teepo[data-state="thinking"] .t-ant-stick { animation: tAntWiggle 1.2s ease-in-out infinite; }
+@keyframes tAntWiggle { 0%,100%{transform:rotate(-8deg)} 50%{transform:rotate(8deg)} }
+.teepo[data-state="thinking"] .t-ant-group { transform-origin: 50px 18px; transform-box: view-box; }
+.teepo[data-state="thinking"] .t-eye       { animation: none; }
+.teepo[data-state="thinking"] .t-eye.left  { transform: translateX(-2px); }
+.teepo[data-state="thinking"] .t-eye.right { transform: translateX(-2px); }
+.teepo[data-state="thinking"] .t-mouth     { d: path("M 42 64 L 58 64"); }
+.teepo[data-state="thinking"] .t-think-dots { opacity: 1; }
+.t-think-dots circle {
+  fill: #B8A9FF; opacity: 0;
+  animation: thinkDot 1.5s infinite;
+}
+.t-think-dots circle:nth-child(1) { animation-delay: 0s; }
+.t-think-dots circle:nth-child(2) { animation-delay: .3s; }
+.t-think-dots circle:nth-child(3) { animation-delay: .6s; }
+@keyframes thinkDot { 0%,60%,100%{opacity:0;transform:translateY(0)} 30%{opacity:1;transform:translateY(-3px)} }
+
+/* ── SASSY ── */
+.teepo[data-state="sassy"] { animation: tSassyTilt 3s ease-in-out infinite; }
+@keyframes tSassyTilt { 0%,100%{transform:rotate(-3deg) translateY(0)} 50%{transform:rotate(-3deg) translateY(-6px)} }
+.teepo[data-state="sassy"] .t-eye   { animation: tSassyEye 4s ease-in-out infinite; }
+@keyframes tSassyEye { 0%,70%,100%{transform:scaleY(1) translateY(0)} 20%,50%{transform:scaleY(0.5) translateY(-3px)} }
+.teepo[data-state="sassy"] .t-mouth { d: path("M 38 65 Q 50 60 62 65"); }
+
+/* ── SLEEP ── */
+.teepo[data-state="sleep"] { animation: tSleepSway 5s ease-in-out infinite; }
+@keyframes tSleepSway { 0%,100%{transform:rotate(-2deg)} 50%{transform:rotate(2deg)} }
+.teepo[data-state="sleep"] .t-eye     { animation: none; transform: scaleY(0.1); }
+.teepo[data-state="sleep"] .t-mouth   { d: path("M 44 66 Q 50 63 56 66"); }
+.teepo[data-state="sleep"] .t-ant-tip { animation: none; opacity: .3; }
+.teepo[data-state="sleep"] .t-zzz     { opacity: 1; }
+.t-zzz text {
+  fill: #B8A9FF; font-family: 'Inter', sans-serif; font-weight: 700;
+  opacity: 0; animation: zzzFloat 3s infinite;
+}
+.t-zzz text:nth-child(1) { animation-delay: 0s; }
+.t-zzz text:nth-child(2) { animation-delay: 1s; }
+.t-zzz text:nth-child(3) { animation-delay: 2s; }
+@keyframes zzzFloat {
+  0%   { opacity:0; transform:translate(0,0) scale(.8); }
+  20%  { opacity:1; }
+  100% { opacity:0; transform:translate(8px,-20px) scale(1.2); }
+}
+
+/* ── ALERT ── */
+.teepo[data-state="alert"] { animation: tAlertJump .6s cubic-bezier(.36,.07,.19,.97) infinite; }
+@keyframes tAlertJump {
+  0%,100%{transform:translateY(0) scale(1)}
+  20%{transform:translateY(-22px) scale(1.05,.95)}
+  40%{transform:translateY(0) scale(.95,1.05)}
+  60%{transform:translateY(-10px) scale(1)}
+}
+.teepo[data-state="alert"] .t-eye     { animation: none; transform: scale(1.3); fill: #FFA657; }
+.teepo[data-state="alert"] .t-mouth   { d: path("M 50 62 m -4 0 a 4 4 0 1 0 8 0 a 4 4 0 1 0 -8 0"); fill: #FFA657; stroke: #FFA657; }
+.teepo[data-state="alert"] .t-ant-tip { fill: #FFA657; filter: drop-shadow(0 0 14px #FFA657); animation: alertPulse .4s infinite; }
+@keyframes alertPulse { 0%,100%{r:6} 50%{r:8} }
+.teepo[data-state="alert"] .t-ant-stick { animation: none; }
+
+/* ── CELEBRATE ── */
+.teepo[data-state="celebrate"] { animation: tCelebSpin 1.2s ease-in-out infinite; }
+@keyframes tCelebSpin {
+  0%  {transform:translateY(0) rotate(0)}
+  25% {transform:translateY(-20px) rotate(-8deg)}
+  50% {transform:translateY(-8px) rotate(0)}
+  75% {transform:translateY(-20px) rotate(8deg)}
+  100%{transform:translateY(0) rotate(0)}
+}
+.teepo[data-state="celebrate"] .t-eye     { animation: none; transform: scaleY(0.3); }
+.teepo[data-state="celebrate"] .t-mouth   { d: path("M 33 60 Q 50 78 67 60"); }
+.teepo[data-state="celebrate"] .t-confetti { opacity: 1; }
+.t-confetti rect {
+  animation: confettiFall 1.8s linear infinite;
+  transform-origin: center; transform-box: fill-box;
+}
+.t-confetti rect:nth-child(1){animation-delay:0s;   fill:#B8A9FF}
+.t-confetti rect:nth-child(2){animation-delay:.2s;  fill:#4ADE80}
+.t-confetti rect:nth-child(3){animation-delay:.4s;  fill:#FFA657}
+.t-confetti rect:nth-child(4){animation-delay:.6s;  fill:#FF7EB6}
+.t-confetti rect:nth-child(5){animation-delay:.8s;  fill:#8B7FF0}
+.t-confetti rect:nth-child(6){animation-delay:1s;   fill:#B8A9FF}
+.t-confetti rect:nth-child(7){animation-delay:1.2s; fill:#4ADE80}
+.t-confetti rect:nth-child(8){animation-delay:1.4s; fill:#FF7EB6}
+@keyframes confettiFall {
+  0%  {opacity:0; transform:translate(0,-10px) rotate(0)}
+  10% {opacity:1}
+  100%{opacity:0; transform:translate(var(--dx,0),60px) rotate(720deg)}
+}
+
+/* ── ERROR ── */
+.teepo[data-state="error"] { animation: tErrorShake .6s ease-in-out infinite; }
+@keyframes tErrorShake {
+  0%,100%{transform:translateX(0) rotate(8deg)}
+  25%{transform:translateX(-4px) rotate(8deg)}
+  75%{transform:translateX(4px) rotate(8deg)}
+}
+.teepo[data-state="error"] .t-eyes-normal { display: none; }
+.teepo[data-state="error"] .t-eyes-error  { display: block; }
+.teepo[data-state="error"] .t-mouth       { d: path("M 40 68 Q 50 60 60 68"); }
+.teepo[data-state="error"] .t-ant-tip     { fill: #FF6B6B; filter: drop-shadow(0 0 10px #FF6B6B); }
+
+/* ── HERO STAGE ── */
+.teepo-hero-stage {
+  position: relative;
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse at center, rgba(107,91,229,0.15), transparent 70%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.005));
+  border: 1px solid rgba(255,255,255,0.08);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.teepo-hero-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 30%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 30%, transparent 100%);
+  pointer-events: none;
+}
+.teepo-shadow {
+  position: absolute;
+  bottom: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30%;
+  height: 24px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(107,91,229,0.55), transparent 70%);
+  filter: blur(12px);
+  animation: shadowPulse 4s ease-in-out infinite;
+}
+@keyframes shadowPulse {
+  0%,100%{transform:translateX(-50%) scale(1);opacity:.7}
+  50%{transform:translateX(-50%) scale(.8);opacity:.35}
+}
+
+/* ── STATE CARD ── */
+.teepo-state-card {
+  aspect-ratio: 1;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color .2s, transform .2s, box-shadow .2s;
+  overflow: hidden;
+  padding: 20px;
+}
+.teepo-state-card:hover {
+  border-color: rgba(184,169,255,0.35);
+  transform: translateY(-3px);
+  box-shadow: 0 20px 40px -15px rgba(107,91,229,0.3);
+}
+.teepo-state-card.active {
+  border-color: rgba(184,169,255,0.5);
+  background: linear-gradient(180deg, rgba(107,91,229,0.08), rgba(255,255,255,0.01));
+  box-shadow: 0 0 0 1px rgba(184,169,255,0.2), 0 20px 40px -15px rgba(107,91,229,0.4);
+}
