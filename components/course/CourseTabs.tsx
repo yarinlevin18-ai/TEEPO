@@ -6,16 +6,21 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckSquare, FileText, StickyNote, MessageCircle, Plus, Trash2,
   Loader2, Calendar, Send, Sparkles, Pencil, X,
+  Download, Check, FileDown,
 } from 'lucide-react'
 import { io, Socket } from 'socket.io-client'
 import { useDB } from '@/lib/db-context'
 import { useAuth } from '@/lib/auth-context'
+import { exportNoteToWord } from '@/lib/export-to-word'
 import type { Assignment, StudyTask, CourseNote, ChatMessage } from '@/types'
 import { format } from 'date-fns'
+
+const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false })
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -54,10 +59,54 @@ export default function CourseTabs({ courseId, activeTab, courseTitle }: Props) 
 }
 
 // ═══════════════════════════════════════════════════════════════
+// UNIFIED WORKSPACE — renders ALL panels stacked in one view
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Responsive 2-column workspace. On desktop: Lessons on the left (primary),
+ * stacked Tasks/Assignments/AI on the right. Notes span full width beneath.
+ * On mobile: everything stacks vertically.
+ *
+ * `lessonsSlot` is rendered as-is — we pass the existing lessons UI from
+ * the course page so we don't have to re-implement it here.
+ */
+export function CourseWorkspace({
+  courseId,
+  courseTitle,
+  lessonsSlot,
+}: {
+  courseId: string
+  courseTitle: string
+  lessonsSlot: React.ReactNode
+}) {
+  return (
+    <div className="space-y-5">
+      {/* Top grid: Lessons (left, wider) + side widgets */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        {/* LEFT — Lessons */}
+        <section className="min-w-0">{lessonsSlot}</section>
+
+        {/* RIGHT — stacked side panels */}
+        <aside className="space-y-5 min-w-0">
+          <TasksPanel courseId={courseId} compact />
+          <AssignmentsPanel courseId={courseId} compact />
+          <AIPanel courseId={courseId} courseTitle={courseTitle} compact />
+        </aside>
+      </div>
+
+      {/* Bottom — Notes (full width with rich editor) */}
+      <section>
+        <NotesPanel courseId={courseId} />
+      </section>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════
 // TASKS PANEL
 // ═══════════════════════════════════════════════════════════════
 
-function TasksPanel({ courseId }: { courseId: string }) {
+function TasksPanel({ courseId, compact = false }: { courseId: string; compact?: boolean }) {
   const { db, createTask, updateTask, deleteTask } = useDB()
   const tasks = db.tasks.filter(t => t.course_id === courseId)
   const [adding, setAdding] = useState(false)
@@ -173,7 +222,7 @@ function TaskRow({ task, onToggle, onDelete }: {
 // ASSIGNMENTS PANEL
 // ═══════════════════════════════════════════════════════════════
 
-function AssignmentsPanel({ courseId }: { courseId: string }) {
+function AssignmentsPanel({ courseId, compact = false }: { courseId: string; compact?: boolean }) {
   const { db, createAssignment, updateAssignment, deleteAssignment } = useDB()
   const assignments = db.assignments.filter(a => a.course_id === courseId)
 
@@ -302,30 +351,87 @@ function AssignmentRow({ a, onUpdate, onDelete }: {
 // NOTES PANEL
 // ═══════════════════════════════════════════════════════════════
 
-function NotesPanel({ courseId }: { courseId: string }) {
+type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+
+export function NotesPanel({ courseId }: { courseId: string }) {
   const { db, createNote, updateNote, deleteNote } = useDB()
-  const notes = db.notes.filter(n => n.course_id === courseId)
+  const notes = db.notes
+    .filter(n => n.course_id === courseId)
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
 
   const [editing, setEditing] = useState<CourseNote | null>(null)
   const [newNote, setNewNote] = useState(false)
   const [form, setForm] = useState({ title: '', content: '' })
+  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Auto-save when editing an existing note (debounced 1.5s)
+  useEffect(() => {
+    if (!editing || !newNote) return
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+
+    // Only auto-save if the content actually changed
+    const unchanged = form.title === editing.title && form.content === editing.content
+    if (unchanged || !form.title.trim()) return
+
+    setSaveState('saving')
+    debounceRef.current = setTimeout(async () => {
+      try {
+        await updateNote(editing.id, { title: form.title, content: form.content })
+        setSaveState('saved')
+        setTimeout(() => setSaveState('idle'), 2000)
+      } catch {
+        setSaveState('error')
+      }
+    }, 1500)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.title, form.content, editing?.id])
 
   const handleSave = async () => {
     if (!form.title.trim()) return
-    if (editing) {
-      await updateNote(editing.id, { title: form.title, content: form.content })
-    } else {
-      await createNote(courseId, { title: form.title, content: form.content })
+    setSaveState('saving')
+    try {
+      if (editing) {
+        await updateNote(editing.id, { title: form.title, content: form.content })
+      } else {
+        await createNote(courseId, { title: form.title, content: form.content })
+      }
+      setSaveState('saved')
+      setTimeout(() => {
+        setForm({ title: '', content: '' })
+        setNewNote(false)
+        setEditing(null)
+        setSaveState('idle')
+      }, 700)
+    } catch {
+      setSaveState('error')
     }
-    setForm({ title: '', content: '' })
+  }
+
+  const handleClose = () => {
     setNewNote(false)
     setEditing(null)
+    setForm({ title: '', content: '' })
+    setSaveState('idle')
   }
 
   const openEdit = (n: CourseNote) => {
     setEditing(n)
     setForm({ title: n.title, content: n.content })
     setNewNote(true)
+    setSaveState('idle')
+  }
+
+  const handleExport = (n: CourseNote) => {
+    exportNoteToWord({
+      title: n.title,
+      html: n.content,
+      rtl: true,
+    })
   }
 
   return (
@@ -334,28 +440,87 @@ function NotesPanel({ courseId }: { courseId: string }) {
         <h2 className="text-base font-semibold text-ink flex items-center gap-2">
           <StickyNote size={16} className="text-indigo-400" />
           סיכומים לקורס
+          {notes.length > 0 && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/5 text-ink-muted font-normal">
+              {notes.length}
+            </span>
+          )}
         </h2>
-        <button onClick={() => { setNewNote(true); setEditing(null); setForm({ title: '', content: '' }) }}
-          className="btn-gradient px-3.5 py-2 rounded-xl text-sm text-white font-medium flex items-center gap-1.5 shadow-lg shadow-indigo-500/20">
+        <button
+          onClick={() => { setNewNote(true); setEditing(null); setForm({ title: '', content: '' }); setSaveState('idle') }}
+          className="btn-gradient px-3.5 py-2 rounded-xl text-sm text-white font-medium flex items-center gap-1.5 shadow-lg shadow-indigo-500/20"
+        >
           <Plus size={15} /> סיכום חדש
         </button>
       </div>
 
       <AnimatePresence>
         {newNote && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-            <div className="glass rounded-xl p-4 space-y-3">
-              <input autoFocus type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
-                placeholder="כותרת הסיכום" className="input-dark w-full text-sm font-medium" />
-              <textarea value={form.content} onChange={e => setForm({ ...form, content: e.target.value })}
-                placeholder="התחל לכתוב כאן..." rows={8} className="input-dark w-full text-sm resize-none" />
-              <div className="flex items-center justify-end gap-2">
-                <button onClick={() => { setNewNote(false); setEditing(null); setForm({ title: '', content: '' }) }}
-                  className="px-3 py-2 text-xs text-ink-muted hover:text-ink">ביטול</button>
-                <button onClick={handleSave} disabled={!form.title.trim()}
-                  className="btn-gradient px-4 py-2 rounded-lg text-xs text-white font-medium disabled:opacity-40">
-                  {editing ? 'שמור שינויים' : 'צור סיכום'}
-                </button>
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="glass rounded-2xl p-4 space-y-3">
+              {/* Title + status row */}
+              <div className="flex items-center gap-3">
+                <input
+                  autoFocus
+                  type="text"
+                  value={form.title}
+                  onChange={e => setForm({ ...form, title: e.target.value })}
+                  placeholder="כותרת הסיכום"
+                  className="input-dark flex-1 text-base font-semibold"
+                />
+                <SaveIndicator state={saveState} />
+              </div>
+
+              {/* Rich text editor (replaces plain textarea) */}
+              <RichTextEditor
+                content={form.content}
+                onChange={content => setForm(f => ({ ...f, content }))}
+                placeholder="התחל לכתוב את הסיכום שלך כאן. אפשר להשתמש בכותרות, רשימות, הדגשות..."
+              />
+
+              {/* Action bar */}
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <p className="text-[11px] text-ink-subtle flex items-center gap-1.5">
+                  {editing ? (
+                    <>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      שמירה אוטומטית פעילה
+                    </>
+                  ) : (
+                    <span>הסיכום יישמר כשתלחץ "צור"</span>
+                  )}
+                </p>
+                <div className="flex items-center gap-2">
+                  {editing && form.content && (
+                    <button
+                      onClick={() => handleExport({ ...editing, ...form } as CourseNote)}
+                      className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 transition-colors"
+                      title="הורד כמסמך Word"
+                    >
+                      <FileDown size={13} />
+                      הורד כ-Word
+                    </button>
+                  )}
+                  <button
+                    onClick={handleClose}
+                    className="px-3 py-2 text-xs text-ink-muted hover:text-ink"
+                  >
+                    סגור
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={!form.title.trim() || saveState === 'saving'}
+                    className="btn-gradient px-4 py-2 rounded-lg text-xs text-white font-medium disabled:opacity-40 flex items-center gap-1.5"
+                  >
+                    {saveState === 'saving' ? <Loader2 size={12} className="animate-spin" /> : null}
+                    {editing ? 'שמור' : 'צור סיכום'}
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -363,27 +528,85 @@ function NotesPanel({ courseId }: { courseId: string }) {
       </AnimatePresence>
 
       {notes.length === 0 && !newNote ? (
-        <EmptyState icon={StickyNote} title="אין סיכומים" hint="כתוב סיכומים חופשיים לקורס. לסיכומים לכל שיעור — השתמש ב'שיעורים'." />
+        <EmptyState
+          icon={StickyNote}
+          title="אין סיכומים"
+          hint="כתוב סיכומים חופשיים לקורס. לסיכומים לכל שיעור — השתמש ב'שיעורים'."
+        />
       ) : (
         <div className="grid sm:grid-cols-2 gap-3">
-          {notes.map(n => (
-            <div key={n.id} className="glass rounded-xl p-4 group cursor-pointer hover:bg-white/[0.06] transition-colors" onClick={() => openEdit(n)}>
-              <div className="flex items-start justify-between gap-2 mb-1.5">
-                <p className="text-sm font-semibold text-ink flex-1">{n.title}</p>
-                <button onClick={e => { e.stopPropagation(); deleteNote(n.id) }}
-                  className="p-1 rounded text-ink-subtle hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                  <Trash2 size={12} />
-                </button>
+          {notes.map(n => {
+            const plainText = n.content.replace(/<[^>]*>/g, '').trim()
+            return (
+              <div
+                key={n.id}
+                className="glass rounded-xl p-4 group hover:bg-white/[0.04] transition-colors"
+              >
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <button
+                    onClick={() => openEdit(n)}
+                    className="text-sm font-semibold text-ink flex-1 text-right hover:text-indigo-300 transition-colors"
+                  >
+                    {n.title}
+                  </button>
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                    <button
+                      onClick={() => handleExport(n)}
+                      className="p-1.5 rounded text-ink-subtle hover:text-violet-400 hover:bg-violet-500/10 transition-colors"
+                      title="הורד כ-Word"
+                    >
+                      <FileDown size={12} />
+                    </button>
+                    <button
+                      onClick={() => deleteNote(n.id)}
+                      className="p-1.5 rounded text-ink-subtle hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      title="מחק"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+                <p
+                  className="text-xs text-ink-muted line-clamp-3 cursor-pointer"
+                  onClick={() => openEdit(n)}
+                >
+                  {plainText || <span className="italic text-ink-subtle">סיכום ריק</span>}
+                </p>
+                <p className="text-[10px] text-ink-subtle mt-2">
+                  עודכן {new Date(n.updated_at).toLocaleDateString('he-IL')}
+                </p>
               </div>
-              <p className="text-xs text-ink-muted line-clamp-3 whitespace-pre-wrap">{n.content}</p>
-              <p className="text-[10px] text-ink-subtle mt-2">
-                עודכן {new Date(n.updated_at).toLocaleDateString('he-IL')}
-              </p>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
+  )
+}
+
+/** Tiny pill that animates through saving → saved → idle. */
+function SaveIndicator({ state }: { state: SaveState }) {
+  if (state === 'idle') return null
+
+  const config: Record<Exclude<SaveState, 'idle'>, { icon: any; label: string; color: string; bg: string }> = {
+    saving: { icon: Loader2, label: 'שומר…', color: '#B8A9FF', bg: 'rgba(139,127,240,0.15)' },
+    saved:  { icon: Check,   label: 'נשמר',  color: '#4ADE80', bg: 'rgba(74,222,128,0.15)' },
+    error:  { icon: X,       label: 'שגיאה', color: '#FF6B6B', bg: 'rgba(255,107,107,0.15)' },
+  }
+  const c = config[state]
+  const Icon = c.icon
+
+  return (
+    <motion.span
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0 }}
+      className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-medium flex-shrink-0"
+      style={{ color: c.color, background: c.bg }}
+    >
+      <Icon size={11} className={state === 'saving' ? 'animate-spin' : ''} />
+      {c.label}
+    </motion.span>
   )
 }
 
@@ -391,7 +614,7 @@ function NotesPanel({ courseId }: { courseId: string }) {
 // AI PANEL — inline chat scoped to this course
 // ═══════════════════════════════════════════════════════════════
 
-function AIPanel({ courseId, courseTitle }: { courseId: string; courseTitle: string }) {
+function AIPanel({ courseId, courseTitle, compact = false }: { courseId: string; courseTitle: string; compact?: boolean }) {
   const { user } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -445,7 +668,10 @@ function AIPanel({ courseId, courseTitle }: { courseId: string; courseTitle: str
   }
 
   return (
-    <div className="glass rounded-2xl overflow-hidden flex flex-col" style={{ height: 'min(70vh, 560px)' }}>
+    <div
+      className="glass rounded-2xl overflow-hidden flex flex-col"
+      style={{ height: compact ? 'min(55vh, 420px)' : 'min(70vh, 560px)' }}
+    >
       {/* Header */}
       <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
         <div className="flex items-center gap-2">

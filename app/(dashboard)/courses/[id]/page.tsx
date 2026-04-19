@@ -15,7 +15,8 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { api } from '@/lib/api-client'
 import { useDB, useCourse, useLessons } from '@/lib/db-context'
-import CourseTabs, { CourseTab, COURSE_TAB_META } from '@/components/course/CourseTabs'
+import { CourseWorkspace } from '@/components/course/CourseTabs'
+import { exportNoteToWord } from '@/lib/export-to-word'
 
 const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false })
 import ErrorAlert from '@/components/ui/ErrorAlert'
@@ -62,9 +63,6 @@ export default function CourseDetailPage() {
   const lessons = useLessons(courseId)
 
   const [error, setError] = useState<string | null>(null)
-
-  // Active workspace tab — 'lessons' is the default/existing view
-  const [activeTab, setActiveTab] = useState<'lessons' | CourseTab>('lessons')
 
   // Lesson management
   const [expandedLesson, setExpandedLesson] = useState<string | null>(null)
@@ -271,61 +269,11 @@ export default function CourseDetailPage() {
         )}
       </div>
 
-      {/* ── Workspace Tab Bar ── */}
-      <div className="glass rounded-xl p-1.5 flex items-center gap-1 overflow-x-auto">
-        {/* Lessons tab (default) */}
-        <button
-          onClick={() => setActiveTab('lessons')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-shrink-0 ${
-            activeTab === 'lessons'
-              ? 'bg-gradient-to-r from-indigo-500/20 to-violet-500/20 text-ink shadow-inner'
-              : 'text-ink-muted hover:text-ink hover:bg-white/5'
-          }`}
-        >
-          <StickyNote size={15} />
-          שיעורים
-          {lessons.length > 0 && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-              activeTab === 'lessons' ? 'bg-indigo-500/30 text-indigo-200' : 'bg-white/5 text-ink-subtle'
-            }`}>
-              {lessons.length}
-            </span>
-          )}
-        </button>
-
-        {/* Workspace tabs */}
-        {COURSE_TAB_META.map(tab => {
-          const Icon = tab.icon
-          const isActive = activeTab === tab.id
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-shrink-0 ${
-                isActive
-                  ? 'bg-gradient-to-r from-indigo-500/20 to-violet-500/20 text-ink shadow-inner'
-                  : 'text-ink-muted hover:text-ink hover:bg-white/5'
-              }`}
-            >
-              <Icon size={15} />
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ── Non-lesson workspace panels ── */}
-      {activeTab !== 'lessons' && (
-        <CourseTabs
-          courseId={courseId}
-          activeTab={activeTab}
-          courseTitle={course.title}
-        />
-      )}
-
-      {/* ── Lessons Section (only when tab = 'lessons') ── */}
-      {activeTab === 'lessons' && (
-      <>
+      {/* ── Unified Workspace — all panels in one layout ── */}
+      <CourseWorkspace
+        courseId={courseId}
+        courseTitle={course.title}
+        lessonsSlot={<>
       {/* ── Lessons Header ── */}
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-ink flex items-center gap-2">
@@ -549,12 +497,27 @@ export default function CourseDetailPage() {
                               סיכום השיעור
                             </h4>
                             {!isEditing && (
-                              <button
-                                onClick={() => startEditing(lesson)}
-                                className="text-[11px] px-2 py-1 rounded-lg bg-white/5 text-ink-muted hover:text-indigo-400 hover:bg-indigo-500/10 transition-all flex items-center gap-1"
-                              >
-                                <Edit3 size={11} /> {hasContent ? 'ערוך' : 'כתוב סיכום'}
-                              </button>
+                              <div className="flex items-center gap-1">
+                                {hasContent && (
+                                  <button
+                                    onClick={() => exportNoteToWord({
+                                      title: `${course.title} — ${lesson.title}`,
+                                      html: lesson.content!,
+                                      rtl: true,
+                                    })}
+                                    className="text-[11px] px-2 py-1 rounded-lg bg-violet-500/10 text-violet-300 hover:text-violet-200 hover:bg-violet-500/20 transition-all flex items-center gap-1"
+                                    title="הורד סיכום כ-Word"
+                                  >
+                                    <FileText size={11} /> Word
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => startEditing(lesson)}
+                                  className="text-[11px] px-2 py-1 rounded-lg bg-white/5 text-ink-muted hover:text-indigo-400 hover:bg-indigo-500/10 transition-all flex items-center gap-1"
+                                >
+                                  <Edit3 size={11} /> {hasContent ? 'ערוך' : 'כתוב סיכום'}
+                                </button>
+                              </div>
                             )}
                           </div>
 
@@ -654,8 +617,8 @@ export default function CourseDetailPage() {
           })}
         </div>
       )}
-      </>
-      )}
+      </>}
+      />
     </div>
   )
 }
