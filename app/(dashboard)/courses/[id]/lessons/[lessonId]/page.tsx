@@ -41,6 +41,7 @@ import { exportNoteToWord } from '@/lib/export-to-word'
 import { semesterLabel } from '@/lib/semester-classifier'
 import QuickAddInput from '@/components/course/QuickAddInput'
 import LessonNotebookChat from '@/components/course/LessonNotebookChat'
+import NotebookPaper, { type NotebookPrefs } from '@/components/course/NotebookPaper'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import type { StudyTask, Assignment, LessonFile } from '@/types'
 import { format } from 'date-fns'
@@ -76,7 +77,13 @@ export default function LessonNotebookPage() {
   const courseId = params.id as string
   const lessonId = params.lessonId as string
 
-  const { ready, loading, error: dbError, updateLesson, createTask, updateTask, deleteTask, db } = useDB()
+  const {
+    ready, loading, error: dbError,
+    updateLesson,
+    createTask, updateTask, deleteTask,
+    createAssignment, updateAssignment, deleteAssignment,
+    db,
+  } = useDB()
   const course = useCourse(courseId)
   const lessons = useLessons(courseId)
   const lesson = lessons.find(l => l.id === lessonId)
@@ -100,6 +107,38 @@ export default function LessonNotebookPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Notebook visual preferences — persisted in localStorage so the user's
+  // comfort choices stick across lessons.
+  type PaperColor = 'white' | 'cream' | 'blush' | 'dark'
+  type FontFamily = 'sans' | 'serif' | 'hand'
+  type TextSize = 'sm' | 'md' | 'lg' | 'xl'
+  type LineGap = 'tight' | 'normal' | 'roomy'
+  const [paper, setPaper] = useState<PaperColor>('cream')
+  const [fontFamily, setFontFamily] = useState<FontFamily>('serif')
+  const [textSize, setTextSize] = useState<TextSize>('md')
+  const [lineGap, setLineGap] = useState<LineGap>('normal')
+  const [showLines, setShowLines] = useState(true)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('teepo.notebook.prefs')
+      if (!raw) return
+      const p = JSON.parse(raw)
+      if (p.paper) setPaper(p.paper)
+      if (p.fontFamily) setFontFamily(p.fontFamily)
+      if (p.textSize) setTextSize(p.textSize)
+      if (p.lineGap) setLineGap(p.lineGap)
+      if (typeof p.showLines === 'boolean') setShowLines(p.showLines)
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('teepo.notebook.prefs',
+        JSON.stringify({ paper, fontFamily, textSize, lineGap, showLines }))
+    } catch { /* ignore */ }
+  }, [paper, fontFamily, textSize, lineGap, showLines])
 
   // Hydrate editor once when the lesson data arrives
   useEffect(() => {
@@ -468,43 +507,45 @@ export default function LessonNotebookPage() {
 
       {/* ── Main 2-column layout ── */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        {/* LEFT — Rich editor */}
+        {/* LEFT — Notebook paper editor */}
         <motion.section
           initial={{ opacity: 0, x: 8 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="glass rounded-2xl overflow-hidden min-h-[480px] flex flex-col"
+          className="min-h-[480px] flex flex-col"
         >
-          <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
-            <span className="text-xs font-semibold text-ink-muted">סיכום השיעור</span>
-            {lesson.ai_summary && (
-              <details className="relative">
-                <summary className="list-none cursor-pointer text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-300 hover:bg-violet-500/20">
-                  <span className="inline-flex items-center gap-1">
-                    <Sparkles size={10} /> סיכום AI קיים
-                  </span>
-                </summary>
-                <div className="absolute left-0 mt-1 w-80 max-h-64 overflow-y-auto p-3 rounded-xl bg-[#141222] border border-white/10 shadow-xl z-10 text-xs text-ink-muted leading-relaxed whitespace-pre-wrap">
-                  {lesson.ai_summary}
-                </div>
-              </details>
-            )}
-          </div>
-          <div className="flex-1 flex flex-col lesson-editor">
+          <NotebookPaper
+            paper={paper}
+            fontFamily={fontFamily}
+            textSize={textSize}
+            lineGap={lineGap}
+            showLines={showLines}
+            onChange={(patch: Partial<NotebookPrefs>) => {
+              if (patch.paper !== undefined) setPaper(patch.paper)
+              if (patch.fontFamily !== undefined) setFontFamily(patch.fontFamily)
+              if (patch.textSize !== undefined) setTextSize(patch.textSize)
+              if (patch.lineGap !== undefined) setLineGap(patch.lineGap)
+              if (patch.showLines !== undefined) setShowLines(patch.showLines)
+            }}
+            headerRight={
+              lesson.ai_summary ? (
+                <details className="relative">
+                  <summary className="list-none cursor-pointer text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-600 hover:bg-violet-500/25 inline-flex items-center gap-1">
+                    <Sparkles size={10} /> סיכום AI
+                  </summary>
+                  <div className="absolute left-0 mt-1 w-80 max-h-64 overflow-y-auto p-3 rounded-xl bg-[#141222] border border-white/10 shadow-xl z-20 text-xs text-ink-muted leading-relaxed whitespace-pre-wrap text-right">
+                    {lesson.ai_summary}
+                  </div>
+                </details>
+              ) : null
+            }
+          >
             <RichTextEditor
               content={content}
               onChange={setContent}
               placeholder="כתוב כאן את הסיכום של השיעור. שורה ריקה = פסקה חדשה. לחץ על ה-toolbar לעיצוב. הכל נשמר אוטומטית."
             />
-          </div>
-          <style jsx>{`
-            .lesson-editor :global(.rich-editor-content) {
-              min-height: 420px;
-              padding: 18px 22px;
-              font-size: 14.5px;
-              line-height: 1.75;
-            }
-          `}</style>
+          </NotebookPaper>
         </motion.section>
 
         {/* RIGHT — AI Notebook chat */}
@@ -684,7 +725,7 @@ export default function LessonNotebookPage() {
           )}
         </motion.section>
 
-        {/* Course assignments — read-only */}
+        {/* Course assignments — interactive add + list */}
         <motion.section
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -705,17 +746,36 @@ export default function LessonNotebookPage() {
               href={`/courses/${courseId}`}
               className="text-[11px] text-ink-subtle hover:text-ink inline-flex items-center gap-1"
             >
-              ערוך בקורס <ExternalLink size={10} />
+              פתח בקורס <ExternalLink size={10} />
             </Link>
           </div>
 
+          <QuickAddInput
+            placeholder='מטלה חדשה (למשל "תרגיל 3", "מבחן אמצע")…'
+            accent="amber"
+            onAdd={async text => {
+              await createAssignment({
+                title: text,
+                course_id: courseId,
+                priority: 'medium',
+              })
+            }}
+          />
+
           {assignments.length === 0 ? (
             <p className="text-[11px] text-ink-subtle text-center py-3">
-              אין מטלות פתוחות לקורס.
+              תרגילים, מבחנים, פרויקטים…
             </p>
           ) : (
             <div className="space-y-1">
-              {assignments.map(a => <ReadOnlyAssignmentRow key={a.id} a={a} />)}
+              {assignments.map(a => (
+                <InlineAssignmentRow
+                  key={a.id}
+                  a={a}
+                  onUpdate={updateAssignment}
+                  onDelete={deleteAssignment}
+                />
+              ))}
             </div>
           )}
         </motion.section>
@@ -837,23 +897,29 @@ function LessonTaskRow({
   )
 }
 
-function ReadOnlyAssignmentRow({ a }: { a: Assignment }) {
+function InlineAssignmentRow({
+  a, onUpdate, onDelete,
+}: {
+  a: Assignment
+  onUpdate: (id: string, patch: Partial<Assignment>) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+}) {
   const priorityDot: Record<string, string> = {
     high: '#ef4444',
     medium: '#f59e0b',
     low: '#10b981',
   }
-  const statusLabel: Record<Assignment['status'], string> = {
-    todo: 'לא התחיל',
-    in_progress: 'בתהליך',
-    submitted: 'הוגש',
-    graded: 'נבדק',
-  }
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg">
-      <span
-        className="w-2 h-2 rounded-full flex-shrink-0"
+    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 group transition-colors">
+      <button
+        onClick={() => {
+          const next: Assignment['priority'] =
+            a.priority === 'high' ? 'medium' : a.priority === 'medium' ? 'low' : 'high'
+          onUpdate(a.id, { priority: next })
+        }}
+        className="w-2 h-2 rounded-full flex-shrink-0 cursor-pointer"
         style={{ background: priorityDot[a.priority] }}
+        title={a.priority === 'high' ? 'דחוף' : a.priority === 'medium' ? 'בינוני' : 'רגיל'}
       />
       <span className="text-sm flex-1 truncate text-ink">{a.title}</span>
       {a.deadline && (
@@ -861,7 +927,22 @@ function ReadOnlyAssignmentRow({ a }: { a: Assignment }) {
           <Calendar size={9} /> {a.deadline.slice(5)}
         </span>
       )}
-      <span className="text-[10px] text-ink-subtle flex-shrink-0">{statusLabel[a.status]}</span>
+      <select
+        value={a.status}
+        onChange={e => onUpdate(a.id, { status: e.target.value as Assignment['status'] })}
+        className="text-[10px] bg-transparent border-0 cursor-pointer text-ink-muted hover:text-ink outline-none"
+      >
+        <option value="todo">לא התחיל</option>
+        <option value="in_progress">בתהליך</option>
+        <option value="submitted">הוגש</option>
+        <option value="graded">נבדק</option>
+      </select>
+      <button
+        onClick={() => onDelete(a.id)}
+        className="p-0.5 rounded text-ink-subtle hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+      >
+        <Trash2 size={11} />
+      </button>
     </div>
   )
 }
