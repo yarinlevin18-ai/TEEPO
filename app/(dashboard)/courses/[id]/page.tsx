@@ -158,6 +158,13 @@ export default function CourseDetailPage() {
                 </a>
               )}
               <span className="text-xs text-ink-muted">{lessons.length} שיעורים</span>
+              <Link
+                href={`/courses/${courseId}/preview`}
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/20 hover:bg-violet-500/25 transition-colors"
+                title="תצוגה חדשה (ספייק) — מחברת כמרכז"
+              >
+                <Sparkles size={12} /> נסה תצוגה חדשה
+              </Link>
             </div>
           </div>
         </div>
