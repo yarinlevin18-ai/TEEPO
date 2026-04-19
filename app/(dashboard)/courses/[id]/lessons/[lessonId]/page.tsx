@@ -505,63 +505,67 @@ export default function LessonNotebookPage() {
         </div>
       </motion.div>
 
-      {/* ── Main 2-column layout ── */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        {/* LEFT — Notebook paper editor */}
-        <motion.section
-          initial={{ opacity: 0, x: 8 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
-          className="min-h-[480px] flex flex-col"
+      {/* ── Unified notebook: editor + AI chat in one paper ── */}
+      <motion.section
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="flex flex-col"
+      >
+        <NotebookPaper
+          paper={paper}
+          fontFamily={fontFamily}
+          textSize={textSize}
+          lineGap={lineGap}
+          showLines={showLines}
+          onChange={(patch: Partial<NotebookPrefs>) => {
+            if (patch.paper !== undefined) setPaper(patch.paper)
+            if (patch.fontFamily !== undefined) setFontFamily(patch.fontFamily)
+            if (patch.textSize !== undefined) setTextSize(patch.textSize)
+            if (patch.lineGap !== undefined) setLineGap(patch.lineGap)
+            if (patch.showLines !== undefined) setShowLines(patch.showLines)
+          }}
+          headerRight={
+            lesson.ai_summary ? (
+              <details className="relative">
+                <summary className="list-none cursor-pointer text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-600 hover:bg-violet-500/25 inline-flex items-center gap-1">
+                  <Sparkles size={10} /> סיכום AI
+                </summary>
+                <div className="absolute left-0 mt-1 w-80 max-h-64 overflow-y-auto p-3 rounded-xl bg-[#141222] border border-white/10 shadow-xl z-20 text-xs text-ink-muted leading-relaxed whitespace-pre-wrap text-right">
+                  {lesson.ai_summary}
+                </div>
+              </details>
+            ) : null
+          }
         >
-          <NotebookPaper
-            paper={paper}
-            fontFamily={fontFamily}
-            textSize={textSize}
-            lineGap={lineGap}
-            showLines={showLines}
-            onChange={(patch: Partial<NotebookPrefs>) => {
-              if (patch.paper !== undefined) setPaper(patch.paper)
-              if (patch.fontFamily !== undefined) setFontFamily(patch.fontFamily)
-              if (patch.textSize !== undefined) setTextSize(patch.textSize)
-              if (patch.lineGap !== undefined) setLineGap(patch.lineGap)
-              if (patch.showLines !== undefined) setShowLines(patch.showLines)
-            }}
-            headerRight={
-              lesson.ai_summary ? (
-                <details className="relative">
-                  <summary className="list-none cursor-pointer text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-600 hover:bg-violet-500/25 inline-flex items-center gap-1">
-                    <Sparkles size={10} /> סיכום AI
-                  </summary>
-                  <div className="absolute left-0 mt-1 w-80 max-h-64 overflow-y-auto p-3 rounded-xl bg-[#141222] border border-white/10 shadow-xl z-20 text-xs text-ink-muted leading-relaxed whitespace-pre-wrap text-right">
-                    {lesson.ai_summary}
-                  </div>
-                </details>
-              ) : null
-            }
-          >
-            <RichTextEditor
-              content={content}
-              onChange={setContent}
-              placeholder="כתוב כאן את הסיכום של השיעור. שורה ריקה = פסקה חדשה. לחץ על ה-toolbar לעיצוב. הכל נשמר אוטומטית."
-            />
-          </NotebookPaper>
-        </motion.section>
-
-        {/* RIGHT — AI Notebook chat */}
-        <motion.section
-          initial={{ opacity: 0, x: -8 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.15 }}
-          className="min-h-[480px] flex"
-        >
-          <LessonNotebookChat
-            lesson={lesson}
-            courseId={courseId}
-            courseTitle={course.title}
+          <RichTextEditor
+            content={content}
+            onChange={setContent}
+            placeholder="כתוב כאן את הסיכום של השיעור. שורה ריקה = פסקה חדשה. לחץ על ה-toolbar לעיצוב. הכל נשמר אוטומטית."
           />
-        </motion.section>
-      </div>
+
+          {/* Divider between editor and AI chat — looks like a page crease */}
+          <div
+            className="relative mx-7 my-2 h-px"
+            style={{
+              background:
+                paper === 'dark'
+                  ? 'linear-gradient(to left, transparent, rgba(255,255,255,0.12), transparent)'
+                  : 'linear-gradient(to left, transparent, rgba(15,23,42,0.12), transparent)',
+            }}
+          />
+
+          {/* Embedded AI chat — inherits the paper background */}
+          <div className="h-[420px] flex flex-col">
+            <LessonNotebookChat
+              embedded
+              lesson={lesson}
+              courseId={courseId}
+              courseTitle={course.title}
+            />
+          </div>
+        </NotebookPaper>
+      </motion.section>
 
       {/* ── Files strip ── */}
       <motion.section
