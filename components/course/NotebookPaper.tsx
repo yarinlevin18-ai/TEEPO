@@ -36,6 +36,8 @@ interface Props extends NotebookPrefs {
   children: React.ReactNode
   onChange: (patch: Partial<NotebookPrefs>) => void
   headerRight?: React.ReactNode
+  /** Label shown in the top-left of the header. Default: "המחברת". */
+  title?: string
 }
 
 const PAPER_BG: Record<PaperColor, string> = {
@@ -78,7 +80,7 @@ const LINE_GAP:  Record<LineGap,  number> = { tight: 28, normal: 32, roomy: 38 }
 export default function NotebookPaper({
   children,
   paper, fontFamily, textSize, lineGap, showLines,
-  onChange, headerRight,
+  onChange, headerRight, title = 'המחברת',
 }: Props) {
   const [open, setOpen] = useState(false)
 
@@ -115,7 +117,7 @@ export default function NotebookPaper({
           className="text-[11px] font-semibold uppercase tracking-[0.22em]"
           style={{ color: isDarkPaper ? 'rgba(232,229,250,0.65)' : 'rgba(15,23,42,0.55)' }}
         >
-          סיכום השיעור
+          {title}
         </span>
         <div className="flex items-center gap-2">
           {headerRight}

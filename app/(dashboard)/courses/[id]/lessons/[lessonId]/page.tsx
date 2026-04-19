@@ -20,17 +20,17 @@
  * reuses the existing `exportNoteToWord` helper.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, ChevronLeft, Loader2, FileDown,
-  CheckSquare, FileText, Calendar, Sparkles, Wand2,
+  CheckSquare, FileText, Calendar,
   Trash2, ExternalLink, FileUp, Plus, Check, X,
   BookOpen, FolderOpen, File as FileIcon, Presentation,
-  Image as ImageIcon, Mic, Square, Upload, StopCircle,
+  Image as ImageIcon, Mic, Upload, StopCircle,
   ArrowLeft,
 } from 'lucide-react'
 import { api } from '@/lib/api-client'
@@ -91,7 +91,6 @@ export default function LessonNotebookPage() {
   const [error, setError] = useState<string | null>(null)
   const [content, setContent] = useState('')
   const [saveState, setSaveState] = useState<SaveState>('idle')
-  const [summarizing, setSummarizing] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialisedRef = useRef(false)
 
@@ -174,22 +173,6 @@ export default function LessonNotebookPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, lesson?.id])
 
-  const handleSummarize = useCallback(async () => {
-    if (!lesson) return
-    const text = content || lesson.content || lesson.title
-    if (!text) return
-    setSummarizing(true)
-    try {
-      const result = await api.lessons.summarize(text, lesson.title)
-      const summary = result.result || result.summary || result.answer
-      await updateLesson(lesson.id, { ai_summary: summary })
-    } catch {
-      setError('שגיאה ביצירת סיכום AI.')
-    } finally {
-      setSummarizing(false)
-    }
-  }, [lesson, content, updateLesson])
-
   const handleExport = () => {
     if (!lesson || !course) return
     exportNoteToWord({
@@ -250,29 +233,6 @@ export default function LessonNotebookPage() {
     e.target.value = ''
     await uploadRecording(f, f.name)
   }
-
-  // ── Auto-summarize when leaving (creates/updates lesson.ai_summary silently) ──
-  // We reuse `summarize` only when the user has written enough content AND
-  // no recent ai_summary exists — so we don't spam tokens on every back-nav.
-  useEffect(() => {
-    return () => {
-      const current = lesson
-      if (!current) return
-      const plain = (content || current.content || '').replace(/<[^>]*>/g, '').trim()
-      if (plain.length < 120) return           // too short to summarize
-      if (current.ai_summary && current.ai_summary.length > 40) return // fresh enough
-      // Fire-and-forget: we can't await in cleanup reliably, but the HTTP
-      // call still flushes to the backend.
-      api.lessons
-        .summarize(plain.slice(0, 8000), current.title)
-        .then(r => {
-          const summary = r.result || r.summary || r.answer
-          if (summary) return updateLesson(current.id, { ai_summary: summary, recap: summary })
-        })
-        .catch(() => { /* silent — best-effort */ })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lesson?.id])
 
   // Per-lesson tasks (now scoped by lesson_id)
   const lessonTasks = db.tasks.filter(t => t.lesson_id === lessonId)
@@ -385,36 +345,6 @@ export default function LessonNotebookPage() {
         <span className="text-ink font-medium truncate">{lesson.title}</span>
       </div>
 
-      {/* ── Prev chapter recap ── */}
-      {prevLesson && (prevLesson.recap || prevLesson.ai_summary) && (
-        <motion.div
-          initial={{ opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-3"
-        >
-          <Link
-            href={`/courses/${courseId}/lessons/${prevLesson.id}`}
-            className="block group rounded-2xl border border-white/5 bg-gradient-to-l from-indigo-500/[0.06] to-transparent hover:from-indigo-500/[0.1] transition-colors px-4 py-3"
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
-                <ArrowRight size={14} className="text-indigo-300 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] uppercase tracking-[0.16em] text-ink-subtle font-semibold">
-                  מה היה בפרק הקודם
-                </p>
-                <p className="text-xs text-ink-muted line-clamp-2 mt-0.5">
-                  <span className="text-ink font-medium">{prevLesson.title}</span>
-                  <span className="mx-1.5 text-ink-subtle">·</span>
-                  {prevLesson.recap || prevLesson.ai_summary}
-                </p>
-              </div>
-            </div>
-          </Link>
-        </motion.div>
-      )}
-
       {/* ── Lesson header ── */}
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
@@ -485,15 +415,6 @@ export default function LessonNotebookPage() {
           />
 
           <button
-            onClick={handleSummarize}
-            disabled={summarizing || !(content || lesson.content)}
-            className="hidden sm:inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 transition-colors disabled:opacity-40"
-            title="סכם את הסיכום הזה עם AI"
-          >
-            {summarizing ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
-            {summarizing ? 'מסכם…' : 'סכם AI'}
-          </button>
-          <button
             onClick={handleExport}
             disabled={!content && !lesson.content}
             className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 transition-colors disabled:opacity-40"
@@ -525,18 +446,6 @@ export default function LessonNotebookPage() {
             if (patch.lineGap !== undefined) setLineGap(patch.lineGap)
             if (patch.showLines !== undefined) setShowLines(patch.showLines)
           }}
-          headerRight={
-            lesson.ai_summary ? (
-              <details className="relative">
-                <summary className="list-none cursor-pointer text-[10px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-600 hover:bg-violet-500/25 inline-flex items-center gap-1">
-                  <Sparkles size={10} /> סיכום AI
-                </summary>
-                <div className="absolute left-0 mt-1 w-80 max-h-64 overflow-y-auto p-3 rounded-xl bg-[#141222] border border-white/10 shadow-xl z-20 text-xs text-ink-muted leading-relaxed whitespace-pre-wrap text-right">
-                  {lesson.ai_summary}
-                </div>
-              </details>
-            ) : null
-          }
         >
           <RichTextEditor
             content={content}
