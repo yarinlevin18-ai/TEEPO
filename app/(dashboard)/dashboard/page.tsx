@@ -20,6 +20,7 @@ import { supabase } from '@/lib/supabase'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import GlowCard from '@/components/ui/GlowCard'
 import AnimatedBorder from '@/components/ui/AnimatedBorder'
+import Teepo, { type TeepoState } from '@/components/Teepo'
 import type { Course, Assignment, StudyTask, BGUGrade } from '@/types'
 import { format, formatDistanceToNow, differenceInDays, differenceInHours } from 'date-fns'
 import { he } from 'date-fns/locale'
@@ -44,6 +45,32 @@ function getGreeting(): string {
   if (h >= 12 && h < 17) return 'צהריים טובים'
   if (h >= 17 && h < 21) return 'ערב טוב'
   return 'לילה טוב'
+}
+
+/**
+ * TEEPO mood based on time of day + user activity.
+ * Priority order: activity > time-of-day.
+ */
+function getTeepoMood(opts: {
+  hour: number
+  hasData: boolean
+  urgentCount: number
+  todayTotal: number
+  todayDone: number
+}): { state: TeepoState; hint: string } {
+  const { hour, hasData, urgentCount, todayTotal, todayDone } = opts
+
+  // Activity-driven states (override time of day)
+  if (!hasData) return { state: 'sassy', hint: 'שעמום. תתחיל להוסיף משהו?' }
+  if (urgentCount >= 3) return { state: 'alert', hint: 'ערמת דחופים. יאללה.' }
+  if (urgentCount >= 1) return { state: 'thinking', hint: 'משהו דחוף בפתח.' }
+  if (todayTotal > 0 && todayDone === todayTotal) return { state: 'celebrate', hint: 'סיימת הכל היום. כל הכבוד!' }
+
+  // Time-of-day fallback
+  if (hour >= 22 || hour < 5) return { state: 'sleep', hint: 'מאוחר. לכו לישון.' }
+  if (hour >= 5 && hour < 12)   return { state: 'idle',     hint: 'יום חדש, בוא נתחיל.' }
+  if (hour >= 12 && hour < 17)  return { state: 'happy',    hint: 'צהריים טובים!' }
+  return { state: 'thinking', hint: 'ערב טוב. מה על הבוקר מחר?' }
 }
 
 
@@ -293,14 +320,35 @@ export default function DashboardPage() {
 
       {/* ── Header ── */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-heading-1 leading-tight">
-            <span className="text-ink">{getGreeting()}, </span>
-            <span className="gradient-text hand-underline">{displayName}</span>
-          </h1>
-          <p className="text-sm text-ink-muted mt-1">
-            {getSemesterStatus().label} &middot; {format(new Date(), 'EEEE, d בMMMM', { locale: he })}
-          </p>
+        <div className="flex items-center gap-4">
+          {/* TEEPO mascot — state reflects time of day + activity */}
+          {(() => {
+            const { state, hint } = getTeepoMood({
+              hour: new Date().getHours(),
+              hasData,
+              urgentCount: urgentAssignments.length,
+              todayTotal: todayTasks.length,
+              todayDone: completedTodayTasks.length,
+            })
+            return (
+              <div
+                className="flex-shrink-0 hidden sm:block"
+                title={hint}
+                aria-label={`TEEPO: ${hint}`}
+              >
+                <Teepo state={state} size={68} />
+              </div>
+            )
+          })()}
+          <div>
+            <h1 className="text-heading-1 leading-tight">
+              <span className="text-ink">{getGreeting()}, </span>
+              <span className="gradient-text hand-underline">{displayName}</span>
+            </h1>
+            <p className="text-sm text-ink-muted mt-1">
+              {getSemesterStatus().label} &middot; {format(new Date(), 'EEEE, d בMMMM', { locale: he })}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <NotificationCenter
@@ -333,37 +381,89 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
         >
-          <div className="grid grid-cols-3 gap-3">
-            <div className="glass-sm rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold text-ink">{completedTodayTasks.length}/{todayTasks.length}</p>
-              <p className="text-xs text-ink-muted mt-0.5">משימות היום</p>
-            </div>
-            <div className="glass-sm rounded-xl p-3 text-center">
-              <p className="text-2xl font-bold" style={{ color: urgentAssignments.length > 0 ? '#f59e0b' : '#10b981' }}>
-                {urgentAssignments.length}
-              </p>
-              <p className="text-xs text-ink-muted mt-0.5">
-                {urgentAssignments.length > 0 ? 'מטלות דחופות' : 'אין דחופות'}
-              </p>
-            </div>
-            {(() => {
-              const s = getSemesterStatus()
-              const num = s.daysRemaining ?? s.daysUntilNext ?? null
-              const label = s.daysRemaining != null
-                ? 'ימים לסוף הסמסטר'
-                : s.daysUntilNext != null
-                  ? `עד פתיחת ${s.nextLabel}`
-                  : 'חופשה'
-              return (
-                <div className="glass-sm rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold gradient-text">
-                    {num ?? '—'}
-                  </p>
-                  <p className="text-xs text-ink-muted mt-0.5">{label}</p>
+          {(() => {
+            const hasGpa = gradesAvg != null
+            const cols = hasGpa ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'
+            return (
+              <div className={`grid ${cols} gap-3`}>
+                {/* Tasks today */}
+                <div className="glass-sm rounded-xl p-3 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                       style={{ background: 'rgba(107,91,229,0.15)' }}>
+                    <CheckSquare size={18} style={{ color: '#B8A9FF' }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xl font-bold text-ink leading-none">
+                      {completedTodayTasks.length}
+                      <span className="text-sm text-ink-muted font-medium">/{todayTasks.length}</span>
+                    </p>
+                    <p className="text-[11px] text-ink-muted mt-1">משימות היום</p>
+                  </div>
                 </div>
-              )
-            })()}
-          </div>
+
+                {/* Urgent assignments */}
+                <div className="glass-sm rounded-xl p-3 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                       style={{ background: urgentAssignments.length > 0 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)' }}>
+                    {urgentAssignments.length > 0
+                      ? <AlertTriangle size={18} style={{ color: '#f59e0b' }} />
+                      : <CheckCircle2 size={18} style={{ color: '#10b981' }} />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xl font-bold leading-none"
+                       style={{ color: urgentAssignments.length > 0 ? '#f59e0b' : '#10b981' }}>
+                      {urgentAssignments.length}
+                    </p>
+                    <p className="text-[11px] text-ink-muted mt-1">
+                      {urgentAssignments.length > 0 ? 'מטלות דחופות' : 'אין דחופות'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Semester days */}
+                {(() => {
+                  const s = getSemesterStatus()
+                  const num = s.daysRemaining ?? s.daysUntilNext ?? null
+                  const label = s.daysRemaining != null
+                    ? 'ימים לסוף הסמסטר'
+                    : s.daysUntilNext != null
+                      ? `עד פתיחת ${s.nextLabel}`
+                      : 'חופשה'
+                  return (
+                    <div className="glass-sm rounded-xl p-3 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                           style={{ background: 'rgba(129,140,248,0.15)' }}>
+                        <Calendar size={18} style={{ color: '#818cf8' }} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xl font-bold gradient-text leading-none">
+                          {num ?? '—'}
+                        </p>
+                        <p className="text-[11px] text-ink-muted mt-1">{label}</p>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* GPA (only when available) */}
+                {hasGpa && (
+                  <div className="glass-sm rounded-xl p-3 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                         style={{ background: `${getGradeColor(gradesAvg!)}22` }}>
+                      <Award size={18} style={{ color: getGradeColor(gradesAvg!) }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xl font-bold leading-none"
+                         style={{ color: getGradeColor(gradesAvg!) }}>
+                        {gradesAvg!.toFixed(1)}
+                      </p>
+                      <p className="text-[11px] text-ink-muted mt-1">ממוצע ציונים</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </motion.div>
       )}
 
