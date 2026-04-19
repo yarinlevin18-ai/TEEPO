@@ -147,6 +147,30 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ content, num_questions: numQuestions }),
       }),
+    /**
+     * Upload a recording of a class → Whisper transcription → Claude summary.
+     * Goes through multipart/form-data, so we skip the generic `request()`
+     * helper (which forces JSON Content-Type).
+     */
+    transcribe: async (
+      lessonId: string,
+      audio: Blob,
+      filename = 'recording.webm',
+    ): Promise<{ transcript: string; summary: string; lesson: any }> => {
+      const authHeaders = await getAuthHeaders()
+      const form = new FormData()
+      form.append('audio', audio, filename)
+      const res = await fetch(`${BACKEND}/api/lessons/${lessonId}/transcribe`, {
+        method: 'POST',
+        headers: { ...authHeaders }, // Do NOT set Content-Type — browser adds boundary
+        body: form,
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }))
+        throw new Error(err.error || `שגיאת תמלול: ${res.status}`)
+      }
+      return res.json()
+    },
   },
 
   bgu: {

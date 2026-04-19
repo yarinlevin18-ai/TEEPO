@@ -553,6 +553,10 @@ def update_lesson(lesson_id: str):
             update_data["files"] = body["files"]  # JSON array
         if "ai_summary" in body:
             update_data["ai_summary"] = str(body["ai_summary"])[:MAX_CONTENT]
+        if "transcript" in body:
+            update_data["transcript"] = str(body["transcript"])[:MAX_CONTENT * 4]
+        if "recap" in body:
+            update_data["recap"] = str(body["recap"])[:MAX_CONTENT]
         if "is_completed" in body:
             update_data["is_completed"] = bool(body["is_completed"])
             if body["is_completed"]:
@@ -614,3 +618,99 @@ def generate_quiz():
     orch = get_orchestrator()
     result = orch.generate_quiz(lesson_text, num_questions)
     return jsonify(result)
+
+
+# ------------------------------------------------------------------ #
+#  Lesson Recording — Whisper transcription + summary                  #
+# ------------------------------------------------------------------ #
+
+# Max audio upload: 24 MB (Whisper API limit is 25 MB — leave headroom).
+MAX_AUDIO_BYTES = 24 * 1024 * 1024
+
+
+@api.post("/lessons/<lesson_id>/transcribe")
+def transcribe_lesson(lesson_id: str):
+    """
+    Accept an audio file, send it to OpenAI Whisper (language=he), save the
+    transcript on the lesson row, and return both transcript + an AI summary.
+
+    Request: multipart/form-data with field ``audio`` (file blob).
+    Response: { transcript, summary, lesson: { id, transcript, recap } }
+    """
+    import os as _os
+
+    if "audio" not in request.files:
+        return jsonify({"error": "לא נשלח קובץ אודיו"}), 400
+
+    f = request.files["audio"]
+    raw = f.read()
+    if len(raw) == 0:
+        return jsonify({"error": "קובץ ריק"}), 400
+    if len(raw) > MAX_AUDIO_BYTES:
+        return jsonify({
+            "error": f"הקובץ גדול מדי ({len(raw) // (1024*1024)}MB). מקסימום 24MB."
+        }), 413
+
+    openai_key = _os.getenv("OPENAI_API_KEY", "")
+    if not openai_key:
+        return jsonify({"error": "תמלול לא מוגדר בשרת (OPENAI_API_KEY חסר)."}), 503
+
+    try:
+        # Lazy import so dev environments without openai installed don't crash on import
+        from openai import OpenAI
+        client_oa = OpenAI(api_key=openai_key)
+
+        # Whisper wants a file-like object with a .name attribute
+        import io
+        buf = io.BytesIO(raw)
+        buf.name = f.filename or "recording.webm"
+
+        tx = client_oa.audio.transcriptions.create(
+            model="whisper-1",
+            file=buf,
+            language="he",
+            response_format="text",
+        )
+        transcript_text = (tx if isinstance(tx, str) else getattr(tx, "text", "")) or ""
+        transcript_text = transcript_text.strip()
+
+        if not transcript_text:
+            return jsonify({"error": "לא זוהה דיבור בקובץ"}), 422
+
+    except Exception as e:
+        logger.warning(f"[transcribe] whisper error: {e}")
+        return jsonify({"error": f"תמלול נכשל: {e}"}), 500
+
+    # Ask Claude for a concise Hebrew study summary of the transcript
+    summary_text = ""
+    try:
+        orch = get_orchestrator()
+        summary_res = orch.summarize_lesson(transcript_text[:MAX_CONTENT], "הקלטת שיעור")
+        summary_text = (
+            summary_res.get("result")
+            or summary_res.get("summary")
+            or summary_res.get("answer")
+            or ""
+        )
+    except Exception as e:
+        logger.warning(f"[transcribe] summary failed (non-fatal): {e}")
+
+    # Persist transcript + recap on the lesson
+    lesson_row = None
+    try:
+        sb = db.get_client()
+        patch = {
+            "transcript": transcript_text[:MAX_CONTENT * 4],
+        }
+        if summary_text:
+            patch["recap"] = summary_text[:MAX_CONTENT]
+        res = sb.table("lessons").update(patch).eq("id", lesson_id).execute()
+        lesson_row = res.data[0] if res.data else None
+    except Exception as e:
+        logger.warning(f"[transcribe] db save failed (non-fatal): {e}")
+
+    return jsonify({
+        "transcript": transcript_text,
+        "summary": summary_text,
+        "lesson": lesson_row,
+    })

@@ -20,6 +20,7 @@ import {
 import Link from 'next/link'
 import { useDB, useCourse, useLessons } from '@/lib/db-context'
 import { CourseWorkspace } from '@/components/course/CourseTabs'
+import CourseNotebookStack from '@/components/course/CourseNotebookStack'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import { semesterLabel } from '@/lib/semester-classifier'
 import type { Lesson } from '@/types'
@@ -242,46 +243,35 @@ export default function CourseDetailPage() {
               )}
             </AnimatePresence>
 
-            {/* Lessons List or Empty State */}
-            {lessons.length === 0 && !showNewLesson ? (
-              <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="glass rounded-2xl p-10 text-center relative overflow-hidden"
-              >
-                <div className="absolute inset-0 opacity-30">
-                  <div className="absolute top-6 right-10 w-20 h-20 rounded-full bg-indigo-500/10 blur-2xl" />
-                  <div className="absolute bottom-8 left-12 w-16 h-16 rounded-full bg-violet-500/10 blur-2xl" />
+            {/* The chapters stack — unveil-style cascade */}
+            <CourseNotebookStack
+              courseId={courseId}
+              lessons={lessons}
+              onAddLesson={() => {
+                setShowNewLesson(true)
+                setTimeout(() => newLessonInputRef.current?.focus(), 100)
+              }}
+            />
+
+            {/* Compact linear index — power-user fallback under the stack */}
+            {lessons.length > 0 && (
+              <details className="mt-1">
+                <summary className="text-[11px] text-ink-subtle cursor-pointer hover:text-ink px-1 py-1">
+                  רשימה קומפקטית ({lessons.length})
+                </summary>
+                <div className="space-y-1 mt-2">
+                  {lessons.map((lesson, index) => (
+                    <LessonCard
+                      key={lesson.id}
+                      lesson={lesson}
+                      index={index}
+                      courseId={courseId}
+                      onToggleCompleted={() => toggleLesson(lesson)}
+                      onDelete={() => deleteLesson(lesson.id)}
+                    />
+                  ))}
                 </div>
-                <div className="relative">
-                  <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
-                    <BookOpen size={28} className="text-indigo-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-ink mb-1">אין שיעורים עדיין</h3>
-                  <p className="text-sm text-ink-muted mb-5 max-w-sm mx-auto">
-                    הוסף שיעורים לקורס. לכל שיעור תקבל מחברת AI עם סיכום, צ׳אט וקבצים.
-                  </p>
-                  <button
-                    onClick={() => { setShowNewLesson(true); setTimeout(() => newLessonInputRef.current?.focus(), 100) }}
-                    className="btn-gradient px-5 py-2.5 rounded-xl text-sm text-white font-medium inline-flex items-center gap-2 shadow-lg shadow-indigo-500/20"
-                  >
-                    <Plus size={15} /> הוסף שיעור ראשון
-                  </button>
-                </div>
-              </motion.div>
-            ) : (
-              <div className="space-y-2">
-                {lessons.map((lesson, index) => (
-                  <LessonCard
-                    key={lesson.id}
-                    lesson={lesson}
-                    index={index}
-                    courseId={courseId}
-                    onToggleCompleted={() => toggleLesson(lesson)}
-                    onDelete={() => deleteLesson(lesson.id)}
-                  />
-                ))}
-              </div>
+              </details>
             )}
           </>
         }

@@ -30,7 +30,8 @@ import {
   CheckSquare, FileText, Calendar, Sparkles, Wand2,
   Trash2, ExternalLink, FileUp, Plus, Check, X,
   BookOpen, FolderOpen, File as FileIcon, Presentation,
-  Image as ImageIcon,
+  Image as ImageIcon, Mic, Square, Upload, StopCircle,
+  ArrowLeft,
 } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import {
@@ -86,6 +87,19 @@ export default function LessonNotebookPage() {
   const [summarizing, setSummarizing] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialisedRef = useRef(false)
+
+  // Neighbours for the prev/next recap bands
+  const sortedLessons = [...lessons].sort((a, b) => a.order_index - b.order_index)
+  const myIdx = sortedLessons.findIndex(l => l.id === lessonId)
+  const prevLesson = myIdx > 0 ? sortedLessons[myIdx - 1] : null
+  const nextLesson = myIdx >= 0 && myIdx < sortedLessons.length - 1 ? sortedLessons[myIdx + 1] : null
+
+  // Recording + transcription
+  const [recording, setRecording] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Hydrate editor once when the lesson data arrives
   useEffect(() => {
@@ -145,6 +159,81 @@ export default function LessonNotebookPage() {
       rtl: true,
     })
   }
+
+  // ── Recording: browser MediaRecorder → upload to /transcribe ──
+  const startRecording = async () => {
+    if (recording || transcribing) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      audioChunksRef.current = []
+      mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        await uploadRecording(blob, 'recording.webm')
+      }
+      mediaRecorderRef.current = mr
+      mr.start()
+      setRecording(true)
+    } catch (e: any) {
+      setError(e?.message?.includes('Permission') ? 'אין הרשאה למיקרופון.' : 'שגיאה בהתחלת ההקלטה.')
+    }
+  }
+
+  const stopRecording = () => {
+    const mr = mediaRecorderRef.current
+    if (mr && mr.state !== 'inactive') mr.stop()
+    setRecording(false)
+  }
+
+  const uploadRecording = async (blob: Blob, filename: string) => {
+    if (!lesson) return
+    setTranscribing(true)
+    try {
+      const res = await api.lessons.transcribe(lesson.id, blob, filename)
+      // Backend already saved transcript+recap, but refresh locally so UI
+      // sees it without waiting for the next DB poll.
+      await updateLesson(lesson.id, {
+        transcript: res.transcript,
+        ...(res.summary ? { recap: res.summary } : {}),
+      })
+    } catch (e: any) {
+      setError(e?.message || 'תמלול נכשל.')
+    } finally {
+      setTranscribing(false)
+    }
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    e.target.value = ''
+    await uploadRecording(f, f.name)
+  }
+
+  // ── Auto-summarize when leaving (creates/updates lesson.ai_summary silently) ──
+  // We reuse `summarize` only when the user has written enough content AND
+  // no recent ai_summary exists — so we don't spam tokens on every back-nav.
+  useEffect(() => {
+    return () => {
+      const current = lesson
+      if (!current) return
+      const plain = (content || current.content || '').replace(/<[^>]*>/g, '').trim()
+      if (plain.length < 120) return           // too short to summarize
+      if (current.ai_summary && current.ai_summary.length > 40) return // fresh enough
+      // Fire-and-forget: we can't await in cleanup reliably, but the HTTP
+      // call still flushes to the backend.
+      api.lessons
+        .summarize(plain.slice(0, 8000), current.title)
+        .then(r => {
+          const summary = r.result || r.summary || r.answer
+          if (summary) return updateLesson(current.id, { ai_summary: summary, recap: summary })
+        })
+        .catch(() => { /* silent — best-effort */ })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson?.id])
 
   // Per-lesson tasks (now scoped by lesson_id)
   const lessonTasks = db.tasks.filter(t => t.lesson_id === lessonId)
@@ -257,6 +346,36 @@ export default function LessonNotebookPage() {
         <span className="text-ink font-medium truncate">{lesson.title}</span>
       </div>
 
+      {/* ── Prev chapter recap ── */}
+      {prevLesson && (prevLesson.recap || prevLesson.ai_summary) && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-3"
+        >
+          <Link
+            href={`/courses/${courseId}/lessons/${prevLesson.id}`}
+            className="block group rounded-2xl border border-white/5 bg-gradient-to-l from-indigo-500/[0.06] to-transparent hover:from-indigo-500/[0.1] transition-colors px-4 py-3"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
+                <ArrowRight size={14} className="text-indigo-300 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] uppercase tracking-[0.16em] text-ink-subtle font-semibold">
+                  מה היה בפרק הקודם
+                </p>
+                <p className="text-xs text-ink-muted line-clamp-2 mt-0.5">
+                  <span className="text-ink font-medium">{prevLesson.title}</span>
+                  <span className="mx-1.5 text-ink-subtle">·</span>
+                  {prevLesson.recap || prevLesson.ai_summary}
+                </p>
+              </div>
+            </div>
+          </Link>
+        </motion.div>
+      )}
+
       {/* ── Lesson header ── */}
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
@@ -287,6 +406,45 @@ export default function LessonNotebookPage() {
         {/* Actions */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <SaveIndicator state={saveState} />
+
+          {/* Record / stop */}
+          {recording ? (
+            <button
+              onClick={stopRecording}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 transition-colors animate-pulse"
+              title="עצור הקלטה"
+            >
+              <StopCircle size={12} /> עצור
+            </button>
+          ) : (
+            <button
+              onClick={startRecording}
+              disabled={transcribing}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 transition-colors disabled:opacity-40"
+              title="הקלט שיעור"
+            >
+              {transcribing ? <Loader2 size={12} className="animate-spin" /> : <Mic size={12} />}
+              {transcribing ? 'מתמלל…' : 'הקלט'}
+            </button>
+          )}
+
+          {/* Upload audio file */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={transcribing || recording}
+            className="hidden md:inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+            title="העלה קובץ אודיו לתמלול"
+          >
+            <Upload size={12} /> העלה
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*,video/mp4,video/webm"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+
           <button
             onClick={handleSummarize}
             disabled={summarizing || !(content || lesson.content)}
@@ -562,6 +720,57 @@ export default function LessonNotebookPage() {
           )}
         </motion.section>
       </div>
+
+      {/* ── Transcript viewer ── */}
+      {lesson.transcript && (
+        <motion.section
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="glass rounded-2xl p-4 mt-4"
+        >
+          <details>
+            <summary className="cursor-pointer flex items-center gap-2 select-none">
+              <Mic size={14} className="text-rose-400" />
+              <span className="text-sm font-semibold text-ink">תמלול השיעור</span>
+              <span className="text-[10px] text-ink-subtle">
+                ({Math.round(lesson.transcript.length / 1000)}K תווים)
+              </span>
+              <ChevronLeft size={12} className="text-ink-subtle mr-auto transition-transform group-open:-rotate-90" />
+            </summary>
+            <pre className="mt-3 text-xs text-ink-muted leading-relaxed whitespace-pre-wrap font-sans max-h-72 overflow-y-auto p-3 rounded-xl bg-white/[0.02]">
+              {lesson.transcript}
+            </pre>
+          </details>
+        </motion.section>
+      )}
+
+      {/* ── Next chapter teaser ── */}
+      {nextLesson && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.34 }}
+          className="mt-4"
+        >
+          <Link
+            href={`/courses/${courseId}/lessons/${nextLesson.id}`}
+            className="block group rounded-2xl border border-white/5 bg-gradient-to-r from-violet-500/[0.06] to-transparent hover:from-violet-500/[0.1] transition-colors px-4 py-3"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0 text-right">
+                <p className="text-[10px] uppercase tracking-[0.16em] text-ink-subtle font-semibold">
+                  הפרק הבא
+                </p>
+                <p className="text-sm text-ink font-medium truncate">{nextLesson.title}</p>
+              </div>
+              <div className="w-9 h-9 rounded-lg bg-violet-500/15 flex items-center justify-center flex-shrink-0">
+                <ArrowLeft size={16} className="text-violet-300 group-hover:-translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+          </Link>
+        </motion.div>
+      )}
     </motion.div>
   )
 }

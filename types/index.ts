@@ -61,6 +61,10 @@ export interface Lesson {
   title: string
   content?: string
   ai_summary?: string
+  /** Raw Whisper transcript of a class recording. Stored as plain text. */
+  transcript?: string
+  /** Short AI recap of this lesson to greet the user when they open the next chapter. */
+  recap?: string
   duration_minutes?: number
   order_index: number
   is_completed: boolean
