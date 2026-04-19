@@ -714,3 +714,286 @@ def transcribe_lesson(lesson_id: str):
         "summary": summary_text,
         "lesson": lesson_row,
     })
+
+
+# ====================================================================== #
+#  Long-form recording pipeline — chunked Whisper + async job tracking    #
+# ====================================================================== #
+#
+# The sync /transcribe endpoint above handles <24 MB audio (a short tutor
+# session). Real lectures + Zoom recordings are 80–400 MB, so we:
+#
+#   1. Stream the upload to a temp file (no 500 MB in memory).
+#   2. Kick off a background thread → return { job_id } immediately.
+#   3. Thread uses ffmpeg to split into 10-minute mono 64 kbps mp3 chunks
+#      (~5 MB each, well under Whisper's 25 MB cap).
+#   4. Sequentially calls Whisper on each chunk, concatenates text.
+#   5. Asks Claude for a Hebrew summary, saves transcript + recap to DB.
+#   6. Frontend polls /transcribe/jobs/<id> every 2 s for stage + progress.
+#
+# Jobs live in process memory (2 h TTL) — fine for the current single-box
+# deployment; migrate to Redis / RQ when this becomes multi-worker.
+
+import os as _os_mod
+import time as _time_mod
+import threading as _threading_mod
+import tempfile as _tempfile_mod
+import subprocess as _subprocess_mod
+
+MAX_TRANSCRIBE_BYTES = 500 * 1024 * 1024  # 500 MB
+CHUNK_SECONDS = 600                       # 10-minute chunks
+_JOB_TTL_SEC = 2 * 3600                   # keep job state for 2 hours
+
+# { job_id: { lesson_id, stage, progress, total, transcript, summary, error,
+#             created_at, updated_at, filename, size_bytes } }
+_tx_jobs: dict = {}
+_tx_jobs_lock = _threading_mod.Lock()
+
+
+def _tx_set(job_id: str, **kwargs) -> None:
+    """Atomic partial update of a job's state dict."""
+    with _tx_jobs_lock:
+        job = _tx_jobs.get(job_id)
+        if job is None:
+            return
+        job.update(kwargs)
+        job["updated_at"] = _time_mod.time()
+
+
+def _tx_get(job_id: str) -> dict:
+    with _tx_jobs_lock:
+        job = _tx_jobs.get(job_id)
+        return dict(job) if job else {}
+
+
+def _tx_cleanup_old() -> None:
+    """Drop jobs older than TTL so memory doesn't grow unbounded."""
+    now = _time_mod.time()
+    with _tx_jobs_lock:
+        stale = [k for k, v in _tx_jobs.items()
+                 if now - v.get("created_at", 0) > _JOB_TTL_SEC]
+        for k in stale:
+            _tx_jobs.pop(k, None)
+
+
+def _ffmpeg_split(src_path: str, out_dir: str) -> list:
+    """
+    Convert any input container to a series of 10-minute mono 64 kbps mp3
+    chunks that each fit comfortably under Whisper's 25 MB cap.
+
+    Raises RuntimeError with the last 600 chars of ffmpeg stderr on failure.
+    """
+    cmd = [
+        "ffmpeg", "-y", "-i", src_path,
+        "-vn",                        # drop any video stream (mp4 from Zoom)
+        "-ac", "1",                   # mono
+        "-ar", "16000",               # 16 kHz — Whisper's native rate
+        "-b:a", "64k",                # ~5 MB per 10-minute chunk
+        "-c:a", "libmp3lame",
+        "-f", "segment",
+        "-segment_time", str(CHUNK_SECONDS),
+        "-reset_timestamps", "1",
+        _os_mod.path.join(out_dir, "chunk_%03d.mp3"),
+    ]
+    try:
+        _subprocess_mod.run(
+            cmd, check=True,
+            capture_output=True,
+            timeout=20 * 60,          # worst case: ~15 min for a 400 MB file
+        )
+    except _subprocess_mod.CalledProcessError as e:
+        tail = (e.stderr or b"").decode("utf-8", errors="replace")[-600:]
+        raise RuntimeError(f"ffmpeg failed: {tail}") from e
+    except _subprocess_mod.TimeoutExpired as e:
+        raise RuntimeError("ffmpeg timed out (>20 min)") from e
+
+    files = sorted(
+        f for f in _os_mod.listdir(out_dir)
+        if f.startswith("chunk_") and f.endswith(".mp3")
+    )
+    if not files:
+        raise RuntimeError("ffmpeg produced no chunks (unsupported file?)")
+    return [_os_mod.path.join(out_dir, f) for f in files]
+
+
+def _run_tx_job(job_id: str, lesson_id: str, src_path: str) -> None:
+    """Worker thread: chunk → whisper each chunk → summarize → save."""
+    try:
+        openai_key = _os_mod.getenv("OPENAI_API_KEY", "")
+        if not openai_key:
+            _tx_set(job_id, stage="error",
+                    error="תמלול לא מוגדר בשרת (OPENAI_API_KEY חסר).")
+            return
+
+        from openai import OpenAI
+        client_oa = OpenAI(api_key=openai_key)
+
+        with _tempfile_mod.TemporaryDirectory(prefix="tx_") as tmp:
+            # ── 1. chunk ────────────────────────────────────────────
+            _tx_set(job_id, stage="chunking")
+            try:
+                chunks = _ffmpeg_split(src_path, tmp)
+            except Exception as e:
+                logger.warning(f"[tx {job_id}] ffmpeg: {e}")
+                _tx_set(job_id, stage="error",
+                        error="עיבוד הקובץ נכשל. ייתכן שהפורמט לא נתמך.")
+                return
+
+            # ── 2. transcribe each chunk ────────────────────────────
+            _tx_set(job_id, stage="transcribing", progress=0, total=len(chunks))
+            parts = []
+            for i, cpath in enumerate(chunks):
+                try:
+                    with open(cpath, "rb") as cf:
+                        tx = client_oa.audio.transcriptions.create(
+                            model="whisper-1",
+                            file=cf,
+                            language="he",
+                            response_format="text",
+                        )
+                    text = (tx if isinstance(tx, str)
+                            else getattr(tx, "text", "")) or ""
+                    parts.append(text.strip())
+                except Exception as e:
+                    logger.warning(f"[tx {job_id}] whisper chunk {i}: {e}")
+                    # Keep going — one bad chunk shouldn't kill the whole job
+                    parts.append("")
+                _tx_set(job_id, progress=i + 1)
+
+            transcript = " ".join(p for p in parts if p).strip()
+            if not transcript:
+                _tx_set(job_id, stage="error",
+                        error="לא זוהה דיבור בקובץ.")
+                return
+
+            # ── 3. summarize via Claude ─────────────────────────────
+            _tx_set(job_id, stage="summarizing")
+            summary = ""
+            try:
+                orch = get_orchestrator()
+                s = orch.summarize_lesson(
+                    transcript[:MAX_CONTENT],
+                    "הקלטת שיעור",
+                )
+                summary = (
+                    s.get("result") or s.get("summary") or s.get("answer") or ""
+                ).strip()
+            except Exception as e:
+                logger.warning(f"[tx {job_id}] summary failed (non-fatal): {e}")
+
+            # ── 4. persist ──────────────────────────────────────────
+            _tx_set(job_id, stage="saving")
+            try:
+                sb = db.get_client()
+                patch = {"transcript": transcript[:MAX_CONTENT * 4]}
+                if summary:
+                    patch["recap"] = summary[:MAX_CONTENT]
+                sb.table("lessons").update(patch).eq("id", lesson_id).execute()
+            except Exception as e:
+                logger.warning(f"[tx {job_id}] db save failed (non-fatal): {e}")
+
+            _tx_set(job_id, stage="done",
+                    transcript=transcript, summary=summary)
+
+    except Exception as e:
+        logger.exception(f"[tx {job_id}] unexpected error")
+        _tx_set(job_id, stage="error", error=f"שגיאה לא צפויה: {e}")
+    finally:
+        # Always clean up the uploaded temp file.
+        try:
+            _os_mod.unlink(src_path)
+        except Exception:
+            pass
+
+
+@api.post("/lessons/<lesson_id>/transcribe/start")
+def transcribe_lesson_start(lesson_id: str):
+    """
+    Accept a large audio/video upload, stream it to disk, kick off the
+    chunking+transcribe pipeline in a background thread, and return a
+    job_id the client can poll.
+    """
+    if "audio" not in request.files:
+        return jsonify({"error": "לא נשלח קובץ"}), 400
+
+    f = request.files["audio"]
+    original_name = f.filename or "recording"
+
+    # Preserve extension so ffmpeg can sniff the container.
+    _, ext = _os_mod.path.splitext(original_name)
+    if not ext or len(ext) > 8:
+        ext = ".bin"
+
+    fd, tmp_path = _tempfile_mod.mkstemp(prefix="tx_src_", suffix=ext)
+    total = 0
+    try:
+        with _os_mod.fdopen(fd, "wb") as out:
+            while True:
+                buf = f.stream.read(1024 * 1024)
+                if not buf:
+                    break
+                total += len(buf)
+                if total > MAX_TRANSCRIBE_BYTES:
+                    raise ValueError("too_large")
+                out.write(buf)
+    except ValueError:
+        try: _os_mod.unlink(tmp_path)
+        except Exception: pass
+        return jsonify({
+            "error": f"הקובץ גדול מדי (מעל {MAX_TRANSCRIBE_BYTES // (1024*1024)}MB)."
+        }), 413
+    except Exception as e:
+        try: _os_mod.unlink(tmp_path)
+        except Exception: pass
+        return jsonify({"error": f"העלאה נכשלה: {e}"}), 500
+
+    if total == 0:
+        try: _os_mod.unlink(tmp_path)
+        except Exception: pass
+        return jsonify({"error": "קובץ ריק"}), 400
+
+    job_id = uuid.uuid4().hex
+    now = _time_mod.time()
+    with _tx_jobs_lock:
+        _tx_jobs[job_id] = {
+            "lesson_id": lesson_id,
+            "stage": "queued",
+            "progress": 0,
+            "total": 0,
+            "transcript": "",
+            "summary": "",
+            "error": None,
+            "created_at": now,
+            "updated_at": now,
+            "filename": original_name,
+            "size_bytes": total,
+        }
+
+    _threading_mod.Thread(
+        target=_run_tx_job,
+        args=(job_id, lesson_id, tmp_path),
+        daemon=True,
+    ).start()
+
+    _tx_cleanup_old()
+    return jsonify({"job_id": job_id, "size_bytes": total, "filename": original_name})
+
+
+@api.get("/transcribe/jobs/<job_id>")
+def transcribe_job_status(job_id: str):
+    """Poll endpoint — returns current stage/progress and final result."""
+    job = _tx_get(job_id)
+    if not job:
+        return jsonify({"error": "job_not_found"}), 404
+    stage = job.get("stage")
+    return jsonify({
+        "stage": stage,
+        "progress": job.get("progress", 0),
+        "total": job.get("total", 0),
+        "error": job.get("error"),
+        # Only ship the heavy fields when the job is complete.
+        "transcript": job.get("transcript", "") if stage == "done" else "",
+        "summary":    job.get("summary", "")    if stage == "done" else "",
+        "filename":   job.get("filename", ""),
+        "size_bytes": job.get("size_bytes", 0),
+    })

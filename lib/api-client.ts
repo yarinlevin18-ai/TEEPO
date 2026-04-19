@@ -171,6 +171,59 @@ export const api = {
       }
       return res.json()
     },
+    /**
+     * Async large-recording pipeline. Uploads audio/video up to 500 MB,
+     * gets back a `job_id`, then the caller polls `transcribeJob(jobId)`
+     * every ~2 s until stage === 'done' or 'error'.
+     */
+    startTranscribe: async (
+      lessonId: string,
+      audio: Blob,
+      filename: string,
+      onUploadProgress?: (pct: number) => void,
+    ): Promise<{ job_id: string; size_bytes: number; filename: string }> => {
+      const authHeaders = await getAuthHeaders()
+      const form = new FormData()
+      form.append('audio', audio, filename)
+
+      // Use XHR so we get real upload progress — fetch() doesn't expose it.
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('POST', `${BACKEND}/api/lessons/${lessonId}/transcribe/start`)
+        for (const [k, v] of Object.entries(authHeaders)) xhr.setRequestHeader(k, v)
+        xhr.upload.onprogress = (e) => {
+          if (onUploadProgress && e.lengthComputable) {
+            onUploadProgress(Math.round((e.loaded / e.total) * 100))
+          }
+        }
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText)) }
+            catch { reject(new Error('תגובת שרת לא תקינה.')) }
+          } else {
+            let msg = `שגיאת העלאה (${xhr.status}).`
+            try {
+              const j = JSON.parse(xhr.responseText)
+              if (j?.error) msg = j.error
+            } catch { /* keep default */ }
+            reject(new Error(msg))
+          }
+        }
+        xhr.onerror = () => reject(new Error('חיבור לרשת נכשל.'))
+        xhr.send(form)
+      })
+    },
+    transcribeJob: (jobId: string) =>
+      request<{
+        stage: 'queued' | 'chunking' | 'transcribing' | 'summarizing' | 'saving' | 'done' | 'error'
+        progress: number
+        total: number
+        error: string | null
+        transcript: string
+        summary: string
+        filename: string
+        size_bytes: number
+      }>(`/api/transcribe/jobs/${jobId}`),
   },
 
   bgu: {

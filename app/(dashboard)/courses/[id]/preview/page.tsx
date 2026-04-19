@@ -39,6 +39,7 @@ import {
 import { useDB, useCourse, useLessons } from '@/lib/db-context'
 import NotebookPaper, { type NotebookPrefs } from '@/components/course/NotebookPaper'
 import LessonNotebookChat from '@/components/course/LessonNotebookChat'
+import LessonRecorder from '@/components/course/LessonRecorder'
 import { TasksMini, AssignmentsMini } from '@/components/course/CourseTabs'
 import {
   runNotebookAi,
@@ -129,6 +130,27 @@ export default function CourseNotebookPreview() {
     triggerIdle()
   }
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current) }, [])
+
+  // ── Insert AI summary from a lesson recording into the notebook body.
+  //    Parses the summary (which may be plain text, numbered sections, or
+  //    bullet lines) into lightweight HTML and appends it to the target
+  //    lesson's existing content. The editor auto-syncs via its content
+  //    prop effect, so the user sees the insertion immediately.
+  const handleInsertSummary = (targetLessonId: string, summary: string) => {
+    const target = lessons.find(l => l.id === targetLessonId)
+    if (!target) return
+    const dateLabel = new Date().toLocaleDateString('he-IL', {
+      day: 'numeric', month: 'numeric', year: 'numeric',
+    })
+    const block = summaryToHtml(summary, dateLabel)
+    const existing = target.content || ''
+    const separator = existing.trim() ? '<p></p>' : ''
+    updateLesson(targetLessonId, { content: existing + separator + block })
+    // If the user was looking at a different chapter, jump to the one we
+    // just updated so they see the inserted summary.
+    if (activeLesson?.id !== targetLessonId) setActiveId(targetLessonId)
+    setCoachMsg(`הסיכום של ההקלטה נוסף לפרק "${target.title}".`)
+  }
 
   // ── AI actions — wire the inline editor affordances to the notebook
   //    backend. Each handler returns { ok, text } or { ok:false, error }.
@@ -379,6 +401,17 @@ export default function CourseNotebookPreview() {
         </aside>
       </div>
 
+      {/* ── Lesson recorder (audio/Zoom → Whisper → Claude summary) ── */}
+      {lessons.length > 0 && (
+        <div className="mb-6">
+          <LessonRecorder
+            lessons={lessons.map(l => ({ id: l.id, title: l.title }))}
+            defaultLessonId={activeLesson?.id || lessons[0]?.id}
+            onInsertSummary={handleInsertSummary}
+          />
+        </div>
+      )}
+
       {/* ── Missions (synced view) ─────────────────────── */}
       <div className="glass rounded-2xl p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
@@ -477,6 +510,39 @@ function MoodleCard({
       {children}
     </div>
   )
+}
+
+// ── summaryToHtml ────────────────────────────────────────────
+// Claude's summary comes back as Hebrew plain text that mixes numbered
+// section headers ("1. נקודות עיקריות"), bullet lines ("- foo") and plain
+// paragraphs. Convert that into lightweight HTML the TipTap editor will
+// round-trip cleanly, so inserting it "just looks right" in the notebook.
+function summaryToHtml(text: string, dateLabel: string): string {
+  const esc = (s: string) => s
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+  const lines = (text || '').split('\n')
+  let html = `<h3>🎤 סיכום הקלטת השיעור · ${esc(dateLabel)}</h3>`
+  let inList = false
+  const closeList = () => { if (inList) { html += '</ul>'; inList = false } }
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line) { closeList(); continue }
+    const bulletMatch = line.match(/^[-•·*]\s+(.*)$/)
+    const numberedMatch = line.match(/^\d+[.)]\s+(.*)$/)
+    if (bulletMatch) {
+      if (!inList) { html += '<ul>'; inList = true }
+      html += `<li>${esc(bulletMatch[1])}</li>`
+    } else if (numberedMatch) {
+      closeList()
+      html += `<p><strong>${esc(numberedMatch[1])}</strong></p>`
+    } else {
+      closeList()
+      html += `<p>${esc(line)}</p>`
+    }
+  }
+  closeList()
+  return html
 }
 
 function StubList({ items, emptyText }: { items: string[]; emptyText: string }) {

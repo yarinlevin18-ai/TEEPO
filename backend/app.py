@@ -19,6 +19,10 @@ _start_time = _time.time()
 
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET_KEY
+# Allow large uploads for recorded-lesson audio/video (Zoom recordings of a
+# 90-minute class are 100–400 MB). The transcribe endpoint streams the file
+# to a temp path, so we're not holding 500 MB in memory.
+app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB
 
 # CORS — restrict to known origins in production
 _allowed_origins = [
