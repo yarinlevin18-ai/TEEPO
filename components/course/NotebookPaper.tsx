@@ -38,6 +38,10 @@ interface Props extends NotebookPrefs {
   headerRight?: React.ReactNode
   /** Label shown in the top-left of the header. Default: "המחברת". */
   title?: string
+  /** Optional live writing stats rendered in a small footer under the page. */
+  stats?: { words: number; chars?: number }
+  /** Optional save state — "saved" / "saving" / null. Shown next to stats. */
+  saveState?: 'saving' | 'saved' | null
 }
 
 const PAPER_BG: Record<PaperColor, string> = {
@@ -81,6 +85,7 @@ export default function NotebookPaper({
   children,
   paper, fontFamily, textSize, lineGap, showLines,
   onChange, headerRight, title = 'המחברת',
+  stats, saveState,
 }: Props) {
   const [open, setOpen] = useState(false)
 
@@ -182,6 +187,19 @@ export default function NotebookPaper({
 
       {/* The paper + lines */}
       <div className="relative" style={{ minHeight: 440 }}>
+        {/* Subtle paper grain — SVG noise overlay, very low opacity so lines
+            stay crisp but the surface reads as paper, not pixels. */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.28 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
+            opacity: isDarkPaper ? 0.18 : 0.08,
+            mixBlendMode: isDarkPaper ? 'screen' : 'multiply',
+          }}
+        />
+
         {/* Red margin (RTL → on the right) */}
         <div
           className="absolute top-0 bottom-0 w-[1.5px] pointer-events-none"
@@ -203,6 +221,36 @@ export default function NotebookPaper({
           {children}
         </div>
       </div>
+
+      {/* Footer strip — writing stats + save state */}
+      {(stats || saveState) && (
+        <div
+          className="flex items-center justify-between gap-3 px-5 py-1.5 border-t text-[10.5px]"
+          style={{
+            borderColor: isDarkPaper ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+            color: isDarkPaper ? 'rgba(232,229,250,0.55)' : 'rgba(15,23,42,0.52)',
+            background: isDarkPaper ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.025)',
+          }}
+        >
+          <span className="tabular-nums">
+            {stats ? (
+              <>
+                {stats.words.toLocaleString('he-IL')} מילים
+                {' · '}
+                ~{Math.max(1, Math.round(stats.words / 180))} דק׳ קריאה
+              </>
+            ) : <span>&nbsp;</span>}
+          </span>
+          <span className="flex items-center gap-1">
+            {saveState === 'saving' && (
+              <><span className="w-1.5 h-1.5 rounded-full bg-amber-400/80 animate-pulse" />שומר…</>
+            )}
+            {saveState === 'saved' && (
+              <><Check size={10} />נשמר</>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Global-ish styles for the embedded editor */}
       <style jsx>{`

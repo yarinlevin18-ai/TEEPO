@@ -40,6 +40,12 @@ import { useDB, useCourse, useLessons } from '@/lib/db-context'
 import NotebookPaper, { type NotebookPrefs } from '@/components/course/NotebookPaper'
 import LessonNotebookChat from '@/components/course/LessonNotebookChat'
 import { TasksMini, AssignmentsMini } from '@/components/course/CourseTabs'
+import {
+  runNotebookAi,
+  promptContinue, promptSummarize, promptExpand, promptFix, promptToList,
+  promptImprove, promptShorten, promptExplain,
+} from '@/lib/notebook-ai-client'
+import type { AiActionsAPI, EditorStats } from '@/components/RichTextEditor'
 import type { Lesson } from '@/types'
 
 const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false })
@@ -104,12 +110,42 @@ export default function CourseNotebookPreview() {
     )
   }
 
+  // ── Save state + editor stats (shown in the NotebookPaper footer) ──
+  const [saveState, setSaveState] = useState<'saving' | 'saved' | null>(null)
+  const [stats, setStats] = useState<EditorStats>({ words: 0, chars: 0 })
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // ── Save editor content ──────────────────────────────────
   const handleEdit = (html: string) => {
     if (!activeLesson) return
     updateLesson(activeLesson.id, { content: html })
+    setSaveState('saving')
+    if (savedTimer.current) clearTimeout(savedTimer.current)
+    savedTimer.current = setTimeout(() => {
+      setSaveState('saved')
+      // Hide "saved" after a moment so the footer returns to empty.
+      savedTimer.current = setTimeout(() => setSaveState(null), 1600)
+    }, 400)
     triggerIdle()
   }
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current) }, [])
+
+  // ── AI actions — wire the inline editor affordances to the notebook
+  //    backend. Each handler returns { ok, text } or { ok:false, error }.
+  const aiActions: AiActionsAPI = useMemo(() => {
+    const run = (prompt: string, context: string) =>
+      runNotebookAi({ prompt, context, courseId })
+    return {
+      continue:  (ctx) => run(promptContinue(), ctx),
+      summarize: (ctx) => run(promptSummarize(), ctx),
+      expand:    (para, ctx) => run(promptExpand(para), ctx),
+      fix:       (para, ctx) => run(promptFix(para), ctx),
+      toList:    (para, ctx) => run(promptToList(para), ctx),
+      improve:   (sel, ctx)  => run(promptImprove(sel), ctx),
+      shorten:   (sel, ctx)  => run(promptShorten(sel), ctx),
+      explain:   (sel, ctx)  => run(promptExplain(sel), ctx),
+    }
+  }, [courseId])
   const toggleDone = () => {
     if (!activeLesson) return
     updateLesson(activeLesson.id, { is_completed: !activeLesson.is_completed })
@@ -206,6 +242,8 @@ export default function CourseNotebookPreview() {
               {...prefs}
               onChange={(patch) => setPrefs(p => ({ ...p, ...patch }))}
               title={`פרק ${lessons.findIndex(l => l.id === activeLesson.id) + 1} · ${activeLesson.title}`}
+              stats={stats}
+              saveState={saveState}
               headerRight={
                 <div className="flex items-center gap-1">
                   <button
@@ -230,7 +268,9 @@ export default function CourseNotebookPreview() {
               <RichTextEditor
                 content={activeLesson.content || ''}
                 onChange={handleEdit}
-                placeholder="כתוב את הסיכום שלך כאן. ה-AI שקט אלא אם תבקש ממנו משהו."
+                placeholder="כתוב את הסיכום שלך כאן. ה-AI שקט אלא אם תבקש ממנו משהו. הקלד / לפעולות AI."
+                aiActions={aiActions}
+                onStats={setStats}
               />
             </NotebookPaper>
           ) : (
