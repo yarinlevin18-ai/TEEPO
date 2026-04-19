@@ -4,30 +4,26 @@
  * Course workspace — a click-minimized dashboard for a single course.
  *
  * UX principles:
- *  1. The Notes editor is the centerpiece — always open, auto-saved,
- *     cursor-ready the moment the page loads.
+ *  1. Lessons are the centerpiece — summaries live *per-lesson*, not at
+ *     the course level (the parent renders the lessons list via
+ *     `lessonsSlot`).
  *  2. Every side panel has an inline "type + Enter = added" input. No
  *     modals, no toggle flows, no "+ click → form → submit".
  *  3. Empty states are small inline hints, not huge empty cards.
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import dynamic from 'next/dynamic'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckSquare, FileText, StickyNote, MessageCircle, Trash2,
-  Loader2, Calendar, Send, Sparkles, X, Plus,
-  Check, FileDown, BookOpen,
+  Loader2, Calendar, Send, Sparkles,
 } from 'lucide-react'
 import { io, Socket } from 'socket.io-client'
 import { useDB } from '@/lib/db-context'
 import { useAuth } from '@/lib/auth-context'
-import { exportNoteToWord } from '@/lib/export-to-word'
 import QuickAddInput from './QuickAddInput'
-import type { Assignment, StudyTask, CourseNote, ChatMessage } from '@/types'
+import type { Assignment, StudyTask, ChatMessage } from '@/types'
 import { format } from 'date-fns'
-
-const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false })
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -63,9 +59,8 @@ export function CourseWorkspace({
 }) {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-      {/* LEFT — Notes editor (hero) */}
+      {/* LEFT — Lessons (each lesson holds its own summary) */}
       <section className="min-w-0 space-y-5">
-        <NotesHero courseId={courseId} courseTitle={courseTitle} />
         {lessonsSlot}
       </section>
 
@@ -76,252 +71,6 @@ export function CourseWorkspace({
         <AIMini courseId={courseId} courseTitle={courseTitle} />
       </aside>
     </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════
-// NOTES HERO — always-open rich editor, pills to switch between notes
-// ═══════════════════════════════════════════════════════════════
-
-type SaveState = 'idle' | 'saving' | 'saved' | 'error'
-
-function NotesHero({ courseId, courseTitle }: { courseId: string; courseTitle: string }) {
-  const { db, createNote, updateNote, deleteNote } = useDB()
-
-  // Notes for this course, most-recent first
-  const notes = useMemo(
-    () =>
-      db.notes
-        .filter(n => n.course_id === courseId)
-        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()),
-    [db.notes, courseId],
-  )
-
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [saveState, setSaveState] = useState<SaveState>('idle')
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const initialisedRef = useRef(false)
-
-  // Default to the most recent note when the list first arrives
-  useEffect(() => {
-    if (initialisedRef.current) return
-    if (notes.length > 0) {
-      setActiveId(notes[0].id)
-      setTitle(notes[0].title)
-      setContent(notes[0].content)
-      initialisedRef.current = true
-    }
-  }, [notes])
-
-  // Load the selected note into the editor when the user switches pills
-  useEffect(() => {
-    if (!activeId) return
-    const n = notes.find(x => x.id === activeId)
-    if (n && (n.title !== title || n.content !== content)) {
-      setTitle(n.title)
-      setContent(n.content)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId])
-
-  const active = activeId ? notes.find(n => n.id === activeId) : null
-
-  // Debounced auto-save — only runs when we have a note AND the content changed
-  useEffect(() => {
-    if (!active) return
-    const unchanged = title === active.title && content === active.content
-    if (unchanged) return
-    if (!title.trim() && !content.trim()) return
-
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    setSaveState('saving')
-    debounceRef.current = setTimeout(async () => {
-      try {
-        await updateNote(active.id, { title: title.trim() || 'ללא כותרת', content })
-        setSaveState('saved')
-        setTimeout(() => setSaveState('idle'), 1800)
-      } catch {
-        setSaveState('error')
-      }
-    }, 1200)
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content, active?.id])
-
-  const handleNewNote = useCallback(async () => {
-    try {
-      const created = await createNote(courseId, {
-        title: `סיכום ${format(new Date(), 'dd/MM')}`,
-        content: '',
-      })
-      setActiveId(created.id)
-      setTitle(created.title)
-      setContent('')
-      initialisedRef.current = true
-    } catch {
-      /* swallow */
-    }
-  }, [courseId, createNote])
-
-  const handleDelete = async () => {
-    if (!active) return
-    if (!confirm(`למחוק את הסיכום "${active.title}"?`)) return
-    await deleteNote(active.id)
-    setActiveId(null)
-    setTitle('')
-    setContent('')
-    initialisedRef.current = false
-  }
-
-  const handleExport = () => {
-    if (!active) return
-    exportNoteToWord({
-      title: `${courseTitle} — ${title || active.title}`,
-      html: content || active.content,
-      rtl: true,
-    })
-  }
-
-  // If there are no notes yet, show an editor that creates one on first keystroke
-  const showEmptyStarter = notes.length === 0 && !active
-
-  return (
-    <div className="glass rounded-2xl overflow-hidden">
-      {/* Pills bar + quick actions */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/5 overflow-x-auto">
-        <StickyNote size={14} className="text-indigo-400 flex-shrink-0" />
-        <span className="text-xs font-semibold text-ink-muted flex-shrink-0 ml-1">סיכומים</span>
-
-        <div className="flex items-center gap-1.5 flex-1 overflow-x-auto scrollbar-none">
-          {notes.map(n => {
-            const isActive = n.id === activeId
-            return (
-              <button
-                key={n.id}
-                onClick={() => setActiveId(n.id)}
-                className={`flex-shrink-0 text-xs px-2.5 py-1 rounded-full transition-all ${
-                  isActive
-                    ? 'bg-gradient-to-r from-indigo-500/30 to-violet-500/30 text-ink border border-indigo-400/30'
-                    : 'bg-white/5 text-ink-muted hover:text-ink hover:bg-white/10 border border-transparent'
-                }`}
-              >
-                {n.title || 'ללא כותרת'}
-              </button>
-            )
-          })}
-          <button
-            onClick={handleNewNote}
-            className="flex-shrink-0 w-6 h-6 rounded-full bg-white/5 hover:bg-indigo-500/20 hover:text-indigo-300 text-ink-muted flex items-center justify-center transition-all"
-            title="סיכום חדש"
-          >
-            <Plus size={12} />
-          </button>
-        </div>
-
-        {/* Save indicator */}
-        <SaveIndicator state={saveState} />
-
-        {/* Export to Word */}
-        {active && content && (
-          <button
-            onClick={handleExport}
-            className="flex-shrink-0 inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 transition-colors"
-            title="הורד כ-Word"
-          >
-            <FileDown size={12} />
-            Word
-          </button>
-        )}
-
-        {/* Delete current */}
-        {active && (
-          <button
-            onClick={handleDelete}
-            className="flex-shrink-0 p-1.5 rounded-lg text-ink-subtle hover:text-red-400 hover:bg-red-500/10 transition-colors"
-            title="מחק סיכום"
-          >
-            <Trash2 size={12} />
-          </button>
-        )}
-      </div>
-
-      {/* Title input */}
-      {(active || showEmptyStarter) && (
-        <div className="px-4 pt-4 pb-2">
-          <input
-            type="text"
-            value={title}
-            onChange={e => {
-              const v = e.target.value
-              setTitle(v)
-              // If this is a "ghost" session (no note yet), create on first keystroke
-              if (!active && (v || content) && !showEmptyStarter) return
-            }}
-            onFocus={async () => {
-              // Auto-create a note the moment the user engages with the empty editor
-              if (!active && showEmptyStarter) {
-                await handleNewNote()
-              }
-            }}
-            placeholder="כותרת הסיכום…"
-            className="w-full bg-transparent border-0 outline-none text-lg font-bold text-ink placeholder:text-ink-subtle"
-          />
-        </div>
-      )}
-
-      {/* Rich editor (always visible) */}
-      <div className="px-2 pb-3">
-        <div className="editor-shell">
-          <RichTextEditor
-            content={content}
-            onChange={async html => {
-              setContent(html)
-              // If the user just starts typing into the blank starter editor,
-              // create a note on the fly so their keystrokes are persisted.
-              if (!active && html && html !== '<p></p>') {
-                await handleNewNote()
-              }
-            }}
-            placeholder="התחל לכתוב את הסיכום שלך כאן. Enter כדי לרדת שורה, toolbar למעלה לעיצוב…"
-          />
-        </div>
-      </div>
-
-      {/* Editor chrome overrides to look less boxy */}
-      <style jsx>{`
-        .editor-shell :global(.rich-editor-content) {
-          min-height: 280px;
-          padding: 12px 14px;
-        }
-      `}</style>
-    </div>
-  )
-}
-
-function SaveIndicator({ state }: { state: SaveState }) {
-  if (state === 'idle') return null
-  const config = {
-    saving: { icon: Loader2, label: 'שומר…', color: '#B8A9FF', bg: 'rgba(139,127,240,0.15)' },
-    saved:  { icon: Check,   label: 'נשמר',  color: '#4ADE80', bg: 'rgba(74,222,128,0.15)' },
-    error:  { icon: X,       label: 'שגיאה', color: '#FF6B6B', bg: 'rgba(255,107,107,0.15)' },
-  } as const
-  const c = config[state]
-  const Icon = c.icon
-  return (
-    <motion.span
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex-shrink-0 inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-medium"
-      style={{ color: c.color, background: c.bg }}
-    >
-      <Icon size={11} className={state === 'saving' ? 'animate-spin' : ''} />
-      {c.label}
-    </motion.span>
   )
 }
 
@@ -648,7 +397,8 @@ function AIChat({ courseId, courseTitle }: { courseId: string; courseTitle: stri
 // ═══════════════════════════════════════════════════════════════
 // BACKWARD-COMPAT: old tab-switching component (kept in case any
 // other caller still imports `CourseTabs`). Routes now use the new
-// `CourseWorkspace` component instead.
+// `CourseWorkspace` component instead. The `notes` tab is a no-op —
+// summaries are per-lesson now.
 // ═══════════════════════════════════════════════════════════════
 
 interface LegacyTabsProps {
@@ -662,7 +412,11 @@ export default function CourseTabs({ courseId, activeTab, courseTitle }: LegacyT
     <div>
       {activeTab === 'tasks'       && <TasksMini courseId={courseId} />}
       {activeTab === 'assignments' && <AssignmentsMini courseId={courseId} />}
-      {activeTab === 'notes'       && <NotesHero courseId={courseId} courseTitle={courseTitle} />}
+      {activeTab === 'notes'       && (
+        <p className="text-sm text-ink-muted p-6 text-center">
+          סיכומים נכתבים כעת בתוך השיעור עצמו.
+        </p>
+      )}
       {activeTab === 'ai'          && <AIMini courseId={courseId} courseTitle={courseTitle} />}
     </div>
   )
