@@ -37,7 +37,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
       <footer className="border-t border-paper-subtle/15 mt-16">
         <div className="max-w-3xl mx-auto px-6 py-8 flex items-center justify-between text-xs text-paper-subtle">
           <span>© 2026 TEEPO · יריין לוין</span>
-          <span>לא קשור רשמית לאוניברסיטת בן-גוריון</span>
+          <span>לא קשור רשמית לאף מוסד אקדמי</span>
         </div>
       </footer>
     </div>

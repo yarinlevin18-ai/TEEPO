@@ -8,10 +8,10 @@ from flask import Flask
 from flask_socketio import SocketIO
 from flask_cors import CORS
 
-from config import FLASK_SECRET_KEY, FLASK_ENV, IS_PRODUCTION, BGU_USERNAME, BGU_PASSWORD, logger
+from config import FLASK_SECRET_KEY, FLASK_ENV, IS_PRODUCTION, UNIVERSITY_USERNAME, UNIVERSITY_PASSWORD, logger
 from routes.api import api
 from routes.auth import auth
-from routes.bgu import bgu, _login_status
+from routes.university import university, _login_status
 from routes.catalog import catalog
 from routes.websocket import register_socket_events
 
@@ -54,7 +54,7 @@ socketio = SocketIO(
 # Register REST routes
 app.register_blueprint(api)
 app.register_blueprint(auth)
-app.register_blueprint(bgu)
+app.register_blueprint(university)
 app.register_blueprint(catalog)
 
 # Register WebSocket events
@@ -126,16 +126,16 @@ def setup_db():
 
 
 def _auto_login_on_startup():
-    """If BGU credentials are set as env vars, auto-login on startup."""
+    """If university credentials are set as env vars, auto-login on startup."""
     import time
-    from services import bgu_scraper
-    if not (BGU_USERNAME and BGU_PASSWORD and bgu_scraper.IS_SERVER):
+    from services import moodle_scraper
+    if not (UNIVERSITY_USERNAME and UNIVERSITY_PASSWORD and moodle_scraper.IS_SERVER):
         return
     time.sleep(5)  # wait for server to be ready
     for site in ("moodle", "portal"):
         try:
             logger.info(f"Auto-login: connecting to {site}...")
-            result = bgu_scraper.login_headless(site, BGU_USERNAME, BGU_PASSWORD)
+            result = moodle_scraper.login_headless(site, UNIVERSITY_USERNAME, UNIVERSITY_PASSWORD)
             _login_status[site] = "connected" if result.get("status") == "success" else "failed"
             logger.info(f"Auto-login {site}: {_login_status[site]}")
         except Exception as e:

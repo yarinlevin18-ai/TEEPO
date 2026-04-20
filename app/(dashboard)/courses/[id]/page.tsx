@@ -496,7 +496,7 @@ export default function CoursePage() {
               <div>שעת קבלה: יום ג׳ 14:00</div>
               <div className="flex items-center gap-1">
                 <ExternalLink size={10} />
-                <span>example@bgu.ac.il</span>
+                <span>example@university.ac.il</span>
               </div>
             </div>
           </MoodleCard>

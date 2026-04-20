@@ -1,0 +1,603 @@
+"""
+University LMS routes — Moodle + optional legacy Portal integration.
+
+The allowlist for SSRF protection is derived from MOODLE_URL / PORTAL_URL /
+PORTAL_URL_OLD by default, or can be explicitly set via UNIVERSITY_ALLOWED_DOMAINS.
+"""
+import threading
+from urllib.parse import urlparse
+from flask import Blueprint, request, jsonify
+from services import moodle_scraper
+from config import (
+    UNIVERSITY_USERNAME,
+    UNIVERSITY_PASSWORD,
+    IS_PRODUCTION,
+    logger,
+    MOODLE_URL,
+    PORTAL_URL,
+    PORTAL_URL_OLD,
+    UNIVERSITY_ALLOWED_DOMAINS,
+)
+
+
+def _build_allowed_domains() -> tuple:
+    """Explicit env var wins; else derive from the configured URLs."""
+    explicit = [d.strip().lower() for d in UNIVERSITY_ALLOWED_DOMAINS.split(",") if d.strip()]
+    if explicit:
+        return tuple(explicit)
+    derived = []
+    for url in (MOODLE_URL, PORTAL_URL, PORTAL_URL_OLD):
+        if not url:
+            continue
+        host = urlparse(url).hostname
+        if host:
+            derived.append(host.lower())
+            # Also allow the registrable parent (e.g., add 'bgu.ac.il' for
+            # 'moodle.bgu.ac.il') so sub-site redirects pass.
+            parts = host.split(".")
+            if len(parts) >= 3:
+                derived.append(".".join(parts[-3:]).lower())
+    return tuple(dict.fromkeys(derived))  # dedup, preserve order
+
+
+ALLOWED_UNIVERSITY_DOMAINS = _build_allowed_domains()
+
+
+def _is_university_url(url: str) -> bool:
+    """Validate URL is on the configured university allowlist (SSRF protection)."""
+    if not url or not url.startswith("https://"):
+        return False
+    if not ALLOWED_UNIVERSITY_DOMAINS:
+        return False  # no LMS configured — reject everything
+    parsed = urlparse(url)
+    return any(parsed.hostname and parsed.hostname.endswith(d) for d in ALLOWED_UNIVERSITY_DOMAINS)
+
+university = Blueprint("university", __name__, url_prefix="/api/university")
+
+# Track login progress (rehydrated from Supabase at import time — see _init_login_status below).
+# Render's free tier restarts drop in-memory state, so this dict is NOT the source of truth —
+# it's just a fast-path cache. Supabase `bgu_sessions` is canonical.
+_login_status: dict = {"moodle": "idle", "portal": "idle"}
+
+
+def _is_connected(site: str) -> bool:
+    """Return True if we have a valid session for `site`.
+    Source of truth is Supabase (survives Render restarts); in-memory dict is a cache.
+    """
+    # 1. In-memory fast-path (already verified this session)
+    if _login_status.get(site) == "connected":
+        return True
+    # 2. Supabase bgu_sessions (persists across restarts)
+    try:
+        from services.supabase_client import get_client
+        result = get_client().table("bgu_sessions").select("site").eq("site", site).execute()
+        if result.data:
+            _login_status[site] = "connected"
+            return True
+    except Exception as e:
+        logger.debug(f"bgu_sessions check failed for {site}: {e}")
+    # 3. Live cookie validation (slowest, last resort — also covers local-file cookies)
+    if moodle_scraper.is_session_valid(site):
+        _login_status[site] = "connected"
+        return True
+    return False
+
+
+def _init_login_status():
+    """Rehydrate _login_status from Supabase at module-import time so the first
+    /status call after a Render restart doesn't lie about being disconnected."""
+    try:
+        from services.supabase_client import get_client
+        result = get_client().table("bgu_sessions").select("site").execute()
+        if result.data:
+            for row in result.data:
+                site = row.get("site")
+                if site in _login_status:
+                    _login_status[site] = "connected"
+            logger.info(f"[university] Rehydrated login_status from Supabase: {_login_status}")
+    except Exception as e:
+        # Non-fatal: /status will re-check Supabase on demand.
+        logger.debug(f"[university] Could not rehydrate login_status at startup: {e}")
+
+
+_init_login_status()
+
+
+def _user_id():
+    """Extract user_id — reuse the verified auth from api routes."""
+    from routes.api import _user_id as _api_user_id
+    return _api_user_id()
+
+
+# ------------------------------------------------------------------ #
+#  Connection status                                                   #
+# ------------------------------------------------------------------ #
+
+@university.get("/status")
+def connection_status():
+    """Check if sessions are still valid. Checks in-memory state, Supabase cookies, then live session."""
+    moodle_ok = _is_connected("moodle")
+    portal_ok = _is_connected("portal")
+    return jsonify({
+        "moodle": moodle_ok,
+        "portal": portal_ok,
+        "login_status": _login_status,
+    })
+
+
+# ------------------------------------------------------------------ #
+#  Login (opens browser window for user to log in)                    #
+# ------------------------------------------------------------------ #
+
+@university.post("/connect/<site>")
+def connect_site(site: str):
+    """
+    SERVER mode: accepts {username, password} and logs in headlessly.
+    LOCAL mode:  opens a visible Chrome window for manual login.
+    """
+    if site not in ("moodle", "portal"):
+        return jsonify({"error": "אתר לא ידוע"}), 400
+
+    body = request.get_json() or {}
+    # Use body credentials first, fall back to env vars (so no form is needed)
+    username = body.get("username") or UNIVERSITY_USERNAME
+    password = body.get("password") or UNIVERSITY_PASSWORD
+
+    _login_status[site] = "opening"
+
+    if moodle_scraper.IS_SERVER:
+        # Cloud: headless login with credentials
+        if not username or not password:
+            _login_status[site] = "failed"
+            return jsonify({"error": "נדרשים שם משתמש וסיסמה — הגדר UNIVERSITY_USERNAME/UNIVERSITY_PASSWORD ב-Render"}), 400
+
+        def _do_headless():
+            _login_status[site] = "waiting_for_login"
+            result = moodle_scraper.login_headless(site, username, password)
+            _login_status[site] = "connected" if result["status"] == "success" else "failed"
+
+        thread = threading.Thread(target=_do_headless, daemon=True)
+        thread.start()
+        return jsonify({"status": "logging_in", "message": "מתחבר עם הפרטים..."})
+
+    else:
+        # Local: open visible browser window
+        def _do_login():
+            _login_status[site] = "waiting_for_login"
+            result = moodle_scraper.open_browser_for_login(site)
+            _login_status[site] = "connected" if result["status"] == "success" else "failed"
+
+        thread = threading.Thread(target=_do_login, daemon=True)
+        thread.start()
+        return jsonify({"status": "opening_browser", "message": "פותח דפדפן Chrome..."})
+
+
+@university.get("/mode")
+def get_mode():
+    """Tell the frontend whether we're in server or local mode."""
+    return jsonify({"server_mode": moodle_scraper.IS_SERVER})
+
+
+@university.get("/info")
+def lms_info():
+    """Return non-secret LMS config so the frontend can render the correct
+    "open Moodle" / "open Portal" buttons and hide tabs for features this
+    deploy hasn't configured."""
+    def _host(url: str) -> str:
+        try:
+            return urlparse(url).hostname or ""
+        except Exception:
+            return ""
+
+    return jsonify({
+        "moodle": {
+            "enabled": bool(MOODLE_URL),
+            "url": MOODLE_URL,
+            "host": _host(MOODLE_URL),
+            "my_url": f"{MOODLE_URL}/my/" if MOODLE_URL else "",
+        },
+        "portal": {
+            "enabled": bool(PORTAL_URL),
+            "url": PORTAL_URL,
+            "host": _host(PORTAL_URL),
+        },
+        "portal_old": {
+            "enabled": bool(PORTAL_URL_OLD),
+            "url": PORTAL_URL_OLD,
+            "host": _host(PORTAL_URL_OLD),
+        },
+    })
+
+
+@university.get("/connect/<site>/poll")
+def poll_login(site: str):
+    """Frontend polls this to check if login completed.
+    Also consults Supabase so a backend restart mid-poll doesn't flip to 'idle'."""
+    if site not in ("moodle", "portal"):
+        return jsonify({"status": "idle", "connected": False})
+    status = _login_status.get(site, "idle")
+    # If in-memory says not connected, double-check Supabase (survives restarts).
+    if status != "connected" and status not in ("opening", "waiting_for_login"):
+        if _is_connected(site):
+            status = "connected"
+    return jsonify({
+        "status": status,
+        "connected": status == "connected",
+    })
+
+
+# ------------------------------------------------------------------ #
+#  Sync                                                                #
+# ------------------------------------------------------------------ #
+
+@university.post("/cookies")
+def receive_cookies():
+    """Receive cookies from the Chrome extension and store them."""
+    body = request.get_json() or {}
+    site = body.get("site", "")
+    cookies = body.get("cookies", [])
+
+    if site not in ("moodle", "portal") or not cookies:
+        return jsonify({"status": "error", "message": "נתונים חסרים"}), 400
+
+    try:
+        moodle_scraper._save_cookies_to_store(site, cookies)
+        _login_status[site] = "connected"
+        return jsonify({"status": "success", "message": f"{len(cookies)} cookies נשמרו עבור {site}"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@university.post("/parse-portal")
+def parse_portal():
+    """Receive raw HTML from the Chrome extension and parse grades + credits from it."""
+    body = request.get_json() or {}
+    html = body.get("html", "")
+    url = body.get("url", "")
+    title = body.get("title", "")
+    site = body.get("site", "portal")
+
+    if not html or len(html) < 100:
+        return jsonify({"status": "error", "message": "HTML ריק או קצר מדי"}), 400
+
+    try:
+        result = moodle_scraper.parse_portal_html(html, url, title)
+        grades = result.get("grades", [])
+
+        # Persist grades to Supabase
+        if grades:
+            user_id = None
+            try:
+                user_id = _user_id()
+            except Exception:
+                pass  # No auth — still return grades but don't persist
+
+            if user_id:
+                from datetime import datetime as _dt
+                from services.supabase_client import get_client
+                saved = 0
+                for g in grades:
+                    try:
+                        row = {
+                            "user_id": user_id,
+                            "course_name": g["course_name"],
+                            "source": "portal",
+                            "updated_at": _dt.utcnow().isoformat(),
+                        }
+                        if g.get("grade") is not None:
+                            row["grade"] = g["grade"]
+                        if g.get("grade_text"):
+                            row["grade_text"] = g["grade_text"]
+                        if g.get("semester"):
+                            row["semester"] = g["semester"]
+                        if g.get("academic_year"):
+                            row["academic_year"] = g["academic_year"]
+                        if g.get("credits"):
+                            row["credits"] = g["credits"]
+                        if g.get("course_id"):
+                            row["course_moodle_id"] = g["course_id"]
+
+                        # Delete existing record first (expression index can't use on_conflict)
+                        sem = g.get("semester", "") or ""
+                        (get_client().table("student_grades")
+                         .delete()
+                         .eq("user_id", user_id)
+                         .eq("course_name", g["course_name"])
+                         .eq("semester", sem)
+                         .execute())
+                        # Insert new record
+                        get_client().table("student_grades").insert(row).execute()
+                        saved += 1
+                    except Exception as e:
+                        logger.debug(f"[parse-portal] Failed to persist grade for {g['course_name']}: {e}")
+
+                logger.info(f"[parse-portal] Parsed {len(grades)}, stored {saved} grades for user {user_id}")
+                result["grades_saved"] = saved
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"[parse-portal] Failed: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@university.post("/sync")
+def sync_all():
+    """Sync all Moodle/portal data into the app."""
+    user_id = _user_id()
+    try:
+        from agents.university_sync_agent import UniversitySyncAgent
+        agent = UniversitySyncAgent()
+        result = agent.execute({"action": "sync_all", "user_id": user_id})
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"University sync failed for user {user_id}: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": f"שגיאה בסנכרון: {str(e)}"}), 500
+
+
+@university.get("/debug")
+def debug_status():
+    """Full diagnostic — check Supabase connection, cookie store, and scraper.
+    In production, only shows summary (no error details)."""
+    info = {"is_server": moodle_scraper.IS_SERVER, "tables": {}, "cookies": {}, "errors": []}
+
+    # Check Supabase tables
+    for table in ("bgu_sessions", "courses", "assignments", "study_tasks"):
+        try:
+            from services.supabase_client import get_client
+            result = get_client().table(table).select("*", count="exact").limit(1).execute()
+            info["tables"][table] = "✓ exists"
+        except Exception as e:
+            info["tables"][table] = f"✗ {str(e)[:80]}"
+            info["errors"].append(f"{table}: {e}")
+
+    # Check cookies in store
+    for site in ("moodle", "portal"):
+        cookies = moodle_scraper._load_cookies_from_store(site)
+        info["cookies"][site] = f"{len(cookies)} cookies" if cookies else "none"
+
+    # Hide error details in production
+    if IS_PRODUCTION:
+        info["errors"] = [f"error in {e.split(':')[0]}" for e in info["errors"]] if info["errors"] else []
+
+    return jsonify(info)
+
+
+@university.get("/courses")
+def get_bgu_courses():
+    """Get live course list from Moodle."""
+    result = moodle_scraper.scrape_moodle_courses()
+    return jsonify(result)
+
+
+@university.get("/schedule")
+def get_schedule():
+    """Get schedule from portal."""
+    result = moodle_scraper.scrape_portal_schedule()
+    return jsonify(result)
+
+
+@university.post("/assignments")
+def get_course_assignments():
+    body = request.get_json() or {}
+    course_url = body.get("course_url", "")
+    if not course_url:
+        return jsonify({"error": "חסרה כתובת קורס"}), 400
+    if not _is_university_url(course_url):
+        return jsonify({"error": "כתובת URL חייבת להיות באתר האוניברסיטה המוגדר"}), 400
+    result = moodle_scraper.scrape_course_assignments(course_url)
+    return jsonify(result)
+
+
+@university.post("/materials")
+def get_course_materials():
+    body = request.get_json() or {}
+    course_url = body.get("course_url", "")
+    if not course_url:
+        return jsonify({"error": "חסרה כתובת קורס"}), 400
+    if not _is_university_url(course_url):
+        return jsonify({"error": "כתובת URL חייבת להיות באתר האוניברסיטה המוגדר"}), 400
+    result = moodle_scraper.scrape_course_materials(course_url)
+    return jsonify(result)
+
+
+@university.get("/grades")
+def get_grades():
+    """Get all grades — saved from DB + live from Moodle/Portal.
+    First returns saved grades, then tries to fetch fresh ones and merge."""
+    user_id = _user_id()
+    all_grades = []
+    seen = set()
+
+    # 1. Load persisted grades from DB
+    try:
+        from services.supabase_client import get_client
+        result = get_client().table("student_grades").select("*").eq("user_id", user_id).order("academic_year", desc=True).execute()
+        if result.data:
+            for g in result.data:
+                key = f"{g['course_name']}_{g.get('semester', '')}"
+                seen.add(key)
+                all_grades.append({
+                    "course_id": g.get("course_moodle_id", ""),
+                    "course_name": g["course_name"],
+                    "grade": g.get("grade"),
+                    "grade_text": g.get("grade_text"),
+                    "semester": g.get("semester"),
+                    "academic_year": g.get("academic_year"),
+                    "credits": g.get("credits"),
+                    "rank": g.get("rank"),
+                    "source": g.get("source", "db"),
+                })
+    except Exception as e:
+        logger.debug(f"[grades] DB load failed: {e}")
+
+    # 2. Try live fetch and merge new grades
+    try:
+        live = moodle_scraper.scrape_grades()
+        if live.get("grades"):
+            from datetime import datetime as _dt
+            for g in live["grades"]:
+                name = g.get("course_name", "").strip()
+                key = f"{name}_{g.get('semester', '')}"
+                if name and key not in seen:
+                    seen.add(key)
+                    all_grades.append(g)
+
+                    # Also persist the new grade
+                    try:
+                        row = {
+                            "user_id": user_id,
+                            "course_name": name,
+                            "source": g.get("source", "moodle"),
+                            "updated_at": _dt.utcnow().isoformat(),
+                        }
+                        if g.get("grade") is not None:
+                            row["grade"] = g["grade"]
+                        if g.get("grade_text"):
+                            row["grade_text"] = g["grade_text"]
+                        if g.get("course_moodle_id"):
+                            row["course_moodle_id"] = g["course_moodle_id"]
+                        if g.get("semester"):
+                            row["semester"] = g["semester"]
+                        if g.get("academic_year"):
+                            row["academic_year"] = g["academic_year"]
+                        if g.get("credits"):
+                            row["credits"] = g["credits"]
+                        if g.get("rank"):
+                            row["rank"] = g["rank"]
+                        from services.supabase_client import get_client
+                        get_client().table("student_grades").upsert(row).execute()
+                    except Exception:
+                        pass
+    except Exception as e:
+        logger.debug(f"[grades] Live fetch failed (returning DB grades): {e}")
+
+    # Calculate stats
+    numeric_grades = [g["grade"] for g in all_grades if g.get("grade") is not None]
+    total_credits = sum(g.get("credits", 0) or 0 for g in all_grades if g.get("grade") is not None)
+    avg = round(sum(numeric_grades) / len(numeric_grades), 2) if numeric_grades else None
+
+    return jsonify({
+        "status": "success",
+        "grades": all_grades,
+        "count": len(all_grades),
+        "average": avg,
+        "total_credits": total_credits,
+    })
+
+
+@university.get("/degree")
+def get_degree_settings():
+    """Get user's degree settings + credits summary."""
+    user_id = _user_id()
+    try:
+        from services.supabase_client import get_client
+        # Get degree settings
+        result = get_client().table("degree_settings").select("*").eq("user_id", user_id).execute()
+        settings = result.data[0] if result.data else None
+
+        # If no settings configured, return null — don't make up numbers
+        if not settings:
+            return jsonify({"status": "success", "settings": None, "credits": None})
+
+        # Get total credits earned from grades
+        grades_result = get_client().table("student_grades").select("credits, grade").eq("user_id", user_id).execute()
+        completed_credits = 0
+        if grades_result.data:
+            for g in grades_result.data:
+                if g.get("credits") and g.get("grade") is not None:
+                    try:
+                        grade_val = float(g["grade"]) if g["grade"] else 0
+                        if grade_val >= 56:  # Israeli higher-ed passing grade
+                            completed_credits += float(g["credits"])
+                    except (ValueError, TypeError):
+                        pass
+
+        total_required = float(settings["total_credits_required"])
+        remaining = max(0, total_required - completed_credits)
+
+        # Calculate recommended credits per semester
+        from datetime import datetime as _dt
+        now = _dt.now()
+        if settings.get("expected_end_year"):
+            end_year = settings["expected_end_year"]
+            remaining_semesters = max(1, (end_year - now.year) * 2 + (1 if now.month <= 7 else 0))
+        elif settings.get("total_semesters"):
+            remaining_semesters = max(1, settings["total_semesters"])
+        else:
+            remaining_semesters = 1
+
+        recommended_per_semester = round(remaining / max(1, remaining_semesters), 1) if remaining > 0 else 0
+
+        return jsonify({
+            "status": "success",
+            "settings": settings,
+            "credits": {
+                "completed": completed_credits,
+                "required": total_required,
+                "remaining": remaining,
+                "remaining_semesters": remaining_semesters,
+                "recommended_per_semester": recommended_per_semester,
+            },
+        })
+    except Exception as e:
+        logger.error(f"Degree settings failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@university.post("/degree")
+def save_degree_settings():
+    """Save/update user's degree settings."""
+    user_id = _user_id()
+    body = request.get_json() or {}
+    from datetime import datetime as _dt
+    try:
+        from services.supabase_client import get_client
+        data = {
+            "user_id": user_id,
+            "updated_at": _dt.utcnow().isoformat(),
+        }
+        for field in ["degree_name", "total_credits_required", "start_year", "expected_end_year", "total_semesters"]:
+            if field in body:
+                data[field] = body[field]
+        get_client().table("degree_settings").upsert(data, on_conflict="user_id").execute()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        logger.error(f"Degree save failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@university.get("/assignments/all")
+def get_all_assignments():
+    """Get all assignments from all Moodle courses (AJAX bulk fetch)."""
+    try:
+        result = moodle_scraper.scrape_all_assignments()
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Bulk assignment fetch failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@university.post("/course/ingest")
+def ingest_course():
+    """Download + extract text from all PDF materials in a Moodle course.
+    Intended for the notebook auto-ingest flow: client posts the course URL,
+    we return ready-to-save source dicts that the client adds to a notebook.
+
+    Body: {course_url: str, max_pdfs?: int (default 20, hard cap 40)}
+    """
+    body = request.get_json() or {}
+    course_url = body.get("course_url", "")
+    max_pdfs = min(int(body.get("max_pdfs", 20) or 20), 40)
+
+    if not course_url:
+        return jsonify({"status": "error", "message": "חסרה כתובת קורס"}), 400
+    if not _is_university_url(course_url):
+        return jsonify({"status": "error", "message": "כתובת URL חייבת להיות באתר האוניברסיטה המוגדר"}), 400
+
+    try:
+        result = moodle_scraper.ingest_course_materials(course_url, max_pdfs=max_pdfs)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"[university] Course ingest failed for {course_url}: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500

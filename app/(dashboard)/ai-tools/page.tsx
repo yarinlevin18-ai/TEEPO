@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * AI Tools — curated toolkit for BGU students.
+ * AI Tools — curated toolkit for university students.
  * Data lives in `data/ai-tools.json` so it's easy to extend without touching code.
  */
 

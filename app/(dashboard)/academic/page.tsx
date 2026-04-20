@@ -5,6 +5,15 @@ import { motion } from 'framer-motion'
 import { GraduationCap, Loader2, Sparkles, BookOpen } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import ErrorAlert from '@/components/ui/ErrorAlert'
+import { universityName } from '@/lib/university'
+
+type AdviceResult = {
+  advice: string
+  // Legacy key name — backend may still return `bgu_resources`. Kept for
+  // back-compat; newer backends should return `university_resources`.
+  university_resources?: Record<string, string>
+  bgu_resources?: Record<string, string>
+}
 
 export default function AcademicPage() {
   const [courseName, setCourseName] = useState('')
@@ -12,7 +21,7 @@ export default function AcademicPage() {
   const [courses, setCourses] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<{ advice: string; bgu_resources: Record<string, string> } | null>(null)
+  const [result, setResult] = useState<AdviceResult | null>(null)
 
   const getAdvice = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,8 +53,8 @@ export default function AcademicPage() {
             <GraduationCap size={22} className="text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-ink">יועץ אקדמי BGU</h1>
-            <p className="text-ink-muted text-sm">אוניברסיטת בן-גוריון בנגב</p>
+            <h1 className="text-2xl font-bold text-ink">יועץ אקדמי</h1>
+            <p className="text-ink-muted text-sm">{universityName()}</p>
           </div>
         </div>
         <p className="text-ink-muted mt-2">
@@ -116,13 +125,13 @@ export default function AcademicPage() {
           <div className="p-6">
             <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{result.advice}</p>
 
-            {result.bgu_resources && (
+            {(result.university_resources || result.bgu_resources) && (
               <div className="mt-6 border-t border-white/5 pt-4">
                 <p className="text-xs font-semibold text-ink-muted mb-3 flex items-center gap-2">
-                  <BookOpen size={14} className="text-amber-400" /> משאבי BGU
+                  <BookOpen size={14} className="text-amber-400" /> משאבי האוניברסיטה
                 </p>
                 <div className="space-y-2">
-                  {Object.entries(result.bgu_resources).map(([key, value]) => (
+                  {Object.entries(result.university_resources || result.bgu_resources || {}).map(([key, value]) => (
                     <div key={key} className="flex gap-2 text-xs text-ink-muted">
                       <span className="font-medium text-amber-400/80 w-20 flex-shrink-0">
                         {key === 'moodle' ? 'Moodle' : key === 'registration' ? 'רישום' : key === 'library' ? 'ספרייה' : key}:

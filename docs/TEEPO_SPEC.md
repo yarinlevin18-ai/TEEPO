@@ -157,7 +157,7 @@ TEEPO/
 
 ### 3.4 סנכרון Moodle ופורטל
 
-עמוד /bgu-connect מאפשר חיבור למערכות האוניברסיטה. בשלב 1 הוא תומך ב־Moodle ובפורטל הציונים של בן־גוריון; בשלב 3 המבנה יורחב ל־LMS נוספים (TAU Moodle, HUJI, Technion Academe).
+עמוד /moodle מאפשר חיבור למערכות האוניברסיטה. בשלב 1 הוא תומך ב־Moodle ובפורטל הציונים של האוניברסיטה (URL־ים מוגדרים ב־env — `MOODLE_URL`, `PORTAL_URL`); בשלב 3 המבנה יורחב ל־LMS נוספים (TAU Moodle, HUJI, Technion Academe).
 
 **התהליך**:
 1. הסטודנט לוחץ "חיבור Moodle" ומזין שם משתמש וסיסמה של בן־גוריון.
@@ -249,7 +249,7 @@ TEEPO/
 
 **חישוב המלצות לסמסטר הבא**: על בסיס ההתקדמות, המערכת ממליצה כמה נק"ז לקחת בסמסטר הבא כדי לסיים בזמן.
 
-**קטלוג מלא**: `lib/bgu-catalog.ts` מכיל את קטלוג הקורסים של בן־גוריון (bundled client-side); הסטודנט מקבל autocomplete חכם בחיפוש קורסים.
+**קטלוג מלא**: `lib/catalog.ts` מכיל את קטלוג הקורסים של האוניברסיטה (bundled client-side מתוך `public/catalog.json`); הסטודנט מקבל autocomplete חכם בחיפוש קורסים.
 
 ### 3.9 אינטגרציה עם Google Calendar ו־Drive
 
@@ -561,7 +561,7 @@ pending → watched → reviewed
 
 ### 9.2 ייבוא וסנכרון קורסים
 
-- המערכת תתמוך בסנכרון מ־BGU Moodle ו־BGU Portal
+- המערכת תתמוך בסנכרון מ־Moodle ומפורטל הציונים של האוניברסיטה (URL־ים מוגדרים ב־env)
 - התהליך יהיה headless (לא חלון דפדפן חיצוני למשתמש)
 - המערכת תסווג אוטומטית קורסים לסמסטר (א/ב/קיץ) על בסיס תאריכי התחלה וסיום
 - המערכת תמזג קורסים חדשים עם קיימים (לא תיצור כפילויות)
@@ -724,8 +724,8 @@ pending → watched → reviewed
 - ✓ עוזר AI צף עם WebSocket streaming
 - ✓ אינטגרציית Google Calendar (קריאה)
 - ✓ סנכרון תיקיות Drive
-- ✓ מעקב נק"ז עם קטלוג BGU
-- ✓ סנכרון מ־BGU Moodle + Portal
+- ✓ מעקב נק"ז עם קטלוג האוניברסיטה
+- ✓ סנכרון מ־Moodle + פורטל האוניברסיטה
 - ✓ יועץ אקדמי AI
 - ✓ רשימת AI tools מאוצרת
 - ✓ מצב כהה/בהיר
@@ -897,7 +897,7 @@ C:\dev\smartdesk\
 │  ├─ auth-context.tsx    Auth + Google token mgmt
 │  ├─ db-context.tsx      Drive DB CRUD
 │  ├─ drive-db.ts         Drive API wrapper
-│  └─ bgu-catalog.ts      BGU course catalog
+│  └─ catalog.ts          University course catalog
 ├─ types/index.ts         All TypeScript interfaces
 ├─ backend/               Python Flask server
 │  ├─ agents/             Claude agents

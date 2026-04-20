@@ -56,3 +56,4 @@ desktop.ini
 # Claude local state
 .claude/scheduled_tasks.lock
 .claude/local-agent-mode-sessions/
+.claude/settings.local.json

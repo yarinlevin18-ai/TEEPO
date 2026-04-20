@@ -297,7 +297,7 @@ body {
 .glow-success { box-shadow: 0 0 16px rgba(16,185,129,0.35); }
 .glow-amber   { box-shadow: 0 0 16px rgba(245,158,11,0.3); }
 
-/* ── Pulse dot (BGU status indicator) ── */
+/* ── Pulse dot (Moodle/portal status indicator) ── */
 .pulse-dot {
   width: 8px; height: 8px;
   border-radius: 50%;

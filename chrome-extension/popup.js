@@ -41,7 +41,7 @@ async function init() {
 async function checkStatus(backendUrl) {
   try {
     // Give Render 25s to wake up on first check
-    const res = await fetch(`${backendUrl}/api/bgu/status`, { signal: AbortSignal.timeout(25000) })
+    const res = await fetch(`${backendUrl}/api/university/status`, { signal: AbortSignal.timeout(25000) })
     const data = await res.json()
     updateStatusUI('moodle', data.moodle)
     updateStatusUI('portal', data.portal)
@@ -158,7 +158,7 @@ async function syncSite(site) {
       showToast('השרת מתעורר מתרדמה... זה עלול לקחת עד 40 שניות בפעם הראשונה', 'loading')
     }, 8000)
 
-    const res = await fetch(`${backendUrl}/api/bgu/cookies`, {
+    const res = await fetch(`${backendUrl}/api/university/cookies`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ site, cookies }),
@@ -177,7 +177,7 @@ async function syncSite(site) {
       if (pageData) {
         showToast('מנתח את הדף לציונים ונק"ז...', 'loading')
         try {
-          await fetch(`${backendUrl}/api/bgu/parse-portal`, {
+          await fetch(`${backendUrl}/api/university/parse-portal`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -224,14 +224,14 @@ async function syncGrades() {
   try {
     const pageData = await captureActiveTabHTML()
     if (!pageData) {
-      showToast('גלוש קודם לדף הציונים בפורטל BGU, ואז לחץ כאן', 'error')
+      showToast('גלוש קודם לדף הציונים בפורטל האוניברסיטה, ואז לחץ כאן', 'error')
       return
     }
 
     showToast(`סורק את "${pageData.title}"...`, 'loading')
     const backendUrl = await getBackendUrl()
 
-    const res = await fetch(`${backendUrl}/api/bgu/parse-portal`, {
+    const res = await fetch(`${backendUrl}/api/university/parse-portal`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -21,7 +21,7 @@ import ErrorAlert from '@/components/ui/ErrorAlert'
 import GlowCard from '@/components/ui/GlowCard'
 import AnimatedBorder from '@/components/ui/AnimatedBorder'
 import Teepo, { type TeepoState } from '@/components/Teepo'
-import type { Course, Assignment, StudyTask, BGUGrade } from '@/types'
+import type { Course, Assignment, StudyTask, Grade } from '@/types'
 import { format, formatDistanceToNow, differenceInDays, differenceInHours } from 'date-fns'
 import { he } from 'date-fns/locale'
 import {
@@ -139,7 +139,7 @@ export default function DashboardPage() {
   const courses = db.courses
   const assignments = db.assignments
   const tasks = db.tasks
-  const [grades, setGrades] = useState<BGUGrade[]>([])
+  const [grades, setGrades] = useState<Grade[]>([])
   const [gradesAvg, setGradesAvg] = useState<number | null>(null)
   const [credits, setCredits] = useState<CreditsInfo | null>(null)
   const [bguConnected, setBguConnected] = useState<boolean>(false)
@@ -165,14 +165,14 @@ export default function DashboardPage() {
 
   // Zone 1 (courses/assignments/tasks) now comes from DB context automatically
 
-  // ── Zone 2: Load BGU status, grades, credits (independent) ─
+  // ── Zone 2: Load Moodle status, grades, credits (independent) ─
   useEffect(() => {
     async function loadZone2() {
       try {
         const [statusRes, gradesRes, degreeRes] = await Promise.all([
-          api.bgu.status().catch(() => null),
-          api.bgu.grades().catch(() => ({ grades: [], average: null })),
-          api.bgu.degree().catch(() => ({ credits: null, settings: null })),
+          api.university.status().catch(() => null),
+          api.university.grades().catch(() => ({ grades: [], average: null })),
+          api.university.degree().catch(() => ({ credits: null, settings: null })),
         ])
 
         const isConnected = statusRes?.moodle || statusRes?.portal
@@ -362,7 +362,7 @@ export default function DashboardPage() {
           <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg ${bguConnected ? 'text-emerald-400' : 'text-ink-subtle'}`}
             style={{ background: bguConnected ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${bguConnected ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
             {bguConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
-            BGU
+            Moodle
           </span>
         </div>
       </motion.div>
@@ -752,9 +752,9 @@ export default function DashboardPage() {
                   <h2 className="font-semibold text-ink">ציונים</h2>
                 </div>
                 {!bguConnected && (
-                  <Link href="/bgu-connect">
+                  <Link href="/moodle">
                     <button className="text-xs text-accent-400 hover:text-accent flex items-center gap-1 transition-colors">
-                      חבר BGU <ArrowLeft size={12} />
+                      חבר Moodle <ArrowLeft size={12} />
                     </button>
                   </Link>
                 )}
@@ -1174,7 +1174,7 @@ function AssignmentsSection({ assignments, courses, loading }: {
 // ── Grades Section ──────────────────────────────────────────
 
 function GradesSection({ grades, bguConnected, avgGrade, loading }: {
-  grades: BGUGrade[]; bguConnected: boolean; avgGrade: number | null; loading: boolean
+  grades: Grade[]; bguConnected: boolean; avgGrade: number | null; loading: boolean
 }) {
   if (loading) {
     return <div className="space-y-2">{[1, 2].map(i => <div key={i} className="h-14 rounded-xl shimmer" />)}</div>
@@ -1185,8 +1185,8 @@ function GradesSection({ grades, bguConnected, avgGrade, loading }: {
       <GlowCard className="text-center">
         <div className="p-6">
           <GraduationCap size={24} className="mx-auto mb-2" style={{ color: '#64748b' }} />
-          <p className="text-ink-muted text-sm">חבר את BGU כדי לראות ציונים</p>
-          <Link href="/bgu-connect">
+          <p className="text-ink-muted text-sm">חבר את Moodle כדי לראות ציונים</p>
+          <Link href="/moodle">
             <button className="mt-2 inline-flex items-center gap-1.5 text-xs text-accent-400 hover:text-accent transition-colors">
               <Wifi size={12} /> התחבר עכשיו
             </button>
@@ -1297,7 +1297,7 @@ function DegreeSetupPrompt() {
     if (!totalCredits) return
     setSaving(true)
     try {
-      await api.bgu.saveDegree({
+      await api.university.saveDegree({
         total_credits_required: parseFloat(totalCredits),
         expected_end_year: endYear ? parseInt(endYear) : undefined,
         degree_name: degreeName || undefined,

@@ -79,9 +79,9 @@ export default function NotebookDetailPage() {
   }>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // BGU ingest is only available if the notebook is linked to a BGU course
-  // that carries a Moodle URL. We also need Moodle cookies on the backend —
-  // if the user never synced, the call will just return an error.
+  // Moodle ingest is only available if the notebook is linked to a Moodle
+  // course that carries a Moodle URL. We also need Moodle cookies on the
+  // backend — if the user never synced, the call will just return an error.
   const canIngestFromBgu = Boolean(
     course && course.source === 'bgu' && course.source_url,
   )
@@ -390,8 +390,8 @@ export default function NotebookDetailPage() {
     setEditingTitle(false)
   }
 
-  // ── BGU auto-ingest ────────────────────────────────────────
-  // Pull every PDF material for the linked BGU course via the backend,
+  // ── Moodle auto-ingest ─────────────────────────────────────
+  // Pull every PDF material for the linked Moodle course via the backend,
   // then batch-create notebook sources from the extracted text. Existing
   // titles are skipped so re-running doesn't duplicate sources.
   const handleBguIngest = async () => {
@@ -405,7 +405,7 @@ export default function NotebookDetailPage() {
       try { await fetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(60_000) }) } catch {}
 
       setUploadProgress('שולף רשימת קבצים מ-Moodle...')
-      const res = await fetch(`${BACKEND}/api/bgu/course/ingest`, {
+      const res = await fetch(`${BACKEND}/api/university/course/ingest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ course_url: course.source_url, max_pdfs: 20 }),
@@ -413,7 +413,7 @@ export default function NotebookDetailPage() {
       })
       if (!res.ok) {
         const text = await res.text().catch(() => '')
-        throw new Error(`שרת BGU החזיר ${res.status}${text ? `: ${text.slice(0, 160)}` : ''}`)
+        throw new Error(`שרת האוניברסיטה החזיר ${res.status}${text ? `: ${text.slice(0, 160)}` : ''}`)
       }
       const data = await res.json()
       if (data.status === 'error') {
@@ -737,7 +737,7 @@ export default function NotebookDetailPage() {
                 { id: 'text' as const, label: 'טקסט', icon: Type },
                 { id: 'lesson' as const, label: 'שיעור', icon: BookOpen, disabled: courseLessons.length === 0 },
                 { id: 'reuse' as const, label: 'מחברת אחרת', icon: Layers, disabled: reuseCandidates.length === 0 },
-                { id: 'bgu' as const, label: 'מ-BGU', icon: GraduationCap, disabled: !canIngestFromBgu },
+                { id: 'bgu' as const, label: 'מ-Moodle', icon: GraduationCap, disabled: !canIngestFromBgu },
               ].map((t) => {
                 const Icon = t.icon
                 return (
@@ -906,12 +906,12 @@ export default function NotebookDetailPage() {
               </div>
             )}
 
-            {/* BGU auto-ingest */}
+            {/* Moodle auto-ingest */}
             {addMode === 'bgu' && (
               <div className="space-y-3">
                 {!canIngestFromBgu ? (
                   <div className="text-center py-8 text-ink-muted text-sm">
-                    יבוא אוטומטי זמין רק למחברת המשויכת לקורס BGU.
+                    יבוא אוטומטי זמין רק למחברת המשויכת לקורס מה-Moodle.
                   </div>
                 ) : (
                   <>
@@ -924,7 +924,7 @@ export default function NotebookDetailPage() {
                         נמשוך עד 20 קבצי PDF מדף הקורס ב-Moodle, נחלץ טקסט ונוסיף כמקורות.
                       </div>
                       <div className="text-[11px]">
-                        דורש חיבור פעיל ל-Moodle מדף &quot;חיבור BGU&quot;. קבצים סרוקים (תמונה בלבד)
+                        דורש חיבור פעיל ל-Moodle מדף &quot;חיבור Moodle&quot;. קבצים סרוקים (תמונה בלבד)
                         יידלגו — אפשר להעלות אותם ידנית עם OCR.
                       </div>
                     </div>

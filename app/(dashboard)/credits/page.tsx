@@ -11,7 +11,7 @@ import {
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
-import { computeCreditSummary } from '@/lib/bgu-catalog'
+import { computeCreditSummary } from '@/lib/catalog'
 import GlowCard from '@/components/ui/GlowCard'
 import Modal from '@/components/ui/Modal'
 import ErrorAlert from '@/components/ui/ErrorAlert'

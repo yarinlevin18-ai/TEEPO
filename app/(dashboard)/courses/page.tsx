@@ -420,7 +420,7 @@ export default function CoursesPage() {
                 : 'צור תיקיות ב-Drive'}
             </button>
           )}
-          {/* Reclassify all (only if we have BGU courses with metadata) */}
+          {/* Reclassify all (only if we have Moodle-sourced courses with metadata) */}
           {courses.some((c) => c.source === 'bgu' && (c.moodle_startdate || c.shortname)) && (
             <button
               onClick={handleReclassifyAll}
@@ -517,11 +517,11 @@ export default function CoursesPage() {
         <div className="p-12">
           <BookOpen size={32} className="text-white/10 mx-auto mb-4" />
           <p className="text-ink-muted mb-2">עדיין לא הוספת קורסים</p>
-          <p className="text-ink-subtle text-sm mb-4">חבר את חשבון BGU שלך או הוסף קורס מ-Udemy/Coursera</p>
+          <p className="text-ink-subtle text-sm mb-4">חבר את חשבון ה-Moodle שלך או הוסף קורס מ-Udemy/Coursera</p>
           <div className="flex gap-3 justify-center">
-            <Link href="/bgu-connect">
+            <Link href="/moodle">
               <button className="px-4 py-2 border border-white/10 rounded-xl text-sm text-ink-muted hover:text-ink hover:border-white/15 transition-colors">
-                חבר BGU
+                חבר Moodle
               </button>
             </Link>
             <Link href="/courses/extract">
@@ -1129,7 +1129,7 @@ function CourseCard({
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                 : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
             }`}>
-              {course.source === 'bgu' ? 'BGU' : course.source}
+              {course.source === 'bgu' ? 'Moodle' : course.source}
             </span>
             {course.source_url && (
               <a

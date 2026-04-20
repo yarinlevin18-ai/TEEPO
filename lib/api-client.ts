@@ -8,7 +8,7 @@ import {
   getDepartments as _catalogDepartments,
   searchCatalogCourses as _catalogSearch,
   computeCreditSummary as _catalogCredits,
-} from './bgu-catalog'
+} from './catalog'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -226,21 +226,21 @@ export const api = {
       }>(`/api/transcribe/jobs/${jobId}`),
   },
 
-  bgu: {
-    status: () => request<any>('/api/bgu/status'),
-    grades: () => request<any>('/api/bgu/grades'),
-    courses: () => request<any>('/api/bgu/courses'),
-    assignmentsAll: () => request<any>('/api/bgu/assignments/all'),
-    schedule: () => request<any>('/api/bgu/schedule'),
-    degree: () => request<any>('/api/bgu/degree'),
+  university: {
+    status: () => request<any>('/api/university/status'),
+    grades: () => request<any>('/api/university/grades'),
+    courses: () => request<any>('/api/university/courses'),
+    assignmentsAll: () => request<any>('/api/university/assignments/all'),
+    schedule: () => request<any>('/api/university/schedule'),
+    degree: () => request<any>('/api/university/degree'),
     saveDegree: (data: Record<string, any>) =>
-      request<any>('/api/bgu/degree', { method: 'POST', body: JSON.stringify(data) }),
+      request<any>('/api/university/degree', { method: 'POST', body: JSON.stringify(data) }),
   },
 
   catalog: {
     // ── Static catalog data (tracks/departments/course catalog) ──
-    // Served from /public/bgu-catalog.json — backend Supabase tables are empty,
-    // and this data is static BGU shnaton reference anyway.
+    // Served from /public/catalog.json — backend Supabase tables are empty,
+    // and this data is static shnaton reference anyway.
     departments: () => _catalogDepartments(),
     tracks: () => _catalogTracks(),
     track: (id: string) => _catalogTrack(id),

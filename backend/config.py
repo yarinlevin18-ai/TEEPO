@@ -12,7 +12,7 @@ logging.basicConfig(
     level=logging.INFO if IS_PRODUCTION else logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-logger = logging.getLogger("bgu-study")
+logger = logging.getLogger("teepo")
 
 # ── Core credentials ──────────────────────────────────────────────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
@@ -22,9 +22,32 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-secret-change-in-production")
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 
-# Optional: pre-set BGU credentials so no login form is needed
-BGU_USERNAME = os.getenv("BGU_USERNAME", "")
-BGU_PASSWORD = os.getenv("BGU_PASSWORD", "")
+# ── University / Moodle integration ───────────────────────────────────
+# URLs for the university LMS. Set per deploy so the platform can serve
+# students from any school. Moodle is supported out of the box; Portal is
+# an optional integration (originally for BGU's bgu4u22/my.bgu.ac.il).
+MOODLE_URL = os.getenv("MOODLE_URL", "")
+PORTAL_URL = os.getenv("PORTAL_URL", "")
+PORTAL_URL_OLD = os.getenv("PORTAL_URL_OLD", "")
+
+# Comma-separated SSRF allowlist. If unset we derive it from MOODLE_URL /
+# PORTAL_URL / PORTAL_URL_OLD hostnames.
+UNIVERSITY_ALLOWED_DOMAINS = os.getenv("UNIVERSITY_ALLOWED_DOMAINS", "")
+
+# Optional: pre-set credentials so no login form is needed.
+# Legacy BGU_USERNAME / BGU_PASSWORD env vars are still read as a fallback so
+# existing deploys keep working without rotation.
+UNIVERSITY_USERNAME = os.getenv("UNIVERSITY_USERNAME") or os.getenv("BGU_USERNAME", "")
+UNIVERSITY_PASSWORD = os.getenv("UNIVERSITY_PASSWORD") or os.getenv("BGU_PASSWORD", "")
+
+# Human-readable university name for prompts / logs. User-facing UI uses
+# NEXT_PUBLIC_UNIVERSITY_NAME on the frontend.
+UNIVERSITY_NAME = os.getenv("UNIVERSITY_NAME", "")
+
+# Optional path to a university-info JSON file (deans, faculties, calendar,
+# etc.) used by the academic advisor. Empty = advisor runs without school-
+# specific context.
+UNIVERSITY_INFO_PATH = os.getenv("UNIVERSITY_INFO_PATH", "")
 
 # Google OAuth (used for refreshing the provider access_token that Supabase
 # surfaces once but never rotates — needed for Drive + Calendar persistence)

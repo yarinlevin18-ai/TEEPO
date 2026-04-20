@@ -35,7 +35,7 @@ const NAV_GROUPS = [
       { href: '/university',   icon: Building2,       label: 'על האוניברסיטה' },
       { href: '/study-buddy',  icon: MessageCircle,  label: 'TEEPO AI' },
       { href: '/ai-tools',     icon: Sparkles,        label: 'כלי AI' },
-      { href: '/bgu-connect',  icon: Wifi,            label: 'חיבור BGU' },
+      { href: '/moodle',       icon: Wifi,            label: 'חיבור Moodle' },
     ],
   },
 ]

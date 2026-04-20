@@ -181,14 +181,14 @@ export interface NotebookSource {
   created_at: string
 }
 
-export interface BGUGrade {
+export interface Grade {
   course_id: string
   course_name: string
   grade: number | string
   rank?: string
 }
 
-export interface BGUStatus {
+export interface MoodleStatus {
   moodle: boolean
   portal: boolean
   login_status?: Record<string, any>
