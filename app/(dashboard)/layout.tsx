@@ -9,6 +9,7 @@ import Sidebar from '@/components/layout/Sidebar'
 import DriveConnectionBanner from '@/components/DriveConnectionBanner'
 import WakeupBanner from '@/components/WakeupBanner'
 import SkyScene from '@/components/SkyScene'
+import OnboardingGate from '@/components/onboarding/OnboardingGate'
 import Image from 'next/image'
 import { Menu } from 'lucide-react'
 
@@ -68,7 +69,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className="flex-1 overflow-auto relative z-[1] pt-14 lg:pt-0">
           <DriveConnectionBanner />
           <WakeupBanner />
-          {children}
+          <OnboardingGate>{children}</OnboardingGate>
         </main>
       </div>
       </LivingDayProvider>
