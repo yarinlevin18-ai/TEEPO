@@ -1,0 +1,41 @@
+name: Supabase keep-alive
+
+# Pings the Supabase REST API daily so the Hobby-tier project doesn't
+# auto-pause from inactivity. Replace with a paid tier upgrade before launch.
+#
+# Required repo secrets:
+#   SUPABASE_URL       - e.g. https://xxxxx.supabase.co
+#   SUPABASE_ANON_KEY  - the anon (public) key, NOT the service-role key
+
+on:
+  schedule:
+    # 03:17 UTC daily — odd minute to avoid GitHub Actions cron herd.
+    - cron: '17 3 * * *'
+  workflow_dispatch:  # allow manual runs from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping Supabase REST endpoint
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::SUPABASE_URL or SUPABASE_ANON_KEY secret is missing"
+            exit 1
+          fi
+
+          # Hit the REST root with the anon key. Any 2xx is a healthy ping.
+          # We use --fail so non-2xx responses exit non-zero and the job fails loudly.
+          response=$(curl --silent --show-error --fail \
+            --max-time 30 \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -o /dev/null -w "%{http_code}" \
+            "$SUPABASE_URL/rest/v1/")
+
+          echo "Supabase responded: HTTP $response"
+          echo "Project pinged at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
