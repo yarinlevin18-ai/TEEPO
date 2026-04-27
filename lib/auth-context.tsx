@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from './supabase'
 import type { User, Session } from '@supabase/supabase-js'
+import { isDevAuthBypassEnabled, FAKE_USER, FAKE_SESSION } from './dev-auth-bypass'
 
 const GOOGLE_TOKEN_KEY = 'smartdesk_google_token'
 const GOOGLE_REFRESH_KEY = 'smartdesk_google_refresh_token'
@@ -203,6 +204,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshGoogleToken])
 
   useEffect(() => {
+    // Dev-only bypass — short-circuit auth with a fake user. Never active in prod.
+    // See lib/dev-auth-bypass.ts.
+    if (isDevAuthBypassEnabled()) {
+      setUser(FAKE_USER)
+      setSession(FAKE_SESSION)
+      setGoogleToken('dev-bypass-google-token')
+      setLoading(false)
+      return
+    }
+
     // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
