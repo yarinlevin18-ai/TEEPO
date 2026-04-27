@@ -21,6 +21,11 @@ CREATE TABLE IF NOT EXISTS courses (
   thumbnail_url       TEXT,
   semester            TEXT,
   academic_year       TEXT,
+  lecturer_email      TEXT,
+  syllabus_url        TEXT,
+  teaching_assistants JSONB DEFAULT '[]'::jsonb,
+  course_links        JSONB DEFAULT '[]'::jsonb,
+  portal_metadata     JSONB DEFAULT '{}'::jsonb,
   created_at          TIMESTAMPTZ DEFAULT now(),
   updated_at          TIMESTAMPTZ DEFAULT now()
 );
@@ -151,16 +156,17 @@ CREATE TABLE IF NOT EXISTS student_grades (
   grade_text      TEXT,
   semester        TEXT,
   academic_year   TEXT,
-  source          TEXT DEFAULT 'moodle',
+  source          TEXT DEFAULT 'moodle' CHECK (source IN ('moodle', 'portal', 'manual')),
+  component       TEXT,
   rank            TEXT,
   credits         NUMERIC,
   created_at      TIMESTAMPTZ DEFAULT now(),
   updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
--- Prevent duplicates: same user + course + semester
+-- Prevent duplicates: same user + course + semester + component
 CREATE UNIQUE INDEX IF NOT EXISTS idx_student_grades_unique
-  ON student_grades(user_id, course_name, COALESCE(semester, ''));
+  ON student_grades(user_id, course_name, COALESCE(semester, ''), COALESCE(component, ''));
 
 -- ── Degree Settings (user's degree program info) ───────────────────────────
 CREATE TABLE IF NOT EXISTS degree_settings (

@@ -51,7 +51,7 @@ gh pr create --draft                    # 5. PR — השותף מאשר → merg
 |---|----|-------|-------|--------|
 | 1★ | Yarin | עדכון types ל-v2.1: `Grade.source/component/updated_at`, `Course.lecturer_email/syllabus_url/teaching_assistants/course_links/portal_metadata`, חדש `TeachingAssistant`, `UserSettings.university/theme`, העברת `StudentProfile`+`StudentCourse` מ-`drive-db.ts` ל-types | `types/index.ts` | פתוח |
 | 2★ | Yarin | Drive DB v1→v2 migration + debounce 30 שניות | `lib/drive-db.ts` | פתוח |
-| 3★ | Tzvi | `migrate_003.sql`: שדות חדשים ל-`courses` + `'manual'` ל-`student_grades.source` | `backend/migrate_003.sql` | פתוח |
+| 3★ | Tzvi | `migrate_003.sql`: שדות חדשים ל-`courses` + `'manual'` ל-`student_grades.source` | `backend/migrate_003.sql` | ✅ |
 
 ### Backend (Tzvi) — 10 משימות
 
