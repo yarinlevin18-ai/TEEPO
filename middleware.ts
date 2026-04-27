@@ -1,6 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 
+// Dev-only bypass: when NEXT_PUBLIC_DEV_BYPASS_AUTH=true and not in production,
+// /dashboard/* is reachable without a real session. The flag is read here
+// (Edge runtime) directly from env to avoid pulling in client modules.
+const DEV_AUTH_BYPASS =
+  process.env.NODE_ENV !== 'production' &&
+  process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true'
+
 /**
  * Auth gate for /dashboard/*.
  * - Unauthenticated users are redirected to /auth with ?next=<path>.
@@ -13,6 +20,9 @@ export async function middleware(request: NextRequest) {
   // Only guard protected surfaces
   const needsAuth = pathname.startsWith('/dashboard')
   if (!needsAuth) return NextResponse.next()
+
+  // Dev-only bypass — see lib/dev-auth-bypass.ts. Never active in prod.
+  if (DEV_AUTH_BYPASS) return NextResponse.next()
 
   const response = NextResponse.next()
 
