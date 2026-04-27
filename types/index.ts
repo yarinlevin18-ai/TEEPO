@@ -2,14 +2,40 @@
 // טיפוסי TypeScript לאפליקציית הלימודים
 // ============================================================
 
+/** Universities supported in v2.1. More are roadmapped for Phase 3. */
+export type UniversityCode = 'bgu' | 'tau'
+
 /** Per-user app settings stored inside the Drive DB */
 export interface UserSettings {
+  /** Which university's catalog + scrapers to use. Set during onboarding. */
+  university?: UniversityCode
+  /** Light/dark mode preference. Mirrors the `smartdesk_theme` localStorage key. */
+  theme?: 'light' | 'dark'
   /** Gregorian year the user started their degree (e.g. 2023) */
   degree_start_year?: number
   /** Month (1-12) the user started — normally 10 (October). Used to align year-of-study boundaries. */
   degree_start_month?: number
   /** True if the user does summer semesters (shows קיץ slots even if empty) */
   takes_summer?: boolean
+}
+
+/**
+ * Teaching assistant attached to a course. Pulled from Moodle/Portal where
+ * available; user-editable when not.
+ */
+export interface TeachingAssistant {
+  name: string
+  email?: string
+  /** e.g. "מתרגל", "מתרגלת ראשית" — free-form, comes from the source. */
+  role?: string
+  /** Free-text — "ראשון 14:00–16:00, חדר 304". Optional. */
+  office_hours?: string
+}
+
+/** Generic external link attached to a course (syllabus is its own field). */
+export interface CourseLink {
+  label: string
+  url: string
 }
 
 export interface Course {
@@ -47,6 +73,19 @@ export interface Course {
   /** The classification (year+semester) we used last time we created/verified the Drive folders.
    *  If this drifts from current year_of_study+semester, the folder is stale and may need to move. */
   drive_folder_path?: string
+
+  // ── v2.1 fields ────────────────────────────────────────────────
+  /** Lecturer's email — typically pulled from Moodle/Portal, sometimes user-supplied. */
+  lecturer_email?: string
+  /** URL to the official syllabus PDF (Moodle resource or external). */
+  syllabus_url?: string
+  /** TAs assigned to the course. Empty array = none known yet. */
+  teaching_assistants?: TeachingAssistant[]
+  /** Free-form links the lecturer/TA shared (lab guides, recorded lectures, etc). */
+  course_links?: CourseLink[]
+  /** Opaque snapshot from the university Portal scraper. Schema is per-university;
+   *  the frontend treats it as read-only and just surfaces specific keys. */
+  portal_metadata?: Record<string, unknown>
 }
 
 export interface LessonFile {
@@ -181,11 +220,53 @@ export interface NotebookSource {
   created_at: string
 }
 
+/** Where a grade came from. v2.1 added `'manual'` so users can enter grades
+ *  that aren't in Moodle or the Portal yet. */
+export type GradeSource = 'moodle' | 'portal' | 'manual'
+
 export interface Grade {
   course_id: string
   course_name: string
   grade: number | string
   rank?: string
+
+  // ── v2.1 fields ────────────────────────────────────────────────
+  /** Origin of the grade — drives the "מקור" badge in the UI. */
+  source?: GradeSource
+  /** Optional sub-component label (e.g. "מבחן סופי", "תרגיל בית 3").
+   *  When set, this is a partial grade for that component, not the final course grade. */
+  component?: string
+  /** ISO timestamp of the last update — Moodle/Portal scrapes overwrite this on each sync. */
+  updated_at?: string
+}
+
+// ============================================================
+// Student catalog (credits tracking) — moved from lib/drive-db.ts
+// in v2.1 so backend code, components, and Drive DB code share one
+// definition. lib/drive-db.ts re-exports for backward compat.
+// ============================================================
+
+export interface StudentProfile {
+  track_id: string
+  start_year: number
+  current_year: number
+  expected_end?: number
+  updated_at: string
+}
+
+export interface StudentCourse {
+  /** Internal row id — unique per DB entry */
+  id: string
+  /** Catalog course_id (e.g. "68110279") or synthesized "manual_<ts>" */
+  course_id: string
+  course_name: string
+  credits: number
+  status: 'completed' | 'in_progress' | 'planned'
+  grade?: number
+  semester?: string
+  academic_year?: string
+  source: 'manual' | 'catalog' | 'moodle'
+  updated_at: string
 }
 
 export interface MoodleStatus {
