@@ -12,7 +12,22 @@
  * The whole DB is small enough to round-trip as one JSON file. If it grows
  * huge later, we can shard per-course.
  */
-import type { Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings, Notebook, NotebookSource } from '@/types'
+import type {
+  Course,
+  Lesson,
+  StudyTask,
+  Assignment,
+  CourseNote,
+  UserSettings,
+  Notebook,
+  NotebookSource,
+  StudentProfile,
+  StudentCourse,
+} from '@/types'
+
+// Re-export for backward compat — existing callers import these from
+// `lib/drive-db`. The canonical home is now `types/index.ts`.
+export type { StudentProfile, StudentCourse } from '@/types'
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3'
 const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
@@ -20,32 +35,14 @@ const FOLDER_NAME = 'TEEPO'
 const DB_FILE_NAME = 'db.json'
 
 // ── Student catalog (credits tracking) ────────────────────────────
-// These live in the per-user Drive DB now. The backend was supposed to
-// host them in Supabase, but the FK to bgu_tracks (which is empty) makes
-// saves fail with 500. Keeping this in Drive aligns with "Supabase is
-// auth-only" and makes the feature work offline too.
-export interface StudentProfile {
-  track_id: string
-  start_year: number
-  current_year: number
-  expected_end?: number
-  updated_at: string
-}
-
-export interface StudentCourse {
-  /** Internal row id — unique per DB entry */
-  id: string
-  /** Catalog course_id (e.g. "68110279") or synthesized "manual_<ts>" */
-  course_id: string
-  course_name: string
-  credits: number
-  status: 'completed' | 'in_progress' | 'planned'
-  grade?: number
-  semester?: string
-  academic_year?: string
-  source: 'manual' | 'catalog' | 'moodle'
-  updated_at: string
-}
+// `StudentProfile` and `StudentCourse` live in `types/index.ts` now (v2.1).
+// They're re-exported above so existing callers that import them from
+// `lib/drive-db` keep working. New code should import from `@/types`.
+//
+// These live in the per-user Drive DB. The backend was supposed to host
+// them in Supabase, but the FK to bgu_tracks (which is empty) made saves
+// fail with 500. Keeping this in Drive aligns with "Supabase is auth-only"
+// and makes the feature work offline too.
 
 export interface DriveDB {
   version: number
