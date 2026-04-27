@@ -10,6 +10,7 @@ import {
 import Image from 'next/image'
 import { useAuth } from '@/lib/auth-context'
 import { useTheme } from '@/lib/theme-context'
+import { useUniversityName, useUniversityCode } from '@/lib/use-university'
 import { useEffect } from 'react'
 
 const NAV_GROUPS = [
@@ -49,6 +50,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
   const pathname = usePathname()
   const { user, signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const universityName = useUniversityName()
+  const universityCode = useUniversityCode()
 
   // Block body scroll when mobile drawer is open
   useEffect(() => {
@@ -70,9 +73,16 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
         <div className="px-5 py-6 border-b border-white/5">
           <div className="flex items-center gap-3">
             <Image src="/logo-128.png" alt="TEEPO" width={40} height={40} className="flex-shrink-0" />
-            <div>
+            <div className="min-w-0">
               <p className="font-bold text-ink text-sm leading-tight">TEEPO</p>
               <p className="text-xs mt-0.5 gradient-text">מערכת לימודים חכמה</p>
+              {/* User's university — from settings.university (v2.1). Hidden
+                  if no setting is present (e.g. fresh user, pre-onboarding). */}
+              {universityCode && (
+                <p className="text-[10px] mt-1 text-ink-subtle truncate" title={universityName}>
+                  {universityName}
+                </p>
+              )}
             </div>
           </div>
         </div>
