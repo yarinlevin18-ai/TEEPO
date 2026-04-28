@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase'
 import GlowCard from '@/components/ui/GlowCard'
 import { useDB } from '@/lib/db-context'
 import { classifyCourse, computeYearOfStudy } from '@/lib/semester-classifier'
-import { universityName } from '@/lib/university'
+import { useUniversityName } from '@/lib/use-university'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -38,6 +38,7 @@ type Status = { moodle: boolean; portal: boolean; login_status: Record<string, s
 
 export default function UniversityConnectPage() {
   const { db, ready, createCourse, updateCourse } = useDB()
+  const universityName = useUniversityName()
   const [status, setStatus] = useState<Status>({ moodle: false, portal: false, login_status: {} })
   const [loading, setLoading] = useState<Record<string, boolean>>({})
   const [syncing, setSyncing] = useState(false)
@@ -249,7 +250,7 @@ export default function UniversityConnectPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-ink">חיבור Moodle</h1>
-          <p className="text-ink-muted text-sm">התחבר ל-Moodle של {universityName()}</p>
+          <p className="text-ink-muted text-sm">התחבר ל-Moodle של {universityName}</p>
         </div>
       </div>
 
