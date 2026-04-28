@@ -359,6 +359,47 @@ def fetch_google_doc():
 
 
 # ------------------------------------------------------------------ #
+#  Google Calendar (read-only)                                         #
+# ------------------------------------------------------------------ #
+
+@api.get("/calendar/events")
+def list_calendar_events():
+    """List events from the user's Google Calendar.
+
+    Auth: Google access token in `X-Google-Token` header (or body for POST).
+    Query params:
+      - start: ISO 8601 timeMin (optional)
+      - end:   ISO 8601 timeMax (optional)
+      - q:     free-text filter (optional)
+      - max:   1..250, default 50
+      - calendar_id: defaults to 'primary'
+    """
+    from services import google_calendar
+
+    google_token = request.headers.get("X-Google-Token", "").strip()
+    if not google_token:
+        return jsonify({"error": "חסר טוקן Google"}), 401
+
+    try:
+        events = google_calendar.list_events(
+            google_token,
+            calendar_id=request.args.get("calendar_id", "primary"),
+            time_min=request.args.get("start") or None,
+            time_max=request.args.get("end") or None,
+            query=request.args.get("q") or None,
+            max_results=_clamp(request.args.get("max"), 1, 250, default=50),
+        )
+    except google_calendar.CalendarError as e:
+        if e.status == 401:
+            return jsonify({"error": "טוקן Google לא תקף או פג תוקף"}), 401
+        if e.status == 403:
+            return jsonify({"error": "אין הרשאת קריאה ל-Google Calendar"}), 403
+        return jsonify({"error": "שגיאה בטעינת היומן"}), 502
+
+    return jsonify({"events": events, "count": len(events)})
+
+
+# ------------------------------------------------------------------ #
 #  Lesson Summarize                                                    #
 # ------------------------------------------------------------------ #
 
