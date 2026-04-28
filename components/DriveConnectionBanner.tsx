@@ -46,18 +46,21 @@ export default function DriveConnectionBanner() {
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
-        className="mx-4 sm:mx-6 lg:mx-8 mt-4 p-4 rounded-2xl flex items-start gap-3 relative z-[2]"
+        className="qa-drive-banner mx-4 sm:mx-6 lg:mx-8 mt-4 p-4 rounded-2xl flex items-start gap-3 relative z-[2]"
         style={{
-          background: 'rgba(245,158,11,0.08)',
-          border: '1px solid rgba(245,158,11,0.25)',
-          backdropFilter: 'blur(12px)',
+          background: 'rgba(var(--glow1), 0.07)',
+          border: '0.5px solid rgba(var(--glow1), 0.32)',
+          backdropFilter: 'blur(14px)',
         }}
       >
-        <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center flex-shrink-0">
-          <AlertTriangle size={18} className="text-amber-400" />
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(var(--glow1), 0.14)' }}
+        >
+          <AlertTriangle size={18} style={{ color: 'var(--accent)' }} />
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-semibold text-amber-300">
+          <h4 className="text-sm font-medium" style={{ color: 'var(--accent)' }}>
             Google Drive לא מחובר
           </h4>
           <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">

@@ -6,6 +6,25 @@
   --font-heebo:  'Heebo', sans-serif;
   --font-serif:  'Frank Ruhl Libre', Georgia, serif;
   --font-script: 'Caveat', cursive;
+
+  /* ── Quiet Atmosphere — time-of-day palette ──
+     Defaults to the מילה (deep night) phase; LivingDayProvider
+     overrides these per-minute via inline style on <html>. */
+  --bg1: rgb(8, 16, 30);
+  --bg2: rgb(13, 22, 40);
+  --glow1: 32, 160, 140;        /* RGB triplet, used as rgba(var(--glow1), α) */
+  --glow2: 20, 60, 110;
+  --accent: #20dca0;
+  --accent-2: #4dd9b8;
+
+  /* Sun/moon position; updated by LivingDayProvider on a 60s cadence. */
+  --sun-x: 88%;
+  --sun-y: 78%;
+  --sun-opacity: 1;
+
+  /* Standard easings for the atmosphere. */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-snappy: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 * { box-sizing: border-box; }
@@ -385,6 +404,271 @@ body {
   font-size: 1.25em;
   color: #d4c9b4;
   letter-spacing: 0.01em;
+}
+
+/* ══════════════════════════════════════════
+   QUIET ATMOSPHERE — Sky scene
+   Fixed-position layered background driven by CSS custom properties
+   set per-minute by LivingDayProvider:
+     --bg1, --bg2          base wash colors
+     --glow1, --glow2      RGB triplets for warm/cool halos
+     --sun-x, --sun-y      celestial body position (0-100%)
+     --sun-opacity         edge fade
+   ══════════════════════════════════════════ */
+.sky-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* 1. Base wash — bg1 at top, bg2 deeper toward bottom. */
+.sky-scene__base {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
+  transition: background 1.2s var(--ease-snappy);
+}
+
+/* 2. Glow halo — warm/cool radials. The warm halo follows the sun;
+      the cool halo sits at the bottom edge for atmospheric depth.
+      Alphas tuned for full-viewport: prototype's 0.50/0.45 read as
+      restrained inside a 900px frame but flood at fullscreen, so we
+      hold the warm halo at ~0.30 and the cool well at ~0.22. */
+.sky-scene__glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 38% 32% at var(--sun-x) var(--sun-y),
+      rgba(var(--glow1), 0.30), transparent 70%),
+    radial-gradient(ellipse 70% 26% at 50% 100%,
+      rgba(var(--glow2), 0.22), transparent 75%);
+  filter: blur(10px);
+  transition: background 1.2s var(--ease-snappy);
+}
+
+/* 3. Sun/moon body — pseudo-elements paint the disc and corona. The
+      wrapper carries position; ::before is the wide soft halo and
+      ::after is the bright core. mix-blend-mode: screen keeps it
+      reading as light, not paint. */
+.sky-scene__body {
+  position: absolute;
+  left: var(--sun-x);
+  top: var(--sun-y);
+  transform: translate(-50%, -50%);
+  width: 240px;
+  height: 240px;
+  opacity: var(--sun-opacity);
+  mix-blend-mode: screen;
+  transition: left 0.6s var(--ease-snappy),
+              top 0.6s var(--ease-snappy),
+              opacity 0.8s linear;
+}
+.sky-scene__body::before,
+.sky-scene__body::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  transition: background 1.2s var(--ease-snappy),
+              box-shadow 1.2s var(--ease-snappy);
+}
+.sky-scene__body::before {
+  inset: 0;
+}
+
+/* Sun — five layers of breath in the corona, cream→gold disc.
+   Per the philosophy: the disc is "a hole in the sky", never pure white
+   at the heart and never deep orange at the rim. Each corona stop is
+   tuned so no edge is visible — fade to almost nothing before you can
+   name where it ended. */
+.sky-scene__body--sun::before {
+  background: radial-gradient(circle,
+    rgba(255, 240, 195, 0.38) 0%,    /* 1. inner brightness pressing on disc */
+    rgba(255, 220, 160, 0.22) 18%,   /* 2. mid yellow */
+    rgba(255, 195, 125, 0.12) 36%,   /* 3. softening to peach */
+    rgba(255, 180, 105, 0.05) 55%,   /* 4. far amber, thinning */
+    rgba(255, 180, 105, 0.015) 72%,  /* 5. near-invisible haze */
+    transparent 92%);
+}
+.sky-scene__body--sun::after {
+  width: 38px;
+  height: 38px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle,
+    #fff7d8 0%,    /* cream — never pure white */
+    #fce9a8 55%,   /* warming */
+    #efc972 92%,   /* pale gold edge — never deep orange */
+    #e6bd62 100%);
+  /* Stacked shadows extend the corona beyond ::before's box, knitting
+     halo into base atmosphere so the eye can't find an edge. */
+  box-shadow:
+    0 0 72px 16px rgba(255, 215, 140, 0.22),
+    0 0 38px 9px  rgba(255, 230, 170, 0.36),
+    0 0 18px 4px  rgba(255, 245, 210, 0.55);
+}
+
+/* Moon — same logic, temperature inverted. Pale silver center, cool
+   blue-white edge, cool corona that doesn't overstay. */
+.sky-scene__body--moon::before {
+  background: radial-gradient(circle,
+    rgba(225, 235, 252, 0.28) 0%,    /* 1. inner brightness */
+    rgba(215, 228, 248, 0.16) 22%,   /* 2. cool silver */
+    rgba(205, 222, 248, 0.07) 42%,   /* 3. cool blue-white */
+    rgba(205, 222, 248, 0.025) 62%,  /* 4. far cool */
+    transparent 85%);
+}
+.sky-scene__body--moon::after {
+  width: 30px;
+  height: 30px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle,
+    #f6f8fc 0%,    /* pale silver */
+    #e0e7f1 65%,   /* gentle blue-white */
+    #c6d0dd 100%); /* cool edge */
+  box-shadow:
+    0 0 50px 12px rgba(220, 235, 255, 0.18),
+    0 0 26px 7px  rgba(230, 240, 255, 0.30),
+    0 0 12px 3px  rgba(240, 248, 255, 0.45);
+}
+
+/* 4. Grain — barely-there texture so the gradients don't feel like CSS. */
+.sky-scene__grain {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+  background-size: 3px 3px;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sky-scene__base,
+  .sky-scene__glow,
+  .sky-scene__body,
+  .sky-scene__body::before,
+  .sky-scene__body::after {
+    transition: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════
+   QUIET ATMOSPHERE — dashboard scope overrides
+   The `.qa` class is on the dashboard layout root. These rules retune
+   site-wide primitives (glass cards, gradient text, accent buttons,
+   heading weights) for the dashboard without touching the rest of the
+   app (auth, landing, legal, etc).
+   ══════════════════════════════════════════ */
+
+/* ── Glass cards: hairline glass with top-edge shimmer ── */
+.qa .glass,
+.qa .glass-sm {
+  background: rgba(255, 255, 255, 0.04);
+  border: 0.5px solid rgba(255, 255, 255, 0.09);
+  box-shadow: none;
+  position: relative;
+  overflow: hidden;
+  transition: transform 280ms var(--ease-spring),
+              border-color 280ms var(--ease-spring),
+              background 280ms var(--ease-spring);
+}
+.qa .glass    { border-radius: 14px; }
+.qa .glass-sm { border-radius: 12px; }
+
+/* Top-edge luminance — a 1px shimmer at the top of every card,
+   suggested by light catching the hairline edge. */
+.qa .glass::before,
+.qa .glass-sm::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 18%;
+  right: 18%;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255, 255, 255, 0.18),
+    transparent);
+  pointer-events: none;
+}
+
+.qa .glass:hover,
+.qa .glass-sm:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: none;
+}
+
+/* ── Typography: drop weights from 800/700 to 500/400/300 and
+      retune the gradient-text shimmer to use the time-of-day accent. */
+.qa .text-heading-1 { font-weight: 500; letter-spacing: 0; }
+.qa .text-heading-2 { font-weight: 500; }
+.qa .text-heading-3 { font-weight: 500; }
+.qa .text-body,
+.qa .text-body-sm   { font-weight: 300; }
+.qa .text-caption   { font-weight: 400; }
+
+/* Greeting / number / accent shimmer — replaces the indigo→violet
+   gradient-text with a teal shimmer driven by --accent. */
+@keyframes qa-shimmer {
+  to { background-position: -200% 0; }
+}
+.qa .gradient-text {
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 65%, white),
+    var(--accent)
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: qa-shimmer 4s linear infinite;
+}
+.qa .gradient-text-white {
+  background: linear-gradient(135deg, #ffffff, color-mix(in srgb, var(--accent) 50%, white));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Accent buttons: drop the indigo claymorphism for a flat tinted-glass
+   pill that picks up the current time-of-day accent. */
+.qa .btn-gradient {
+  background: rgba(var(--glow1), 0.18);
+  border: 0.5px solid rgba(var(--glow1), 0.5);
+  color: var(--accent);
+  box-shadow: none;
+  transition: background 200ms var(--ease-snappy),
+              border-color 200ms var(--ease-snappy),
+              transform 200ms var(--ease-snappy);
+}
+.qa .btn-gradient:hover {
+  background: rgba(var(--glow1), 0.26);
+  border-color: rgba(var(--glow1), 0.7);
+  transform: translateY(-1px);
+  box-shadow: none;
+}
+.qa .btn-gradient:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+.qa .btn-gradient::after { display: none; }  /* kill the white shine sweep */
+
+/* Typing dots / loading shimmer — neutralize the indigo references. */
+.qa .typing-dot { background: var(--accent); }
+.qa .shimmer {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.07) 50%,
+    rgba(255,255,255,0.03) 100%);
 }
 
 /* ══════════════════════════════════════════
