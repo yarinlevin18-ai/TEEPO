@@ -92,9 +92,8 @@ export function LivingDayProvider({ children }: { children: ReactNode }) {
       bg1.join(','), bg2.join(','),
       glow1.join(','), glow2.join(','),
       accent,
-      celestial.xPct.toFixed(2),
-      celestial.yPct.toFixed(2),
-      celestial.opacity.toFixed(3),
+      celestial.sun.xPct.toFixed(2),  celestial.sun.yPct.toFixed(2),  celestial.sun.opacity.toFixed(3),
+      celestial.moon.xPct.toFixed(2), celestial.moon.yPct.toFixed(2), celestial.moon.opacity.toFixed(3),
       celestial.type,
     ].join('|')
     if (sig === lastWritten.current) return
@@ -105,9 +104,14 @@ export function LivingDayProvider({ children }: { children: ReactNode }) {
     root.style.setProperty('--glow1', glow1.join(','))
     root.style.setProperty('--glow2', glow2.join(','))
     root.style.setProperty('--accent', accent)
-    root.style.setProperty('--sun-x', `${celestial.xPct}%`)
-    root.style.setProperty('--sun-y', `${celestial.yPct}%`)
-    root.style.setProperty('--sun-opacity', String(celestial.opacity))
+    // Sun and moon each get their own position + opacity so they can
+    // cross-fade through each other during dawn/dusk overlap.
+    root.style.setProperty('--sun-x',       `${celestial.sun.xPct}%`)
+    root.style.setProperty('--sun-y',       `${celestial.sun.yPct}%`)
+    root.style.setProperty('--sun-opacity', String(celestial.sun.opacity))
+    root.style.setProperty('--moon-x',       `${celestial.moon.xPct}%`)
+    root.style.setProperty('--moon-y',       `${celestial.moon.yPct}%`)
+    root.style.setProperty('--moon-opacity', String(celestial.moon.opacity))
     root.dataset.celestial = celestial.type
   }, [atmosphere])
 

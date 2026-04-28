@@ -441,30 +441,207 @@ body {
   position: absolute;
   inset: 0;
   background:
+    /* Halo around the sun position. */
     radial-gradient(ellipse 38% 32% at var(--sun-x) var(--sun-y),
       rgba(var(--glow1), 0.30), transparent 70%),
+    /* Warm horizon band — wide and tall, anchored to the bottom edge.
+       Uses --glow1 so it's hot orange at sunset, soft yellow at noon,
+       teal at night. The atmosphere palette interpolates this for us. */
+    radial-gradient(ellipse 110% 55% at 50% 110%,
+      rgba(var(--glow1), 0.30), transparent 78%),
+    /* Cool secondary glow at the bottom — blends below the warm band
+       to push depth and recede the lower atmosphere. */
     radial-gradient(ellipse 70% 26% at 50% 100%,
-      rgba(var(--glow2), 0.22), transparent 75%);
+      rgba(var(--glow2), 0.18), transparent 75%);
   filter: blur(10px);
-  transition: background 1.2s var(--ease-snappy);
+  transition: background 0.8s var(--ease-snappy);
 }
 
-/* 3. Sun/moon body — pseudo-elements paint the disc and corona. The
-      wrapper carries position; ::before is the wide soft halo and
-      ::after is the bright core. mix-blend-mode: screen keeps it
-      reading as light, not paint. */
+/* 3a. Clouds — JS-driven via SkyClouds component. Each `.sky-cloud`
+       carries inline styles for top / width / opacity / image /
+       animation duration & delay; the CSS provides the keyframes for
+       directional drift across the viewport. Layer fades in only
+       when the sun is dominant (no clouds at night). */
+.sky-clouds {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  opacity: 0;
+  /* Fast-but-graceful day/night transition. Combined with the cloud
+     drift continuing in the background, day-to-night feels like a
+     dimming rather than a freeze. */
+  transition: opacity 1.4s ease-out;
+}
+html[data-celestial="sun"] .sky-clouds { opacity: 1; }
+
+.sky-cloud {
+  position: absolute;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  /* Aspect — assumes the source PNGs are roughly 16:9. */
+  aspect-ratio: 16 / 9;
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+  will-change: transform;
+}
+/* LTR: starts off-left, drifts to off-right. */
+.sky-cloud--ltr {
+  left: -50%;
+  animation-name: qa-cloud-ltr;
+}
+/* RTL: starts off-right, drifts to off-left. */
+.sky-cloud--rtl {
+  left: 100%;
+  animation-name: qa-cloud-rtl;
+}
+/* Each cloud also drifts vertically with scroll, like the celestial
+   body, for parallax depth. */
+.sky-cloud {
+  --cloud-scroll: calc(var(--scroll-y) * -0.14);
+}
+@keyframes qa-cloud-ltr {
+  from { transform: translate(0,     var(--cloud-scroll)); }
+  to   { transform: translate(170vw, var(--cloud-scroll)); }
+}
+@keyframes qa-cloud-rtl {
+  from { transform: translate(0,      var(--cloud-scroll)); }
+  to   { transform: translate(-170vw, var(--cloud-scroll)); }
+}
+
+/* 3c. Wildlife — birds + butterflies. The container is fixed-position
+       so it sits over the sky but under the dashboard content. Pointer
+       events disabled so it never blocks interaction. */
+.sky-wildlife {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+/* ── Birds ── three small silhouettes that drift across the viewport
+   in a loose V. The flock cycle is ~52s with a long invisible tail so
+   they only "spark through" every minute or so. */
+.sky-bird {
+  position: absolute;
+  width: 32px;
+  height: 12px;
+  opacity: 0;
+  animation: qa-bird-cross 52s linear infinite;
+}
+.sky-bird--lead   { top: 22%; animation-delay: 0s; }
+.sky-bird--wing-l { top: 25%; animation-delay: -1.2s; }
+.sky-bird--wing-r { top: 25%; animation-delay: -2.4s; }
+.sky-bird--wing-l { width: 26px; height: 10px; }
+.sky-bird--wing-r { width: 26px; height: 10px; }
+
+@keyframes qa-bird-cross {
+  /* Stay invisible most of the cycle so the crossing feels rare. */
+  0%   { transform: translateX(110vw) translateY(0);     opacity: 0; }
+  6%   { opacity: 0.9; }
+  /* Tiny vertical drift across the journey so it feels alive. */
+  20%  { transform: translateX(60vw)  translateY(-6px);  opacity: 0.9; }
+  35%  { transform: translateX(30vw)  translateY(4px);   opacity: 0.85; }
+  48%  { transform: translateX(-5vw)  translateY(-2px);  opacity: 0.4; }
+  50%  { transform: translateX(-15vw) translateY(0);     opacity: 0; }
+  100% { transform: translateX(-15vw) translateY(0);     opacity: 0; }
+}
+
+/* Wing flap — the path morph happens via stroke-dasharray on the
+   silhouette, but here we just scale the SVG vertically a touch to
+   suggest the flapping rhythm. */
+.bird-wings {
+  animation: qa-wing-flap 0.45s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+@keyframes qa-wing-flap {
+  0%, 100% { transform: scaleY(1);   }
+  50%      { transform: scaleY(0.55); }
+}
+
+/* ── Butterflies ── two small fluttering shapes that meander in the
+   lower half of the viewport. Each has its own path + flutter timing. */
+.sky-butterfly {
+  position: absolute;
+  width: 22px;
+  height: 18px;
+  opacity: 0.78;
+  animation: qa-butterfly-flutter 0.32s ease-in-out infinite;
+}
+.sky-butterfly--a {
+  /* Lazy figure-8 across mid-lower viewport. */
+  animation:
+    qa-butterfly-path-a 38s ease-in-out infinite,
+    qa-butterfly-flutter 0.32s ease-in-out infinite;
+}
+.sky-butterfly--b {
+  width: 18px;
+  height: 14px;
+  opacity: 0.7;
+  animation:
+    qa-butterfly-path-b 46s ease-in-out infinite,
+    qa-butterfly-flutter 0.28s ease-in-out infinite;
+  animation-delay: -10s, 0s;
+}
+@keyframes qa-butterfly-path-a {
+  0%   { transform: translate(15vw, 70vh); }
+  20%  { transform: translate(35vw, 58vh); }
+  40%  { transform: translate(55vw, 72vh); }
+  60%  { transform: translate(70vw, 60vh); }
+  80%  { transform: translate(85vw, 75vh); }
+  100% { transform: translate(15vw, 70vh); }
+}
+@keyframes qa-butterfly-path-b {
+  0%   { transform: translate(80vw, 80vh); }
+  25%  { transform: translate(60vw, 65vh); }
+  50%  { transform: translate(40vw, 78vh); }
+  75%  { transform: translate(20vw, 62vh); }
+  100% { transform: translate(80vw, 80vh); }
+}
+.butterfly-wings {
+  animation: qa-butterfly-wings 0.20s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+@keyframes qa-butterfly-wings {
+  0%, 100% { transform: scaleX(1);   }
+  50%      { transform: scaleX(0.45); }
+}
+@keyframes qa-butterfly-flutter {
+  0%, 100% { /* parent driver — overridden by path animation */ }
+}
+
+/* 3b. Sun/moon body — pseudo-elements paint the disc and corona. The
+       wrapper carries position; ::before is the wide soft halo and
+       ::after is the bright core. mix-blend-mode: screen keeps it
+       reading as light, not paint. */
 .sky-scene__body {
   position: absolute;
+  /* Default to sun's coordinates; moon overrides below. The base
+     translate(-50%,-50%) anchors the body at its (x,y) center; we add a
+     scroll-linked vertical offset so the body drifts as the page
+     scrolls. -0.18 sits between near-stars (-0.08) and content (1.0)
+     for a believable mid-depth. */
   left: var(--sun-x);
   top: var(--sun-y);
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, calc(-50% + var(--scroll-y) * -0.18));
   width: 240px;
   height: 240px;
-  opacity: var(--sun-opacity);
   mix-blend-mode: screen;
-  transition: left 0.6s var(--ease-snappy),
-              top 0.6s var(--ease-snappy),
-              opacity 0.8s linear;
+  will-change: transform, opacity;
+  transition: left 0.4s var(--ease-snappy),
+              top 0.4s var(--ease-snappy),
+              opacity 0.5s linear;
+}
+.sky-scene__body--sun  { opacity: var(--sun-opacity); }
+.sky-scene__body--moon {
+  left: var(--moon-x);
+  top: var(--moon-y);
+  opacity: var(--moon-opacity);
 }
 .sky-scene__body::before,
 .sky-scene__body::after {
@@ -478,63 +655,71 @@ body {
   inset: 0;
 }
 
-/* Sun — five layers of breath in the corona, cream→gold disc.
-   Per the philosophy: the disc is "a hole in the sky", never pure white
-   at the heart and never deep orange at the rim. Each corona stop is
-   tuned so no edge is visible — fade to almost nothing before you can
-   name where it ended. */
+/* Sun — small disc with a wide soft warm halo. The PNG sits as the
+   bright core (kept small + slightly muted so it doesn't blind),
+   wrapped by a multi-stop radial halo on ::before that fades into
+   the sky so no edge is visible. */
+.sky-scene__body--sun {
+  width: 320px;
+  height: 320px;
+  background: none;
+}
 .sky-scene__body--sun::before {
+  display: block;
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* Soft warm halo, 5 stops fading to transparent. A bit warmer and
+     denser at the inner stops so the slightly brighter disc has glow
+     to bloom into. */
   background: radial-gradient(circle,
-    rgba(255, 240, 195, 0.38) 0%,    /* 1. inner brightness pressing on disc */
-    rgba(255, 220, 160, 0.22) 18%,   /* 2. mid yellow */
-    rgba(255, 195, 125, 0.12) 36%,   /* 3. softening to peach */
-    rgba(255, 180, 105, 0.05) 55%,   /* 4. far amber, thinning */
-    rgba(255, 180, 105, 0.015) 72%,  /* 5. near-invisible haze */
+    rgba(255, 225, 170, 0.42) 0%,
+    rgba(255, 205, 135, 0.24) 18%,
+    rgba(255, 180, 105, 0.13) 36%,
+    rgba(255, 170, 95,  0.05) 56%,
+    rgba(255, 170, 95,  0.015) 74%,
     transparent 92%);
 }
 .sky-scene__body--sun::after {
-  width: 38px;
-  height: 38px;
+  display: block;
+  content: '';
+  position: absolute;
+  width: 110px;
+  height: 110px;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: radial-gradient(circle,
-    #fff7d8 0%,    /* cream — never pure white */
-    #fce9a8 55%,   /* warming */
-    #efc972 92%,   /* pale gold edge — never deep orange */
-    #e6bd62 100%);
-  /* Stacked shadows extend the corona beyond ::before's box, knitting
-     halo into base atmosphere so the eye can't find an edge. */
-  box-shadow:
-    0 0 72px 16px rgba(255, 215, 140, 0.22),
-    0 0 38px 9px  rgba(255, 230, 170, 0.36),
-    0 0 18px 4px  rgba(255, 245, 210, 0.55);
+  background: url('/atmosphere/sun.png') center / contain no-repeat;
+  /* Mask feathers the PNG's square edges into the halo. */
+  -webkit-mask-image: radial-gradient(circle, black 44%, transparent 80%);
+          mask-image: radial-gradient(circle, black 44%, transparent 80%);
+  /* Brighter and softly blurred — reads as a glowing source, not a
+     hard disc. The blur smears the surface texture into a warm haze
+     in the middle while the halo + mask preserve the round silhouette. */
+  opacity: 1;
+  filter: brightness(1.12) saturate(1.05) blur(2.5px);
 }
 
-/* Moon — same logic, temperature inverted. Pale silver center, cool
-   blue-white edge, cool corona that doesn't overstay. */
-.sky-scene__body--moon::before {
-  background: radial-gradient(circle,
-    rgba(225, 235, 252, 0.28) 0%,    /* 1. inner brightness */
-    rgba(215, 228, 248, 0.16) 22%,   /* 2. cool silver */
-    rgba(205, 222, 248, 0.07) 42%,   /* 3. cool blue-white */
-    rgba(205, 222, 248, 0.025) 62%,  /* 4. far cool */
-    transparent 85%);
+/* Moon — image-based body. The crescent PNG carries its own subtle
+   halo and rim lighting. A radial mask fades the square PNG edges
+   to transparent so no rectangle outline is visible against the sky. */
+.sky-scene__body--moon {
+  width: 220px;
+  height: 220px;
+  background: url('/atmosphere/moon.png') center / contain no-repeat;
+  -webkit-mask-image: radial-gradient(circle, black 50%, transparent 78%);
+          mask-image: radial-gradient(circle, black 50%, transparent 78%);
 }
+.sky-scene__body--moon::before,
 .sky-scene__body--moon::after {
-  width: 30px;
-  height: 30px;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle,
-    #f6f8fc 0%,    /* pale silver */
-    #e0e7f1 65%,   /* gentle blue-white */
-    #c6d0dd 100%); /* cool edge */
-  box-shadow:
-    0 0 50px 12px rgba(220, 235, 255, 0.18),
-    0 0 26px 7px  rgba(230, 240, 255, 0.30),
-    0 0 12px 3px  rgba(240, 248, 255, 0.45);
+  display: none;
+}
+/* Same treatment for the sun, in case the PNG has any visible square
+   bleed against the sky base. */
+.sky-scene__body--sun {
+  -webkit-mask-image: radial-gradient(circle, black 52%, transparent 80%);
+          mask-image: radial-gradient(circle, black 52%, transparent 80%);
 }
 
 /* 4. Grain — barely-there texture so the gradients don't feel like CSS. */
@@ -546,6 +731,59 @@ body {
   mix-blend-mode: overlay;
   pointer-events: none;
 }
+
+/* 5. Star field — uses a tiled starfield + nebula PNG. Two layers
+   parallax slightly via different background sizes and slow drift,
+   and a subtle filter twinkle gives life. Visible only when the
+   celestial body is the moon (i.e. nighttime). */
+.sky-scene__stars,
+.sky-scene__stars--far {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.6s ease-out;
+  background-image: url('/atmosphere/stars.png');
+  background-repeat: repeat;
+  mix-blend-mode: screen;
+}
+.sky-scene {
+  /* Default scroll offset; overwritten by the SkyScene component on
+     every scroll tick via a passive listener. Used by the inner
+     layers' translateY() calls below. */
+  --scroll-y: 0px;
+}
+.sky-scene__stars {
+  background-size: 1100px 1100px;
+  /* Crush brightness + saturation so the nebula sits as atmosphere
+     rather than punching through the glass cards above. */
+  filter: brightness(0.45) saturate(0.65);
+  /* Slow horizontal drift + scroll-linked vertical parallax. The
+     -0.08 factor means stars rise gently as you scroll down — just
+     enough to feel like depth, not a moving wallpaper. */
+  transform: translateY(calc(var(--scroll-y) * -0.08));
+  will-change: transform, background-position;
+  animation: qa-star-drift 90s linear infinite;
+}
+.sky-scene__stars--far {
+  /* Smaller tiling reads as more-distant stars; even more crushed and
+     a smaller parallax factor so the layers separate visually. */
+  background-size: 700px 700px;
+  filter: brightness(0.30) saturate(0.5);
+  transform: translateY(calc(var(--scroll-y) * -0.04));
+  will-change: transform, background-position;
+  animation: qa-star-drift 160s linear infinite reverse;
+}
+@keyframes qa-star-drift {
+  from { background-position: 0 0; }
+  to   { background-position: -1100px 0; }
+}
+/* Targets — held to a fraction of full opacity so the night sky
+   doesn't compete with content. The previous values (1.0 / 0.55)
+   bled the nebula through every glass card. */
+html[data-celestial="moon"] .sky-scene__stars     { opacity: 0.16; }
+html[data-celestial="moon"] .sky-scene__stars--far { opacity: 0.08; }
+
 
 @media (prefers-reduced-motion: reduce) {
   .sky-scene__base,
@@ -566,48 +804,101 @@ body {
    ══════════════════════════════════════════ */
 
 /* ── Glass cards: hairline glass with top-edge shimmer ── */
+/* Liquid glass — inspired by Reijo-Palmiste-style Spline glass buttons.
+   Heavy backdrop blur + saturate creates real refraction; layered
+   inset shadows simulate the top specular highlight and bottom rim
+   shadow that give thick glass its volume; the outer drop shadow
+   grounds each card softly without the indigo claymorphism feel. */
 .qa .glass,
 .qa .glass-sm {
-  background: rgba(255, 255, 255, 0.04);
-  border: 0.5px solid rgba(255, 255, 255, 0.09);
-  box-shadow: none;
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.025) 100%);
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+          backdrop-filter: blur(18px) saturate(1.35);
+  box-shadow:
+    /* Top specular — light catching the upper inside surface. */
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    /* Bottom rim — refractive edge under the glass. */
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    /* Outer drop — soft, low-alpha so it grounds without weight. */
+    0 12px 36px -8px rgba(8, 14, 26, 0.45),
+    0 4px  12px -4px rgba(8, 14, 26, 0.30);
   position: relative;
   overflow: hidden;
   transition: transform 280ms var(--ease-spring),
               border-color 280ms var(--ease-spring),
-              background 280ms var(--ease-spring);
+              background 280ms var(--ease-spring),
+              box-shadow 280ms var(--ease-spring);
 }
-.qa .glass    { border-radius: 14px; }
-.qa .glass-sm { border-radius: 12px; }
+.qa .glass    { border-radius: 18px; }
+.qa .glass-sm { border-radius: 14px; }
 
-/* Top-edge luminance — a 1px shimmer at the top of every card,
-   suggested by light catching the hairline edge. */
+/* Top-edge specular shimmer — a sharper highlight band at the very
+   top of each card, suggesting light bouncing off the curved upper
+   surface of the glass. */
 .qa .glass::before,
 .qa .glass-sm::before {
   content: '';
   position: absolute;
   top: 0;
-  left: 18%;
-  right: 18%;
+  left: 14%;
+  right: 14%;
   height: 1px;
   background: linear-gradient(90deg,
     transparent,
-    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.55),
     transparent);
   pointer-events: none;
+}
+
+/* Refraction tint overlay — a soft top-to-bottom gradient that picks
+   up the surrounding atmosphere through the glass. Uses --glow1 so
+   it tints warm at sunset, cool at night, etc. */
+.qa .glass::after,
+.qa .glass-sm::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(160deg,
+    rgba(var(--glow1), 0.06) 0%,
+    transparent 40%,
+    rgba(var(--glow2), 0.04) 100%);
+  border-radius: inherit;
 }
 
 .qa .glass:hover,
 .qa .glass-sm:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.055);
-  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.10) 0%,
+    rgba(255, 255, 255, 0.04) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 44px -8px rgba(8, 14, 26, 0.55),
+    0 6px  16px -4px rgba(8, 14, 26, 0.35);
 }
 
 /* ── Typography: drop weights from 800/700 to 500/400/300 and
       retune the gradient-text shimmer to use the time-of-day accent. */
-.qa .text-heading-1 { font-weight: 500; letter-spacing: 0; }
+/* Soft text-shadow on heading 1 and wisdom line — keeps them legible
+   even when the moon/sun arc passes behind them. The shadow is a
+   wide, very low-alpha black halo, invisible against dark sky but
+   doing the work where the celestial body brightens the backdrop. */
+.qa .text-heading-1 {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-shadow: 0 2px 16px rgba(8, 14, 26, 0.7),
+               0 0   8px rgba(8, 14, 26, 0.55);
+}
+.qa .text-heading-1 + div,           /* wisdom line wrapper */
+.qa .text-heading-1 + div span {
+  text-shadow: 0 1px 8px rgba(8, 14, 26, 0.65);
+}
 .qa .text-heading-2 { font-weight: 500; }
 .qa .text-heading-3 { font-weight: 500; }
 .qa .text-body,
@@ -664,6 +955,69 @@ body {
 
 /* Typing dots / loading shimmer — neutralize the indigo references. */
 .qa .typing-dot { background: var(--accent); }
+
+/* Wisdom-line fade-in — runs once per remount (key change). */
+@keyframes qa-wisdom-fade {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 0.85; transform: translateY(0); }
+}
+.wisdom-fade-in {
+  animation: qa-wisdom-fade 0.55s ease-out both;
+}
+
+/* ── Stage J: motion polish ──────────────────────────── */
+
+/* Breathing dot on the active sidebar icon container — a soft 2.6s
+   pulse on a pseudo-element. The pseudo sidesteps framer-motion's
+   inline transform on the parent. Animating opacity (which interpolates
+   reliably) instead of box-shadow channel values avoids the var()-in-
+   rgba() interpolation quirk. */
+@keyframes qa-breathe {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.05); }
+}
+.qa .sidebar-active-icon {
+  position: relative;
+}
+.qa .sidebar-active-icon::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 16px 2px rgba(var(--glow1), 0.45);
+  opacity: 0;
+  animation: qa-breathe 2.6s ease-in-out infinite;
+}
+
+/* Card-stagger entrance — applies to direct .glass children of a
+   .qa-stagger container. CSS handles delays via :nth-child so we
+   avoid re-mount issues from React re-renders. */
+@keyframes qa-card-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.qa-stagger > * {
+  animation: qa-card-rise 0.55s ease-out both;
+}
+.qa-stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.qa-stagger > *:nth-child(2) { animation-delay: 0.10s; }
+.qa-stagger > *:nth-child(3) { animation-delay: 0.16s; }
+.qa-stagger > *:nth-child(4) { animation-delay: 0.22s; }
+.qa-stagger > *:nth-child(5) { animation-delay: 0.28s; }
+.qa-stagger > *:nth-child(6) { animation-delay: 0.34s; }
+.qa-stagger > *:nth-child(n+7) { animation-delay: 0.40s; }
+
+/* Day-pick spring — light bounce on the selected week-strip day.
+   Keyframed, not React-driven, so it survives parent re-renders. */
+@keyframes qa-day-spring {
+  0%   { transform: scale(0.92); }
+  60%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.qa-day-spring {
+  animation: qa-day-spring 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
 .qa .shimmer {
   background: linear-gradient(90deg,
     rgba(255,255,255,0.03) 0%,

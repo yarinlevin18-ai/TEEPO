@@ -8,6 +8,10 @@ import { LivingDayProvider } from '@/lib/living-day-context'
 import Sidebar from '@/components/layout/Sidebar'
 import DriveConnectionBanner from '@/components/DriveConnectionBanner'
 import SkyScene from '@/components/SkyScene'
+import WeatherParticles from '@/components/WeatherParticles'
+import SkyClouds from '@/components/SkyClouds'
+import SkyWildlife from '@/components/SkyWildlife'
+import TimeRailDev from '@/components/TimeRailDev'
 import Image from 'next/image'
 import { Menu } from 'lucide-react'
 
@@ -48,6 +52,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <LivingDayProvider>
       <div className="qa flex min-h-screen bg-base">
         <SkyScene />
+        <SkyClouds />
+        <WeatherParticles />
+        <SkyWildlife />
 
         {/* Mobile header bar */}
         <header
@@ -68,6 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <DriveConnectionBanner />
           {children}
         </main>
+        <TimeRailDev />
       </div>
       </LivingDayProvider>
     </DBProvider>

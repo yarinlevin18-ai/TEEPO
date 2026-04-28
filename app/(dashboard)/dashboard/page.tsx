@@ -33,6 +33,7 @@ import {
 import { useNotifications } from '@/lib/use-notifications'
 import NotificationCenter from '@/components/NotificationCenter'
 import SemesterCard from '@/components/SemesterCard'
+import WisdomLine from '@/components/WisdomLine'
 import { getSemesterStatus } from '@/lib/academic-calendar'
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -310,7 +311,7 @@ export default function DashboardPage() {
   } = useNotifications(assignments, tasks, allTodayEvents)
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-5">
+    <div className="qa-stagger p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-5">
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {/* Todo Popup */}
@@ -351,6 +352,7 @@ export default function DashboardPage() {
               <span className="text-ink">{getGreeting()}, </span>
               <span className="gradient-text hand-underline">{displayName}</span>
             </h1>
+            <WisdomLine />
             <p className="text-sm text-ink-muted mt-1">
               {getSemesterStatus().label} &middot; {format(new Date(), 'EEEE, d בMMMM', { locale: he })}
             </p>
@@ -522,7 +524,12 @@ export default function DashboardPage() {
               } : undefined}
             >
               <span className="text-[10px] font-medium">{DAYS_SHORT[i]}</span>
-              <span className="text-lg font-medium mt-0.5">{day.date.getDate()}</span>
+              <span
+                key={selectedDay === i ? `sel-${i}` : `idle-${i}`}
+                className={`text-lg font-medium mt-0.5 ${selectedDay === i ? 'qa-day-spring' : ''}`}
+              >
+                {day.date.getDate()}
+              </span>
               {/* "Today" hairline pill under the date */}
               {day.isToday && selectedDay !== i && (
                 <span

@@ -129,7 +129,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                           </motion.div>
                         )}
                         <motion.div
-                          className="relative z-10 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                          className={`relative z-10 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${active ? 'sidebar-active-icon' : ''}`}
                           animate={active ? { scale: 1.05 } : { scale: 1 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                           style={active ? {

@@ -177,46 +177,99 @@ export function applyWeatherHex(hex: string, mod: WeatherMod): string {
 }
 
 // ─── Celestial body — sun and moon arc ─────────────────────────
-export interface CelestialState {
-  type: 'sun' | 'moon'
+export interface BodyState {
   /** 0..100 (% from left). */
   xPct: number
   /** 0..100 (% from top). */
   yPct: number
-  /** 0..1 fade at the very edges of the visibility window. */
+  /** 0..1 fade. Zero outside the visibility window. */
   opacity: number
 }
 
-const SUN_START = 300   // 05:00
-const SUN_END = 1140    // 19:00
-const MOON_START = 1170 // 19:30
-const MOON_TOTAL = 540  // 09:00 worth of arc, wraps past midnight
+export interface CelestialState {
+  /** Whichever body is currently dominant — drives data-celestial for stars. */
+  type: 'sun' | 'moon'
+  sun: BodyState
+  moon: BodyState
+  /** Backwards-compat: position/opacity of the dominant body. */
+  xPct: number
+  yPct: number
+  opacity: number
+}
+
+// Visibility windows: NO overlap — the sun fully sets below the horizon
+// before the moon rises on the other side, so the two bodies are never
+// on screen at once. The window edges include a small margin where each
+// body is below the horizon (yPct > 100), creating an "off-screen
+// transition" where the body enters/leaves from the horizon line.
+const SUN_START = 300    // 05:00 — sun begins rising below horizon
+const SUN_END   = 1140   // 19:00 — sun fully set below horizon
+const MOON_START = 1170  // 19:30 — moon begins rising
+const MOON_END   = 270   // 04:30 next day — moon fully set
+
+/** Smooth fade-in/out over the first/last `edge` fraction of the window. */
+function edgeFade(p: number, edge = 0.10): number {
+  if (p < 0 || p > 1) return 0
+  if (p < edge) return p / edge
+  if (p > 1 - edge) return (1 - p) / edge
+  return 1
+}
+
+function sunState(min: number): BodyState {
+  const m = ((min % 1440) + 1440) % 1440
+  if (m < SUN_START || m > SUN_END) {
+    return { xPct: 50, yPct: 115, opacity: 0 }
+  }
+  const p = (m - SUN_START) / (SUN_END - SUN_START)
+  // Sun rises from below the horizon (y > 100), peaks high at noon,
+  // melts back below the horizon at sunset. yPct hits 110 at the
+  // window edges so the disc is partially submerged in the warm
+  // horizon glow as it crosses the horizon line — a beach-sunset
+  // melt rather than a fade-from-air.
+  return {
+    xPct: 88 - p * 76,
+    yPct: 110 - Math.sin(p * Math.PI) * 95,
+    // Tighter edge fade so the disc only fades during the brief
+    // moment it's mostly under the horizon — most of the in/out is
+    // handled by the position (rising into / sinking out of view).
+    opacity: edgeFade(p, 0.04),
+  }
+}
+
+function moonState(min: number): BodyState {
+  const m = ((min % 1440) + 1440) % 1440
+  const moonTotal = 1440 - MOON_START + MOON_END
+  let elapsed: number
+  if (m >= MOON_START) elapsed = m - MOON_START
+  else if (m <= MOON_END) elapsed = (1440 - MOON_START) + m
+  else return { xPct: 50, yPct: 115, opacity: 0 }
+  const p = elapsed / moonTotal
+  return {
+    xPct: 88 - p * 76,
+    // Moon rises from / sets to the horizon the same way as the sun.
+    yPct: 108 - Math.sin(p * Math.PI) * 88,
+    opacity: edgeFade(p, 0.05) * 0.95,
+  }
+}
 
 /**
- * Returns the active celestial body and its arc position. The sun rises
- * in the east (right side, RTL) and sets in the west; moon mirrors the
- * arc with a slightly lower peak. Both fade in/out at the window edges.
+ * Returns sun + moon arc states. Both can be non-zero during dawn/dusk
+ * so the bodies cross-fade through each other. `type` is whichever body
+ * is currently dominant (used to gate the star-field via data-celestial).
  */
 export function celestialState(min: number): CelestialState {
-  const m = ((min % 1440) + 1440) % 1440
-  if (m >= SUN_START && m <= SUN_END) {
-    const p = (m - SUN_START) / (SUN_END - SUN_START)
-    const xPct = 88 - p * 76
-    const yPct = 78 - Math.sin(p * Math.PI) * 60
-    let opacity = 1
-    if (p < 0.06) opacity = p / 0.06
-    else if (p > 0.94) opacity = (1 - p) / 0.06
-    return { type: 'sun', xPct, yPct, opacity }
+  const sun = sunState(min)
+  const moon = moonState(min)
+  const type: 'sun' | 'moon' = sun.opacity >= moon.opacity ? 'sun' : 'moon'
+  const primary = type === 'sun' ? sun : moon
+  return {
+    type,
+    sun,
+    moon,
+    xPct: primary.xPct,
+    yPct: primary.yPct,
+    opacity: primary.opacity,
   }
-  // Moon — wraps past midnight.
-  const elapsed = m >= MOON_START ? m - MOON_START : m + (1440 - MOON_START)
-  const p = Math.max(0, Math.min(1, elapsed / MOON_TOTAL))
-  const xPct = 88 - p * 76
-  const yPct = 75 - Math.sin(p * Math.PI) * 55
-  let opacity = 0.95
-  if (p < 0.06) opacity = (p / 0.06) * 0.95
-  else if (p > 0.94) opacity = ((1 - p) / 0.06) * 0.95
-  return { type: 'moon', xPct, yPct, opacity }
 }
 
 // ─── Convenience — full snapshot with weather applied ──────────
