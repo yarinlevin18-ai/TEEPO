@@ -4,47 +4,62 @@
 -- ══════════════════════════════════════════════════════════════════
 
 -- ── Departments ──────────────────────────────────────────────────
+-- Composite PK (id, university): course IDs are school-local.
 CREATE TABLE IF NOT EXISTS bgu_departments (
-  id            TEXT PRIMARY KEY,
+  id            TEXT NOT NULL,
+  university    TEXT NOT NULL DEFAULT 'bgu' CHECK (university IN ('bgu', 'tau')),
   name          TEXT NOT NULL,
   faculty       TEXT,
-  program_code  TEXT
+  program_code  TEXT,
+  PRIMARY KEY (id, university)
 );
 
 -- ── Study Tracks (מסלולים) ───────────────────────────────────────
 CREATE TABLE IF NOT EXISTS bgu_tracks (
-  id             TEXT PRIMARY KEY,
+  id             TEXT NOT NULL,
+  university     TEXT NOT NULL DEFAULT 'bgu' CHECK (university IN ('bgu', 'tau')),
   name           TEXT NOT NULL,
   departments    TEXT[] NOT NULL,
   total_credits  NUMERIC NOT NULL,
   type           TEXT DEFAULT 'single',  -- single / dual / minor
-  details        JSONB DEFAULT '{}'
+  details        JSONB DEFAULT '{}',
+  PRIMARY KEY (id, university)
 );
 
 -- ── Course Catalog ───────────────────────────────────────────────
+-- FK to bgu_departments was dropped in migrate_004 — composite PK upstream
+-- means we'd need a composite FK and the read code isn't university-aware
+-- yet. Bring it back when routes/catalog.py filters by university.
 CREATE TABLE IF NOT EXISTS bgu_course_catalog (
-  course_id      TEXT PRIMARY KEY,
+  course_id      TEXT NOT NULL,
+  university     TEXT NOT NULL DEFAULT 'bgu' CHECK (university IN ('bgu', 'tau')),
   name           TEXT NOT NULL,
   name_en        TEXT,
   credits        NUMERIC NOT NULL,
-  department     TEXT REFERENCES bgu_departments(id),
+  department     TEXT,
   year           INTEGER,
   semester       TEXT,
   type           TEXT DEFAULT 'elective',  -- mandatory / elective
   tracks         TEXT[] DEFAULT '{}',
   prerequisites  TEXT[] DEFAULT '{}',
-  category       TEXT  -- cs_mandatory, math_mandatory, etc.
+  category       TEXT,  -- cs_mandatory, math_mandatory, etc.
+  PRIMARY KEY (course_id, university)
 );
 
 CREATE INDEX IF NOT EXISTS idx_catalog_dept ON bgu_course_catalog(department);
 CREATE INDEX IF NOT EXISTS idx_catalog_name ON bgu_course_catalog USING gin(to_tsvector('simple', name));
 CREATE INDEX IF NOT EXISTS idx_catalog_tracks ON bgu_course_catalog USING gin(tracks);
+CREATE INDEX IF NOT EXISTS idx_bgu_departments_university    ON bgu_departments(university);
+CREATE INDEX IF NOT EXISTS idx_bgu_tracks_university         ON bgu_tracks(university);
+CREATE INDEX IF NOT EXISTS idx_bgu_course_catalog_university ON bgu_course_catalog(university);
 
 -- ── Student Academic Profile ─────────────────────────────────────
--- Replaces the old degree_settings — now tracks what the student studies
+-- Replaces the old degree_settings — now tracks what the student studies.
+-- track_id no longer FKs (composite PK upstream); pair (track_id, university)
+-- is what identifies a track. The university comes from user_settings.
 CREATE TABLE IF NOT EXISTS student_profile (
   user_id        TEXT PRIMARY KEY,
-  track_id       TEXT REFERENCES bgu_tracks(id),
+  track_id       TEXT,
   start_year     INTEGER,
   current_year   INTEGER DEFAULT 1,
   expected_end   INTEGER,
