@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { DBProvider } from '@/lib/db-context'
+import { LivingDayProvider } from '@/lib/living-day-context'
 import Sidebar from '@/components/layout/Sidebar'
-import AIChatWidget from '@/components/AIChatWidget'
 import DriveConnectionBanner from '@/components/DriveConnectionBanner'
+import SkyScene from '@/components/SkyScene'
 import Image from 'next/image'
 import { Menu } from 'lucide-react'
 
@@ -44,14 +45,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <DBProvider>
-      <div className="flex min-h-screen bg-base">
-        {/* Aurora animated mesh background */}
-        <div className="aurora-mesh">
-          <div className="aurora-blob aurora-blob-1" />
-          <div className="aurora-blob aurora-blob-2" />
-          <div className="aurora-blob aurora-blob-3" />
-          <div className="aurora-blob aurora-blob-4" />
-        </div>
+      <LivingDayProvider>
+      <div className="qa flex min-h-screen bg-base">
+        <SkyScene />
 
         {/* Mobile header bar */}
         <header
@@ -72,8 +68,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <DriveConnectionBanner />
           {children}
         </main>
-        <AIChatWidget />
       </div>
+      </LivingDayProvider>
     </DBProvider>
   )
 }
