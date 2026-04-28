@@ -139,9 +139,13 @@ def register_socket_events(socketio: SocketIO):
 
         try:
             if agent_type == "academic":
-                result = orch.get_bgu_advice(
+                university = (str(data.get("university", "")) or "bgu").lower()
+                if university not in ("bgu", "tau"):
+                    university = "bgu"
+                result = orch.get_academic_advice(
                     course_name=context,
                     major=data.get("major", ""),
+                    university=university,
                 )
                 answer = result.get("advice") or result.get("answer", "")
             else:
