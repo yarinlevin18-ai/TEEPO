@@ -7,6 +7,10 @@ Modes:
 
 URLs are loaded from env vars (MOODLE_URL / PORTAL_URL / PORTAL_URL_OLD) so the
 platform supports any university that uses Moodle, not just a specific school.
+
+Per-university selectors (role names, syllabus patterns, login success
+hosts) live in services/{bgu,tau}_selectors.py. The active set is picked
+by the UNIVERSITY env var.
 """
 import json
 import os
@@ -23,6 +27,12 @@ from config import (
     PORTAL_URL as _CFG_PORTAL_URL,
     PORTAL_URL_OLD as _CFG_PORTAL_URL_OLD,
 )
+from services.university_selectors import get_selectors
+
+# Active selectors for this process. Driven by UNIVERSITY env var (bgu/tau);
+# defaults to 'bgu' for backward compatibility with the original deployment.
+_SEL = get_selectors()
+_LOG = _SEL["log_prefix"]
 
 # --------------------------------------------------------------------------- #
 #  Environment detection                                                        #
@@ -58,9 +68,9 @@ def _save_cookies_to_store(site: str, cookies: list):
     try:
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(cookies, f, ensure_ascii=False, indent=2)
-        logger.debug(f"[BGU] Cookies saved to local file for {site}")
+        logger.debug(f"{_LOG} Cookies saved to local file for {site}")
     except Exception as e:
-        logger.debug(f"[BGU] Warning: could not save cookies to file: {e}")
+        logger.debug(f"{_LOG} Warning: could not save cookies to file: {e}")
 
     # Also save to Supabase (persists across Render restarts)
     try:
@@ -70,9 +80,9 @@ def _save_cookies_to_store(site: str, cookies: list):
             "cookies": json.dumps(cookies),
             "updated_at": _dt.utcnow().isoformat(),
         }, on_conflict="site").execute()
-        logger.debug(f"[BGU] Cookies saved to Supabase for {site}")
+        logger.debug(f"{_LOG} Cookies saved to Supabase for {site}")
     except Exception as e:
-        logger.debug(f"[BGU] Warning: could not save cookies to Supabase: {e}")
+        logger.debug(f"{_LOG} Warning: could not save cookies to Supabase: {e}")
 
 
 def _load_cookies_from_store(site: str) -> Optional[list]:
@@ -82,10 +92,10 @@ def _load_cookies_from_store(site: str) -> Optional[list]:
         from services.supabase_client import get_client
         result = get_client().table("bgu_sessions").select("cookies").eq("site", site).execute()
         if result.data:
-            logger.debug(f"[BGU] Cookies loaded from Supabase for {site}")
+            logger.debug(f"{_LOG} Cookies loaded from Supabase for {site}")
             return json.loads(result.data[0]["cookies"])
     except Exception as e:
-        logger.debug(f"[BGU] Warning: could not load cookies from Supabase: {e}")
+        logger.debug(f"{_LOG} Warning: could not load cookies from Supabase: {e}")
 
     # Fall back to local file
     filepath = MOODLE_COOKIES_FILE if site == "moodle" else PORTAL_COOKIES_FILE
@@ -93,12 +103,12 @@ def _load_cookies_from_store(site: str) -> Optional[list]:
         try:
             with open(filepath, encoding="utf-8") as f:
                 cookies = json.load(f)
-            logger.debug(f"[BGU] Cookies loaded from local file for {site}")
+            logger.debug(f"{_LOG} Cookies loaded from local file for {site}")
             return cookies
         except Exception as e:
-            logger.debug(f"[BGU] Warning: could not load cookies from file: {e}")
+            logger.debug(f"{_LOG} Warning: could not load cookies from file: {e}")
 
-    logger.debug(f"[BGU] No cookies found for {site}")
+    logger.debug(f"{_LOG} No cookies found for {site}")
     return None
 
 
@@ -158,14 +168,16 @@ def login_headless(site: str, username: str, password: str) -> dict:
     from selenium.webdriver.support import expected_conditions as EC
     from webdriver_manager.chrome import ChromeDriverManager
 
+    moodle_host = _SEL["moodle_login_success_host"]
+    portal_host = _SEL["portal_login_success_host"]
     if site == "moodle":
         target_url = f"{MOODLE_URL}/login/index.php"
-        success_check = lambda url: "moodle.bgu.ac.il" in url and not any(
+        success_check = lambda url: moodle_host in url and not any(
             b in url.lower() for b in ("login", "shibboleth", "adfs", "saml", "wayf", "idp")
         )
     else:
         target_url = f"{PORTAL_URL}/login"
-        success_check = lambda url: "my.bgu.ac.il" in url and "login" not in url.lower()
+        success_check = lambda url: portal_host in url and "login" not in url.lower()
 
     options = webdriver.ChromeOptions()
     options.add_argument("--headless=new")
@@ -182,7 +194,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
         )
         wait = WebDriverWait(driver, 20)
 
-        logger.debug(f"[BGU] Headless login → {target_url}")
+        logger.debug(f"{_LOG} Headless login → {target_url}")
         driver.get(target_url)
         time.sleep(3)
 
@@ -193,7 +205,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
                 field = driver.find_element(By.CSS_SELECTOR, user_sel)
                 field.clear()
                 field.send_keys(username)
-                logger.debug(f"[BGU] Filled username field: {user_sel}")
+                logger.debug(f"{_LOG} Filled username field: {user_sel}")
                 break
             except Exception:
                 continue
@@ -204,7 +216,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
                 field = driver.find_element(By.CSS_SELECTOR, pass_sel)
                 field.clear()
                 field.send_keys(password)
-                logger.debug(f"[BGU] Filled password field: {pass_sel}")
+                logger.debug(f"{_LOG} Filled password field: {pass_sel}")
                 break
             except Exception:
                 continue
@@ -214,7 +226,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
             try:
                 btn = driver.find_element(By.CSS_SELECTOR, submit_sel)
                 btn.click()
-                logger.debug(f"[BGU] Clicked submit: {submit_sel}")
+                logger.debug(f"{_LOG} Clicked submit: {submit_sel}")
                 break
             except Exception:
                 continue
@@ -233,7 +245,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
                 break
 
             if current_url != last_url:
-                logger.debug(f"[BGU] URL → {current_url}")
+                logger.debug(f"{_LOG} URL → {current_url}")
                 last_url = current_url
 
             if success_check(current_url):
@@ -241,7 +253,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
                 cookies = driver.get_cookies()
                 _save_cookies_to_store(site, cookies)
                 logged_in = True
-                logger.debug("[BGU] Headless login successful!")
+                logger.debug(f"{_LOG} Headless login successful!")
                 break
 
         if not logged_in:
@@ -251,7 +263,7 @@ def login_headless(site: str, username: str, password: str) -> dict:
         return {"status": "success", "message": f"מחובר בהצלחה ל-{site}"}
 
     except Exception as e:
-        logger.debug(f"[BGU] Headless login error: {e}")
+        logger.debug(f"{_LOG} Headless login error: {e}")
         return {"status": "error", "message": str(e)}
     finally:
         try:
@@ -280,11 +292,13 @@ def open_browser_for_login(site: str = "moodle") -> dict:
     from selenium.webdriver.chrome.service import Service
     from webdriver_manager.chrome import ChromeDriverManager
 
+    moodle_host = _SEL["moodle_login_success_host"]
+    portal_host = _SEL["portal_login_success_host"]
     if site == "moodle":
         cookies_file = MOODLE_COOKIES_FILE
         target_url = f"{MOODLE_URL}/my/"
         def logged_in_check(url):
-            if "moodle.bgu.ac.il" not in url:
+            if moodle_host not in url:
                 return False
             bad = ("login/index", "login.php", "shibboleth", "adfs", "saml", "wayf", "idp")
             return not any(b in url.lower() for b in bad)
@@ -292,13 +306,13 @@ def open_browser_for_login(site: str = "moodle") -> dict:
         cookies_file = PORTAL_COOKIES_FILE
         target_url = PORTAL_URL
         def logged_in_check(url):
-            if "my.bgu.ac.il" not in url:
+            if portal_host not in url:
                 return False
             bad = ("login", "shibboleth", "adfs", "saml")
             return not any(b in url.lower() for b in bad)
 
     app_profile = _get_app_chrome_profile()
-    logger.debug(f"[BGU] Using dedicated app Chrome profile: {app_profile}")
+    logger.debug(f"{_LOG} Using dedicated app Chrome profile: {app_profile}")
 
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
@@ -317,7 +331,7 @@ def open_browser_for_login(site: str = "moodle") -> dict:
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
 
-        logger.debug(f"[BGU] Navigating to {target_url}")
+        logger.debug(f"{_LOG} Navigating to {target_url}")
         driver.get(target_url)
 
         timeout = 300
@@ -330,11 +344,11 @@ def open_browser_for_login(site: str = "moodle") -> dict:
             try:
                 current_url = driver.current_url
             except Exception:
-                logger.debug("[BGU] Browser closed unexpectedly.")
+                logger.debug(f"{_LOG} Browser closed unexpectedly.")
                 break
 
             if current_url != last_url:
-                logger.debug(f"[BGU] URL changed → {current_url}")
+                logger.debug(f"{_LOG} URL changed → {current_url}")
                 last_url = current_url
 
             if logged_in_check(current_url):
@@ -343,7 +357,7 @@ def open_browser_for_login(site: str = "moodle") -> dict:
                 _save_cookies(driver, cookies_file)
                 _save_cookies_to_store(site, cookies)
                 logged_in = True
-                logger.debug("[BGU] Logged in! Cookies saved.")
+                logger.debug(f"{_LOG} Logged in! Cookies saved.")
                 break
 
         if not logged_in:
@@ -358,7 +372,7 @@ def open_browser_for_login(site: str = "moodle") -> dict:
         return {"status": "success", "message": f"מחובר בהצלחה ל-{site}"}
 
     except Exception as e:
-        logger.debug(f"[BGU] Error: {e}")
+        logger.debug(f"{_LOG} Error: {e}")
         return {"status": "error", "message": str(e)}
     finally:
         try:
@@ -438,9 +452,9 @@ def scrape_moodle_courses() -> dict:
                         "enddate": course.get("enddate") or None,
                         "category_name": course.get("coursecategory") or "",
                     })
-                logger.debug(f"[BGU] AJAX API found {len(courses)} courses")
+                logger.debug(f"{_LOG} AJAX API found {len(courses)} courses")
     except Exception as e:
-        logger.debug(f"[BGU] AJAX strategy failed: {e}")
+        logger.debug(f"{_LOG} AJAX strategy failed: {e}")
 
     # ── Strategy 2: Scan ALL <a> tags for course/view.php links ──────────────
     if not courses:
@@ -470,9 +484,9 @@ def scrape_moodle_courses() -> dict:
                         "url": href if href.startswith("http") else f"{MOODLE_URL}{href}",
                         "moodle_id": cid,
                     })
-            logger.debug(f"[BGU] HTML scan found {len(courses)} courses")
+            logger.debug(f"{_LOG} HTML scan found {len(courses)} courses")
         except Exception as e:
-            logger.debug(f"[BGU] HTML strategy failed: {e}")
+            logger.debug(f"{_LOG} HTML strategy failed: {e}")
 
     # ── Strategy 3: /course/ index page ──────────────────────────────────────
     if not courses:
@@ -496,9 +510,9 @@ def scrape_moodle_courses() -> dict:
                         "url": href if href.startswith("http") else f"{MOODLE_URL}{href}",
                         "moodle_id": cid,
                     })
-            logger.debug(f"[BGU] /course/ page found {len(courses)} courses")
+            logger.debug(f"{_LOG} /course/ page found {len(courses)} courses")
         except Exception as e:
-            logger.debug(f"[BGU] /course/ strategy failed: {e}")
+            logger.debug(f"{_LOG} /course/ strategy failed: {e}")
 
     # Deduplicate by moodle_id
     seen = set()
@@ -509,7 +523,7 @@ def scrape_moodle_courses() -> dict:
             seen.add(key)
             unique.append(c)
 
-    logger.debug(f"[BGU] Total unique courses found: {len(unique)}")
+    logger.debug(f"{_LOG} Total unique courses found: {len(unique)}")
     return {"status": "success", "courses": unique, "count": len(unique)}
 
 
@@ -536,7 +550,7 @@ def _moodle_ajax(session: requests.Session, sesskey: str,
         if isinstance(data, list) and data and data[0].get("error") is False:
             return data[0].get("data")
     except Exception as e:
-        logger.debug(f"[BGU] AJAX {method} failed: {e}")
+        logger.debug(f"{_LOG} AJAX {method} failed: {e}")
     return None
 
 
@@ -589,11 +603,11 @@ def scrape_all_assignments(course_ids: list = None) -> dict:
                                     assign.get("intro", ""), "html.parser"
                                 ).get_text(strip=True)[:500],
                             })
-                    logger.debug(f"[BGU] AJAX found {len(assignments)} assignments across {len(data['courses'])} courses")
+                    logger.debug(f"{_LOG} AJAX found {len(assignments)} assignments across {len(data['courses'])} courses")
                     if assignments:
                         return {"status": "success", "assignments": assignments, "count": len(assignments)}
         except Exception as e:
-            logger.debug(f"[BGU] AJAX assignment fetch failed: {e}")
+            logger.debug(f"{_LOG} AJAX assignment fetch failed: {e}")
 
     # ── Strategy 2: Upcoming events API (calendar deadlines) ──
     if sesskey and not assignments:
@@ -621,13 +635,13 @@ def scrape_all_assignments(course_ids: list = None) -> dict:
                             "deadline": deadline,
                             "deadline_text": deadline or "",
                         })
-                logger.debug(f"[BGU] Calendar API found {len(assignments)} assignment events")
+                logger.debug(f"{_LOG} Calendar API found {len(assignments)} assignment events")
                 if assignments:
                     return {"status": "success", "assignments": assignments, "count": len(assignments)}
         except Exception as e:
-            logger.debug(f"[BGU] Calendar strategy failed: {e}")
+            logger.debug(f"{_LOG} Calendar strategy failed: {e}")
 
-    logger.debug(f"[BGU] AJAX assignment strategies returned {len(assignments)} results")
+    logger.debug(f"{_LOG} AJAX assignment strategies returned {len(assignments)} results")
     return {"status": "success", "assignments": assignments, "count": len(assignments)}
 
 
@@ -722,7 +736,7 @@ def scrape_course_materials(course_url: str) -> dict:
                                 "description": module.get("description", ""),
                             })
                 if materials or sections:
-                    logger.debug(f"[BGU] AJAX found {len(materials)} materials, {len(sections)} sections")
+                    logger.debug(f"{_LOG} AJAX found {len(materials)} materials, {len(sections)} sections")
                     return {"status": "success", "materials": materials, "sections": sections}
 
     # HTML fallback
@@ -758,30 +772,15 @@ def scrape_course_materials(course_url: str) -> dict:
 
 # --- v2.1 course metadata enrichment ----------------------------------------
 
-# Role.shortname values Moodle uses for staff. Anything not in either set is
-# treated as student/non-staff. The Hebrew name fallback below catches
-# BGU-localized roles whose shortname is non-standard.
-_LECTURER_ROLE_SHORTNAMES = {"editingteacher", "coursecreator"}
-_TA_ROLE_SHORTNAMES = {"teacher", "ta", "teachingassistant", "tutor"}
-
-# Hebrew role-name keywords (matched as substrings against role.name).
-_LECTURER_HEB = ("מרצה",)
-_TA_HEB = ("מתרגל", "מתרגלת", "עוזר הוראה", "עוזרת הוראה")
-
-# Patterns that flag a resource as a syllabus. Checked against module name
-# case-insensitively; first match wins.
-_SYLLABUS_PATTERNS = (
-    "syllabus",
-    "סילבוס",
-    "תכנית הקורס",
-    "תכנית לימודים",
-    "תיאור הקורס",
-    "תקציר הקורס",
-)
-
-# Module types we lift into course_links (excludes file resources — those go
-# into materials). We want clickable external pointers the lecturer added.
-_LINK_MODULE_TYPES = {"url"}
+# All per-university classification values are loaded from the active
+# selectors set. Frozen into module-level constants so we don't pay a dict
+# lookup on every call inside the parsing loop.
+_LECTURER_ROLE_SHORTNAMES = set(_SEL["lecturer_role_shortnames"])
+_TA_ROLE_SHORTNAMES = set(_SEL["ta_role_shortnames"])
+_LECTURER_HEB = tuple(_SEL["lecturer_heb_keywords"])
+_TA_HEB = tuple(_SEL["ta_heb_keywords"])
+_SYLLABUS_PATTERNS = tuple(_SEL["syllabus_patterns"])
+_LINK_MODULE_TYPES = set(_SEL["link_module_types"])
 
 
 def _classify_role(role: dict) -> Optional[str]:
@@ -926,7 +925,7 @@ def _extract_pdf_text(pdf_bytes: bytes) -> tuple[str, int]:
         # pypdf isn't installed yet on Render until redeploy picks up the
         # updated requirements.txt. Fail soft so the rest of the ingest
         # flow can still report back gracefully.
-        logger.warning("[BGU] pypdf not installed; skipping PDF text extraction")
+        logger.warning(f"{_LOG} pypdf not installed; skipping PDF text extraction")
         return "", 0
 
     reader = PdfReader(BytesIO(pdf_bytes))
@@ -1128,9 +1127,9 @@ def scrape_grades() -> dict:
                                 "rank": g.get("rank") or None,
                                 "source": "moodle",
                             })
-                    logger.debug(f"[BGU] AJAX grades: {len(all_grades)} courses")
+                    logger.debug(f"{_LOG} AJAX grades: {len(all_grades)} courses")
             except Exception as e:
-                logger.debug(f"[BGU] AJAX grade fetch failed: {e}")
+                logger.debug(f"{_LOG} AJAX grade fetch failed: {e}")
 
         # ── Strategy 2: Moodle HTML grade overview page ────────────────────────
         if not all_grades:
@@ -1164,9 +1163,9 @@ def scrape_grades() -> dict:
                                         "grade_text": grade_text if grade_num is None else None,
                                         "source": "moodle",
                                     })
-                        logger.debug(f"[BGU] HTML grade page: {len(all_grades)} courses")
+                        logger.debug(f"{_LOG} HTML grade page: {len(all_grades)} courses")
             except Exception as e:
-                logger.debug(f"[BGU] HTML grade page failed: {e}")
+                logger.debug(f"{_LOG} HTML grade page failed: {e}")
 
     # ── Strategy 3: BGU Portal grade pages ───────────────────────────────────
     portal_cookies = _load_cookies_from_store("portal")
@@ -1179,11 +1178,11 @@ def scrape_grades() -> dict:
                 if name and key not in seen_courses:
                     seen_courses.add(key)
                     all_grades.append(g)
-            logger.debug(f"[BGU] Portal grades: {len(portal_grades)} found")
+            logger.debug(f"{_LOG} Portal grades: {len(portal_grades)} found")
         except Exception as e:
-            logger.debug(f"[BGU] Portal grade scraping failed: {e}")
+            logger.debug(f"{_LOG} Portal grade scraping failed: {e}")
 
-    logger.debug(f"[BGU] Total grades from all sources: {len(all_grades)}")
+    logger.debug(f"{_LOG} Total grades from all sources: {len(all_grades)}")
     return {"status": "success", "grades": all_grades, "count": len(all_grades)}
 
 
@@ -1226,9 +1225,9 @@ def _scrape_portal_grades(cookies: list) -> list:
                         full_url = f"{PORTAL_URL}{a['href']}"
                     if full_url not in [f"{PORTAL_URL}{p}" for p in grade_paths]:
                         grade_paths.insert(0, a["href"])
-                    logger.debug(f"[BGU] Found portal grade link: {a['href']} ({text})")
+                    logger.debug(f"{_LOG} Found portal grade link: {a['href']} ({text})")
     except Exception as e:
-        logger.debug(f"[BGU] Portal main page failed: {e}")
+        logger.debug(f"{_LOG} Portal main page failed: {e}")
 
     # Try each grade path
     for path in grade_paths:
@@ -1296,11 +1295,11 @@ def _scrape_portal_grades(cookies: list) -> list:
                     grades.append(g)
 
                 if grades:
-                    logger.debug(f"[BGU] Portal: found {len(grades)} grades at {path}")
+                    logger.debug(f"{_LOG} Portal: found {len(grades)} grades at {path}")
                     return grades  # Found grades, stop trying other paths
 
         except Exception as e:
-            logger.debug(f"[BGU] Portal path {path} failed: {e}")
+            logger.debug(f"{_LOG} Portal path {path} failed: {e}")
             continue
 
     return grades
@@ -1326,7 +1325,7 @@ def parse_portal_html(html: str, url: str = "", title: str = "") -> dict:
     seen = set()
 
     tables = soup.find_all("table")
-    logger.debug(f"[BGU] parse_portal_html: found {len(tables)} tables in HTML ({len(html)} chars)")
+    logger.debug(f"{_LOG} parse_portal_html: found {len(tables)} tables in HTML ({len(html)} chars)")
 
     for table in tables:
         rows = table.find_all("tr")
@@ -1351,7 +1350,7 @@ def parse_portal_html(html: str, url: str = "", title: str = "") -> dict:
             # or skip this table
             continue
 
-        logger.debug(f"[BGU] parse_portal_html: table has columns: name={name_idx} grade={grade_idx} "
+        logger.debug(f"{_LOG} parse_portal_html: table has columns: name={name_idx} grade={grade_idx} "
                      f"credits={credits_idx} semester={sem_idx} year={year_idx}")
 
         for row in rows[1:]:
@@ -1441,7 +1440,7 @@ def parse_portal_html(html: str, url: str = "", title: str = "") -> dict:
                         except (ValueError, TypeError):
                             continue
 
-    logger.debug(f"[BGU] parse_portal_html: extracted {len(grades)} grades total")
+    logger.debug(f"{_LOG} parse_portal_html: extracted {len(grades)} grades total")
     return {
         "status": "success",
         "grades": grades,
