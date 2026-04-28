@@ -398,7 +398,7 @@ def create_study_plan():
 
 
 # ------------------------------------------------------------------ #
-#  Academic Agent (BGU)                                                #
+#  Academic Agent (BGU / TAU)                                          #
 # ------------------------------------------------------------------ #
 
 @api.post("/academic/advise")
@@ -407,9 +407,12 @@ def academic_advise():
     course_name = body.get("course_name", "")
     major = body.get("major", "")
     your_courses = body.get("your_courses", [])
+    university = (body.get("university") or "bgu").lower()
+    if university not in ("bgu", "tau"):
+        university = "bgu"
 
     orch = get_orchestrator()
-    result = orch.get_bgu_advice(course_name, major, your_courses)
+    result = orch.get_academic_advice(course_name, major, your_courses, university=university)
     return jsonify(result)
 
 

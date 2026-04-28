@@ -1,42 +1,17 @@
 """
-Academic Agent - יועץ אקדמי ייעודי לאוניברסיטת בן-גוריון.
-Phase 1: ידע כללי על BGU + התאמה אישית לפי המחלקה/קורסים של המשתמש.
+Academic Agent - יועץ אקדמי. בוחר את בסיס הידע לפי האוניברסיטה של המשתמש
+(BGU / TAU) ומתאים את הפרומפט בהתאם.
 """
 import json
-import re
 from typing import Dict, Any, List
+
 from agents.base_study_agent import BaseStudyAgent
-
-
-# --- BGU knowledge base (Phase 1 - static, will grow over time) ---
-BGU_KNOWLEDGE = {
-    "university": "אוניברסיטת בן-גוריון בנגב, באר שבע",
-    "faculties": [
-        "מדעי הטבע",
-        "מדעי ההנדסה",
-        "מדעי הרוח ומדעי החברה",
-        "מדעי הבריאות",
-        "ניהול עסקים",
-        "מדעי המחשב ומערכות מידע",
-    ],
-    "tips": [
-        "ניתן למצוא חומרי עזר בספרייה המרכזית ובאתר הספרייה",
-        "מרכז הסיוע ללומדים (מסל) מציע סיוע בכתיבה אקדמית",
-        "שעות קבלה של מרצים מפורסמות ב-Moodle",
-        "קבוצות לימוד ניתן לארגן דרך עמוד הקורס ב-Moodle",
-        "מאגר המידע של הספרייה כולל גישה לכתבי עת מדעיים",
-    ],
-    "systems": {
-        "moodle": "מערכת ניהול הלמידה - moodle.bgu.ac.il",
-        "registration": "מערכת לרישום לקורסים - www.bgu.ac.il",
-        "library": "ספרייה מרכזית - library.bgu.ac.il",
-    },
-}
+from agents.university_knowledge import get_knowledge
 
 
 class AcademicAgent(BaseStudyAgent):
     name = "academic"
-    description = "יועץ אקדמי ייעודי לבן-גוריון - עצות לקורסים, דרישות, ואסטרטגיות לימוד"
+    description = "יועץ אקדמי - עצות לקורסים, דרישות, ואסטרטגיות לימוד"
 
     def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         action: str = input_data.get("action", "advise")
@@ -45,33 +20,36 @@ class AcademicAgent(BaseStudyAgent):
         your_courses: List = input_data.get("your_courses", [])
         question: str = input_data.get("question", "")
         memory_context: str = input_data.get("memory_context", "")
+        university: str = input_data.get("university", "bgu")
+        kb = get_knowledge(university)
 
         if action == "advise":
-            return self._advise_for_course(course_name, major, memory_context)
+            return self._advise_for_course(course_name, major, memory_context, kb)
         elif action == "personalize":
-            return self._personalize(major, your_courses, memory_context)
+            return self._personalize(major, your_courses, memory_context, kb)
         elif action == "question":
-            return self._answer_academic_question(question, major, memory_context)
+            return self._answer_academic_question(question, major, memory_context, kb)
         else:
-            return self._advise_for_course(course_name, major, memory_context)
+            return self._advise_for_course(course_name, major, memory_context, kb)
 
-    def _advise_for_course(self, course_name: str, major: str, memory_context: str = "") -> Dict:
-        """עצות ספציפיות לקורס ב-BGU."""
-        bgu_str = json.dumps(BGU_KNOWLEDGE, ensure_ascii=False, indent=2)
-        prompt = f"""אתה יועץ אקדמי מנוסה באוניברסיטת בן-גוריון בנגב.
+    def _advise_for_course(self, course_name: str, major: str, memory_context: str, kb: dict) -> Dict:
+        """עצות ספציפיות לקורס."""
+        kb_str = json.dumps(kb, ensure_ascii=False, indent=2)
+        uni_name = kb["name"]
+        prompt = f"""אתה יועץ אקדמי מנוסה ב{uni_name}.
 
 מידע על האוניברסיטה:
-{bgu_str}
+{kb_str}
 
 {f"המחלקה: {major}" if major else ""}
 {f"היסטוריית לימודים של הסטודנט: {memory_context}" if memory_context else ""}
 
 הקורס: {course_name}
 
-תן עצות ספציפיות לקורס זה ב-BGU:
+תן עצות ספציפיות לקורס זה ב{uni_name}:
 1. אסטרטגיית לימוד מומלצת
 2. נושאים שכדאי להתמקד בהם
-3. משאבים זמינים ב-BGU (ספרייה, Moodle, שעות קבלה)
+3. משאבים זמינים באוניברסיטה (ספרייה, Moodle, שעות קבלה)
 4. טיפים שהסטודנטים מוצאים מועילים
 5. איך לקשר את הקורס לקורסים אחרים במחלקה
 
@@ -82,13 +60,15 @@ class AcademicAgent(BaseStudyAgent):
             "status": "success",
             "course": course_name,
             "advice": answer,
-            "bgu_resources": BGU_KNOWLEDGE["systems"],
+            "university": kb["code"],
+            "resources": kb["systems"],
         }
 
-    def _personalize(self, major: str, your_courses: List, memory_context: str = "") -> Dict:
+    def _personalize(self, major: str, your_courses: List, memory_context: str, kb: dict) -> Dict:
         """תכנית אישית לפי המחלקה והקורסים של הסטודנט."""
         courses_str = "\n".join([f"- {c}" for c in your_courses]) if your_courses else "לא צוינו קורסים"
-        prompt = f"""אתה יועץ אקדמי אישי באוניברסיטת בן-גוריון.
+        uni_name = kb["name"]
+        prompt = f"""אתה יועץ אקדמי אישי ב{uni_name}.
 
 מחלקה: {major or "לא צוינה"}
 קורסים נוכחיים:
@@ -110,14 +90,16 @@ class AcademicAgent(BaseStudyAgent):
             "status": "success",
             "major": major,
             "personalized_plan": answer,
-            "bgu_tips": BGU_KNOWLEDGE["tips"],
+            "university": kb["code"],
+            "tips": kb["tips"],
         }
 
-    def _answer_academic_question(self, question: str, major: str, memory_context: str = "") -> Dict:
+    def _answer_academic_question(self, question: str, major: str, memory_context: str, kb: dict) -> Dict:
         """ענה על שאלה אקדמית כללית."""
-        bgu_str = json.dumps(BGU_KNOWLEDGE["systems"], ensure_ascii=False)
-        prompt = f"""אתה יועץ אקדמי ב-BGU.
-מערכות האוניברסיטה: {bgu_str}
+        systems_str = json.dumps(kb["systems"], ensure_ascii=False)
+        uni_name = kb["name"]
+        prompt = f"""אתה יועץ אקדמי ב{uni_name}.
+מערכות האוניברסיטה: {systems_str}
 {f"מחלקה: {major}" if major else ""}
 {f"הקשר: {memory_context}" if memory_context else ""}
 
@@ -126,4 +108,4 @@ class AcademicAgent(BaseStudyAgent):
 ענה בעברית בצורה ממוקדת ומועילה."""
 
         answer = self._call_claude(prompt)
-        return {"status": "success", "answer": answer}
+        return {"status": "success", "answer": answer, "university": kb["code"]}
