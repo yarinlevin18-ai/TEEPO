@@ -555,8 +555,14 @@ class StudyOrchestrator:
             {"url": url, "credentials": credentials or {}},
         )
 
-    def get_bgu_advice(self, course_name: str, major: str = "", your_courses: List = None) -> Dict:
-        """ייעוץ אקדמי ייעודי לבן-גוריון."""
+    def get_academic_advice(
+        self,
+        course_name: str,
+        major: str = "",
+        your_courses: List = None,
+        university: str = "bgu",
+    ) -> Dict:
+        """ייעוץ אקדמי לפי האוניברסיטה (BGU/TAU)."""
         return self._execute_agent(
             "academic",
             {
@@ -564,8 +570,14 @@ class StudyOrchestrator:
                 "major": major,
                 "your_courses": your_courses or [],
                 "action": "advise",
+                "university": university,
             },
         )
+
+    # Backwards-compatible alias for the old name. Existing callers don't pass
+    # a university — the agent defaults to 'bgu', which matches old behavior.
+    def get_bgu_advice(self, course_name: str, major: str = "", your_courses: List = None) -> Dict:
+        return self.get_academic_advice(course_name, major, your_courses, university="bgu")
 
 
 # Singleton

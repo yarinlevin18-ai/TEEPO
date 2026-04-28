@@ -1,4 +1,5 @@
 """WebSocket handlers for real-time study buddy chat."""
+import time
 from flask_socketio import SocketIO, emit, join_room
 from orchestrator_wrapper import get_orchestrator
 from services import supabase_client as db
@@ -9,6 +10,16 @@ from datetime import datetime
 # Conversation history per socket session
 _sessions: dict = {}
 
+# Process boot time — set once at import. Used to detect whether a fresh
+# WebSocket connection is hitting a recently-woken backend (Render free tier
+# spins us down after 15min idle, so cold starts are common).
+_BOOT_TIME = time.time()
+
+# How long after boot a connection still counts as "cold start". 45s gives
+# the orchestrator + Supabase pool + Selenium driver enough time to be ready
+# without flagging every connection in the first minute as cold.
+_COLD_START_WINDOW_SECONDS = 45
+
 
 def register_socket_events(socketio: SocketIO):
 
@@ -16,7 +27,26 @@ def register_socket_events(socketio: SocketIO):
     def on_connect():
         sid = _get_sid()
         _sessions[sid] = {"history": [], "conv_id": None, "user_id": None}
-        emit("connected", {"message": "מחובר"})
+
+        uptime = time.time() - _BOOT_TIME
+        is_cold_start = uptime < _COLD_START_WINDOW_SECONDS
+        if is_cold_start:
+            # Frontend shows a "TEEPO מתעורר..." overlay until 'ready'
+            # arrives. Sending the message text from the server keeps the
+            # copy editable in one place.
+            emit("wakeup", {
+                "status": "starting",
+                "message": "TEEPO מתעורר...",
+                "uptime_seconds": round(uptime, 1),
+            })
+
+        emit("connected", {"message": "מחובר", "cold_start": is_cold_start})
+
+        if is_cold_start:
+            # Mark the backend as warm immediately — anyone who connects
+            # next sees cold_start=false. The 'ready' event lets the
+            # current client dismiss the overlay without polling.
+            emit("wakeup", {"status": "ready"})
 
     @socketio.on("disconnect")
     def on_disconnect():
@@ -139,9 +169,13 @@ def register_socket_events(socketio: SocketIO):
 
         try:
             if agent_type == "academic":
-                result = orch.get_bgu_advice(
+                university = (str(data.get("university", "")) or "bgu").lower()
+                if university not in ("bgu", "tau"):
+                    university = "bgu"
+                result = orch.get_academic_advice(
                     course_name=context,
                     major=data.get("major", ""),
+                    university=university,
                 )
                 answer = result.get("advice") or result.get("answer", "")
             else:

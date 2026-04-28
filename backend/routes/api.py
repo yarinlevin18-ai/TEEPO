@@ -268,6 +268,120 @@ def breakdown_assignment():
 
 
 # ------------------------------------------------------------------ #
+#  Grades — manual entry                                              #
+# ------------------------------------------------------------------ #
+
+@api.post("/grades/manual")
+def create_manual_grade():
+    """Create or update a manually-entered grade.
+
+    Coexists with scraped grades (source='moodle' / 'portal'). Uniqueness is
+    on (user_id, course_name, semester, component) — re-posting the same
+    quartet overwrites the prior value so the user can fix typos without
+    accumulating duplicates.
+    """
+    from datetime import datetime, timezone
+
+    user_id = _user_id()
+    body = request.get_json() or {}
+
+    course_name = (body.get("course_name") or "").strip()
+    if not course_name:
+        return jsonify({"error": "חסר שם קורס"}), 400
+    if len(course_name) > MAX_TITLE:
+        return jsonify({"error": "שם קורס ארוך מדי"}), 400
+
+    grade_raw = body.get("grade")
+    grade_text = (body.get("grade_text") or "").strip() or None
+    if grade_raw is None and not grade_text:
+        return jsonify({"error": "חובה למלא ציון מספרי או טקסטואלי"}), 400
+
+    grade_num = None
+    if grade_raw is not None:
+        try:
+            grade_num = float(grade_raw)
+        except (TypeError, ValueError):
+            return jsonify({"error": "ציון מספרי לא תקין"}), 400
+        if not (0 <= grade_num <= 100):
+            return jsonify({"error": "ציון חייב להיות בטווח 0–100"}), 400
+
+    credits_raw = body.get("credits")
+    credits_num = None
+    if credits_raw is not None:
+        try:
+            credits_num = float(credits_raw)
+        except (TypeError, ValueError):
+            return jsonify({"error": "נקודות זכות לא תקינות"}), 400
+        if not (0 <= credits_num <= 30):
+            return jsonify({"error": "נקודות זכות בטווח 0–30"}), 400
+
+    semester = (body.get("semester") or "").strip() or None
+    academic_year = (body.get("academic_year") or "").strip() or None
+    component = (body.get("component") or "").strip() or None
+
+    if semester and len(semester) > 50:
+        return jsonify({"error": "סמסטר ארוך מדי"}), 400
+    if academic_year and len(academic_year) > 20:
+        return jsonify({"error": "שנת לימודים ארוכה מדי"}), 400
+    if component and len(component) > 100:
+        return jsonify({"error": "שם רכיב ארוך מדי"}), 400
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    row = {
+        "user_id": user_id,
+        "course_name": course_name,
+        "source": "manual",
+        "updated_at": now_iso,
+    }
+    if grade_num is not None:
+        row["grade"] = grade_num
+    if grade_text:
+        row["grade_text"] = grade_text
+    if credits_num is not None:
+        row["credits"] = credits_num
+    if semester:
+        row["semester"] = semester
+    if academic_year:
+        row["academic_year"] = academic_year
+    if component:
+        row["component"] = component
+
+    try:
+        client = db.get_client()
+        # Upsert manually: SELECT existing match, then UPDATE or INSERT.
+        # We don't rely on PostgREST on_conflict because the unique index uses
+        # COALESCE() expressions which on_conflict can't target directly.
+        existing_q = (
+            client.table("student_grades")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("course_name", course_name)
+        )
+        if semester:
+            existing_q = existing_q.eq("semester", semester)
+        else:
+            existing_q = existing_q.is_("semester", "null")
+        if component:
+            existing_q = existing_q.eq("component", component)
+        else:
+            existing_q = existing_q.is_("component", "null")
+        existing = existing_q.limit(1).execute()
+
+        if existing.data:
+            grade_id = existing.data[0]["id"]
+            result = client.table("student_grades").update(row).eq("id", grade_id).execute()
+            status_code = 200
+        else:
+            result = client.table("student_grades").insert(row).execute()
+            status_code = 201
+    except Exception as e:
+        logger.warning(f"[manual_grade] DB error: {e}")
+        return jsonify({"error": "שגיאה בשמירת ציון"}), 500
+
+    return jsonify(result.data[0] if result.data else row), status_code
+
+
+# ------------------------------------------------------------------ #
 #  Study Plan                                                          #
 # ------------------------------------------------------------------ #
 
@@ -284,7 +398,7 @@ def create_study_plan():
 
 
 # ------------------------------------------------------------------ #
-#  Academic Agent (BGU)                                                #
+#  Academic Agent (BGU / TAU)                                          #
 # ------------------------------------------------------------------ #
 
 @api.post("/academic/advise")
@@ -293,9 +407,12 @@ def academic_advise():
     course_name = body.get("course_name", "")
     major = body.get("major", "")
     your_courses = body.get("your_courses", [])
+    university = (body.get("university") or "bgu").lower()
+    if university not in ("bgu", "tau"):
+        university = "bgu"
 
     orch = get_orchestrator()
-    result = orch.get_bgu_advice(course_name, major, your_courses)
+    result = orch.get_academic_advice(course_name, major, your_courses, university=university)
     return jsonify(result)
 
 
@@ -356,6 +473,47 @@ def fetch_google_doc():
     except Exception as e:
         logger.warning(f"[gdocs_fetch] error: {e}")
         return jsonify({"error": "שגיאה בשליפת המסמך מ-Google."}), 500
+
+
+# ------------------------------------------------------------------ #
+#  Google Calendar (read-only)                                         #
+# ------------------------------------------------------------------ #
+
+@api.get("/calendar/events")
+def list_calendar_events():
+    """List events from the user's Google Calendar.
+
+    Auth: Google access token in `X-Google-Token` header (or body for POST).
+    Query params:
+      - start: ISO 8601 timeMin (optional)
+      - end:   ISO 8601 timeMax (optional)
+      - q:     free-text filter (optional)
+      - max:   1..250, default 50
+      - calendar_id: defaults to 'primary'
+    """
+    from services import google_calendar
+
+    google_token = request.headers.get("X-Google-Token", "").strip()
+    if not google_token:
+        return jsonify({"error": "חסר טוקן Google"}), 401
+
+    try:
+        events = google_calendar.list_events(
+            google_token,
+            calendar_id=request.args.get("calendar_id", "primary"),
+            time_min=request.args.get("start") or None,
+            time_max=request.args.get("end") or None,
+            query=request.args.get("q") or None,
+            max_results=_clamp(request.args.get("max"), 1, 250, default=50),
+        )
+    except google_calendar.CalendarError as e:
+        if e.status == 401:
+            return jsonify({"error": "טוקן Google לא תקף או פג תוקף"}), 401
+        if e.status == 403:
+            return jsonify({"error": "אין הרשאת קריאה ל-Google Calendar"}), 403
+        return jsonify({"error": "שגיאה בטעינת היומן"}), 502
+
+    return jsonify({"events": events, "count": len(events)})
 
 
 # ------------------------------------------------------------------ #

@@ -10,6 +10,7 @@ import {
 import Image from 'next/image'
 import { useAuth } from '@/lib/auth-context'
 import { useTheme } from '@/lib/theme-context'
+import { useUniversityName, useUniversityCode } from '@/lib/use-university'
 import { useEffect } from 'react'
 
 const NAV_GROUPS = [
@@ -49,6 +50,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
   const pathname = usePathname()
   const { user, signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const universityName = useUniversityName()
+  const universityCode = useUniversityCode()
 
   // Block body scroll when mobile drawer is open
   useEffect(() => {
@@ -70,9 +73,16 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
         <div className="px-5 py-6 border-b border-white/5">
           <div className="flex items-center gap-3">
             <Image src="/logo-128.png" alt="TEEPO" width={40} height={40} className="flex-shrink-0" />
-            <div>
+            <div className="min-w-0">
               <p className="font-bold text-ink text-sm leading-tight">TEEPO</p>
               <p className="text-xs mt-0.5 gradient-text">מערכת לימודים חכמה</p>
+              {/* User's university — from settings.university (v2.1). Hidden
+                  if no setting is present (e.g. fresh user, pre-onboarding). */}
+              {universityCode && (
+                <p className="text-[10px] mt-1 text-ink-subtle truncate" title={universityName}>
+                  {universityName}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -104,23 +114,32 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                         {active && (
                           <motion.div
                             layoutId="sidebar-active"
-                            className="absolute inset-0 rounded-xl"
+                            className="absolute inset-0 rounded-xl overflow-hidden"
                             style={{
-                              background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.10))',
-                              boxShadow: 'inset 0 0 0 1px rgba(99,102,241,0.18), 0 0 20px rgba(99,102,241,0.06)',
+                              background: 'rgba(var(--glow1), 0.10)',
+                              boxShadow: 'inset 0 0 0 0.5px rgba(var(--glow1), 0.28)',
                             }}
                             transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                          />
+                          >
+                            {/* Hairline accent rail on the inside (RTL: right edge of viewport, so left edge of item) */}
+                            <span
+                              className="absolute top-2 bottom-2 left-0 w-[2px] rounded-full"
+                              style={{ background: 'var(--accent)', boxShadow: '0 0 8px rgba(var(--glow1), 0.5)' }}
+                            />
+                          </motion.div>
                         )}
                         <motion.div
                           className="relative z-10 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                           animate={active ? { scale: 1.05 } : { scale: 1 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                           style={active ? {
-                            background: 'rgba(99,102,241,0.25)',
+                            background: 'rgba(var(--glow1), 0.18)',
                           } : undefined}
                         >
-                          <Icon size={16} className={active ? 'text-accent-400' : ''} />
+                          <Icon
+                            size={16}
+                            style={active ? { color: 'var(--accent)' } : undefined}
+                          />
                         </motion.div>
                         <span className="relative z-10">{label}</span>
                       </motion.div>

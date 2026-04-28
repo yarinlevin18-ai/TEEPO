@@ -781,6 +781,30 @@ _LECTURER_HEB = tuple(_SEL["lecturer_heb_keywords"])
 _TA_HEB = tuple(_SEL["ta_heb_keywords"])
 _SYLLABUS_PATTERNS = tuple(_SEL["syllabus_patterns"])
 _LINK_MODULE_TYPES = set(_SEL["link_module_types"])
+# Role.shortname values Moodle uses for staff. Anything not in either set is
+# treated as student/non-staff. The Hebrew name fallback below catches
+# BGU-localized roles whose shortname is non-standard.
+_LECTURER_ROLE_SHORTNAMES = {"editingteacher", "coursecreator"}
+_TA_ROLE_SHORTNAMES = {"teacher", "ta", "teachingassistant", "tutor"}
+
+# Hebrew role-name keywords (matched as substrings against role.name).
+_LECTURER_HEB = ("מרצה",)
+_TA_HEB = ("מתרגל", "מתרגלת", "עוזר הוראה", "עוזרת הוראה")
+
+# Patterns that flag a resource as a syllabus. Checked against module name
+# case-insensitively; first match wins.
+_SYLLABUS_PATTERNS = (
+    "syllabus",
+    "סילבוס",
+    "תכנית הקורס",
+    "תכנית לימודים",
+    "תיאור הקורס",
+    "תקציר הקורס",
+)
+
+# Module types we lift into course_links (excludes file resources — those go
+# into materials). We want clickable external pointers the lecturer added.
+_LINK_MODULE_TYPES = {"url"}
 
 
 def _classify_role(role: dict) -> Optional[str]:
@@ -1186,25 +1210,144 @@ def scrape_grades() -> dict:
     return {"status": "success", "grades": all_grades, "count": len(all_grades)}
 
 
+# --- Portal dynamic URL discovery -------------------------------------------
+
+# Entry points we'll start crawling from. The first one that responds 200 is
+# enough; we don't need all to succeed.
+_PORTAL_ENTRY_PATHS = (
+    "/apex/10g/r/f_kiosk1009/home",
+    "/apex/f?p=1009:HOME",
+    "/pls/scwp/!scwp.main",
+    "/",
+)
+
+# Soft caps so a misbehaving portal can't make us crawl forever.
+_PORTAL_DISCOVERY_MAX_PAGES = 12
+_PORTAL_DISCOVERY_TIMEOUT = 8
+
+# URLs containing any of these substrings are NEVER followed — they'd log us
+# out or wander off-portal. Match is case-insensitive on the path+query.
+_PORTAL_DISCOVERY_SKIP = (
+    "logout", "signoff", "signout", "exit", "logoff",
+    "javascript:", "mailto:", "tel:",
+)
+
+
+def _score_link(text: str, href: str, keyword_groups: list[list[str]]) -> int:
+    """Return number of keywords present in text+href across all groups.
+    A link that hits keywords from multiple groups (e.g. Hebrew AND English)
+    scores higher, which is usually a stronger signal.
+    """
+    blob = f"{text} {href}".lower()
+    score = 0
+    for group in keyword_groups:
+        for kw in group:
+            if kw.lower() in blob:
+                score += 1
+    return score
+
+
+def _discover_portal_paths(
+    session: requests.Session,
+    keyword_groups: list[list[str]],
+) -> list[str]:
+    """BFS-crawl the portal from a small set of entry points and return
+    candidate paths sorted by keyword relevance (highest first).
+
+    Returns absolute URLs starting with PORTAL_URL — callers can pass them
+    directly to `session.get`. Skips logout/external links so we don't
+    invalidate our own cookies mid-crawl.
+    """
+    if not PORTAL_URL:
+        return []
+
+    from urllib.parse import urljoin, urlparse
+
+    portal_host = urlparse(PORTAL_URL).netloc.lower()
+    visited: set[str] = set()
+    scored: dict[str, int] = {}  # absolute_url -> best score
+    queue: list[tuple[str, int]] = [
+        (f"{PORTAL_URL}{p}", 0) for p in _PORTAL_ENTRY_PATHS
+    ]
+
+    pages_fetched = 0
+    while queue and pages_fetched < _PORTAL_DISCOVERY_MAX_PAGES:
+        url, depth = queue.pop(0)
+        if url in visited:
+            continue
+        visited.add(url)
+
+        try:
+            resp = session.get(url, timeout=_PORTAL_DISCOVERY_TIMEOUT)
+        except Exception:
+            continue
+        pages_fetched += 1
+        if resp.status_code != 200 or len(resp.text) < 200:
+            continue
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for a in soup.find_all("a", href=True):
+            href = a["href"].strip()
+            if not href or href.startswith("#"):
+                continue
+            blob_lower = href.lower()
+            if any(skip in blob_lower for skip in _PORTAL_DISCOVERY_SKIP):
+                continue
+
+            absolute = urljoin(url, href)
+            parsed = urlparse(absolute)
+            # Stay on the portal host — don't wander to BGU homepage,
+            # external CDNs, or auth providers.
+            if parsed.netloc and parsed.netloc.lower() != portal_host:
+                continue
+
+            text = a.get_text(strip=True)
+            score = _score_link(text, href, keyword_groups)
+            if score > 0:
+                prior = scored.get(absolute, -1)
+                if score > prior:
+                    scored[absolute] = score
+            # Crawl one more level from the entry pages — that's enough
+            # to find grade pages reachable through a top-level menu.
+            if depth < 1 and absolute not in visited:
+                queue.append((absolute, depth + 1))
+
+    # Sort by score desc, then alphabetically for stable ordering.
+    return [
+        url for url, _score in sorted(
+            scored.items(), key=lambda kv: (-kv[1], kv[0])
+        )
+    ]
+
+
 def _scrape_portal_grades(cookies: list) -> list:
     """
     Try to scrape historical grades from the BGU portal (my.bgu.ac.il).
     Searches for grade-related pages and parses tables.
+
+    URL discovery is dynamic — we crawl from the portal entry points and
+    rank links by grade-related keyword matches in their text + href.
+    A small hardcoded fallback list is tried only if discovery turns up
+    nothing, so the scraper still works on a fresh portal session that
+    lands on a page with no nav links to crawl.
     """
     session = _build_session(cookies)
     grades = []
 
-    # Try common BGU portal grade URLs (APEX-based + legacy PL/SQL)
-    grade_paths = [
-        "/apex/10g/r/f_kiosk1009/home",
+    grade_keyword_groups = [
+        ["ציונים", "ציון", "תעודה", "גיליון", "תיעוד", "תקצירציונים"],
+        ["grades", "grade", "transcript", "tziounim", "record", "gradebook"],
+    ]
+
+    # Last-resort fallback paths kept for the case where discovery yields
+    # zero candidates (e.g. portal landing page is JS-rendered with no
+    # links visible to the parser). These are NOT the primary lookup —
+    # discovery is.
+    fallback_paths = [
         "/apex/10g/r/f_kiosk1009/grades",
         "/apex/10g/r/f_kiosk1009/transcript",
         "/pls/scwp/!scwp.grades",
         "/pls/scwp/!scwp.tziounim",
-        "/pls/scwp/!scwp.student_grades",
-        "/pls/scwp/!scwp.grades_report",
-        "/pls/scwp/!scwp.student_record",
-        "/pls/scwp/!scwp.gradebook",
     ]
 
     # First: try loading the main portal page and find links to grades
@@ -1228,6 +1371,16 @@ def _scrape_portal_grades(cookies: list) -> list:
                     logger.debug(f"{_LOG} Found portal grade link: {a['href']} ({text})")
     except Exception as e:
         logger.debug(f"{_LOG} Portal main page failed: {e}")
+    discovered = _discover_portal_paths(session, grade_keyword_groups)
+    grade_paths: list[str] = list(discovered)
+    for p in fallback_paths:
+        if p not in grade_paths:
+            grade_paths.append(p)
+
+    if discovered:
+        logger.debug(f"[BGU] portal grade discovery: {len(discovered)} candidates (top: {discovered[:3]})")
+    else:
+        logger.debug("[BGU] portal grade discovery: 0 candidates — using fallback paths")
 
     # Try each grade path
     for path in grade_paths:
@@ -1459,9 +1612,25 @@ def scrape_portal_schedule() -> dict:
 
     session = _build_session(cookies)
 
+    schedule_keyword_groups = [
+        ["מערכת שעות", "מערכת", "לוח שיעורים", "לוח שעות"],
+        ["schedule", "timetable", "calendar"],
+    ]
+    fallback_paths = ["/pls/scwp/!scwp.main", "/schedule", "/timetable"]
+
+    discovered = _discover_portal_paths(session, schedule_keyword_groups)
+    candidates: list[str] = list(discovered)
+    for p in fallback_paths:
+        full = f"{PORTAL_URL}{p}"
+        if full not in candidates:
+            candidates.append(full)
+
+    if discovered:
+        logger.debug(f"[BGU] portal schedule discovery: {len(discovered)} candidates (top: {discovered[:3]})")
+
     try:
-        for path in ["/pls/scwp/!scwp.main", "/schedule", "/timetable", "/"]:
-            resp = session.get(f"{PORTAL_URL}{path}", timeout=15)
+        for url in candidates:
+            resp = session.get(url, timeout=15)
             if resp.status_code == 200 and len(resp.text) > 500:
                 soup = BeautifulSoup(resp.text, "html.parser")
                 tables = soup.find_all("table")
