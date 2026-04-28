@@ -756,6 +756,157 @@ def scrape_course_materials(course_url: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
+# --- v2.1 course metadata enrichment ----------------------------------------
+
+# Role.shortname values Moodle uses for staff. Anything not in either set is
+# treated as student/non-staff. The Hebrew name fallback below catches
+# BGU-localized roles whose shortname is non-standard.
+_LECTURER_ROLE_SHORTNAMES = {"editingteacher", "coursecreator"}
+_TA_ROLE_SHORTNAMES = {"teacher", "ta", "teachingassistant", "tutor"}
+
+# Hebrew role-name keywords (matched as substrings against role.name).
+_LECTURER_HEB = ("מרצה",)
+_TA_HEB = ("מתרגל", "מתרגלת", "עוזר הוראה", "עוזרת הוראה")
+
+# Patterns that flag a resource as a syllabus. Checked against module name
+# case-insensitively; first match wins.
+_SYLLABUS_PATTERNS = (
+    "syllabus",
+    "סילבוס",
+    "תכנית הקורס",
+    "תכנית לימודים",
+    "תיאור הקורס",
+    "תקציר הקורס",
+)
+
+# Module types we lift into course_links (excludes file resources — those go
+# into materials). We want clickable external pointers the lecturer added.
+_LINK_MODULE_TYPES = {"url"}
+
+
+def _classify_role(role: dict) -> Optional[str]:
+    """Return 'lecturer' / 'ta' / None for a Moodle role dict."""
+    shortname = (role.get("shortname") or "").lower()
+    if shortname in _LECTURER_ROLE_SHORTNAMES:
+        return "lecturer"
+    if shortname in _TA_ROLE_SHORTNAMES:
+        return "ta"
+    name = role.get("name") or ""
+    if any(kw in name for kw in _LECTURER_HEB):
+        return "lecturer"
+    if any(kw in name for kw in _TA_HEB):
+        return "ta"
+    return None
+
+
+def scrape_course_metadata(course_url: str) -> dict:
+    """Fetch v2.1 enrichment fields for a single course.
+
+    Returns:
+      {
+        "status": "success" | "error",
+        "lecturer_email": str | None,
+        "syllabus_url": str | None,
+        "teaching_assistants": [{"name", "email"?, "role"?}, ...],
+        "course_links": [{"label", "url"}, ...],
+        "portal_metadata": {"moodle_course_id": str},
+      }
+
+    Best-effort: if any sub-step fails, the function still returns
+    `success` with whatever fields it managed to populate, so callers
+    don't need to special-case partial data.
+    """
+    cookies = _load_cookies_from_store("moodle")
+    if not cookies:
+        return {"status": "error", "message": "לא מחובר ל-Moodle"}
+
+    course_id_match = re.search(r"id=(\d+)", course_url)
+    if not course_id_match:
+        return {"status": "error", "message": "course_url לא מכיל מזהה קורס"}
+    cid = int(course_id_match.group(1))
+
+    session = _build_session(cookies)
+    sesskey = _get_sesskey(session)
+
+    lecturer_email: Optional[str] = None
+    teaching_assistants: list[dict] = []
+    syllabus_url: Optional[str] = None
+    course_links: list[dict] = []
+
+    # ── Participants → lecturer email + TAs ────────────────────────────────
+    if sesskey:
+        users = _moodle_ajax(
+            session, sesskey,
+            "core_enrol_get_enrolled_users",
+            {
+                "courseid": cid,
+                "options": [
+                    {"name": "userfields", "value": "id,fullname,email,roles"},
+                ],
+            },
+        )
+        if isinstance(users, list):
+            for user in users:
+                roles = user.get("roles") or []
+                kinds = {_classify_role(r) for r in roles}
+                kinds.discard(None)
+                if not kinds:
+                    continue
+                name = (user.get("fullname") or "").strip()
+                email = (user.get("email") or "").strip() or None
+                # Carry the most descriptive role.name we have, for UI display.
+                role_label = next(
+                    (r.get("name") for r in roles if _classify_role(r)),
+                    None,
+                )
+                if "lecturer" in kinds and not lecturer_email and email:
+                    lecturer_email = email
+                if "ta" in kinds and name:
+                    teaching_assistants.append({
+                        "name": name,
+                        **({"email": email} if email else {}),
+                        **({"role": role_label} if role_label else {}),
+                    })
+
+    # ── Course contents → syllabus + course links ──────────────────────────
+    if sesskey:
+        contents = _moodle_ajax(
+            session, sesskey,
+            "core_course_get_contents",
+            {"courseid": cid},
+        )
+        if isinstance(contents, list):
+            for section in contents:
+                for module in section.get("modules", []):
+                    name = (module.get("name") or "").strip()
+                    url = (module.get("url") or "").strip()
+                    mod_type = module.get("modname", "")
+                    if not name or not url:
+                        continue
+
+                    name_lower = name.lower()
+                    if syllabus_url is None and any(
+                        p in name_lower for p in _SYLLABUS_PATTERNS
+                    ):
+                        # Resource modules redirect to the file; URL modules
+                        # point to the external link directly. Either is a
+                        # valid syllabus_url for the user to click.
+                        if mod_type in ("resource", "url"):
+                            syllabus_url = url
+
+                    if mod_type in _LINK_MODULE_TYPES:
+                        course_links.append({"label": name, "url": url})
+
+    return {
+        "status": "success",
+        "lecturer_email": lecturer_email,
+        "syllabus_url": syllabus_url,
+        "teaching_assistants": teaching_assistants,
+        "course_links": course_links,
+        "portal_metadata": {"moodle_course_id": str(cid)},
+    }
+
+
 # Cap each extracted PDF at 200KB of text — same as the client-side pdfjs
 # extractor, so ingested sources don't blow out the Drive DB.
 _PDF_MAX_CHARS = 200_000

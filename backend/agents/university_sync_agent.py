@@ -151,6 +151,18 @@ class UniversitySyncAgent(BaseStudyAgent):
                 continue
 
             course_id = str(uuid.uuid4())
+
+            # v2.1 enrichment — best-effort. Failures shouldn't block the
+            # course row from being created, so we wrap and default to empty.
+            metadata: dict = {}
+            try:
+                if course.get("url"):
+                    md = moodle_scraper.scrape_course_metadata(course["url"])
+                    if md.get("status") == "success":
+                        metadata = md
+            except Exception as e:
+                logger.debug(f"[sync] metadata scrape failed for {course['title']}: {e}")
+
             try:
                 db.create_course({
                     "id": course_id,
@@ -160,6 +172,14 @@ class UniversitySyncAgent(BaseStudyAgent):
                     "source_url": course.get("url", ""),
                     "description": course.get("summary") or f"קורס BGU - {course['title']}",
                     "status": "active",
+                    "lecturer_email": metadata.get("lecturer_email"),
+                    "syllabus_url": metadata.get("syllabus_url"),
+                    "teaching_assistants": metadata.get("teaching_assistants", []),
+                    "course_links": metadata.get("course_links", []),
+                    "portal_metadata": metadata.get(
+                        "portal_metadata",
+                        {"moodle_course_id": course.get("moodle_id", "")},
+                    ),
                 })
                 saved += 1
             except Exception as e:
