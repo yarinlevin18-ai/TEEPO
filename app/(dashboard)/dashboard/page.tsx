@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen, Clock, Calendar, ArrowLeft,
@@ -294,8 +294,14 @@ export default function DashboardPage() {
   const hasData = courses.length > 0 || assignments.length > 0 || tasks.length > 0
   const hasTodayData = todayTasks.length > 0 || urgentAssignments.length > 0 || (todayData?.events?.length || 0) > 0
 
-  // Collect all today's calendar events for notifications
-  const allTodayEvents: GoogleCalendarEvent[] = todayData?.events || []
+  // Collect all today's calendar events for notifications.
+  // Memoized so the array identity is stable across renders — useNotifications has
+  // an effect that depends on this array and calls setState; an unstable identity
+  // would loop "Maximum update depth exceeded".
+  const allTodayEvents: GoogleCalendarEvent[] = useMemo(
+    () => todayData?.events || [],
+    [todayData],
+  )
 
   // Notification system
   const {
