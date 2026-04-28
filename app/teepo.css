@@ -218,3 +218,72 @@
   background: linear-gradient(180deg, rgba(107,91,229,0.08), rgba(255,255,255,0.01));
   box-shadow: 0 0 0 1px rgba(184,169,255,0.2), 0 20px 40px -15px rgba(107,91,229,0.4);
 }
+
+/* ══════════════════════════════════════════
+   QUIET ATMOSPHERE — Teepo retheme (dashboard scope only)
+   Recolor the SVG mascot to the time-of-day accent. CSS `fill` /
+   `stop-color` override the SVG attributes, so we don't have to
+   touch the component's gradient definitions.
+   ══════════════════════════════════════════ */
+
+/* Body gradient stops — swap purple → teal/atmosphere accent. */
+.qa #teepoBodyGrad stop:nth-child(1) {
+  stop-color: color-mix(in srgb, var(--accent) 65%, white 10%);
+}
+.qa #teepoBodyGrad stop:nth-child(2) {
+  stop-color: var(--accent);
+}
+.qa #teepoBodyGrad stop:nth-child(3) {
+  stop-color: color-mix(in srgb, var(--accent) 60%, black 40%);
+}
+
+/* Drop-shadow under the body — tint to the accent. */
+.qa .teepo .t-body {
+  filter: drop-shadow(0 12px 24px rgba(var(--glow1), 0.35));
+}
+
+/* Eyes / mouth / cheek — soft cream so they read clearly against teal. */
+.qa .teepo .t-eye {
+  fill: rgba(245, 250, 240, 0.95);
+  filter: drop-shadow(0 0 6px rgba(var(--glow1), 0.55));
+}
+.qa .teepo .t-mouth {
+  stroke: rgba(245, 250, 240, 0.95);
+  filter: drop-shadow(0 0 3px rgba(var(--glow1), 0.4));
+}
+.qa .teepo .t-cheek {
+  fill: color-mix(in srgb, var(--accent) 70%, white);
+}
+
+/* Antenna tip pulse uses the accent itself. */
+.qa .teepo .t-ant-tip {
+  fill: var(--accent);
+  filter: drop-shadow(0 0 10px var(--accent));
+}
+
+/* Thinking dots + sleep Z's pick up the accent so the mascot
+   stays coherent across all states. */
+.qa .teepo .t-think-dots circle { fill: var(--accent); }
+.qa .teepo .t-zzz text          { fill: var(--accent); }
+
+/* Hero stage glow + shadow — switch indigo → accent. */
+.qa .teepo-hero-stage {
+  background:
+    radial-gradient(ellipse at center, rgba(var(--glow1), 0.12), transparent 70%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.005));
+  border: 0.5px solid rgba(255,255,255,0.08);
+}
+.qa .teepo-shadow {
+  background: radial-gradient(ellipse, rgba(var(--glow1), 0.5), transparent 70%);
+}
+
+/* State-card active/hover — drop indigo for accent. */
+.qa .teepo-state-card:hover {
+  border-color: rgba(var(--glow1), 0.35);
+  box-shadow: 0 20px 40px -15px rgba(var(--glow1), 0.3);
+}
+.qa .teepo-state-card.active {
+  border-color: rgba(var(--glow1), 0.5);
+  background: linear-gradient(180deg, rgba(var(--glow1), 0.08), rgba(255,255,255,0.01));
+  box-shadow: 0 0 0 1px rgba(var(--glow1), 0.2), 0 20px 40px -15px rgba(var(--glow1), 0.4);
+}

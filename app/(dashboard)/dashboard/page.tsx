@@ -503,20 +503,31 @@ export default function DashboardPage() {
             <button
               key={i}
               onClick={() => setSelectedDay(i)}
-              className={`flex flex-col items-center py-2.5 px-1 rounded-xl transition-all ${
-                selectedDay === i ? 'text-white shadow-lg' : day.isToday ? 'text-accent-400' : 'text-ink-muted hover:text-ink hover:bg-white/5'
+              className={`relative flex flex-col items-center py-2.5 px-1 rounded-xl transition-all ${
+                selectedDay === i
+                  ? 'text-ink'
+                  : day.isToday
+                    ? 'text-ink hover:bg-white/[0.04]'
+                    : 'text-ink-muted hover:text-ink hover:bg-white/[0.04]'
               }`}
               style={selectedDay === i ? {
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
+                background: 'rgba(var(--glow1), 0.12)',
+                border: '0.5px solid rgba(var(--glow1), 0.4)',
               } : undefined}
             >
               <span className="text-[10px] font-medium">{DAYS_SHORT[i]}</span>
-              <span className="text-lg font-bold mt-0.5">{day.date.getDate()}</span>
-              {day.events.length > 0 && selectedDay !== i && (
+              <span className="text-lg font-medium mt-0.5">{day.date.getDate()}</span>
+              {/* "Today" hairline pill under the date */}
+              {day.isToday && selectedDay !== i && (
+                <span
+                  className="mt-1 h-0.5 w-4 rounded-full"
+                  style={{ background: 'var(--accent)', boxShadow: '0 0 6px rgba(var(--glow1), 0.6)' }}
+                />
+              )}
+              {day.events.length > 0 && selectedDay !== i && !day.isToday && (
                 <div className="flex gap-0.5 mt-1">
                   {day.events.slice(0, 3).map((_, j) => (
-                    <div key={j} className="w-1 h-1 rounded-full bg-accent-400" />
+                    <div key={j} className="w-1 h-1 rounded-full" style={{ background: 'rgba(var(--glow1), 0.6)' }} />
                   ))}
                 </div>
               )}
