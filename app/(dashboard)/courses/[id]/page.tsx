@@ -29,8 +29,8 @@ import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, CheckCircle2, Circle, BookOpen, Sparkles, MessageSquare,
-  ChevronLeft, ChevronRight, Lightbulb, X, FileText, Calendar,
-  User, Megaphone, ExternalLink, Plus,
+  ChevronLeft, ChevronRight, Lightbulb, X, FileText,
+  User, ExternalLink, Plus, Link as LinkIcon, Mail, Users,
 } from 'lucide-react'
 import { useDB, useCourse, useLessons } from '@/lib/db-context'
 import NotebookPaper, { type NotebookPrefs } from '@/components/course/NotebookPaper'
@@ -481,31 +481,50 @@ export default function CoursePage() {
             ]} emptyText="אין עדיין קבצים." />
           </MoodleCard>
 
-          <MoodleCard icon={Calendar} title="סילבוס ולו״ז" hint="תאריכים מרכזיים">
-            <StubList items={[
-              'תחילת סמסטר: 27.10',
-              'תרגיל 1: 15.11',
-              'בחינת אמצע: 18.12',
-              'מבחן סופי: בתיאום',
-            ]} emptyText="אין עדיין תאריכים." />
+          <MoodleCard icon={FileText} title="סילבוס" hint="מסמך הקורס הרשמי">
+            {course.syllabus_url ? (
+              <a
+                href={course.syllabus_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                dir="ltr"
+              >
+                <ExternalLink size={11} />
+                <span className="truncate max-w-[180px]">פתח סילבוס</span>
+              </a>
+            ) : (
+              <p className="text-xs text-ink-subtle">אין עדיין סילבוס.</p>
+            )}
           </MoodleCard>
 
-          <MoodleCard icon={User} title="פרטי מרצה" hint="יצירת קשר">
-            <div className="text-xs space-y-1 text-ink-muted">
-              <div className="text-ink">(סטאב) ד״ר דוגמה</div>
-              <div>שעת קבלה: יום ג׳ 14:00</div>
-              <div className="flex items-center gap-1">
-                <ExternalLink size={10} />
-                <span>example@university.ac.il</span>
-              </div>
-            </div>
+          <MoodleCard icon={User} title="פרטי מרצה" hint="יצירת קשר ומתרגלים">
+            <LecturerInfo
+              email={course.lecturer_email}
+              tas={course.teaching_assistants}
+            />
           </MoodleCard>
 
-          <MoodleCard icon={Megaphone} title="הודעות מ-Moodle" hint="הכרזות מרצה">
-            <StubList items={[
-              '(סטאב) תרגיל 2 נדחה בשבוע',
-              'זום לתרגול שלישי: נפתח שעה מוקדם יותר',
-            ]} emptyText="אין הודעות חדשות." />
+          <MoodleCard icon={LinkIcon} title="קישורים" hint="מקורות מהקורס">
+            {course.course_links && course.course_links.length > 0 ? (
+              <ul className="space-y-1.5">
+                {course.course_links.map((link, i) => (
+                  <li key={i}>
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                    >
+                      <ExternalLink size={10} className="flex-shrink-0" />
+                      <span className="truncate">{link.label}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-ink-subtle">אין קישורים.</p>
+            )}
           </MoodleCard>
         </div>
 
@@ -587,5 +606,75 @@ function StubList({ items, emptyText }: { items: string[]; emptyText: string }) 
         </li>
       ))}
     </ul>
+  )
+}
+
+/**
+ * Lecturer + TAs panel for the course detail page (task #16).
+ *
+ * Renders the lecturer's email (mailto link) and a list of teaching
+ * assistants with their email + role + office hours when present. Falls
+ * back to a friendly "אין עדיין פרטים" message when nothing is set.
+ */
+function LecturerInfo({
+  email,
+  tas,
+}: {
+  email?: string
+  tas?: import('@/types').TeachingAssistant[]
+}) {
+  const hasLecturer = !!email
+  const hasTAs = !!(tas && tas.length > 0)
+
+  if (!hasLecturer && !hasTAs) {
+    return <p className="text-xs text-ink-subtle">אין עדיין פרטים.</p>
+  }
+
+  return (
+    <div className="text-xs space-y-2.5 text-ink-muted">
+      {hasLecturer && (
+        <a
+          href={`mailto:${email}`}
+          className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 transition-colors"
+          dir="ltr"
+        >
+          <Mail size={11} className="flex-shrink-0" />
+          <span className="truncate">{email}</span>
+        </a>
+      )}
+      {hasTAs && (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5 text-[11px] text-ink-subtle uppercase tracking-wide">
+            <Users size={11} />
+            <span>מתרגלים</span>
+          </div>
+          <ul className="space-y-1">
+            {tas!.map((ta, i) => (
+              <li key={i} className="space-y-0.5">
+                <div className="text-ink leading-tight">
+                  {ta.name}
+                  {ta.role && (
+                    <span className="text-ink-subtle text-[11px] mr-1">· {ta.role}</span>
+                  )}
+                </div>
+                {ta.email && (
+                  <a
+                    href={`mailto:${ta.email}`}
+                    className="inline-flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
+                    dir="ltr"
+                  >
+                    <Mail size={10} />
+                    <span className="truncate max-w-[160px]">{ta.email}</span>
+                  </a>
+                )}
+                {ta.office_hours && (
+                  <div className="text-[11px] text-ink-subtle">{ta.office_hours}</div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   )
 }
