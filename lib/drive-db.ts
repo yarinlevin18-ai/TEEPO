@@ -19,8 +19,6 @@ import type {
   Assignment,
   CourseNote,
   UserSettings,
-  Notebook,
-  NotebookSource,
   StudentProfile,
   StudentCourse,
 } from '@/types'
@@ -57,10 +55,6 @@ export interface DriveDB {
   student_profile?: StudentProfile
   /** Courses the student has taken / is taking / plans to take, for credits tracking. */
   student_courses?: StudentCourse[]
-  /** NotebookLM-style notebooks — grounded Q&A over uploaded sources. */
-  notebooks?: Notebook[]
-  /** Sources attached to notebooks (extracted plaintext of PDFs, pasted text, etc). */
-  notebook_sources?: NotebookSource[]
 }
 
 export const EMPTY_DB: DriveDB = {
@@ -73,8 +67,6 @@ export const EMPTY_DB: DriveDB = {
   notes: [],
   settings: {},
   student_courses: [],
-  notebooks: [],
-  notebook_sources: [],
 }
 
 // ── Drive REST helpers ────────────────────────────────────────

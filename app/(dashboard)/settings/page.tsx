@@ -423,8 +423,6 @@ export default function SettingsPage() {
             const sizeCourses = bytes(db.courses)
             const sizeLessons = bytes(db.lessons)
             const sizeNotes = bytes(db.notes)
-            const sizeSources = bytes(db.notebook_sources)
-            const sizeNotebooks = bytes(db.notebooks)
             const warnLevel = totalDb > 10 * 1024 * 1024 ? 'danger'
               : totalDb > 5 * 1024 * 1024 ? 'warn'
               : 'ok'
@@ -433,11 +431,9 @@ export default function SettingsPage() {
               : '#10b981'
             const pct = Math.min((totalDb / (10 * 1024 * 1024)) * 100, 100)
             const rows = [
-              { label: 'מקורות מחברות (PDF/טקסט)', size: sizeSources },
               { label: 'שיעורים', size: sizeLessons },
               { label: 'סיכומים', size: sizeNotes },
               { label: 'קורסים', size: sizeCourses },
-              { label: 'מטא של מחברות + שיחות', size: sizeNotebooks },
             ].sort((a, b) => b.size - a.size)
             return (
               <div className="space-y-4">
@@ -462,8 +458,8 @@ export default function SettingsPage() {
                   </div>
                   {warnLevel === 'danger' && (
                     <p className="text-xs mt-2" style={{ color: '#ef4444' }}>
-                      הקובץ גדול מאוד — השמירות ל-Drive יהיו איטיות. מומלץ למחוק מקורות
-                      ישנים מתוך "מחברות AI".
+                      הקובץ גדול מאוד — השמירות ל-Drive יהיו איטיות. מומלץ למחוק שיעורים
+                      או סיכומים ישנים שלא בשימוש.
                     </p>
                   )}
                   {warnLevel === 'warn' && (
@@ -491,16 +487,12 @@ export default function SettingsPage() {
                     <div className="text-[11px] text-ink-muted">קורסים</div>
                   </div>
                   <div>
-                    <div className="text-lg font-semibold text-white">
-                      {(db.notebooks || []).length}
-                    </div>
-                    <div className="text-[11px] text-ink-muted">מחברות</div>
+                    <div className="text-lg font-semibold text-white">{db.lessons.length}</div>
+                    <div className="text-[11px] text-ink-muted">שיעורים</div>
                   </div>
                   <div>
-                    <div className="text-lg font-semibold text-white">
-                      {(db.notebook_sources || []).length}
-                    </div>
-                    <div className="text-[11px] text-ink-muted">מקורות</div>
+                    <div className="text-lg font-semibold text-white">{db.notes.length}</div>
+                    <div className="text-[11px] text-ink-muted">סיכומים</div>
                   </div>
                 </div>
               </div>
