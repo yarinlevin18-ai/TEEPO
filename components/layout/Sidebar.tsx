@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, CheckSquare,
-  FileText, MessageCircle, Wifi, LogOut, GraduationCap, Settings, StickyNote, X, Sparkles, Building2, Sun, Moon, Layers,
+  FileText, MessageCircle, Wifi, LogOut, GraduationCap, Settings, StickyNote, X, Sparkles, Building2, Sun, Moon,
 } from 'lucide-react'
 import Image from 'next/image'
 import { useAuth } from '@/lib/auth-context'
@@ -26,7 +26,6 @@ const NAV_GROUPS = [
       { href: '/tasks',       icon: CheckSquare, label: 'משימות' },
       { href: '/assignments', icon: FileText,    label: 'מטלות' },
       { href: '/notes',       icon: StickyNote,  label: 'הסיכומים שלי' },
-      { href: '/notebooks',   icon: Layers,      label: 'מחברות AI' },
     ],
   },
   {

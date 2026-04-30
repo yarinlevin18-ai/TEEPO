@@ -21,7 +21,6 @@ import {
 import { ensureCourseFolders, pathForCourse } from './drive-folders'
 import type {
   Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings,
-  Notebook, NotebookSource, ChatMessage,
 } from '@/types'
 
 interface DBContextType {
@@ -70,18 +69,6 @@ interface DBContextType {
   upsertStudentCourse: (input: Partial<StudentCourse> & { course_id: string; course_name: string; credits: number }) => Promise<void>
   upsertStudentCoursesBulk: (rows: Array<Partial<StudentCourse> & { course_id: string; course_name: string; credits: number }>) => Promise<void>
   removeStudentCourse: (courseId: string) => Promise<void>
-
-  // Notebooks (NotebookLM-style grounded Q&A)
-  createNotebook: (input: Partial<Notebook> & { title: string }) => Promise<Notebook>
-  updateNotebook: (id: string, patch: Partial<Notebook>) => Promise<void>
-  deleteNotebook: (id: string) => Promise<void>
-  addNotebookSource: (
-    notebookId: string,
-    input: Omit<NotebookSource, 'id' | 'notebook_id' | 'created_at'>,
-  ) => Promise<NotebookSource>
-  deleteNotebookSource: (id: string) => Promise<void>
-  appendNotebookChat: (notebookId: string, msg: ChatMessage) => Promise<void>
-  clearNotebookChat: (notebookId: string) => Promise<void>
 
   // Drive folders (user-facing course hierarchy under TEEPO/)
   /** Ensure one course has its Drive folder hierarchy; persists IDs back onto the course. */
@@ -478,92 +465,6 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     }))
   }, [mutate])
 
-  // ── Notebooks ──────────────────────────────────────────────
-  const createNotebook = useCallback(async (
-    input: Partial<Notebook> & { title: string },
-  ): Promise<Notebook> => {
-    const now = new Date().toISOString()
-    const nb: Notebook = {
-      id: newId('nb'),
-      user_id: user?.id || 'local',
-      title: input.title,
-      description: input.description,
-      course_id: input.course_id,
-      chat_history: [],
-      created_at: now,
-      updated_at: now,
-    }
-    mutate(d => ({ ...d, notebooks: [nb, ...(d.notebooks || [])] }))
-    return nb
-  }, [mutate, user])
-
-  const updateNotebook = useCallback(async (id: string, patch: Partial<Notebook>) => {
-    const now = new Date().toISOString()
-    mutate(d => ({
-      ...d,
-      notebooks: (d.notebooks || []).map(n =>
-        n.id === id ? { ...n, ...patch, updated_at: now } : n,
-      ),
-    }))
-  }, [mutate])
-
-  const deleteNotebook = useCallback(async (id: string) => {
-    mutate(d => ({
-      ...d,
-      notebooks: (d.notebooks || []).filter(n => n.id !== id),
-      notebook_sources: (d.notebook_sources || []).filter(s => s.notebook_id !== id),
-    }))
-  }, [mutate])
-
-  const addNotebookSource = useCallback(async (
-    notebookId: string,
-    input: Omit<NotebookSource, 'id' | 'notebook_id' | 'created_at'>,
-  ): Promise<NotebookSource> => {
-    const now = new Date().toISOString()
-    const source: NotebookSource = {
-      id: newId('src'),
-      notebook_id: notebookId,
-      created_at: now,
-      ...input,
-    }
-    mutate(d => ({
-      ...d,
-      notebook_sources: [...(d.notebook_sources || []), source],
-      notebooks: (d.notebooks || []).map(n =>
-        n.id === notebookId ? { ...n, updated_at: now } : n,
-      ),
-    }))
-    return source
-  }, [mutate])
-
-  const deleteNotebookSource = useCallback(async (id: string) => {
-    mutate(d => ({
-      ...d,
-      notebook_sources: (d.notebook_sources || []).filter(s => s.id !== id),
-    }))
-  }, [mutate])
-
-  const appendNotebookChat = useCallback(async (notebookId: string, msg: ChatMessage) => {
-    const now = new Date().toISOString()
-    mutate(d => ({
-      ...d,
-      notebooks: (d.notebooks || []).map(n =>
-        n.id === notebookId
-          ? { ...n, chat_history: [...(n.chat_history || []), msg], updated_at: now }
-          : n,
-      ),
-    }))
-  }, [mutate])
-
-  const clearNotebookChat = useCallback(async (notebookId: string) => {
-    mutate(d => ({
-      ...d,
-      notebooks: (d.notebooks || []).map(n =>
-        n.id === notebookId ? { ...n, chat_history: [] } : n,
-      ),
-    }))
-  }, [mutate])
-
   // ── Drive folders ──────────────────────────────────────────
   const syncCourseFolders = useCallback(async (courseId: string) => {
     if (!handle) throw new Error('מסד הנתונים טרם נטען.')
@@ -658,9 +559,6 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createNote, updateNote, deleteNote,
     updateSettings, replaceCourses,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
-    createNotebook, updateNotebook, deleteNotebook,
-    addNotebookSource, deleteNotebookSource,
-    appendNotebookChat, clearNotebookChat,
     syncCourseFolders, syncAllCourseFolders,
   }), [
     db, ready, loading, error, driveConnected, driveMissing, reload,
@@ -671,9 +569,6 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createNote, updateNote, deleteNote,
     updateSettings, replaceCourses,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
-    createNotebook, updateNotebook, deleteNotebook,
-    addNotebookSource, deleteNotebookSource,
-    appendNotebookChat, clearNotebookChat,
     syncCourseFolders, syncAllCourseFolders,
   ])
 
