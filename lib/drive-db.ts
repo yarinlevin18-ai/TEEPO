@@ -32,6 +32,21 @@ const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
 const FOLDER_NAME = 'TEEPO'
 const DB_FILE_NAME = 'db.json'
 
+/**
+ * Drive DB schema version. Bump when we change the shape in a way that
+ * needs a migration. `migrateDB()` knows how to upgrade older versions.
+ *
+ * v1 — initial release.
+ * v2 — TEEPO v2.1 fields landed (Grade.source/component/updated_at,
+ *      Course.lecturer_email/syllabus_url/teaching_assistants/course_links/
+ *      portal_metadata, UserSettings.university/theme). All optional, so
+ *      v1 data is structurally valid v2 — the migration just bumps the marker.
+ */
+export const CURRENT_DB_VERSION = 2
+
+/** How long to wait after the last edit before persisting to Drive. */
+export const SAVE_DEBOUNCE_MS = 30_000
+
 // ── Student catalog (credits tracking) ────────────────────────────
 // `StudentProfile` and `StudentCourse` live in `types/index.ts` now (v2.1).
 // They're re-exported above so existing callers that import them from
@@ -58,7 +73,7 @@ export interface DriveDB {
 }
 
 export const EMPTY_DB: DriveDB = {
-  version: 1,
+  version: CURRENT_DB_VERSION,
   updated_at: new Date(0).toISOString(),
   courses: [],
   lessons: [],
@@ -67,6 +82,34 @@ export const EMPTY_DB: DriveDB = {
   notes: [],
   settings: {},
   student_courses: [],
+}
+
+// ── Migrations ────────────────────────────────────────────────
+
+/**
+ * Upgrade an older DriveDB to the current shape. Idempotent — calling on a
+ * v2 DB returns the same DB (just spread, no mutation).
+ *
+ * Returning a NEW object (even when no fields change) lets callers compare
+ * by reference to know whether to persist the migrated version.
+ */
+export function migrateDB(db: DriveDB): DriveDB {
+  let next = db
+  if ((next.version ?? 1) < 2) {
+    next = migrateV1ToV2(next)
+  }
+  // Future migrations: if (next.version < 3) next = migrateV2ToV3(next)
+  return next
+}
+
+/**
+ * v1 → v2.
+ *
+ * v2 only added optional fields, so no existing data is reshaped. The job is
+ * just to mark the DB as v2 so future code paths can rely on the version.
+ */
+function migrateV1ToV2(db: DriveDB): DriveDB {
+  return { ...db, version: 2 }
 }
 
 // ── Drive REST helpers ────────────────────────────────────────
@@ -275,25 +318,43 @@ export interface DriveDBHandle {
 /**
  * Initialise the Drive DB: ensures the folder + db.json exist, and returns
  * both the current contents and a handle to update them.
+ *
+ * If the loaded DB is older than `CURRENT_DB_VERSION`, it runs the migrations
+ * and persists the upgrade back to Drive (one extra write at first load).
  */
 export async function loadDB(
   token: string,
-): Promise<{ db: DriveDB; handle: DriveDBHandle }> {
+): Promise<{ db: DriveDB; handle: DriveDBHandle; migrated: boolean }> {
   const folderId = await getOrCreateTEEPOFolder(token)
   let fileId = await findDBFile(token, folderId)
   let db: DriveDB
+  let migrated = false
 
   if (!fileId) {
     db = { ...EMPTY_DB, updated_at: new Date().toISOString() }
     fileId = await createDBFile(token, folderId, db)
   } else {
-    db = await readDBFile(token, fileId)
+    const raw = await readDBFile(token, fileId)
+    const upgraded = migrateDB(raw)
+    if ((upgraded.version ?? 1) !== (raw.version ?? 1)) {
+      // Schema bumped — persist so future loads skip the migration.
+      await updateDBFile(token, fileId, upgraded)
+      migrated = true
+    }
+    db = upgraded
   }
 
-  return { db, handle: { folderId, fileId } }
+  return { db, handle: { folderId, fileId }, migrated }
 }
 
-/** Persist a new DB snapshot. */
+/**
+ * Persist a new DB snapshot to Drive immediately.
+ *
+ * Most callers should prefer `saveDBDebounced` — it batches rapid edits into
+ * one Drive write, which keeps us well clear of API quotas. Use this direct
+ * version only when you need confirmed persistence right now (sign-out,
+ * critical migrations, error recovery).
+ */
 export async function saveDB(
   token: string,
   handle: DriveDBHandle,
@@ -302,6 +363,97 @@ export async function saveDB(
   const next: DriveDB = { ...db, updated_at: new Date().toISOString() }
   await updateDBFile(token, handle.fileId, next)
   return next
+}
+
+// ── Debounced save ────────────────────────────────────────────
+//
+// We keep a single pending save in module-level state. Multiple `saveDBDebounced`
+// calls in a 30-second window collapse into ONE Drive write — the latest DB
+// snapshot wins, all callers' Promises resolve when that single write lands.
+//
+// Why module-level (not React) state: Drive writes are inherently global per
+// user. Bouncing through React adds remount-flush bugs without buying anything.
+// Code outside React (workers, signOut handlers) can also use the same queue.
+
+interface PendingSave {
+  handle: DriveDBHandle
+  db: DriveDB
+  /** All callers waiting for this batch to flush. */
+  waiters: Array<{
+    resolve: (v: DriveDB) => void
+    reject: (e: unknown) => void
+  }>
+}
+
+let pendingSave: PendingSave | null = null
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Schedule a save 30 seconds from now (sliding window). Calling again before
+ * the timer fires updates the pending state and resets the timer. The returned
+ * Promise resolves when the eventual single Drive write completes.
+ *
+ * The token is captured per-call. If the user signs out or the token expires
+ * during the wait, the save fails — caller catches the rejection.
+ */
+export async function saveDBDebounced(
+  token: string,
+  handle: DriveDBHandle,
+  db: DriveDB,
+): Promise<DriveDB> {
+  if (saveTimer) clearTimeout(saveTimer)
+
+  return new Promise<DriveDB>((resolve, reject) => {
+    if (pendingSave) {
+      pendingSave.handle = handle
+      pendingSave.db = db
+      pendingSave.waiters.push({ resolve, reject })
+    } else {
+      pendingSave = { handle, db, waiters: [{ resolve, reject }] }
+    }
+
+    saveTimer = setTimeout(() => {
+      void flushPendingSave(token).catch(() => {
+        // Errors are forwarded to each waiter's reject inside flushPendingSave.
+      })
+    }, SAVE_DEBOUNCE_MS)
+  })
+}
+
+/**
+ * Write any pending save right now and clear the timer. Returns the saved DB,
+ * or `null` if there was nothing to save.
+ *
+ * Call this in critical paths where the 30-second wait isn't acceptable:
+ *   - tab close / `beforeunload`
+ *   - sign-out
+ *   - explicit "save now" UI
+ */
+export async function flushPendingSave(
+  token: string,
+): Promise<DriveDB | null> {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  if (!pendingSave) return null
+
+  const pending = pendingSave
+  pendingSave = null
+
+  try {
+    const next = await saveDB(token, pending.handle, pending.db)
+    pending.waiters.forEach((w) => w.resolve(next))
+    return next
+  } catch (e) {
+    pending.waiters.forEach((w) => w.reject(e))
+    throw e
+  }
+}
+
+/** True if a debounced save is queued and hasn't fired yet. */
+export function hasPendingSave(): boolean {
+  return pendingSave !== null
 }
 
 /** Generate a stable-ish id for new records. */

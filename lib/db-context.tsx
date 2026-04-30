@@ -15,7 +15,8 @@ import {
 } from 'react'
 import { useAuth } from './auth-context'
 import {
-  DriveDB, DriveDBHandle, EMPTY_DB, loadDB, newId, saveDB, probeTokenScopes,
+  DriveDB, DriveDBHandle, EMPTY_DB, loadDB, newId, saveDB,
+  saveDBDebounced, flushPendingSave, hasPendingSave, probeTokenScopes,
   StudentProfile, StudentCourse,
 } from './drive-db'
 import { ensureCourseFolders, pathForCourse } from './drive-folders'
@@ -96,9 +97,8 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Pending save scheduler
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingRef = useRef<DriveDB | null>(null)
+  // Pending-save state lives in `lib/drive-db` (see `saveDBDebounced`). We
+  // don't keep a timer or pending DB here anymore — that was duplicated state.
 
   // Run a Drive operation, retrying once with a refreshed token on 401.
   const withToken = useCallback(async <T,>(
@@ -168,26 +168,36 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     reload()
   }, [user, googleToken, reload])
 
-  // Schedule a save (debounced ~600ms so rapid edits batch into one write)
+  // Schedule a debounced save. The actual 30-second timer + batching live in
+  // `lib/drive-db` so writes from any context (workers, signOut handlers) share
+  // the same queue. We just kick it and react to the eventual settled Promise.
   const scheduleSave = useCallback((next: DriveDB) => {
-    pendingRef.current = next
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      const snapshot = pendingRef.current
-      if (!snapshot || !handle) return
-      try {
-        const saved = await withToken(t => saveDB(t, handle, snapshot))
-        setDb(prev => ({ ...prev, updated_at: saved.updated_at }))
-      } catch (e: any) {
-        setError(e?.message || 'שמירה ל-Drive נכשלה')
-      }
-    }, 600)
+    if (!handle) return
+    withToken(t => saveDBDebounced(t, handle, next))
+      .then(saved => setDb(prev => ({ ...prev, updated_at: saved.updated_at })))
+      .catch(e => setError(e?.message || 'שמירה ל-Drive נכשלה'))
   }, [handle, withToken])
 
-  // Flush pending save on unmount
-  useEffect(() => () => {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-  }, [])
+  // Flush any pending save on unmount or tab close — the 30s window means a
+  // user closing the tab mid-edit would otherwise lose their last changes.
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      // Synchronous best-effort. We can't await here; the request may or may
+      // not get through before the tab dies. Better than dropping the write.
+      if (hasPendingSave()) {
+        void withToken(t => flushPendingSave(t)).catch(() => {})
+      }
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      // Component unmount: fire any pending save (e.g. user signing out, route
+      // change) so we don't discard the last 30 seconds of edits.
+      if (hasPendingSave()) {
+        void withToken(t => flushPendingSave(t)).catch(() => {})
+      }
+    }
+  }, [withToken])
 
   // Generic mutator: applies `fn` to the current DB, updates state, schedules save
   const mutate = useCallback((fn: (db: DriveDB) => DriveDB) => {
