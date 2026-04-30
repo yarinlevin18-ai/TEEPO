@@ -36,10 +36,10 @@ gh pr create --draft                    # 5. PR — השותף מאשר → merg
 |-------|------|-------|
 | GitHub | ✅ | ✅ |
 | Supabase | ✅ | ✅ |
-| Render (backend deploy + logs + env) | ❌ — צריך הזמנה | ✅ |
+| Render (backend deploy + logs + env) | ❌ — Hobby tier לא תומך ב-team members | ✅ |
 | Vercel (frontend deploy) | לא נדרש | ✅ |
 
-עד ש-Tzvi מקבל גישה ל-Render: ירין מטפל ב-env vars / logs / deploy verification של ה-backend. Tzvi מפתח מקומית עם `python backend/app.py`.
+ירין מטפל ב-env vars / logs / deploy verification של ה-backend עד ששדרוג Render ל-Pro יתאפשר (משימה pre-launch). Tzvi מפתח מקומית עם `python backend/app.py` ומקבל מירין logs/verification דרך הצ'אט.
 
 ---
 
@@ -57,7 +57,7 @@ gh pr create --draft                    # 5. PR — השותף מאשר → merg
 
 | # | משימה | קבצים | תלוי ב | סטטוס |
 |---|-------|-------|--------|--------|
-| 4 | Render keep-alive (`/health` ping כל 13 דק') | `.github/workflows/render-keepalive.yml`, `backend/routes/health.py` | גישה ל-Render | חסום |
+| 4 ⚠️ | Render keep-alive (`/health` ping כל 13 דק') — **חריג: Yarin** (כי Render רק אצלו) | `.github/workflows/render-keepalive.yml`, `backend/routes/health.py` | — | פתוח |
 | 5 | `POST /api/grades/manual` endpoint | `backend/routes/api.py` | 3 | פתוח |
 | 6 | קליטת `lecturer_email`/`syllabus_url`/TAs/links ב-Moodle scraper | `backend/services/moodle_scraper.py` | 3 | פתוח |
 | 7 | חיזוק Portal scraper (BGU) — discovery דינמי במקום URLs קשיחים | `backend/services/moodle_scraper.py` | — | פתוח |
