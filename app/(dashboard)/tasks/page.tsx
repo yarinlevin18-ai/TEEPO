@@ -180,9 +180,9 @@ export default function TasksPage() {
         <motion.button
           whileHover={{ scale: 1.15 }}
           whileTap={{ scale: 0.9 }}
-          onClick={() => setDateOffset(o => o - 7)}
+          onClick={() => setDateOffset(o => o - 30)}
           className="p-2.5 rounded-xl glass text-ink-muted hover:text-ink hover:bg-white/[0.08] transition-colors"
-          title="שבוע קודם"
+          title="חודש קודם"
         >
           <ChevronRight size={16} />
         </motion.button>
@@ -270,9 +270,9 @@ export default function TasksPage() {
         <motion.button
           whileHover={{ scale: 1.15 }}
           whileTap={{ scale: 0.9 }}
-          onClick={() => setDateOffset(o => o + 7)}
+          onClick={() => setDateOffset(o => o + 30)}
           className="p-2.5 rounded-xl glass text-ink-muted hover:text-ink hover:bg-white/[0.08] transition-colors"
-          title="שבוע הבא"
+          title="חודש הבא"
         >
           <ChevronLeft size={16} />
         </motion.button>

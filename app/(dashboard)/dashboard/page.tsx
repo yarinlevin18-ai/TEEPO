@@ -271,7 +271,19 @@ export default function DashboardPage() {
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
     })
 
-  const urgentAssignments = pendingAssignments.filter(a => {
+  // v2.1 default — "מטלות קרובות" widget shows the upcoming month, not all
+  // pending. Items with no deadline are kept at the end (backlog visibility).
+  // The spec called for "month forward instead of week"; we landed on a 30-day
+  // window since dates are already-anchored to the deadline.
+  const UPCOMING_DAYS_WINDOW = 30
+  const upcomingAssignments = pendingAssignments.filter(a => {
+    if (!a.deadline) return true // backlog — still shown
+    const days = differenceInDays(new Date(a.deadline), new Date())
+    return days <= UPCOMING_DAYS_WINDOW
+  })
+  const olderPendingCount = pendingAssignments.length - upcomingAssignments.length
+
+  const urgentAssignments = upcomingAssignments.filter(a => {
     if (!a.deadline) return false
     return differenceInDays(new Date(a.deadline), new Date()) <= 3
   })
@@ -664,7 +676,12 @@ export default function DashboardPage() {
                 </button>
               </Link>
             </div>
-            <AssignmentsSection assignments={pendingAssignments} courses={courses} loading={zone1Loading} />
+            <AssignmentsSection
+              assignments={upcomingAssignments}
+              courses={courses}
+              loading={zone1Loading}
+              olderCount={olderPendingCount}
+            />
           </motion.div>
         </div>
       </div>
@@ -1096,8 +1113,8 @@ function TaskRow({ task, onToggle, index, isToday }: {
 
 // ── Assignments Section ─────────────────────────────────────
 
-function AssignmentsSection({ assignments, courses, loading }: {
-  assignments: Assignment[]; courses: Course[]; loading: boolean
+function AssignmentsSection({ assignments, courses, loading, olderCount = 0 }: {
+  assignments: Assignment[]; courses: Course[]; loading: boolean; olderCount?: number
 }) {
   if (loading) {
     return <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-16 rounded-xl shimmer" />)}</div>
@@ -1181,6 +1198,13 @@ function AssignmentsSection({ assignments, courses, loading }: {
         <Link href="/assignments">
           <button className="w-full text-center text-xs text-accent-400 hover:text-accent py-2 transition-colors">
             +{assignments.length - 5} נוספות
+          </button>
+        </Link>
+      )}
+      {olderCount > 0 && (
+        <Link href="/assignments">
+          <button className="w-full text-center text-[11px] text-ink-subtle hover:text-ink-muted py-2 transition-colors">
+            עוד {olderCount} מטלות מעבר לחודש הקרוב
           </button>
         </Link>
       )}
