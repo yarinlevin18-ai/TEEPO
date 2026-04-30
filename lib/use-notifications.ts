@@ -180,11 +180,33 @@ export function useNotifications(
     try { localStorage.setItem(NOTIFS_READ_KEY, JSON.stringify(Array.from(ids))) } catch {}
   }, [])
 
-  // Rebuild notifications when data changes
+  // Rebuild notifications when data changes.
+  //
+  // The deps (assignments, tasks, events) come from caller-render-time arrays
+  // (e.g. `db.assignments`) — they're new references every render even when
+  // the contents haven't changed. So this effect runs every render. That's
+  // fine — but `setNotifications(newArray)` was unconditional, making React
+  // schedule a re-render every time → "Maximum update depth exceeded" loop.
+  //
+  // Fix: only commit a new notifications array if the meaningful content
+  // (id + read) actually differs. Reference-equal items don't trigger
+  // setState, so the loop closes.
   useEffect(() => {
     const raw = buildNotifications(assignments, tasks, events)
     const withRead = raw.map(n => ({ ...n, read: readIds.has(n.id) }))
-    setNotifications(withRead)
+    setNotifications(prev => {
+      if (prev.length === withRead.length) {
+        let same = true
+        for (let i = 0; i < prev.length; i++) {
+          if (prev[i].id !== withRead[i].id || prev[i].read !== withRead[i].read) {
+            same = false
+            break
+          }
+        }
+        if (same) return prev
+      }
+      return withRead
+    })
 
     // Fire browser notifications for critical/high unread items.
     // iOS Safari (and some in-app browsers) don't expose the Notification API at all —
