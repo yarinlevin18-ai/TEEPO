@@ -82,6 +82,28 @@ export const api = {
       }),
   },
 
+  grades: {
+    /** GET /api/university/grades — saved grades from DB merged with live Moodle/Portal scrape. */
+    list: () => request<{ grades: any[]; average: number | null }>('/api/university/grades'),
+    /**
+     * POST /api/grades/manual — create or update a manually-entered grade.
+     * Coexists with scraped grades; uniqueness is on (course_name, semester, component).
+     */
+    createManual: (input: {
+      course_name: string
+      grade?: number
+      grade_text?: string
+      credits?: number
+      semester?: string
+      academic_year?: string
+      component?: string
+    }) =>
+      request<any>('/api/grades/manual', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+  },
+
   academic: {
     advise: (courseName: string, major?: string, yourCourses?: string[]) =>
       request<any>('/api/academic/advise', {
