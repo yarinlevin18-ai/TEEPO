@@ -239,13 +239,15 @@ export const api = {
 
   catalog: {
     // ── Static catalog data (tracks/departments/course catalog) ──
-    // Served from /public/catalog.json — backend Supabase tables are empty,
-    // and this data is static shnaton reference anyway.
-    departments: () => _catalogDepartments(),
-    tracks: () => _catalogTracks(),
-    track: (id: string) => _catalogTrack(id),
-    searchCourses: (q: string, dept?: string, track?: string) =>
-      _catalogSearch(q, dept, track),
+    // Served from /public/catalog.<uni>.json (v2.1) with /catalog.json as a
+    // legacy fallback. Optional `university` param picks which file. Backend
+    // Supabase catalog tables exist (Tzvi #36) but the frontend stays
+    // file-bundled for speed — these are static shnaton reference anyway.
+    departments: (university?: 'bgu' | 'tau') => _catalogDepartments(university),
+    tracks: (university?: 'bgu' | 'tau') => _catalogTracks(university),
+    track: (id: string, university?: 'bgu' | 'tau') => _catalogTrack(id, university),
+    searchCourses: (q: string, dept?: string, track?: string, university?: 'bgu' | 'tau') =>
+      _catalogSearch(q, dept, track, university),
 
     // ── Per-user data (profile + my courses) — still backend ──
     profile: () => request<any>('/api/catalog/profile'),
