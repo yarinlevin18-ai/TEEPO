@@ -77,18 +77,19 @@ export default function CreditsPage() {
 
   const profile = db.student_profile || null
   const needsOnboarding = ready && !profile
+  const university = db.settings?.university
 
   // Resolve track details from the bundled catalog whenever profile changes.
   useEffect(() => {
     if (!profile?.track_id) { setTrack(null); return }
     let cancelled = false
     setTrackLoading(true)
-    api.catalog.track(profile.track_id)
+    api.catalog.track(profile.track_id, university)
       .then((res: any) => { if (!cancelled) setTrack(res.track as Track) })
       .catch((err: any) => { if (!cancelled) setError(err?.message || 'שגיאה בטעינת המסלול') })
       .finally(() => { if (!cancelled) setTrackLoading(false) })
     return () => { cancelled = true }
-  }, [profile?.track_id])
+  }, [profile?.track_id, university])
 
   if (!ready || dbLoading || trackLoading) {
     return (
@@ -125,7 +126,8 @@ export default function CreditsPage() {
 // ══════════════════════════════════════════════════════════════
 
 function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
-  const { setStudentProfile, upsertStudentCoursesBulk } = useDB()
+  const { db, setStudentProfile, upsertStudentCoursesBulk } = useDB()
+  const university = db.settings?.university
   const [step, setStep] = useState(1)
   const [tracks, setTracks] = useState<Track[]>([])
   const [tracksLoading, setTracksLoading] = useState(true)
@@ -143,14 +145,14 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('השרת לא הגיב (ייתכן שהוא בהפעלה מחדש). נסה שוב בעוד רגע.')), 15000)
       )
-      const result = await Promise.race([api.catalog.tracks(), timeout])
+      const result = await Promise.race([api.catalog.tracks(university), timeout])
       setTracks(result as Track[])
     } catch (err: any) {
       setTracksError(err?.message || 'לא הצלחנו לטעון את רשימת המסלולים')
     } finally {
       setTracksLoading(false)
     }
-  }, [])
+  }, [university])
 
   useEffect(() => { loadTracks() }, [loadTracks])
 
@@ -171,7 +173,7 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
 
       // Auto-add mandatory courses for the track
       try {
-        const trackData = await api.catalog.track(selectedTrack)
+        const trackData = await api.catalog.track(selectedTrack, university)
         const mandatory = (trackData.courses || []).filter((c: CatalogCourse) => c.type === 'mandatory')
         if (mandatory.length > 0) {
           await upsertStudentCoursesBulk(
@@ -420,6 +422,7 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
 
 function CreditsDashboard({ profile, track }: { profile: any; track: Track | null }) {
   const { db, setStudentProfile, upsertStudentCourse, removeStudentCourse } = useDB()
+  const university = db.settings?.university
   const myCourses = (db.student_courses || []) as StudentCourse[]
   const [credits, setCredits] = useState<CreditSummary | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -440,11 +443,11 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
   useEffect(() => {
     if (!profile?.track_id) { setCredits(null); return }
     let cancelled = false
-    computeCreditSummary(profile.track_id, myCourses as any, profile.current_year)
+    computeCreditSummary(profile.track_id, myCourses as any, profile.current_year, university)
       .then(res => { if (!cancelled) setCredits(res as CreditSummary) })
       .catch(err => { if (!cancelled) setError(err?.message || 'שגיאה בחישוב נק"ז') })
     return () => { cancelled = true }
-  }, [profile?.track_id, profile?.current_year, myCourses])
+  }, [profile?.track_id, profile?.current_year, myCourses, university])
 
   // Open the edit-profile modal: fetch tracks and pre-fill values
   const openEditProfile = async () => {
@@ -454,7 +457,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
     setEditOpen(true)
     if (editTracks.length === 0) {
       try {
-        const t = await api.catalog.tracks()
+        const t = await api.catalog.tracks(university)
         setEditTracks(t)
       } catch { /* ignore */ }
     }
@@ -487,7 +490,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
     if (q.length < 2) { setSearchResults([]); return }
     setSearching(true)
     try {
-      const results = await api.catalog.searchCourses(q)
+      const results = await api.catalog.searchCourses(q, undefined, undefined, university)
       setSearchResults(results)
     } catch {
       setSearchResults([])
