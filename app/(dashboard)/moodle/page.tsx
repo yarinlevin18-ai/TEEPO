@@ -150,6 +150,13 @@ export default function UniversityConnectPage() {
         startdate?: number | null
         enddate?: number | null
         category_name?: string
+        // v2.1 enrichment — produced by backend's Moodle scraper (Tzvi #30).
+        // All optional; the scraper may not find every field on every course.
+        lecturer_email?: string | null
+        syllabus_url?: string | null
+        teaching_assistants?: Array<{ name: string; email?: string; role?: string }>
+        course_links?: Array<{ label: string; url: string }>
+        portal_metadata?: Record<string, unknown>
       }> = coursesData.courses || []
 
       // Match existing courses by source_url first, then by exact title.
@@ -196,6 +203,15 @@ export default function UniversityConnectPage() {
             moodle_startdate: c.startdate || undefined,
             moodle_enddate: c.enddate || undefined,
             category_name: c.category_name,
+            // v2.1 — only overwrite scraped fields when the scraper actually found
+            // something. Empty arrays from the backend mean "scraped but found
+            // nothing", which we treat the same as "found something" (it's the
+            // freshest truth). Null/undefined means "didn't even check" — keep prior.
+            ...(c.lecturer_email !== undefined ? { lecturer_email: c.lecturer_email ?? undefined } : {}),
+            ...(c.syllabus_url !== undefined ? { syllabus_url: c.syllabus_url ?? undefined } : {}),
+            ...(c.teaching_assistants !== undefined ? { teaching_assistants: c.teaching_assistants } : {}),
+            ...(c.course_links !== undefined ? { course_links: c.course_links } : {}),
+            ...(c.portal_metadata !== undefined ? { portal_metadata: c.portal_metadata } : {}),
             ...(isManual ? {} : {
               semester: cls.semester,
               academic_year: cls.academic_year,
@@ -216,6 +232,12 @@ export default function UniversityConnectPage() {
             semester: cls.semester,
             academic_year: cls.academic_year,
             year_of_study: yearOfStudy,
+            // v2.1 enrichment — see comment in updateCourse path above.
+            lecturer_email: c.lecturer_email ?? undefined,
+            syllabus_url: c.syllabus_url ?? undefined,
+            teaching_assistants: c.teaching_assistants,
+            course_links: c.course_links,
+            portal_metadata: c.portal_metadata,
           })
           added++
         }

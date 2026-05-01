@@ -83,10 +83,16 @@ export const api = {
   },
 
   academic: {
-    advise: (courseName: string, major?: string, yourCourses?: string[]) =>
+    advise: (
+      courseName: string,
+      major?: string,
+      yourCourses?: string[],
+      /** v2.1 — picks BGU vs TAU advisor variant on the backend. */
+      university?: string,
+    ) =>
       request<any>('/api/academic/advise', {
         method: 'POST',
-        body: JSON.stringify({ course_name: courseName, major, your_courses: yourCourses }),
+        body: JSON.stringify({ course_name: courseName, major, your_courses: yourCourses, university }),
       }),
   },
 
