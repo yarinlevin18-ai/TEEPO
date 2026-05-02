@@ -21,6 +21,11 @@ import type {
   UserSettings,
   StudentProfile,
   StudentCourse,
+  Exam,
+  StudyPlan,
+  PracticeSession,
+  Flashcard,
+  Simulation,
 } from '@/types'
 
 // Re-export for backward compat — existing callers import these from
@@ -41,8 +46,13 @@ const DB_FILE_NAME = 'db.json'
  *      Course.lecturer_email/syllabus_url/teaching_assistants/course_links/
  *      portal_metadata, UserSettings.university/theme). All optional, so
  *      v1 data is structurally valid v2 — the migration just bumps the marker.
+ *
+ * v3 — TEEPO Exam additions (spec §7.2): exams, study_plans, practice_sessions,
+ *      flashcards, simulations, exam_group_memberships. Pure additive — old
+ *      data is structurally valid v3, the migration just initializes empty
+ *      arrays for the new fields.
  */
-export const CURRENT_DB_VERSION = 2
+export const CURRENT_DB_VERSION = 3
 
 /** How long to wait after the last edit before persisting to Drive. */
 export const SAVE_DEBOUNCE_MS = 30_000
@@ -70,6 +80,13 @@ export interface DriveDB {
   student_profile?: StudentProfile
   /** Courses the student has taken / is taking / plans to take, for credits tracking. */
   student_courses?: StudentCourse[]
+  // ── TEEPO Exam (spec §7.2). All optional so v1/v2 data is forward-compatible.
+  exams?: Exam[]
+  study_plans?: StudyPlan[]
+  practice_sessions?: PracticeSession[]
+  flashcards?: Flashcard[]
+  simulations?: Simulation[]
+  exam_group_memberships?: Array<{ group_id: string; joined_at: string }>
 }
 
 export const EMPTY_DB: DriveDB = {
@@ -82,6 +99,12 @@ export const EMPTY_DB: DriveDB = {
   notes: [],
   settings: {},
   student_courses: [],
+  exams: [],
+  study_plans: [],
+  practice_sessions: [],
+  flashcards: [],
+  simulations: [],
+  exam_group_memberships: [],
 }
 
 // ── Migrations ────────────────────────────────────────────────
@@ -98,7 +121,9 @@ export function migrateDB(db: DriveDB): DriveDB {
   if ((next.version ?? 1) < 2) {
     next = migrateV1ToV2(next)
   }
-  // Future migrations: if (next.version < 3) next = migrateV2ToV3(next)
+  if ((next.version ?? 1) < 3) {
+    next = migrateV2ToV3(next)
+  }
   return next
 }
 
@@ -110,6 +135,25 @@ export function migrateDB(db: DriveDB): DriveDB {
  */
 function migrateV1ToV2(db: DriveDB): DriveDB {
   return { ...db, version: 2 }
+}
+
+/**
+ * v2 → v3.
+ *
+ * v3 adds the TEEPO Exam fields. All new fields are optional arrays — initialize
+ * them to empty so consumers don't have to check for undefined.
+ */
+function migrateV2ToV3(db: DriveDB): DriveDB {
+  return {
+    ...db,
+    version: 3,
+    exams: db.exams ?? [],
+    study_plans: db.study_plans ?? [],
+    practice_sessions: db.practice_sessions ?? [],
+    flashcards: db.flashcards ?? [],
+    simulations: db.simulations ?? [],
+    exam_group_memberships: db.exam_group_memberships ?? [],
+  }
 }
 
 // ── Drive REST helpers ────────────────────────────────────────

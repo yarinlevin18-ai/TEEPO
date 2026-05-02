@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { PlanWizard } from '@/components/exam/PlanWizard'
 import { TodayCard } from '@/components/exam/TodayCard'
 import { MacroView } from '@/components/exam/MacroView'
 import { DayFinishDialog, type CompletionVerdict } from '@/components/exam/DayFinishDialog'
-import { loadPlanFromStorage, savePlanToStorage } from '@/lib/exam/plan-storage'
+import { useExamStore } from '@/lib/exam/use-exam-store'
 import { api } from '@/lib/api-client'
-import type { StudyPlan, StudyPlanDay, DayStatus } from '@/types'
+import type { StudyPlan, StudyPlanDay, DayStatus, Exam } from '@/types'
 
 type Tab = 'micro' | 'macro'
 
@@ -18,16 +18,13 @@ const VERDICT_TO_STATUS: Record<CompletionVerdict, DayStatus> = {
 }
 
 export default function PlanPage({ params }: { params: { examId: string } }) {
-  const [plan, setPlan] = useState<StudyPlan | null>(null)
-  const [loaded, setLoaded] = useState(false)
+  const store = useExamStore()
+  const exam: Exam | null = store.exams.find((e) => e.id === params.examId) ?? null
+  const plan: StudyPlan | null = store.getPlanByExam(params.examId)
+
   const [dialogOpen, setDialogOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('micro')
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
-
-  useEffect(() => {
-    setPlan(loadPlanFromStorage(params.examId))
-    setLoaded(true)
-  }, [params.examId])
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
   // Pick the first non-completed day at or after today; fall back to the
@@ -49,8 +46,7 @@ export default function PlanPage({ params }: { params: { examId: string } }) {
   // ---- Mutations ----
 
   const updatePlan = (next: StudyPlan) => {
-    setPlan(next)
-    savePlanToStorage(params.examId, next)
+    void store.savePlan(next)
   }
 
   const toggleActivity = (activityIndex: number, done: boolean) => {
@@ -111,7 +107,7 @@ export default function PlanPage({ params }: { params: { examId: string } }) {
 
   // ---- Render ----
 
-  if (!loaded) {
+  if (!store.ready) {
     return (
       <main dir="rtl" className="p-6 text-zinc-400">
         טוען…
@@ -124,11 +120,11 @@ export default function PlanPage({ params }: { params: { examId: string } }) {
       <main dir="rtl" className="min-h-screen p-6 lg:p-10">
         <PlanWizard
           examId={params.examId}
-          examTitle={`מבחן #${params.examId}`}
-          examDate={defaultExamDate(14)}
-          examType="midterm"
-          courseId="local"
-          courseName="קורס לדוגמה"
+          examTitle={exam?.title ?? `מבחן #${params.examId}`}
+          examDate={exam?.date ?? defaultExamDate(14)}
+          examType={exam?.type ?? 'midterm'}
+          courseId={exam?.course_id ?? 'local'}
+          courseName={exam?.title ?? 'קורס לדוגמה'}
           materials={[]}
           onCancel={() => history.back()}
           onComplete={async (draftPlan) => {
@@ -137,8 +133,7 @@ export default function PlanPage({ params }: { params: { examId: string } }) {
               id: `plan_${Date.now()}`,
               created_at: new Date().toISOString(),
             }
-            savePlanToStorage(params.examId, persisted)
-            setPlan(persisted)
+            await store.savePlan(persisted)
           }}
         />
       </main>
@@ -156,7 +151,7 @@ export default function PlanPage({ params }: { params: { examId: string } }) {
       <header className="flex items-baseline justify-between">
         <div>
           <h1 className="text-2xl font-bold">תכנית חזרה</h1>
-          <p className="text-zinc-400 text-sm mt-1">מבחן #{params.examId}</p>
+          <p className="text-zinc-400 text-sm mt-1">{exam?.title ?? `מבחן #${params.examId}`}</p>
         </div>
         <div className="text-left">
           <div className="text-xs text-zinc-400">ימים נותרים</div>

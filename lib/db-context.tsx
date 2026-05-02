@@ -22,6 +22,7 @@ import {
 import { ensureCourseFolders, pathForCourse } from './drive-folders'
 import type {
   Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings,
+  Exam, StudyPlan, PracticeSession, Flashcard, Simulation,
 } from '@/types'
 
 interface DBContextType {
@@ -78,6 +79,15 @@ interface DBContextType {
   syncAllCourseFolders: (
     onProgress?: (done: number, total: number, title: string) => void,
   ) => Promise<{ created: number; skipped: number; failed: number }>
+
+  // ── TEEPO Exam (spec §7.2) ────────────────────────────────────
+  upsertExam: (exam: Exam) => Promise<void>
+  removeExam: (id: string) => Promise<void>
+  upsertStudyPlan: (plan: StudyPlan) => Promise<void>
+  removeStudyPlan: (id: string) => Promise<void>
+  upsertPracticeSession: (session: PracticeSession) => Promise<void>
+  upsertFlashcards: (cards: Flashcard[]) => Promise<void>
+  upsertSimulation: (sim: Simulation) => Promise<void>
 }
 
 const DBContext = createContext<DBContextType | undefined>(undefined)
@@ -557,6 +567,63 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     return { created, skipped, failed }
   }, [handle, db.courses, withToken, mutate])
 
+  // ── TEEPO Exam ─────────────────────────────────────────────
+  const upsertExam = useCallback(async (exam: Exam) => {
+    mutate(d => {
+      const existing = d.exams ?? []
+      const without = existing.filter(e => e.id !== exam.id)
+      return { ...d, exams: [exam, ...without] }
+    })
+  }, [mutate])
+
+  const removeExam = useCallback(async (id: string) => {
+    mutate(d => ({
+      ...d,
+      exams: (d.exams ?? []).filter(e => e.id !== id),
+      study_plans: (d.study_plans ?? []).filter(p => p.exam_id !== id),
+    }))
+  }, [mutate])
+
+  const upsertStudyPlan = useCallback(async (plan: StudyPlan) => {
+    mutate(d => {
+      const existing = d.study_plans ?? []
+      const without = existing.filter(p => p.id !== plan.id)
+      return { ...d, study_plans: [plan, ...without] }
+    })
+  }, [mutate])
+
+  const removeStudyPlan = useCallback(async (id: string) => {
+    mutate(d => ({
+      ...d,
+      study_plans: (d.study_plans ?? []).filter(p => p.id !== id),
+    }))
+  }, [mutate])
+
+  const upsertPracticeSession = useCallback(async (session: PracticeSession) => {
+    mutate(d => {
+      const existing = d.practice_sessions ?? []
+      const without = existing.filter(s => s.id !== session.id)
+      return { ...d, practice_sessions: [session, ...without] }
+    })
+  }, [mutate])
+
+  const upsertFlashcardsImpl = useCallback(async (cards: Flashcard[]) => {
+    mutate(d => {
+      const byId = new Map<string, Flashcard>()
+      for (const c of d.flashcards ?? []) byId.set(c.id, c)
+      for (const c of cards) byId.set(c.id, c)
+      return { ...d, flashcards: Array.from(byId.values()) }
+    })
+  }, [mutate])
+
+  const upsertSimulation = useCallback(async (sim: Simulation) => {
+    mutate(d => {
+      const existing = d.simulations ?? []
+      const without = existing.filter(s => s.id !== sim.id)
+      return { ...d, simulations: [sim, ...without] }
+    })
+  }, [mutate])
+
   const driveConnected = !!googleToken && ready && !error
   const driveMissing = !!user && !googleToken
 
@@ -570,6 +637,11 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     updateSettings, replaceCourses,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
     syncCourseFolders, syncAllCourseFolders,
+    upsertExam, removeExam,
+    upsertStudyPlan, removeStudyPlan,
+    upsertPracticeSession,
+    upsertFlashcards: upsertFlashcardsImpl,
+    upsertSimulation,
   }), [
     db, ready, loading, error, driveConnected, driveMissing, reload,
     createCourse, updateCourse, deleteCourse,
@@ -580,6 +652,9 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     updateSettings, replaceCourses,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
     syncCourseFolders, syncAllCourseFolders,
+    upsertExam, removeExam,
+    upsertStudyPlan, removeStudyPlan,
+    upsertPracticeSession, upsertFlashcardsImpl, upsertSimulation,
   ])
 
   return <DBContext.Provider value={value}>{children}</DBContext.Provider>
