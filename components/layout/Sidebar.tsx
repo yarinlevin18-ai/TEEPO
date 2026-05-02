@@ -6,12 +6,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, CheckSquare,
   FileText, MessageCircle, Wifi, LogOut, GraduationCap, Settings, StickyNote, X, Sparkles, Building2, Sun, Moon,
+  ClipboardCheck,
 } from 'lucide-react'
 import Image from 'next/image'
 import { useAuth } from '@/lib/auth-context'
 import { useTheme } from '@/lib/theme-context'
 import { useUniversityName, useUniversityCode } from '@/lib/use-university'
 import { useEffect } from 'react'
+
+const EXAM_MODULE_ENABLED = process.env.NEXT_PUBLIC_EXAM_MODULE_ENABLED === 'true'
 
 const NAV_GROUPS = [
   {
@@ -26,6 +29,9 @@ const NAV_GROUPS = [
       { href: '/tasks',       icon: CheckSquare, label: 'משימות' },
       { href: '/assignments', icon: FileText,    label: 'מטלות' },
       { href: '/notes',       icon: StickyNote,  label: 'הסיכומים שלי' },
+      ...(EXAM_MODULE_ENABLED
+        ? [{ href: '/exam', icon: ClipboardCheck, label: 'תקופת מבחנים' }]
+        : []),
     ],
   },
   {
