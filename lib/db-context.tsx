@@ -24,6 +24,7 @@ import type {
   Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings,
   Exam, StudyPlan, PracticeSession, Flashcard, Simulation,
 } from '@/types'
+import type { PointEvent } from '@/lib/exam/points'
 
 interface DBContextType {
   db: DriveDB
@@ -88,6 +89,7 @@ interface DBContextType {
   upsertPracticeSession: (session: PracticeSession) => Promise<void>
   upsertFlashcards: (cards: Flashcard[]) => Promise<void>
   upsertSimulation: (sim: Simulation) => Promise<void>
+  appendPointEvent: (event: PointEvent) => Promise<void>
 }
 
 const DBContext = createContext<DBContextType | undefined>(undefined)
@@ -624,6 +626,10 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     })
   }, [mutate])
 
+  const appendPointEvent = useCallback(async (event: PointEvent) => {
+    mutate(d => ({ ...d, point_events: [event, ...(d.point_events ?? [])] }))
+  }, [mutate])
+
   const driveConnected = !!googleToken && ready && !error
   const driveMissing = !!user && !googleToken
 
@@ -642,6 +648,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     upsertPracticeSession,
     upsertFlashcards: upsertFlashcardsImpl,
     upsertSimulation,
+    appendPointEvent,
   }), [
     db, ready, loading, error, driveConnected, driveMissing, reload,
     createCourse, updateCourse, deleteCourse,
@@ -655,6 +662,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     upsertExam, removeExam,
     upsertStudyPlan, removeStudyPlan,
     upsertPracticeSession, upsertFlashcardsImpl, upsertSimulation,
+    appendPointEvent,
   ])
 
   return <DBContext.Provider value={value}>{children}</DBContext.Provider>

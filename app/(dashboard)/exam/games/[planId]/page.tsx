@@ -8,6 +8,11 @@ import { GravityGame } from '@/components/exam/games/GravityGame'
 import { HangmanGame } from '@/components/exam/games/HangmanGame'
 import { useExamStore } from '@/lib/exam/use-exam-store'
 import { sampleFlashcards } from '@/lib/exam/sample-flashcards'
+import {
+  pointsForGravity,
+  pointsForHangman,
+  pointsForMatch,
+} from '@/lib/exam/points'
 import type { Flashcard } from '@/types'
 
 type GameType = 'match' | 'gravity' | 'hangman'
@@ -155,7 +160,19 @@ export default function GamesPage({ params }: { params: { planId: string } }) {
           title={GAME_INFO.match.label}
           onExit={() => setSelectedGame('')}
         >
-          <MatchGame cards={cards} pairs={Math.min(8, cards.length)} />
+          <MatchGame
+            cards={cards}
+            pairs={Math.min(8, cards.length)}
+            onComplete={(r) =>
+              void store.awardPoints({
+                source: 'game_match',
+                amount: pointsForMatch(r.matched, r.mistakes, r.total),
+                examId: examIdParam ?? plan?.exam_id,
+                planId: plan?.id,
+                meta: { ...r },
+              })
+            }
+          />
         </GameShell>
       )}
 
@@ -164,7 +181,18 @@ export default function GamesPage({ params }: { params: { planId: string } }) {
           title={GAME_INFO.gravity.label}
           onExit={() => setSelectedGame('')}
         >
-          <GravityGame cards={cards} />
+          <GravityGame
+            cards={cards}
+            onComplete={(r) =>
+              void store.awardPoints({
+                source: 'game_gravity',
+                amount: pointsForGravity(r.cleared, r.lives_left, r.total),
+                examId: examIdParam ?? plan?.exam_id,
+                planId: plan?.id,
+                meta: { ...r },
+              })
+            }
+          />
         </GameShell>
       )}
 
@@ -173,7 +201,18 @@ export default function GamesPage({ params }: { params: { planId: string } }) {
           title={GAME_INFO.hangman.label}
           onExit={() => setSelectedGame('')}
         >
-          <HangmanGame cards={cards} />
+          <HangmanGame
+            cards={cards}
+            onComplete={(r) =>
+              void store.awardPoints({
+                source: 'game_hangman',
+                amount: pointsForHangman(r.won),
+                examId: examIdParam ?? plan?.exam_id,
+                planId: plan?.id,
+                meta: { ...r },
+              })
+            }
+          />
         </GameShell>
       )}
     </main>

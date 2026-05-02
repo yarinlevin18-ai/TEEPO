@@ -87,6 +87,11 @@ export interface DriveDB {
   flashcards?: Flashcard[]
   simulations?: Simulation[]
   exam_group_memberships?: Array<{ group_id: string; joined_at: string }>
+  /**
+   * Append-only point ledger. Totals (global + per-exam) are derived from this
+   * array. Adding optional — no version bump needed; absence means zero points.
+   */
+  point_events?: import('./exam/points').PointEvent[]
 }
 
 export const EMPTY_DB: DriveDB = {
@@ -105,6 +110,7 @@ export const EMPTY_DB: DriveDB = {
   flashcards: [],
   simulations: [],
   exam_group_memberships: [],
+  point_events: [],
 }
 
 // ── Migrations ────────────────────────────────────────────────

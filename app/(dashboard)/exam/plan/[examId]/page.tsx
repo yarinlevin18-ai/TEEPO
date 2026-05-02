@@ -7,6 +7,7 @@ import { MacroView } from '@/components/exam/MacroView'
 import { DayFinishDialog, type CompletionVerdict } from '@/components/exam/DayFinishDialog'
 import { useExamStore } from '@/lib/exam/use-exam-store'
 import { api } from '@/lib/api-client'
+import { pointsForDay, examPoints, rankFor, nextRank, rankProgress } from '@/lib/exam/points'
 import type { StudyPlan, StudyPlanDay, DayStatus, Exam } from '@/types'
 
 type Tab = 'micro' | 'macro'
@@ -94,6 +95,17 @@ export default function PlanPage({ params }: { params: { examId: string } }) {
     })
     setDialogOpen(false)
 
+    // Award points only on first completion of this day (no double-counting).
+    if (focusedDay.status !== 'completed' && verdict !== 'none') {
+      void store.awardPoints({
+        source: verdict === 'all' ? 'day_complete' : 'day_partial',
+        amount: pointsForDay(verdict),
+        examId: params.examId,
+        planId: plan.id,
+        meta: { date: focusedDay.date },
+      })
+    }
+
     // Best-effort rebalance signal.
     api.exam
       .completeDay(plan.id, focusedDay.date, { completion: verdict, note })
@@ -146,9 +158,14 @@ export default function PlanPage({ params }: { params: { examId: string } }) {
   const inProgressDays = plan.days.filter((d) => d.status === 'in_progress').length
   const missedDays = plan.days.filter((d) => d.status === 'missed').length
 
+  const points = examPoints(store.pointEvents, params.examId)
+  const rank = rankFor(points)
+  const next = nextRank(points)
+  const progress = rankProgress(points)
+
   return (
     <main dir="rtl" className="min-h-screen p-6 lg:p-10 space-y-6 max-w-4xl mx-auto">
-      <header className="flex items-baseline justify-between">
+      <header className="flex items-baseline justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">תכנית חזרה</h1>
           <p className="text-zinc-400 text-sm mt-1">{exam?.title ?? `מבחן #${params.examId}`}</p>
@@ -158,6 +175,14 @@ export default function PlanPage({ params }: { params: { examId: string } }) {
           <div className="text-3xl font-bold tabular-nums">{daysRemaining}</div>
         </div>
       </header>
+
+      <RankCard
+        points={points}
+        rank={rank}
+        nextThreshold={next?.threshold}
+        progress={progress}
+        predictedScore={rank.predictedScore}
+      />
 
       <div className="grid grid-cols-3 gap-3">
         <Stat label="הושלמו" value={String(completedDays)} tone="text-emerald-300" />
@@ -218,6 +243,55 @@ function Stat({ label, value, tone }: { label: string; value: string; tone: stri
     <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
       <div className="text-xs text-zinc-400">{label}</div>
       <div className={`text-2xl font-bold tabular-nums ${tone}`}>{value}</div>
+    </div>
+  )
+}
+
+interface RankCardProps {
+  points: number
+  rank: ReturnType<typeof rankFor>
+  nextThreshold?: number
+  progress: number
+  predictedScore: number
+}
+
+function RankCard({ points, rank, nextThreshold, progress, predictedScore }: RankCardProps) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-fuchsia-500/10 to-blue-500/10 p-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="text-4xl" aria-hidden>
+            {rank.emoji}
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-zinc-400">דרגה במבחן</div>
+            <div className={`text-xl font-bold ${rank.tone}`}>{rank.label}</div>
+            <div className="text-xs text-zinc-500 mt-0.5">{points} נקודות</div>
+          </div>
+        </div>
+        <div className="text-left">
+          <div className="text-xs text-zinc-400">צפי ציון</div>
+          <div className="text-3xl font-bold tabular-nums bg-gradient-to-l from-fuchsia-300 to-cyan-300 bg-clip-text text-transparent">
+            {predictedScore}%
+          </div>
+          <div className="text-[10px] text-zinc-500">הערכה מבוססת דרגה</div>
+        </div>
+      </div>
+
+      {nextThreshold !== undefined && (
+        <div className="mt-4">
+          <div className="flex justify-between text-xs text-zinc-400 mb-1">
+            <span>שלב הבא · {nextThreshold} נק׳</span>
+            <span>{Math.max(0, nextThreshold - points)} נק׳ נותרו</span>
+          </div>
+          <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-l from-fuchsia-400 to-cyan-400 transition-all"
+              style={{ width: `${progress * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

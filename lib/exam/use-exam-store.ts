@@ -31,7 +31,25 @@ import {
   loadSimulations as lsLoadSimulations,
   saveSimulation as lsSaveSimulation,
 } from '@/lib/exam/simulation-storage'
+import type { PointEvent, PointSource } from '@/lib/exam/points'
 import type { Exam, Flashcard, PracticeSession, Simulation, StudyPlan } from '@/types'
+
+const POINTS_LS_KEY = 'teepo_exam_point_events'
+
+function lsLoadPoints(): PointEvent[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(POINTS_LS_KEY)
+    return raw ? (JSON.parse(raw) as PointEvent[]) : []
+  } catch {
+    return []
+  }
+}
+
+function lsSavePoints(events: PointEvent[]): void {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(POINTS_LS_KEY, JSON.stringify(events))
+}
 
 interface ExamStore {
   ready: boolean
@@ -55,6 +73,15 @@ interface ExamStore {
 
   simulations: Simulation[]
   saveSimulation: (sim: Simulation) => Promise<void>
+
+  pointEvents: PointEvent[]
+  awardPoints: (input: {
+    source: PointSource
+    amount: number
+    examId?: string
+    planId?: string
+    meta?: Record<string, unknown>
+  }) => Promise<void>
 }
 
 export function useExamStore(): ExamStore {
@@ -67,6 +94,7 @@ export function useExamStore(): ExamStore {
   const [localSessions, setLocalSessions] = useState<Record<string, PracticeSession[]>>({})
   const [localFlashcards, setLocalFlashcards] = useState<Record<string, Flashcard[]>>({})
   const [localSimulations, setLocalSimulations] = useState<Record<string, Simulation[]>>({})
+  const [localPointEvents, setLocalPointEvents] = useState<PointEvent[]>([])
 
   // Lazy-load all examIds we know about from localStorage on first mount.
   // We don't have an index — we discover keys directly.
@@ -96,6 +124,7 @@ export function useExamStore(): ExamStore {
     }
     setLocalExams(exams)
     setLocalPlans(plans)
+    setLocalPointEvents(lsLoadPoints())
   }, [driveBacked])
 
   // ── Reads ────────────────────────────────────────────────
@@ -122,6 +151,10 @@ export function useExamStore(): ExamStore {
     if (driveBacked) return db.db.simulations ?? []
     return Object.values(localSimulations).flat()
   }, [driveBacked, db.db.simulations, localSimulations])
+
+  const pointEvents = useMemo<PointEvent[]>(() => {
+    return driveBacked ? db.db.point_events ?? [] : localPointEvents
+  }, [driveBacked, db.db.point_events, localPointEvents])
 
   // ── Helpers ──────────────────────────────────────────────
 
@@ -259,6 +292,37 @@ export function useExamStore(): ExamStore {
     [driveBacked],
   )
 
+  const awardPoints = useCallback(
+    async (input: {
+      source: PointSource
+      amount: number
+      examId?: string
+      planId?: string
+      meta?: Record<string, unknown>
+    }) => {
+      if (input.amount <= 0) return
+      const event: PointEvent = {
+        id: `pt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        source: input.source,
+        amount: input.amount,
+        exam_id: input.examId,
+        plan_id: input.planId,
+        meta: input.meta,
+        created_at: new Date().toISOString(),
+      }
+      if (driveBacked) {
+        await db.appendPointEvent(event)
+      } else {
+        setLocalPointEvents((prev) => {
+          const next = [event, ...prev]
+          lsSavePoints(next)
+          return next
+        })
+      }
+    },
+    [driveBacked, db],
+  )
+
   return {
     ready: driveBacked ? db.ready : true,
     driveBacked,
@@ -275,5 +339,7 @@ export function useExamStore(): ExamStore {
     upsertFlashcards,
     simulations,
     saveSimulation,
+    pointEvents,
+    awardPoints,
   }
 }

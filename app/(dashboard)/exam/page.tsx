@@ -4,6 +4,14 @@ import { useMemo } from 'react'
 import { Timeline } from '@/components/exam/Timeline'
 import { TodayCard } from '@/components/exam/TodayCard'
 import { useExamStore } from '@/lib/exam/use-exam-store'
+import {
+  totalPoints,
+  rankFor,
+  nextRank,
+  rankProgress,
+  recentEvents,
+  SOURCE_LABEL,
+} from '@/lib/exam/points'
 import type { Exam } from '@/types'
 
 export default function ExamDashboard() {
@@ -65,6 +73,10 @@ export default function ExamDashboard() {
         )}
       </section>
 
+      <section aria-label="דרגה כוללת">
+        <GlobalRankCard pointEvents={store.pointEvents} />
+      </section>
+
       <section aria-label="היום שלי" className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <TodayCard day={todayDay} />
@@ -96,6 +108,63 @@ export default function ExamDashboard() {
 
 function makeSample(id: string, courseId: string, title: string, date: string, type: Exam['type']): Exam {
   return { id, course_id: courseId, title, date, type, source: 'manual' }
+}
+
+function GlobalRankCard({ pointEvents }: { pointEvents: Parameters<typeof recentEvents>[0] }) {
+  const total = totalPoints(pointEvents)
+  const rank = rankFor(total)
+  const next = nextRank(total)
+  const progress = rankProgress(total)
+  const recent = recentEvents(pointEvents, 4)
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-fuchsia-500/10 to-blue-500/10 p-5">
+      <div className="grid grid-cols-1 md:grid-cols-[auto,1fr,auto] gap-5 items-center">
+        <div className="flex items-center gap-3">
+          <div className="text-5xl" aria-hidden>
+            {rank.emoji}
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-zinc-400">דרגה כללית</div>
+            <div className={`text-2xl font-bold ${rank.tone}`}>{rank.label}</div>
+            <div className="text-xs text-zinc-500 mt-0.5">{total} נקודות</div>
+          </div>
+        </div>
+
+        <div>
+          {next ? (
+            <>
+              <div className="flex justify-between text-xs text-zinc-400 mb-1.5">
+                <span>{next.emoji} {next.label} · {next.threshold} נק׳</span>
+                <span>{Math.max(0, next.threshold - total)} נק׳ נותרו</span>
+              </div>
+              <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-l from-fuchsia-400 to-cyan-400 transition-all"
+                  style={{ width: `${progress * 100}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="text-xs text-zinc-400">הגעת לדרגה הגבוהה ביותר 🏆</div>
+          )}
+        </div>
+
+        <div className="hidden md:flex flex-col gap-1 text-xs">
+          <span className="text-zinc-500">פעילות אחרונה</span>
+          {recent.length === 0 ? (
+            <span className="text-zinc-600">— אין פעילות עדיין —</span>
+          ) : (
+            recent.slice(0, 3).map((e) => (
+              <span key={e.id} className="text-zinc-300">
+                +{e.amount} · {SOURCE_LABEL[e.source]}
+              </span>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function addDays(n: number): string {

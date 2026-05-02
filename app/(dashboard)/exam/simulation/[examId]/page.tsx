@@ -6,6 +6,7 @@ import { SimulationTimer } from '@/components/exam/SimulationTimer'
 import { sampleExam, totalPoints, type SimQuestion } from '@/lib/exam/sample-exam'
 import { useExamStore } from '@/lib/exam/use-exam-store'
 import { api } from '@/lib/api-client'
+import { pointsForSimulation } from '@/lib/exam/points'
 import type { Simulation, SimulationAnalysis } from '@/types'
 
 type Phase = 'configure' | 'running' | 'analyzing' | 'complete'
@@ -72,6 +73,12 @@ export default function SimulationPage({ params }: { params: { examId: string } 
       analysis: result,
     }
     await store.saveSimulation(sim)
+    void store.awardPoints({
+      source: 'simulation',
+      amount: pointsForSimulation(result.estimated_score),
+      examId: params.examId,
+      meta: { score: result.estimated_score, duration_minutes: duration },
+    })
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(`teepo_exam_sim_inflight_${params.examId}`)
     }

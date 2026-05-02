@@ -14,6 +14,11 @@ import {
 } from '@/lib/exam/sample-questions'
 import { sampleFlashcards } from '@/lib/exam/sample-flashcards'
 import { useExamStore } from '@/lib/exam/use-exam-store'
+import {
+  pointsForFlashcards,
+  pointsForMcq,
+  pointsForOpen,
+} from '@/lib/exam/points'
 import type { Question, PracticeSession, Flashcard } from '@/types'
 
 type Kind = 'mcq' | 'open' | 'flashcard'
@@ -99,6 +104,13 @@ export default function PracticePage({ params }: { params: { planId: string } })
       created_at: new Date().toISOString(),
     }
     void store.savePracticeSession(session)
+    void store.awardPoints({
+      source: 'practice_mcq',
+      amount: pointsForMcq(session.score ?? 0),
+      examId: examId || undefined,
+      planId: plan?.id,
+      meta: { score: session.score, correct: result.correct, total: result.total },
+    })
   }
 
   // ----- Flashcards -----
@@ -131,6 +143,13 @@ export default function PracticePage({ params }: { params: { planId: string } })
 
   const onFlashcardSession = (result: SessionResult) => {
     void store.upsertFlashcards(result.reviewed)
+    void store.awardPoints({
+      source: 'practice_flashcard',
+      amount: pointsForFlashcards(result.knownCount),
+      examId: examId || undefined,
+      planId: plan?.id,
+      meta: { known: result.knownCount, total: result.totalCount },
+    })
     router.back()
   }
 
@@ -201,6 +220,13 @@ export default function PracticePage({ params }: { params: { planId: string } })
       created_at: new Date().toISOString(),
     }
     void store.savePracticeSession(session)
+    void store.awardPoints({
+      source: 'practice_open',
+      amount: pointsForOpen(session.score ?? 0),
+      examId: examId || undefined,
+      planId: plan?.id,
+      meta: { score: session.score },
+    })
   }
 
   // ----- Render -----
