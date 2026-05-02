@@ -1,7 +1,35 @@
 import { Timeline } from "@/components/exam/Timeline";
 import { TodayCard } from "@/components/exam/TodayCard";
+import type { Exam } from "@/types";
 
 export const metadata = { title: "TEEPO Exam — דשבורד" };
+
+// Sample exams used during the local-build phase. Replaced by Drive DB
+// reads once db-context exposes exam mutators.
+const SAMPLE_EXAMS: Exam[] = [
+  {
+    id: "sample-algorithms",
+    course_id: "cs101",
+    title: "אלגוריתמים — אמצע סמסטר",
+    date: addDays(14),
+    type: "midterm",
+    source: "manual",
+  },
+  {
+    id: "sample-sociology",
+    course_id: "soc201",
+    title: "מבוא לסוציולוגיה — סוף",
+    date: addDays(28),
+    type: "final",
+    source: "manual",
+  },
+];
+
+function addDays(n: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function ExamDashboard() {
   return (
@@ -14,7 +42,7 @@ export default function ExamDashboard() {
       </header>
 
       <section aria-label="ציר זמן מבחנים">
-        <Timeline />
+        <Timeline exams={SAMPLE_EXAMS} />
       </section>
 
       <section aria-label="היום שלי" className="grid grid-cols-1 lg:grid-cols-3 gap-4">

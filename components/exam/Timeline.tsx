@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { Exam } from "@/types";
 import { daysBetween } from "@/lib/exam/plan-builder";
 
@@ -31,15 +32,18 @@ export function Timeline({ exams = [] }: Props) {
       {sorted.map((exam) => {
         const days = daysBetween(today, exam.date);
         return (
-          <article
+          <Link
             key={exam.id}
+            href={`/exam/plan/${exam.id}`}
             role="listitem"
-            className={`min-w-[200px] rounded-xl border p-4 ${urgencyColor(days)}`}
+            className={`min-w-[200px] rounded-xl border p-4 transition hover:scale-[1.02] ${urgencyColor(
+              days,
+            )}`}
           >
             <div className="text-xs opacity-80">{exam.date}</div>
             <div className="font-semibold mt-1">{exam.title}</div>
             <div className="text-2xl font-bold tabular-nums mt-2">{days} ימים</div>
-          </article>
+          </Link>
         );
       })}
     </div>

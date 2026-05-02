@@ -275,4 +275,103 @@ export const api = {
       }
     },
   },
+
+  exam: {
+    // Plan
+    extractTopics: (body: {
+      course_name: string
+      exam_type: 'midterm' | 'final' | 'makeup'
+      materials: Array<{ type: string; title: string; file_id: string; pages?: number }>
+    }) =>
+      request<{ topics: Array<{ title: string; estimated_weight: number; source_refs: string[] }> }>(
+        '/exam/plan/topics',
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+
+    buildPlan: (body: {
+      days_available: number
+      daily_minutes: number
+      available_days: string[]
+      topics: Array<{ id: string; title: string; rating: number }>
+      calendar_conflicts?: Array<{ date: string; minutes: number }>
+    }) =>
+      request<{
+        days: Array<{
+          date: string
+          activities: Array<{ type: string; topic_id: string; minutes: number; instruction: string }>
+        }>
+      }>('/exam/plan/build', { method: 'POST', body: JSON.stringify(body) }),
+
+    completeDay: (planId: string, date: string, body: { completion: 'all' | 'partial' | 'none'; note?: string }) =>
+      request<{ rebalanced: boolean }>(`/exam/plan/${planId}/day/${date}/complete`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+
+    // Practice
+    generatePractice: (body: {
+      type: 'mcq' | 'open' | 'flashcard'
+      topic: string
+      sources: Array<Record<string, any>>
+      n?: number
+      difficulty?: 'easy' | 'medium' | 'hard'
+    }) => request<any>('/exam/practice/generate', { method: 'POST', body: JSON.stringify(body) }),
+
+    evaluateOpen: (body: {
+      question: string
+      reference_answer?: string
+      course_snippets?: string[]
+      student_answer: string
+    }) =>
+      request<{
+        verdict: 'full' | 'partial' | 'insufficient' | 'uncertain'
+        reasoning: string
+        missing_points: string[]
+        confidence: number
+      }>('/exam/practice/evaluate', { method: 'POST', body: JSON.stringify(body) }),
+
+    // Simulation
+    parseExamPdf: async (file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`${BACKEND}/exam/simulation/parse`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: fd,
+      })
+      if (!res.ok) throw new Error(`שגיאת חילוץ PDF: ${res.status}`)
+      return res.json() as Promise<{
+        questions: Array<{ number: number; text: string; page: number }>
+        via_ocr: boolean
+        low_confidence_pages: number[]
+        needs_manual_review: boolean
+      }>
+    },
+
+    submitSimulation: (simId: string, body: { qa: any[]; topic_mapping: Record<string, string> }) =>
+      request<{ analysis: any }>(`/exam/simulation/${simId}/submit`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+
+    // Group
+    createGroup: (body: {
+      name: string
+      exam_id_ref: string
+      course_id_ref: string
+      creator_email: string
+      max_members?: number
+      is_open?: boolean
+    }) => request<any>('/exam/group/', { method: 'POST', body: JSON.stringify(body) }),
+
+    joinGroup: (groupId: string) =>
+      request<any>(`/exam/group/${groupId}/join`, { method: 'POST', body: '{}' }),
+
+    postMessage: (groupId: string, content: string) =>
+      request<any>(`/exam/group/${groupId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      }),
+  },
 }
