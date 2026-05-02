@@ -205,3 +205,184 @@ export function sampleMcqs(topicTitle: string, sessionId: string): Question[] {
     source_file_ref: q.source_ref,
   }))
 }
+
+// ============================================================
+// Open-question bank (spec §3.3.2)
+// ============================================================
+
+export interface OpenQuestion {
+  id: string
+  session_id: string
+  content: string
+  reference_answer: string
+  key_points: string[]
+  source_file_ref: string
+}
+
+interface RawOpen {
+  content: string
+  reference_answer: string
+  key_points: string[]
+  source_ref: string
+}
+
+const ALGORITHMS_OPEN: RawOpen[] = [
+  {
+    content: 'הסבר את ההבדל בין DFS ל-BFS, ומה מבנה הנתונים שבו משתמשים בכל אחד.',
+    reference_answer:
+      'DFS (Depth-First Search) חוקר את הגרף לעומק לפני רוחב — נכנס לקודקוד, ממשיך לשכן ראשון, ולשכן שלו, וכן הלאה עד שאי אפשר להמשיך, ואז חוזר אחורה. משתמש במחסנית (stack), במפורש או דרך רקורסיה. BFS (Breadth-First Search) חוקר את הגרף שכבה-שכבה — בודק את כל השכנים של הקודקוד, אז את שכניהם, וכו׳. משתמש בתור (queue, FIFO).',
+    key_points: ['לעומק לעומת לרוחב', 'מחסנית', 'תור', 'רקורסיה', 'שכבות'],
+    source_ref: 'lecture-3, slides 12-15',
+  },
+  {
+    content: 'מהם שני התנאים שצריכים להתקיים כדי להשתמש בתכנון דינמי? תן דוגמה.',
+    reference_answer:
+      'תכנון דינמי דורש (1) תת-בעיות חופפות — אותה תת-בעיה חוזרת בחישוב, ו-(2) תכונה אופטימלית תת-מבנית — הפתרון האופטימלי לבעיה הכוללת בנוי מפתרונות אופטימליים של תת-הבעיות. דוגמה: בעיית התרמיל 0/1, פיבונאצ׳י עם מטמון, או חישוב מסלול קצר ביותר עם בלמן-פורד.',
+    key_points: ['תת-בעיות חופפות', 'תכונה אופטימלית', 'דוגמה'],
+    source_ref: 'lecture-7, slides 4-6',
+  },
+  {
+    content: 'מהי בעיית NP-Complete? תן דוגמה אחת ומדוע היא נחשבת קשה.',
+    reference_answer:
+      'בעיית NP-Complete היא בעיה ב-NP (ניתן לאמת פתרון בזמן פולינומי) שכל בעיה אחרת ב-NP ניתנת להפחתה אליה בזמן פולינומי. דוגמה: SAT (משפט קוק-לווין). הקושי נובע מכך שאם תמצא פתרון פולינומי לאחת מהבעיות הללו, יהיה לך פתרון פולינומי לכל בעיה ב-NP — אבל לא ידוע אם קיים פתרון כזה (השאלה P מול NP).',
+    key_points: ['NP', 'הפחתה', 'SAT', 'משפט קוק-לווין', 'P מול NP'],
+    source_ref: 'lecture-11, slides 8-12',
+  },
+  {
+    content: 'מתי אלגוריתם חמדן יחזיר פתרון אופטימלי? תאר את התנאים והבא דוגמה לאלגוריתם חמדן מוכר.',
+    reference_answer:
+      'אלגוריתם חמדן מחזיר פתרון אופטימלי כאשר הבעיה מקיימת שני תנאים: (1) תכונת בחירה חמדנית — אפשר להגיע לפתרון גלובלי אופטימלי על ידי בחירות מקומיות אופטימליות, ו-(2) תכונה אופטימלית תת-מבנית — הפתרון האופטימלי מורכב מפתרונות אופטימליים של תת-בעיות. דוגמאות: דייקסטרה למסלולים קצרים, פריזם/קרוסקל לעצים פורשים מינימליים, תזמון פעילויות לפי זמן סיום מוקדם.',
+    key_points: ['תכונת בחירה חמדנית', 'תכונה אופטימלית', 'דייקסטרה', 'קרוסקל'],
+    source_ref: 'lecture-9, slides 6-10',
+  },
+]
+
+const SOCIOLOGY_OPEN: RawOpen[] = [
+  {
+    content: 'הסבר את מושג הרציונליזציה לפי ובר ותן דוגמה למימוש שלו במוסד מודרני.',
+    reference_answer:
+      'רציונליזציה לפי ובר היא תהליך שבו הפעולה החברתית הופכת מבוססת על חישוב, חוקים פורמליים, ויעילות, ופחות על מסורת או רגש. היא מתבטאת בעיקר בביורוקרטיה — מערכת היררכית עם תפקידים מוגדרים וכללים פורמליים. דוגמה: משרד ממשלתי שמטפל בבקשות לפי טפסים סטנדרטיים, או חברה שמקצה משאבים לפי מדדי ביצוע מדידים.',
+    key_points: ['חישוב/יעילות', 'חוקים פורמליים', 'ביורוקרטיה', 'דוגמה'],
+    source_ref: 'lecture-9, slides 14-18',
+  },
+  {
+    content: 'מהי "עובדה חברתית" לפי דורקהיים, ולמה היא חשובה לסוציולוגיה כדיסציפלינה?',
+    reference_answer:
+      'עובדה חברתית לפי דורקהיים היא דרך חשיבה ופעולה החיצונית לפרט, ובעלת כוח כפייה (כלומר, הפרט נדרש להתאים את עצמו אליה גם אם אינו מעוניין). דוגמאות: שפה, חוק, מנהג. החשיבות לסוציולוגיה: ההגדרה הזו מבססת את הסוציולוגיה כמדע נפרד — האובייקט שלה אינו פסיכולוגי (פנימי לפרט) אלא חברתי (חיצוני וקיבוצי), ולכן דורש שיטות וכלים משלו.',
+    key_points: ['חיצוני לפרט', 'כוח כפייה', 'דוגמה', 'מדע נפרד'],
+    source_ref: 'lecture-2, slides 14-17',
+  },
+  {
+    content: 'תאר את ההבדל בין הגישה הפונקציונליסטית לתיאוריית הקונפליקט.',
+    reference_answer:
+      'הגישה הפונקציונליסטית רואה את החברה כמערכת של חלקים שמשתפים פעולה לטובת היציבות והשרידות הקולקטיבית. כל מוסד ממלא תפקיד ביחס לסך הכל. דוגמת חוקרים: דורקהיים. תיאוריית הקונפליקט, לעומת זאת, רואה את החברה כזירת מאבק בין קבוצות אינטרסים על משאבים מוגבלים. המבנה החברתי משקף את כוחן של קבוצות חזקות שמשמרות את עליונותן. דוגמת חוקר: מרקס. ההבדל המרכזי הוא בהנחות יסוד — הסכמה ושיתוף פעולה לעומת מאבק וניצול.',
+    key_points: ['יציבות וקונסנזוס', 'מאבק על משאבים', 'דורקהיים', 'מרקס'],
+    source_ref: 'lecture-4, slides 7-12',
+  },
+]
+
+const GENERIC_OPEN: RawOpen[] = [
+  {
+    content: 'הסבר את הרעיון המרכזי של הנושא במילים שלך.',
+    reference_answer: 'תשובה לדוגמה: הסבר תמציתי של הרעיון המרכזי, עם דוגמה רלוונטית.',
+    key_points: ['הסבר תמציתי', 'דוגמה'],
+    source_ref: 'demo',
+  },
+  {
+    content: 'תאר שני יישומים מעשיים של הנושא.',
+    reference_answer: 'תשובה לדוגמה: שני יישומים שונים, עם הסבר על איך הנושא מופעל בכל אחד.',
+    key_points: ['יישום 1', 'יישום 2', 'הסבר'],
+    source_ref: 'demo',
+  },
+]
+
+export function sampleOpenQuestions(topicTitle: string, sessionId: string): OpenQuestion[] {
+  const lower = topicTitle.toLowerCase()
+  let bank: RawOpen[]
+  if (
+    lower.includes('dfs') ||
+    lower.includes('bfs') ||
+    lower.includes('dynamic') ||
+    lower.includes('np') ||
+    lower.includes('סיבוכ') ||
+    lower.includes('גרפ') ||
+    lower.includes('אלגו')
+  ) {
+    bank = ALGORITHMS_OPEN
+  } else if (
+    lower.includes('סוצ') ||
+    lower.includes('פונקצ') ||
+    lower.includes('קונפ') ||
+    lower.includes('דורקה') ||
+    lower.includes('ובר') ||
+    lower.includes('מודרני')
+  ) {
+    bank = SOCIOLOGY_OPEN
+  } else {
+    bank = GENERIC_OPEN
+  }
+  return bank.map((q, i) => ({
+    id: `oq_${sessionId}_${i}`,
+    session_id: sessionId,
+    content: q.content,
+    reference_answer: q.reference_answer,
+    key_points: q.key_points,
+    source_file_ref: q.source_ref,
+  }))
+}
+
+// Offline heuristic for grading open answers.
+// Conservative — when in doubt, returns "uncertain" so the user knows to verify.
+export function offlineEvaluateOpen(question: OpenQuestion, answer: string): {
+  verdict: 'full' | 'partial' | 'insufficient' | 'uncertain'
+  reasoning: string
+  missing_points: string[]
+  confidence: number
+} {
+  const trimmed = answer.trim()
+  if (trimmed.length === 0) {
+    return {
+      verdict: 'insufficient',
+      reasoning: 'לא הוזנה תשובה.',
+      missing_points: question.key_points,
+      confidence: 1.0,
+    }
+  }
+  if (trimmed.length < 20) {
+    return {
+      verdict: 'insufficient',
+      reasoning: 'התשובה קצרה מאוד — חסר פיתוח של הרעיון.',
+      missing_points: question.key_points,
+      confidence: 0.85,
+    }
+  }
+
+  const lower = trimmed.toLowerCase()
+  const hits = question.key_points.filter((kp) => lower.includes(kp.toLowerCase()))
+  const missing = question.key_points.filter((kp) => !lower.includes(kp.toLowerCase()))
+  const ratio = hits.length / Math.max(1, question.key_points.length)
+
+  if (ratio >= 0.7) {
+    return {
+      verdict: 'full',
+      reasoning: `התשובה מכסה את עיקרי הנושא (${hits.length}/${question.key_points.length} נקודות מפתח).`,
+      missing_points: missing,
+      confidence: 0.6, // intentionally not high — heuristic, not real AI
+    }
+  }
+  if (ratio >= 0.3) {
+    return {
+      verdict: 'partial',
+      reasoning: `נראה שכיסית חלק מהנקודות (${hits.length}/${question.key_points.length}). הוסף את הנקודות החסרות.`,
+      missing_points: missing,
+      confidence: 0.55,
+    }
+  }
+  // Low confidence — better to say "uncertain" than wrongly mark insufficient.
+  return {
+    verdict: 'uncertain',
+    reasoning: 'הערכה אוטומטית לא בטוחה. מומלץ לבדוק עם המרצה או עם תשובה לדוגמה.',
+    missing_points: question.key_points,
+    confidence: 0.3,
+  }
+}
