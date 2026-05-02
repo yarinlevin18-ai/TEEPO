@@ -242,3 +242,233 @@ export interface MoodleStatus {
   portal: boolean
   login_status?: Record<string, any>
 }
+
+// ============================================================
+// TEEPO Exam (§7 of TEEPO_Exam_v1_0)
+// Personal entities live in Drive DB; shared entities live in Supabase.
+// ============================================================
+
+export type University = 'BGU' | 'TAU'
+export type ExamType = 'midterm' | 'final' | 'makeup'
+export type ExamSource = 'portal' | 'manual' | 'moodle'
+
+// ---------- Personal (Drive DB) ----------
+
+export interface Exam {
+  id: string
+  course_id: string
+  title: string
+  date: string                 // ISO date (YYYY-MM-DD)
+  type: ExamType
+  source: ExamSource
+}
+
+export type StudyPlanStatus = 'draft' | 'active' | 'paused' | 'completed' | 'abandoned'
+
+export interface StudyPlan {
+  id: string
+  exam_id: string
+  course_id: string
+  status: StudyPlanStatus
+  daily_minutes: number
+  available_days: number[]     // 0=Sun .. 6=Sat
+  preferred_time: 'morning' | 'afternoon' | 'evening'
+  topics: Topic[]
+  days: StudyPlanDay[]
+  created_at: string
+  exam_date: string
+  calendar_synced: boolean
+}
+
+export interface Topic {
+  id: string
+  plan_id: string
+  title: string
+  source_files: string[]
+  self_rating: 1 | 2 | 3 | 4 | 5
+  priority_weight: number
+  status: 'not_started' | 'in_progress' | 'completed'
+}
+
+export type DayStatus = 'upcoming' | 'in_progress' | 'completed' | 'missed'
+
+export interface StudyPlanDay {
+  id: string
+  plan_id: string
+  date: string
+  planned_topics: string[]
+  planned_activities: PlannedActivity[]
+  status: DayStatus
+  completion_note?: string
+}
+
+export type ActivityType = 'read' | 'practice' | 'flashcards' | 'simulation' | 'review'
+
+export interface PlannedActivity {
+  type: ActivityType
+  topic_id: string
+  minutes: number
+  instruction: string
+  done: boolean
+}
+
+// ---------- Practice ----------
+
+export type PracticeSessionType = 'mcq' | 'open' | 'flashcard'
+export type PracticeSessionStatus =
+  | 'requested' | 'generating' | 'ready' | 'in_progress' | 'submitted' | 'reviewed'
+
+export interface PracticeSession {
+  id: string
+  course_id: string
+  topic_id: string
+  type: PracticeSessionType
+  status: PracticeSessionStatus
+  questions: Question[]
+  score?: number
+  created_at: string
+}
+
+export interface Question {
+  id: string
+  session_id: string
+  type: PracticeSessionType
+  content: string
+  options?: McqOption[]
+  correct_answer?: string
+  explanation?: string
+  source_file_ref: string
+  user_answer?: string
+  is_correct?: boolean
+  ai_verdict?: 'full' | 'partial' | 'insufficient' | 'uncertain'
+}
+
+export interface McqOption {
+  label: 'א' | 'ב' | 'ג' | 'ד'
+  text: string
+  is_correct: boolean
+  explanation: string
+}
+
+export type FlashcardStatus = 'new' | 'learning' | 'known' | 'due_again'
+
+export interface Flashcard {
+  id: string
+  course_id: string
+  topic_id: string
+  front: string
+  back: string
+  status: FlashcardStatus
+  last_reviewed?: string
+  next_due?: string
+}
+
+// ---------- Simulation ----------
+
+export type SimulationStatus =
+  | 'configured' | 'running' | 'abandoned' | 'submitted' | 'analyzing' | 'complete'
+
+export interface Simulation {
+  id: string
+  course_id: string
+  exam_pdf_ref: string
+  duration_minutes: number
+  started_at?: string
+  submitted_at?: string
+  status: SimulationStatus
+  score?: number
+  analysis?: SimulationAnalysis
+}
+
+export interface SimulationAnswer {
+  id: string
+  simulation_id: string
+  question_text: string
+  user_answer: string
+  ai_evaluation: 'correct' | 'partial' | 'wrong'
+  explanation: string
+}
+
+export interface SimulationAnalysis {
+  estimated_score: number
+  by_topic: { topic_id: string; correct_pct: number; n_questions: number }[]
+  strengths: string[]
+  weaknesses: string[]
+  recommendations: { action: string; topic_id: string; minutes: number }[]
+}
+
+// ---------- Shared (Supabase) ----------
+
+export type ExamGroupRole = 'creator' | 'member'
+export type ExamGroupLifecycle = 'created' | 'active' | 'archiving' | 'archived' | 'dissolved'
+
+export interface ExamGroup {
+  id: string
+  name: string
+  exam_id_ref: string
+  course_id_ref: string
+  university: University
+  creator_user_id: string
+  max_members: number
+  is_open: boolean
+  status: ExamGroupLifecycle
+  created_at: string
+  archived_at?: string
+}
+
+export interface ExamGroupMember {
+  id: string
+  group_id: string
+  user_id: string
+  joined_at: string
+  role: ExamGroupRole
+  status: 'active' | 'left'
+}
+
+export interface SharedNote {
+  id: string
+  group_id: string
+  sharer_user_id: string
+  drive_file_id: string
+  file_title: string
+  shared_at: string
+  view_count: number
+}
+
+export interface GroupQuestion {
+  id: string
+  group_id: string
+  asker_user_id: string
+  content: string
+  created_at: string
+  best_answer_id?: string
+}
+
+export interface GroupAnswer {
+  id: string
+  question_id: string
+  answerer_user_id: string
+  content: string
+  votes: number
+  is_ai_generated: boolean
+  created_at: string
+}
+
+export interface GroupTask {
+  id: string
+  group_id: string
+  creator_id: string
+  title: string
+  assignee_id?: string
+  status: 'open' | 'claimed' | 'done'
+  created_at: string
+  completed_at?: string
+}
+
+export interface GroupMessage {
+  id: string
+  group_id: string
+  sender_id: string
+  content: string
+  created_at: string
+}

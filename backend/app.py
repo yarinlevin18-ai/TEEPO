@@ -14,6 +14,7 @@ from routes.auth import auth
 from routes.university import university, _login_status
 from routes.catalog import catalog
 from routes.websocket import register_socket_events
+from exam_prep import register as register_exam
 
 _start_time = _time.time()
 
@@ -56,6 +57,9 @@ app.register_blueprint(api)
 app.register_blueprint(auth)
 app.register_blueprint(university)
 app.register_blueprint(catalog)
+
+# TEEPO Exam — mounts under /exam (spec §12.3)
+register_exam(app)
 
 # Register WebSocket events
 register_socket_events(socketio)
