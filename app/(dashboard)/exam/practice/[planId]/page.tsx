@@ -220,7 +220,7 @@ export default function PracticePage({ params }: { params: { planId: string } })
       </header>
 
       {/* Mode switcher — visible at all times so the user can flip between modes for the same topic. */}
-      <div className="mb-4 flex gap-2 text-xs" role="tablist">
+      <div className="mb-4 flex gap-2 text-xs flex-wrap" role="tablist">
         {(['mcq', 'open', 'flashcard'] as const).map((k) => {
           const isActive = kind === k
           const label = k === 'flashcard' ? 'כרטיסיות' : k === 'open' ? 'פתוחות' : 'אמריקאיות'
@@ -245,6 +245,21 @@ export default function PracticePage({ params }: { params: { planId: string } })
             </a>
           )
         })}
+        {(() => {
+          const qs = new URLSearchParams()
+          if (topicId) qs.set('topic', topicId)
+          if (examId) qs.set('examId', examId)
+          const href = `/exam/games/${params.planId}?${qs.toString()}`
+          return (
+            <a
+              href={href}
+              className="px-3 py-1.5 rounded-lg transition bg-white/5 hover:bg-white/10 text-zinc-300 mr-auto"
+              title="משחקי לימוד"
+            >
+              🎮 משחקים
+            </a>
+          )
+        })()}
       </div>
 
       {usedFallback && (
