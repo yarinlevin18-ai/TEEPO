@@ -7,12 +7,17 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from flask import Blueprint, g, jsonify, request
-from supabase import Client, create_client
 
 from ..services import moderation
+
+# Supabase is imported lazily so the standalone exam_app can boot without it.
+# Group routes still require it at request time — we surface a clear 503 if
+# the package is missing or env vars are unset.
+if TYPE_CHECKING:
+    from supabase import Client
 
 group_bp = Blueprint("group", __name__)
 
@@ -22,9 +27,23 @@ UNIVERSITY_DOMAINS = {
 }
 
 
-def _supabase_for_user(jwt: str) -> Client:
+def _supabase_for_user(jwt: str) -> "Client":
     """Create a Supabase client bound to the user's JWT so RLS applies."""
-    client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"])
+    try:
+        from supabase import create_client
+    except ImportError as e:  # pragma: no cover
+        raise RuntimeError(
+            "supabase package is not installed; group routes are disabled. "
+            "Run `pip install supabase` to enable them."
+        ) from e
+
+    url = os.environ.get("SUPABASE_URL")
+    anon = os.environ.get("SUPABASE_ANON_KEY")
+    if not url or not anon:
+        raise RuntimeError(
+            "SUPABASE_URL and SUPABASE_ANON_KEY must be set for group routes."
+        )
+    client = create_client(url, anon)
     client.postgrest.auth(jwt)
     return client
 
@@ -44,6 +63,13 @@ def require_auth():
     g.jwt = auth.removeprefix("Bearer ")
 
 
+def _try_supabase(jwt: str):
+    try:
+        return _supabase_for_user(jwt), None
+    except RuntimeError as e:
+        return None, (jsonify({"error": str(e)}), 503)
+
+
 @group_bp.post("/")
 def create_group():
     body: dict[str, Any] = request.get_json(force=True)
@@ -52,7 +78,9 @@ def create_group():
     if university is None:
         return jsonify({"error": "non-university email"}), 403
 
-    sb = _supabase_for_user(g.jwt)
+    sb, err = _try_supabase(g.jwt)
+    if err:
+        return err
     res = sb.table("exam_groups").insert({
         "name": body["name"],
         "exam_id_ref": body["exam_id_ref"],
@@ -66,7 +94,9 @@ def create_group():
 
 @group_bp.post("/<group_id>/join")
 def join_group(group_id: str):
-    sb = _supabase_for_user(g.jwt)
+    sb, err = _try_supabase(g.jwt)
+    if err:
+        return err
     res = sb.table("exam_group_members").insert({
         "group_id": group_id,
         "role": "member",
@@ -82,7 +112,9 @@ def post_message(group_id: str):
     if flagged.blocked:
         return jsonify({"error": "blocked", "reason": flagged.reason}), 422
 
-    sb = _supabase_for_user(g.jwt)
+    sb, err = _try_supabase(g.jwt)
+    if err:
+        return err
     res = sb.table("group_messages").insert({
         "group_id": group_id,
         "content": body["content"],

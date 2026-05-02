@@ -6,11 +6,19 @@ import os
 from dataclasses import dataclass
 
 import pdfplumber
-import pytesseract
-from PIL import Image
 
-if os.environ.get("TESSERACT_PATH"):
-    pytesseract.pytesseract.tesseract_cmd = os.environ["TESSERACT_PATH"]
+# pytesseract + Tesseract are optional — needed only if a page has no extractable
+# text and we have to OCR it. We import lazily so the standalone exam_app can
+# boot without the OCR pipeline installed.
+try:
+    import pytesseract  # type: ignore[import-not-found]
+    from PIL import Image  # noqa: F401
+    if os.environ.get("TESSERACT_PATH"):
+        pytesseract.pytesseract.tesseract_cmd = os.environ["TESSERACT_PATH"]
+    _OCR_AVAILABLE = True
+except ImportError:
+    pytesseract = None  # type: ignore[assignment]
+    _OCR_AVAILABLE = False
 
 TESSERACT_LANG = os.environ.get("TESSERACT_LANG", "heb+eng")
 
@@ -30,6 +38,10 @@ def extract(pdf_bytes: bytes) -> list[PageText]:
             text = (page.extract_text() or "").strip()
             if len(text) >= 30:
                 out.append(PageText(page=i, text=text, via_ocr=False, confidence=1.0))
+                continue
+            if not _OCR_AVAILABLE:
+                # No OCR fallback available — return what we have, mark low confidence.
+                out.append(PageText(page=i, text=text, via_ocr=False, confidence=0.0))
                 continue
             # Hebrew scan fallback — render to image and OCR.
             img = page.to_image(resolution=200).original
