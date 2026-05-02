@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { QuestionRunner } from '@/components/exam/QuestionRunner'
 import { FlashcardDeck, type SessionResult } from '@/components/exam/FlashcardDeck'
@@ -13,10 +13,8 @@ import {
   type OpenQuestion,
 } from '@/lib/exam/sample-questions'
 import { sampleFlashcards } from '@/lib/exam/sample-flashcards'
-import { savePracticeSession } from '@/lib/exam/practice-storage'
-import { upsertFlashcards, dueFlashcards } from '@/lib/exam/flashcard-storage'
-import { loadPlanFromStorage } from '@/lib/exam/plan-storage'
-import type { Question, PracticeSession, StudyPlan, Flashcard } from '@/types'
+import { useExamStore } from '@/lib/exam/use-exam-store'
+import type { Question, PracticeSession, Flashcard } from '@/types'
 
 type Kind = 'mcq' | 'open' | 'flashcard'
 
@@ -29,13 +27,22 @@ function parseKind(raw: string | null): Kind {
 export default function PracticePage({ params }: { params: { planId: string } }) {
   const router = useRouter()
   const search = useSearchParams()
-  // The URL `planId` is the localStorage key. ?examId= identifies which saved
-  // plan to load (falls back to planId for direct visits without context).
-  const examId = search.get('examId') ?? params.planId
+  const store = useExamStore()
+  // The URL `planId` matches a StudyPlan.id. ?examId= helps look up the plan
+  // by exam when the planId is unknown (e.g. legacy localStorage links).
+  const examIdParam = search.get('examId')
   const topicId = search.get('topic')
   const kind: Kind = parseKind(search.get('kind'))
 
-  const [plan, setPlan] = useState<StudyPlan | null>(null)
+  const plan = useMemo(() => {
+    const byId = store.plans.find((p) => p.id === params.planId)
+    if (byId) return byId
+    if (examIdParam) return store.getPlanByExam(examIdParam)
+    return null
+  }, [store.plans, store.getPlanByExam, params.planId, examIdParam])
+
+  const examId = examIdParam ?? plan?.exam_id ?? params.planId
+
   const [questions, setQuestions] = useState<Question[]>([])
   const [openQuestions, setOpenQuestions] = useState<OpenQuestion[]>([])
   const [cards, setCards] = useState<Flashcard[] | null>(null)
@@ -43,10 +50,6 @@ export default function PracticePage({ params }: { params: { planId: string } })
   const [usedFallback, setUsedFallback] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sessionId] = useState(() => `sess_${Date.now()}`)
-
-  useEffect(() => {
-    setPlan(loadPlanFromStorage(examId))
-  }, [examId])
 
   const topic = useMemo(() => {
     if (!plan || !topicId) return null
@@ -95,7 +98,7 @@ export default function PracticePage({ params }: { params: { planId: string } })
       score: Math.round((result.correct / result.total) * 100),
       created_at: new Date().toISOString(),
     }
-    savePracticeSession(params.planId, session)
+    void store.savePracticeSession(session)
   }
 
   // ----- Flashcards -----
@@ -111,11 +114,7 @@ export default function PracticePage({ params }: { params: { planId: string } })
         n: 20,
       })
       const fresh = toFlashcards(res.flashcards, topic?.id ?? 'free', plan?.course_id ?? 'unknown')
-      const existing = dueFlashcards(params.planId, topic?.id)
-      // Merge: prefer existing card state when ids collide.
-      const byId = new Map<string, Flashcard>(fresh.map((c) => [c.id, c]))
-      for (const c of existing) byId.set(c.id, c)
-      setCards(Array.from(byId.values()))
+      setCards(mergeWithDue(fresh, store.flashcards, topic?.id))
     } catch (e: any) {
       console.warn('Flashcard generation failed, using offline sample:', e.message)
       setUsedFallback(true)
@@ -124,18 +123,14 @@ export default function PracticePage({ params }: { params: { planId: string } })
         topic?.id ?? 'free',
         plan?.course_id ?? 'unknown',
       )
-      const existing = dueFlashcards(params.planId, topic?.id)
-      const byId = new Map<string, Flashcard>(sampled.map((c) => [c.id, c]))
-      for (const c of existing) byId.set(c.id, c)
-      setCards(Array.from(byId.values()))
+      setCards(mergeWithDue(sampled, store.flashcards, topic?.id))
     } finally {
       setGenerating(false)
     }
   }
 
   const onFlashcardSession = (result: SessionResult) => {
-    upsertFlashcards(params.planId, result.reviewed)
-    // Bounce back to the plan view; could show a summary screen later.
+    void store.upsertFlashcards(result.reviewed)
     router.back()
   }
 
@@ -205,7 +200,7 @@ export default function PracticePage({ params }: { params: { planId: string } })
       ),
       created_at: new Date().toISOString(),
     }
-    savePracticeSession(params.planId, session)
+    void store.savePracticeSession(session)
   }
 
   // ----- Render -----
@@ -372,4 +367,23 @@ function toOpenQuestions(
     key_points: q.key_points ?? [],
     source_file_ref: q.source_ref ?? '',
   }))
+}
+
+// Merge a freshly-generated batch with any cards already in the user's bank
+// for this topic so spaced-repetition state survives across sessions.
+function mergeWithDue(
+  fresh: Flashcard[],
+  bank: Flashcard[],
+  topicId: string | undefined,
+): Flashcard[] {
+  const today = new Date().toISOString().slice(0, 10)
+  const due = bank.filter((c) => {
+    if (topicId && c.topic_id !== topicId) return false
+    if (c.status === 'new' || c.status === 'learning') return true
+    if (!c.next_due) return true
+    return c.next_due <= today
+  })
+  const byId = new Map<string, Flashcard>(fresh.map((c) => [c.id, c]))
+  for (const c of due) byId.set(c.id, c)
+  return Array.from(byId.values())
 }

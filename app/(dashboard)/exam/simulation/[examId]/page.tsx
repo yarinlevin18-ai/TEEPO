@@ -4,13 +4,16 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { SimulationTimer } from '@/components/exam/SimulationTimer'
 import { sampleExam, totalPoints, type SimQuestion } from '@/lib/exam/sample-exam'
-import { saveSimulation, loadSimulations } from '@/lib/exam/simulation-storage'
+import { useExamStore } from '@/lib/exam/use-exam-store'
 import { api } from '@/lib/api-client'
 import type { Simulation, SimulationAnalysis } from '@/types'
 
 type Phase = 'configure' | 'running' | 'analyzing' | 'complete'
 
 export default function SimulationPage({ params }: { params: { examId: string } }) {
+  const store = useExamStore()
+  const exam = store.exams.find((e) => e.id === params.examId) ?? null
+
   const [phase, setPhase] = useState<Phase>('configure')
   const [duration, setDuration] = useState(120)
   const [questions, setQuestions] = useState<SimQuestion[]>([])
@@ -18,7 +21,10 @@ export default function SimulationPage({ params }: { params: { examId: string } 
   const [analysis, setAnalysis] = useState<SimulationAnalysis | null>(null)
   const [usedFallback, setUsedFallback] = useState(false)
   const [simId] = useState(() => `sim_${Date.now()}`)
-  const history = useMemo(() => loadSimulations(params.examId), [params.examId])
+  const history = useMemo(
+    () => store.simulations.filter((s) => s.exam_id === params.examId),
+    [store.simulations, params.examId],
+  )
 
   const start = () => {
     // No real PDF parsing in local-build phase — load sample exam.
@@ -56,7 +62,8 @@ export default function SimulationPage({ params }: { params: { examId: string } 
     // Persist the run.
     const sim: Simulation = {
       id: simId,
-      course_id: 'unknown',
+      course_id: exam?.course_id ?? 'unknown',
+      exam_id: params.examId,
       exam_pdf_ref: 'sample',
       duration_minutes: duration,
       submitted_at: new Date().toISOString(),
@@ -64,7 +71,7 @@ export default function SimulationPage({ params }: { params: { examId: string } 
       score: result.estimated_score,
       analysis: result,
     }
-    saveSimulation(params.examId, sim)
+    await store.saveSimulation(sim)
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(`teepo_exam_sim_inflight_${params.examId}`)
     }

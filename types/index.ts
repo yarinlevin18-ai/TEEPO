@@ -371,6 +371,8 @@ export type SimulationStatus =
 export interface Simulation {
   id: string
   course_id: string
+  /** Optional link to an Exam.id when the simulation was launched from one. */
+  exam_id?: string
   exam_pdf_ref: string
   duration_minutes: number
   started_at?: string
