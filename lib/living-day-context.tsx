@@ -27,6 +27,7 @@ import {
   type AtmosphereSnapshot,
   type WeatherKey,
 } from './living-day'
+import { fetchWeather } from './weather-fetch'
 
 interface LivingDayContextValue {
   /** Current minute of day (0..1439). */
@@ -71,6 +72,22 @@ export function LivingDayProvider({ children }: { children: ReactNode }) {
     return () => {
       if (timeout) clearTimeout(timeout)
       if (interval) clearInterval(interval)
+    }
+  }, [])
+
+  // Auto-fetch real weather on mount + every 30 minutes. Falls back to
+  // 'sunny' if geolocation is denied or the API is unreachable.
+  useEffect(() => {
+    let cancelled = false
+    const refresh = async () => {
+      const result = await fetchWeather()
+      if (!cancelled) setWeather(result.weather)
+    }
+    refresh()
+    const id = setInterval(refresh, 30 * 60 * 1000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
     }
   }, [])
 

@@ -92,6 +92,8 @@ export interface DriveDB {
    * array. Adding optional — no version bump needed; absence means zero points.
    */
   point_events?: import('./exam/points').PointEvent[]
+  /** IDs of achievements the user has ever unlocked. Append-only. */
+  achievements_unlocked?: string[]
 }
 
 export const EMPTY_DB: DriveDB = {
@@ -111,6 +113,7 @@ export const EMPTY_DB: DriveDB = {
   simulations: [],
   exam_group_memberships: [],
   point_events: [],
+  achievements_unlocked: [],
 }
 
 // ── Migrations ────────────────────────────────────────────────

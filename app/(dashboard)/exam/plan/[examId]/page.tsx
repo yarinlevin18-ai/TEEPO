@@ -8,9 +8,10 @@ import { DayFinishDialog, type CompletionVerdict } from '@/components/exam/DayFi
 import { useExamStore } from '@/lib/exam/use-exam-store'
 import { api } from '@/lib/api-client'
 import { pointsForDay, examPoints, rankFor, nextRank, rankProgress } from '@/lib/exam/points'
+import { TopicHeatmap } from '@/components/exam/TopicHeatmap'
 import type { StudyPlan, StudyPlanDay, DayStatus, Exam } from '@/types'
 
-type Tab = 'micro' | 'macro'
+type Tab = 'micro' | 'macro' | 'heatmap'
 
 const VERDICT_TO_STATUS: Record<CompletionVerdict, DayStatus> = {
   all: 'completed',
@@ -190,30 +191,29 @@ export default function PlanPage({ params }: { params: { examId: string } }) {
         <Stat label="הוחמצו" value={String(missedDays)} tone="text-red-300" />
       </div>
 
-      <nav className="flex gap-2 border-b border-white/10" role="tablist">
-        <button
-          role="tab"
-          aria-selected={tab === 'micro'}
-          onClick={() => setTab('micro')}
-          className={`px-4 py-2 border-b-2 font-medium transition ${
-            tab === 'micro' ? 'border-fuchsia-400 text-zinc-100' : 'border-transparent text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          היום
-        </button>
-        <button
-          role="tab"
-          aria-selected={tab === 'macro'}
-          onClick={() => setTab('macro')}
-          className={`px-4 py-2 border-b-2 font-medium transition ${
-            tab === 'macro' ? 'border-fuchsia-400 text-zinc-100' : 'border-transparent text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          תצוגת מקרו
-        </button>
+      <nav className="flex gap-2 border-b border-white/10 overflow-x-auto" role="tablist">
+        {(
+          [
+            { id: 'micro' as Tab, label: 'היום' },
+            { id: 'macro' as Tab, label: 'תצוגת מקרו' },
+            { id: 'heatmap' as Tab, label: 'מפת חום' },
+          ]
+        ).map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-4 py-2 border-b-2 font-medium transition whitespace-nowrap ${
+              tab === t.id ? 'border-fuchsia-400 text-zinc-100' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </nav>
 
-      {tab === 'micro' ? (
+      {tab === 'micro' && (
         <TodayCard
           day={focusedDay}
           planId={plan.id}
@@ -221,11 +221,21 @@ export default function PlanPage({ params }: { params: { examId: string } }) {
           onToggleActivity={toggleActivity}
           onFinishDay={() => setDialogOpen(true)}
         />
-      ) : (
+      )}
+      {tab === 'macro' && (
         <MacroView
           plan={plan}
           selectedDate={focusedDay?.date}
           onSelectDay={onSelectDayFromMacro}
+        />
+      )}
+      {tab === 'heatmap' && (
+        <TopicHeatmap
+          plan={plan}
+          examId={params.examId}
+          sessions={store.practiceSessions}
+          simulations={store.simulations}
+          flashcards={store.flashcards}
         />
       )}
 

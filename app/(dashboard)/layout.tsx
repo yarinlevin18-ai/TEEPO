@@ -8,6 +8,7 @@ import { LivingDayProvider } from '@/lib/living-day-context'
 import Sidebar from '@/components/layout/Sidebar'
 import DriveConnectionBanner from '@/components/DriveConnectionBanner'
 import SkyScene from '@/components/SkyScene'
+import ScrollReveal from '@/components/ScrollReveal'
 import Image from 'next/image'
 import { Menu } from 'lucide-react'
 
@@ -48,6 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <LivingDayProvider>
       <div className="qa flex min-h-screen bg-base">
         <SkyScene />
+        <ScrollReveal />
 
         {/* Mobile header bar */}
         <header

@@ -245,7 +245,7 @@ export default function UniversityConnectPage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-glow-sm"
-             style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+             style={{ background: 'linear-gradient(135deg, #38bdf8, #0ea5e9)' }}>
           <GraduationCap size={24} className="text-white" />
         </div>
         <div>
@@ -262,22 +262,22 @@ export default function UniversityConnectPage() {
           <div className="space-y-2.5">
             <div className="flex items-start gap-3">
               <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                    style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>1</span>
+                    style={{ background: 'rgba(56,189,248,0.30)', color: '#7dd3fc' }}>1</span>
               <p className="text-ink-muted">לחץ <strong className="text-ink">"התחבר"</strong> — Moodle ייפתח בטאב חדש</p>
             </div>
             <div className="flex items-start gap-3">
               <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                    style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>2</span>
+                    style={{ background: 'rgba(56,189,248,0.30)', color: '#7dd3fc' }}>2</span>
               <p className="text-ink-muted">התחבר ל-Moodle <strong className="text-ink">בדפדפן שלך כרגיל</strong></p>
             </div>
             <div className="flex items-start gap-3">
               <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                    style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>3</span>
+                    style={{ background: 'rgba(56,189,248,0.30)', color: '#7dd3fc' }}>3</span>
               <p className="text-ink-muted">לחץ על <strong className="text-ink">אייקון התוסף 🎓</strong> בסרגל הדפדפן ← "שלח Session"</p>
             </div>
             <div className="flex items-start gap-3">
               <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                    style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>4</span>
+                    style={{ background: 'rgba(56,189,248,0.30)', color: '#7dd3fc' }}>4</span>
               <p className="text-ink-muted">חזור לכאן ← <strong className="text-ink">סנכרן הכל</strong></p>
             </div>
             <div className="mt-3 pt-3 flex items-center gap-2 text-xs"
@@ -285,7 +285,7 @@ export default function UniversityConnectPage() {
               <span>🔒</span>
               <span>הסיסמה שלך לא נגעת באפליקציה — רק ה-session cookies מועברים</span>
             </div>
-            <div className="pt-2 text-xs" style={{ color: '#a5b4fc' }}>
+            <div className="pt-2 text-xs" style={{ color: '#7dd3fc' }}>
               📱 <strong>מחובר מהטלפון?</strong> לחץ "נייד? התחבר עם סיסמה" למטה — השרת מתחבר ל-Moodle לבד עם הפרטים שלך
             </div>
           </div>
@@ -334,7 +334,7 @@ export default function UniversityConnectPage() {
           <GlowCard glowColor="rgba(99,102,241,0.10)">
           <div className="p-6 space-y-4">
           <div className="flex items-center gap-3">
-            <RefreshCw size={18} style={{ color: '#818cf8' }} />
+            <RefreshCw size={18} style={{ color: '#38bdf8' }} />
             <div>
               <p className="font-semibold text-ink">סנכרן את כל הנתונים</p>
               <p className="text-xs text-ink-muted">מושך קורסים, מטלות ולוח שעות לאפליקציה</p>
@@ -487,7 +487,7 @@ function SiteCard({ site, name, description, url, externalUrl, connected, loginS
                   onChange={e => setUsername(e.target.value)}
                   placeholder="שם המשתמש שלך באוניברסיטה"
                   dir="ltr"
-                  className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 focus:border-indigo-400/50 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 text-ink"
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 focus:border-sky-400/50 focus:outline-none focus:ring-2 focus:ring-sky-400/20 text-ink"
                   required
                 />
               </div>
@@ -499,7 +499,7 @@ function SiteCard({ site, name, description, url, externalUrl, connected, loginS
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   dir="ltr"
-                  className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 focus:border-indigo-400/50 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 text-ink"
+                  className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 focus:border-sky-400/50 focus:outline-none focus:ring-2 focus:ring-sky-400/20 text-ink"
                   required
                 />
               </div>
@@ -534,7 +534,7 @@ function SiteCard({ site, name, description, url, externalUrl, connected, loginS
 
               <div className="flex items-start gap-3 pt-2">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-                     style={{ background: 'rgba(99,102,241,0.2)' }}>
+                     style={{ background: 'rgba(56,189,248,0.20)' }}>
                   <span className="text-sm">1</span>
                 </div>
                 <p className="text-sm text-ink-muted pt-1">
@@ -544,7 +544,7 @@ function SiteCard({ site, name, description, url, externalUrl, connected, loginS
 
               <div className="flex items-start gap-3">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-                     style={{ background: 'rgba(99,102,241,0.2)' }}>
+                     style={{ background: 'rgba(56,189,248,0.20)' }}>
                   <span className="text-sm">2</span>
                 </div>
                 <div className="pt-1">
@@ -559,7 +559,7 @@ function SiteCard({ site, name, description, url, externalUrl, connected, loginS
 
               <div className="flex items-start gap-3">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-                     style={{ background: 'rgba(99,102,241,0.2)' }}>
+                     style={{ background: 'rgba(56,189,248,0.20)' }}>
                   <span className="text-sm">3</span>
                 </div>
                 <p className="text-sm text-ink-muted pt-1">

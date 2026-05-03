@@ -16,11 +16,13 @@ import Image from 'next/image'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
+import { useLivingDay } from '@/lib/living-day-context'
 import { supabase } from '@/lib/supabase'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import GlowCard from '@/components/ui/GlowCard'
 import AnimatedBorder from '@/components/ui/AnimatedBorder'
 import Teepo, { type TeepoState } from '@/components/Teepo'
+import TeepoCompanion from '@/components/TeepoCompanion'
 import type { Course, Assignment, StudyTask, Grade } from '@/types'
 import { format, formatDistanceToNow, differenceInDays, differenceInHours } from 'date-fns'
 import { he } from 'date-fns/locale'
@@ -48,29 +50,37 @@ function getGreeting(): string {
 }
 
 /**
- * TEEPO mood based on time of day + user activity.
- * Priority order: activity > time-of-day.
+ * TEEPO mood reflects weather only. Activity / progress no longer drive
+ * the mascot — that data lives elsewhere on the dashboard. Night
+ * (22:00–05:00) overrides weather so TEEPO can sleep.
  */
 function getTeepoMood(opts: {
   hour: number
-  hasData: boolean
-  urgentCount: number
-  todayTotal: number
-  todayDone: number
+  weather?: 'sunny' | 'cloudy' | 'rainy' | 'stormy' | 'snowy' | 'windy' | 'hamsin'
 }): { state: TeepoState; hint: string } {
-  const { hour, hasData, urgentCount, todayTotal, todayDone } = opts
+  const { hour, weather = 'sunny' } = opts
 
-  // Activity-driven states (override time of day)
-  if (!hasData) return { state: 'sassy', hint: 'שעמום. תתחיל להוסיף משהו?' }
-  if (urgentCount >= 3) return { state: 'alert', hint: 'ערמת דחופים. יאללה.' }
-  if (urgentCount >= 1) return { state: 'thinking', hint: 'משהו דחוף בפתח.' }
-  if (todayTotal > 0 && todayDone === todayTotal) return { state: 'celebrate', hint: 'סיימת הכל היום. כל הכבוד!' }
+  if (hour >= 22 || hour < 5) {
+    return { state: 'sleep', hint: 'לילה טוב. אני נח קצת.' }
+  }
 
-  // Time-of-day fallback
-  if (hour >= 22 || hour < 5) return { state: 'sleep', hint: 'מאוחר. לכו לישון.' }
-  if (hour >= 5 && hour < 12)   return { state: 'idle',     hint: 'יום חדש, בוא נתחיל.' }
-  if (hour >= 12 && hour < 17)  return { state: 'happy',    hint: 'צהריים טובים!' }
-  return { state: 'thinking', hint: 'ערב טוב. מה על הבוקר מחר?' }
+  switch (weather) {
+    case 'stormy':
+      return { state: 'alert', hint: 'סופה בחוץ — מקלט מושלם לקצת לימודים.' }
+    case 'rainy':
+      return { state: 'thinking', hint: 'גשם. ראש שקט וקפה חם.' }
+    case 'snowy':
+      return { state: 'happy', hint: 'שלג! נדיר וכיפי.' }
+    case 'hamsin':
+      return { state: 'sassy', hint: 'חמסין. שתה מים, אל תוציא איברים.' }
+    case 'windy':
+      return { state: 'idle', hint: 'רוחות. שחרר עם מוסיקה.' }
+    case 'cloudy':
+      return { state: 'thinking', hint: 'מעונן ושקט — אור מושלם להתרכז.' }
+    case 'sunny':
+    default:
+      return { state: 'happy', hint: 'שמש. יום טוב.' }
+  }
 }
 
 
@@ -136,6 +146,7 @@ export default function DashboardPage() {
     db, ready: dbReady, loading: dbLoading,
     createTask: dbCreateTask, updateTask: dbUpdateTask, deleteTask: dbDeleteTask,
   } = useDB()
+  const livingDay = useLivingDay()
   const courses = db.courses
   const assignments = db.assignments
   const tasks = db.tasks
@@ -339,14 +350,11 @@ export default function DashboardPage() {
       {/* ── Header ── */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-4">
-          {/* TEEPO mascot — state reflects time of day + activity */}
+          {/* TEEPO mascot — state reflects weather (with night sleep override) */}
           {(() => {
             const { state, hint } = getTeepoMood({
               hour: new Date().getHours(),
-              hasData,
-              urgentCount: urgentAssignments.length,
-              todayTotal: todayTasks.length,
-              todayDone: completedTodayTasks.length,
+              weather: livingDay.weather,
             })
             return (
               <div
@@ -354,7 +362,7 @@ export default function DashboardPage() {
                 title={hint}
                 aria-label={`TEEPO: ${hint}`}
               >
-                <Teepo state={state} size={68} />
+                <TeepoCompanion state={state} weather={livingDay.weather} />
               </div>
             )
           })()}

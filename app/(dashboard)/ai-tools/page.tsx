@@ -20,11 +20,13 @@ const CATEGORY_ICON: Record<string, any> = {
   'ניהול זמן ופרודוקטיביות':      Clock,
 }
 
+/* All four categories in the cool blue family — distinguishable by hue
+ * (sky → cyan → blue → teal) but harmonized with the new sky-blue theme. */
 const CATEGORY_COLOR: Record<string, { bg: string; text: string; border: string }> = {
-  'חיפוש מאמרים וסקירה אקדמית': { bg: 'bg-indigo-500/10',  text: 'text-indigo-400',  border: 'border-indigo-500/20' },
-  'בניית מצגות ועיצוב':           { bg: 'bg-violet-500/10',  text: 'text-violet-400',  border: 'border-violet-500/20' },
-  'כתיבת עבודות וניסוח':          { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-  'ניהול זמן ופרודוקטיביות':      { bg: 'bg-amber-500/10',   text: 'text-amber-400',   border: 'border-amber-500/20' },
+  'חיפוש מאמרים וסקירה אקדמית': { bg: 'bg-sky-500/10',  text: 'text-sky-400',  border: 'border-sky-500/25' },
+  'בניית מצגות ועיצוב':           { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/25' },
+  'כתיבת עבודות וניסוח':          { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/25' },
+  'ניהול זמן ופרודוקטיביות':      { bg: 'bg-teal-500/10', text: 'text-teal-400', border: 'border-teal-500/25' },
 }
 
 interface Tool {
@@ -50,8 +52,8 @@ export default function AIToolsPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6 animate-fade-in">
       {/* ─── Header ─── */}
       <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 flex items-center justify-center flex-shrink-0">
-          <Sparkles size={22} className="text-indigo-400" />
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500/20 to-cyan-500/20 flex items-center justify-center flex-shrink-0">
+          <Sparkles size={22} className="text-sky-400" />
         </div>
         <div>
           <h1 className="text-2xl font-bold text-ink">
@@ -144,20 +146,20 @@ export default function AIToolsPage() {
         transition={{ delay: 0.3 }}
         className="glass rounded-2xl p-5 space-y-3"
         style={{
-          background: 'rgba(245,158,11,0.05)',
-          border: '1px solid rgba(245,158,11,0.15)',
+          background: 'rgba(56, 189, 248, 0.06)',
+          border: '1px solid rgba(56, 189, 248, 0.18)',
         }}
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center">
-            <AlertCircle size={16} className="text-amber-400" />
+          <div className="w-8 h-8 rounded-lg bg-sky-500/15 flex items-center justify-center">
+            <AlertCircle size={16} className="text-sky-400" />
           </div>
-          <h3 className="text-sm font-bold text-amber-300">הנחיות כלליות לשימוש אחראי</h3>
+          <h3 className="text-sm font-bold text-sky-300">הנחיות כלליות לשימוש אחראי</h3>
         </div>
         <ul className="space-y-2 mr-2">
           {general_guidelines.map((g, i) => (
             <li key={i} className="text-xs text-ink-muted leading-relaxed flex items-start gap-2">
-              <span className="text-amber-400/60 flex-shrink-0 mt-0.5">•</span>
+              <span className="text-sky-400/70 flex-shrink-0 mt-0.5">•</span>
               <span>{g}</span>
             </li>
           ))}

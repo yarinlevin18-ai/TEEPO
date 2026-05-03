@@ -5,30 +5,35 @@
   width: var(--teepo-size);
   height: var(--teepo-size);
   position: relative;
-  animation: tFloat 4s ease-in-out infinite;
+  animation: tFloat 7s ease-in-out infinite;
   flex-shrink: 0;
 }
 .teepo svg { width: 100%; height: 100%; overflow: visible; display: block; }
 
-/* elements */
-.t-body  { filter: drop-shadow(0 15px 30px rgba(107,91,229,0.45)); }
-.t-face  { fill: #0A0A15; }
+/* elements — drop shadows tinted blue to match the new body palette */
+.t-body  {
+  /* Soft ambient shadow with a hint of sky-blue lift. */
+  filter:
+    drop-shadow(0 1px 1px rgba(14, 116, 165, 0.22))
+    drop-shadow(0 8px 18px rgba(14, 116, 165, 0.28));
+}
+.t-face  { fill: #0c4a6e; }
 .t-eye   {
-  fill: #B8A9FF;
-  filter: drop-shadow(0 0 6px rgba(184,169,255,0.7));
+  fill: #f0f9ff;
+  filter: drop-shadow(0 0 2px rgba(240, 249, 255, 0.55));
   transform-origin: center; transform-box: fill-box;
-  animation: tBlink 5s infinite;
+  animation: tBlink 4.2s ease-in-out infinite;
 }
 .t-mouth {
-  fill: none; stroke: #B8A9FF; stroke-width: 2.5; stroke-linecap: round;
-  filter: drop-shadow(0 0 3px rgba(184,169,255,0.5));
+  fill: none; stroke: #f0f9ff; stroke-width: 2.5; stroke-linecap: round;
 }
-.t-cheek        { fill: #8B7FF0; opacity: .4; }
-.t-ant-stick    { stroke: rgba(255,255,255,0.25); stroke-width: 2.5; stroke-linecap: round; fill: none; }
+.t-cheek        { fill: #fda4af; opacity: .60; }
+.t-ant-stick    { stroke: rgba(240, 249, 255, 0.45); stroke-width: 2.5; stroke-linecap: round; fill: none; }
 .t-ant-tip      {
-  fill: #B8A9FF;
-  filter: drop-shadow(0 0 10px #B8A9FF);
-  animation: tAntPulse 2.2s ease-in-out infinite;
+  fill: #fde68a;
+  /* Warm soft glow on the antenna tip. */
+  filter: drop-shadow(0 0 5px rgba(253, 230, 138, 0.7));
+  animation: tAntPulse 3.2s ease-in-out infinite;
   transform-origin: center; transform-box: fill-box;
 }
 .t-eyes-error   { display: none; }
@@ -37,15 +42,21 @@
 .t-confetti     { opacity: 0; }
 
 /* ── base animations ── */
-@keyframes tFloat    { 0%,100%{transform:translateY(0)}        50%{transform:translateY(-12px)} }
-@keyframes tBlink    { 0%,46%,50%,92%,96%,100%{transform:scaleY(1)} 48%,94%{transform:scaleY(0.1)} }
+@keyframes tFloat    { 0%,100%{transform:translateY(0)}        50%{transform:translateY(-5px)} }
+/* Blink: single, dramatic close-and-open near the end of each loop.
+ * Eye scales from 1 to 0 (fully closed) and back. Held closed for
+ * ~80ms so the blink is unmistakable. */
+@keyframes tBlink {
+  0%, 88%, 100% { transform: scaleY(1); }
+  92%, 94%      { transform: scaleY(0); }
+}
 @keyframes tAntPulse { 0%,100%{opacity:.8} 50%{opacity:1} }
 
 /* ── IDLE (default) ── already covered by base .teepo */
 
 /* ── HAPPY ── */
-.teepo[data-state="happy"] { animation: tHappyBounce .8s ease-in-out infinite; }
-@keyframes tHappyBounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-18px)} }
+.teepo[data-state="happy"] { animation: tHappyBounce 2.4s ease-in-out infinite; }
+@keyframes tHappyBounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
 .teepo[data-state="happy"] .t-eye   { animation: none; transform: scaleY(0.3); }
 .teepo[data-state="happy"] .t-mouth { d: path("M 35 62 Q 50 75 65 62"); }
 
@@ -69,8 +80,8 @@
 @keyframes thinkDot { 0%,60%,100%{opacity:0;transform:translateY(0)} 30%{opacity:1;transform:translateY(-3px)} }
 
 /* ── SASSY ── */
-.teepo[data-state="sassy"] { animation: tSassyTilt 3s ease-in-out infinite; }
-@keyframes tSassyTilt { 0%,100%{transform:rotate(-3deg) translateY(0)} 50%{transform:rotate(-3deg) translateY(-6px)} }
+.teepo[data-state="sassy"] { animation: tSassyTilt 5s ease-in-out infinite; }
+@keyframes tSassyTilt { 0%,100%{transform:rotate(-2deg) translateY(0)} 50%{transform:rotate(-2deg) translateY(-3px)} }
 .teepo[data-state="sassy"] .t-eye   { animation: tSassyEye 4s ease-in-out infinite; }
 @keyframes tSassyEye { 0%,70%,100%{transform:scaleY(1) translateY(0)} 20%,50%{transform:scaleY(0.5) translateY(-3px)} }
 .teepo[data-state="sassy"] .t-mouth { d: path("M 38 65 Q 50 60 62 65"); }
@@ -96,7 +107,7 @@
 }
 
 /* ── ALERT ── */
-.teepo[data-state="alert"] { animation: tAlertJump .6s cubic-bezier(.36,.07,.19,.97) infinite; }
+.teepo[data-state="alert"] { animation: tAlertJump 1.6s cubic-bezier(.36,.07,.19,.97) infinite; }
 @keyframes tAlertJump {
   0%,100%{transform:translateY(0) scale(1)}
   20%{transform:translateY(-22px) scale(1.05,.95)}
@@ -219,52 +230,12 @@
   box-shadow: 0 0 0 1px rgba(184,169,255,0.2), 0 20px 40px -15px rgba(107,91,229,0.4);
 }
 
-/* ══════════════════════════════════════════
-   QUIET ATMOSPHERE — Teepo retheme (dashboard scope only)
-   Recolor the SVG mascot to the time-of-day accent. CSS `fill` /
-   `stop-color` override the SVG attributes, so we don't have to
-   touch the component's gradient definitions.
-   ══════════════════════════════════════════ */
-
-/* Body gradient stops — swap purple → teal/atmosphere accent. */
-.qa #teepoBodyGrad stop:nth-child(1) {
-  stop-color: color-mix(in srgb, var(--accent) 65%, white 10%);
-}
-.qa #teepoBodyGrad stop:nth-child(2) {
-  stop-color: var(--accent);
-}
-.qa #teepoBodyGrad stop:nth-child(3) {
-  stop-color: color-mix(in srgb, var(--accent) 60%, black 40%);
-}
-
-/* Drop-shadow under the body — tint to the accent. */
-.qa .teepo .t-body {
-  filter: drop-shadow(0 12px 24px rgba(var(--glow1), 0.35));
-}
-
-/* Eyes / mouth / cheek — soft cream so they read clearly against teal. */
-.qa .teepo .t-eye {
-  fill: rgba(245, 250, 240, 0.95);
-  filter: drop-shadow(0 0 6px rgba(var(--glow1), 0.55));
-}
-.qa .teepo .t-mouth {
-  stroke: rgba(245, 250, 240, 0.95);
-  filter: drop-shadow(0 0 3px rgba(var(--glow1), 0.4));
-}
-.qa .teepo .t-cheek {
-  fill: color-mix(in srgb, var(--accent) 70%, white);
-}
-
-/* Antenna tip pulse uses the accent itself. */
-.qa .teepo .t-ant-tip {
-  fill: var(--accent);
-  filter: drop-shadow(0 0 10px var(--accent));
-}
-
-/* Thinking dots + sleep Z's pick up the accent so the mascot
-   stays coherent across all states. */
-.qa .teepo .t-think-dots circle { fill: var(--accent); }
-.qa .teepo .t-zzz text          { fill: var(--accent); }
+/* TEEPO mascot uses its own blue palette regardless of dashboard scope.
+ * The previous `.qa #teepoBodyGrad`, `.qa .teepo .t-*` overrides forced
+ * the body, eyes, mouth, cheeks, and antenna to follow LivingDayProvider's
+ * `--accent` and `--glow1`, which turned teal/green during summer-day
+ * phases and made TEEPO look like a green alien. Deleted — the base
+ * teepo.css colors above are the single source of truth. */
 
 /* Hero stage glow + shadow — switch indigo → accent. */
 .qa .teepo-hero-stage {

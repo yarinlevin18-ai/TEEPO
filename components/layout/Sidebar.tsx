@@ -5,16 +5,28 @@ import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, CheckSquare,
-  FileText, MessageCircle, Wifi, LogOut, GraduationCap, Settings, StickyNote, X, Sparkles, Building2, Sun, Moon,
-  ClipboardCheck,
+  FileText, Wifi, LogOut, GraduationCap, Settings, StickyNote, X, Sparkles, Building2, Sun, Moon,
+  ClipboardCheck, ChevronDown, ExternalLink,
 } from 'lucide-react'
-import Image from 'next/image'
 import { useAuth } from '@/lib/auth-context'
 import { useTheme } from '@/lib/theme-context'
 import { useUniversityName, useUniversityCode } from '@/lib/use-university'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import Teepo from '@/components/Teepo'
 
 const EXAM_MODULE_ENABLED = process.env.NEXT_PUBLIC_EXAM_MODULE_ENABLED === 'true'
+
+/** Quick-launch tools surfaced inline under "כלי AI". The full catalogue
+ * still lives at /ai-tools — these are the highest-impact ones for one-click
+ * access from anywhere in the app. */
+const AI_QUICK_TOOLS: { name: string; url: string; tag: string }[] = [
+  { name: 'Consensus',   url: 'https://consensus.app',    tag: 'מחקר' },
+  { name: 'Elicit',      url: 'https://elicit.com',       tag: 'מחקר' },
+  { name: 'ChatPDF',     url: 'https://www.chatpdf.com',  tag: 'PDF' },
+  { name: 'Gamma',       url: 'https://gamma.app',        tag: 'מצגות' },
+  { name: 'NotebookLM',  url: 'https://notebooklm.google.com', tag: 'סיכומים' },
+  { name: 'Perplexity',  url: 'https://www.perplexity.ai', tag: 'חיפוש' },
+]
 
 const NAV_GROUPS = [
   {
@@ -39,8 +51,7 @@ const NAV_GROUPS = [
     items: [
       { href: '/credits',      icon: GraduationCap,  label: "מעקב נק\"ז" },
       { href: '/university',   icon: Building2,       label: 'על האוניברסיטה' },
-      { href: '/study-buddy',  icon: MessageCircle,  label: 'TEEPO AI' },
-      { href: '/ai-tools',     icon: Sparkles,        label: 'כלי AI' },
+      { href: '/ai-tools',     icon: Sparkles,        label: 'כלי AI', expandable: 'ai' as const },
       { href: '/moodle',       icon: Wifi,            label: 'חיבור Moodle' },
     ],
   },
@@ -58,6 +69,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
   const universityName = useUniversityName()
   const universityCode = useUniversityCode()
 
+  const [aiOpen, setAiOpen] = useState(false)
+
   // Block body scroll when mobile drawer is open
   useEffect(() => {
     if (mobileOpen) {
@@ -74,15 +87,15 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
   function SidebarContent() {
     return (
       <>
-        {/* Logo */}
-        <div className="px-5 py-6 border-b border-white/5">
+        {/* Logo — live SVG mascot, bigger + happy state */}
+        <div className="px-5 py-5 border-b border-white/5">
           <div className="flex items-center gap-3">
-            <Image src="/logo-128.png" alt="TEEPO" width={40} height={40} className="flex-shrink-0" />
+            <div className="flex-shrink-0 w-16 h-16 flex items-center justify-center -my-2">
+              <Teepo size={68} state="happy" />
+            </div>
             <div className="min-w-0">
-              <p className="font-bold text-ink text-sm leading-tight">TEEPO</p>
+              <p className="font-bold text-ink text-base leading-tight">TEEPO</p>
               <p className="text-xs mt-0.5 gradient-text">מערכת לימודים חכמה</p>
-              {/* User's university — from settings.university (v2.1). Hidden
-                  if no setting is present (e.g. fresh user, pre-onboarding). */}
               {universityCode && (
                 <p className="text-[10px] mt-1 text-ink-subtle truncate" title={universityName}>
                   {universityName}
@@ -97,58 +110,128 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
           {NAV_GROUPS.map((group, gi) => (
             <div key={gi}>
               {group.label && (
-                <p className="px-3 mb-2 text-[10px] font-bold text-ink-subtle uppercase tracking-widest">
+                <p
+                  className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest"
+                  style={{ color: '#7dd3fc' }}
+                >
                   {group.label}
                 </p>
               )}
               <div className="space-y-0.5">
-                {group.items.map(({ href, icon: Icon, label }) => {
+                {group.items.map((item) => {
+                  const { href, icon: Icon, label } = item
+                  const expandable = 'expandable' in item ? item.expandable : undefined
                   const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+                  const isAI = expandable === 'ai'
+                  const expanded = isAI && aiOpen
+
                   return (
-                    <Link key={href} href={href} onClick={onMobileClose}>
-                      <motion.div
-                        whileHover={{ x: -2 }}
-                        whileTap={{ scale: 0.98 }}
-                        className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                          active
-                            ? 'text-white'
-                            : 'text-ink-muted hover:text-ink hover:bg-white/[0.04]'
-                        }`}
-                      >
-                        {/* Animated active indicator — slides between items */}
-                        {active && (
+                    <div key={href}>
+                      <div className="relative flex items-stretch">
+                        <Link href={href} onClick={onMobileClose} className="flex-1 min-w-0">
                           <motion.div
-                            layoutId="sidebar-active"
-                            className="absolute inset-0 rounded-xl overflow-hidden"
-                            style={{
-                              background: 'rgba(var(--glow1), 0.10)',
-                              boxShadow: 'inset 0 0 0 0.5px rgba(var(--glow1), 0.28)',
-                            }}
-                            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                            whileHover={{ x: -2 }}
+                            whileTap={{ scale: 0.98 }}
+                            className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors cursor-pointer ${
+                              active
+                                ? 'text-white'
+                                : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
+                            }`}
                           >
-                            {/* Hairline accent rail on the inside (RTL: right edge of viewport, so left edge of item) */}
-                            <span
-                              className="absolute top-2 bottom-2 left-0 w-[2px] rounded-full"
-                              style={{ background: 'var(--accent)', boxShadow: '0 0 8px rgba(var(--glow1), 0.5)' }}
-                            />
+                            {active && (
+                              <motion.div
+                                layoutId="sidebar-active"
+                                className="absolute inset-0 rounded-xl overflow-hidden"
+                                style={{
+                                  background:
+                                    'linear-gradient(90deg, rgba(56, 189, 248, 0.26) 0%, rgba(56, 189, 248, 0.10) 100%)',
+                                  boxShadow:
+                                    'inset 0 0 0 1px rgba(125, 211, 252, 0.50), 0 6px 18px rgba(56, 189, 248, 0.22)',
+                                }}
+                                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                              >
+                                <span
+                                  className="absolute top-1.5 bottom-1.5 left-0 w-[3px] rounded-full"
+                                  style={{
+                                    background: 'linear-gradient(180deg, #7dd3fc 0%, #38bdf8 100%)',
+                                    boxShadow: '0 0 12px rgba(56, 189, 248, 0.75)',
+                                  }}
+                                />
+                              </motion.div>
+                            )}
+                            <motion.div
+                              className="relative z-10 w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                              animate={active ? { scale: 1.05 } : { scale: 1 }}
+                              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                              style={
+                                active
+                                  ? { background: 'rgba(56, 189, 248, 0.22)' }
+                                  : { background: 'rgba(255, 255, 255, 0.04)' }
+                              }
+                            >
+                              <Icon
+                                size={16}
+                                style={active ? { color: '#bae6fd' } : { color: 'rgb(212, 212, 216)' }}
+                              />
+                            </motion.div>
+                            <span className="relative z-10 flex-1">{label}</span>
                           </motion.div>
+                        </Link>
+                        {isAI && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); setAiOpen((v) => !v) }}
+                            aria-expanded={expanded}
+                            aria-label="הצג כלים מהירים"
+                            className="absolute left-1 top-1/2 -translate-y-1/2 z-10 p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition"
+                          >
+                            <ChevronDown
+                              size={14}
+                              style={{
+                                transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transition: 'transform 200ms ease',
+                              }}
+                            />
+                          </button>
                         )}
-                        <motion.div
-                          className="relative z-10 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                          animate={active ? { scale: 1.05 } : { scale: 1 }}
-                          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                          style={active ? {
-                            background: 'rgba(var(--glow1), 0.18)',
-                          } : undefined}
-                        >
-                          <Icon
-                            size={16}
-                            style={active ? { color: 'var(--accent)' } : undefined}
-                          />
-                        </motion.div>
-                        <span className="relative z-10">{label}</span>
-                      </motion.div>
-                    </Link>
+                      </div>
+
+                      {/* AI quick-launcher — inline external links */}
+                      {isAI && (
+                        <AnimatePresence initial={false}>
+                          {expanded && (
+                            <motion.div
+                              key="ai-quick"
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="mt-1 mr-9 ml-1 mb-1 space-y-0.5">
+                                {AI_QUICK_TOOLS.map((tool) => (
+                                  <a
+                                    key={tool.name}
+                                    href={tool.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={onMobileClose}
+                                    className="group flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-zinc-300 hover:text-white hover:bg-white/[0.06] transition"
+                                  >
+                                    <span className="w-1 h-1 rounded-full bg-indigo-400/70 flex-shrink-0" />
+                                    <span className="flex-1 truncate font-medium">{tool.name}</span>
+                                    <span className="text-[10px] text-zinc-500 group-hover:text-zinc-300 transition">
+                                      {tool.tag}
+                                    </span>
+                                    <ExternalLink size={11} className="text-zinc-500 group-hover:text-indigo-300 transition" />
+                                  </a>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      )}
+                    </div>
                   )
                 })}
               </div>
@@ -204,12 +287,14 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
         <aside
           className="w-64 min-h-screen flex flex-col"
           style={{
-            background: 'linear-gradient(180deg, #1a1f2c 0%, #121620 100%)',
-            borderLeft: '1px solid rgba(255,255,255,0.04)',
+            background:
+              'linear-gradient(180deg, rgba(20, 24, 36, 0.96) 0%, rgba(13, 16, 24, 0.96) 100%)',
+            borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
             boxShadow:
-              'inset -1px 0 2px rgba(255,255,255,0.04), ' +
-              'inset 0 1px 2px rgba(255,255,255,0.04), ' +
-              '-4px 0 20px rgba(0,0,0,0.35)',
+              'inset 1px 0 0 rgba(255, 255, 255, 0.06), ' +
+              '-8px 0 32px rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(16px) saturate(140%)',
+            WebkitBackdropFilter: 'blur(16px) saturate(140%)',
           }}
         >
           <SidebarContent />

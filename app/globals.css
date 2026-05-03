@@ -220,7 +220,7 @@ body {
 
 /* ── Gradient text ── */
 .gradient-text {
-  background: linear-gradient(135deg, #818cf8, #8b5cf6, #a78bfa);
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9, #7dd3fc);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -407,14 +407,24 @@ body {
 }
 
 /* ══════════════════════════════════════════
-   QUIET ATMOSPHERE — Sky scene
-   Fixed-position layered background driven by CSS custom properties
-   set per-minute by LivingDayProvider:
-     --bg1, --bg2          base wash colors
-     --glow1, --glow2      RGB triplets for warm/cool halos
-     --sun-x, --sun-y      celestial body position (0-100%)
-     --sun-opacity         edge fade
+   SkyScene — site-wide background, time-of-day aware.
+
+   The .sky-scene wrapper carries data-phase="night|dawn|day|dusk|evening".
+   Every layer below has a 12-second transition on background-color and
+   opacity so phase changes (which only happen at clock-driven boundaries
+   every few hours) blend smoothly without jerky position snaps.
+
+   Layers (back → front):
+     1. base       solid phase-tinted gradient
+     2. stars      scattered dots, twinkle, fade in for night/evening/dawn
+     3. sun        soft warm disc upper-right, visible dawn/day/dusk
+     4. moon       cool disc upper-left, visible evening/night
+     5. clouds     three blurred ellipses drifting slowly, always visible
+     6. aurora     subtle indigo+clay glow drifting (constant)
+     7. grid       static dot texture, masked to fade at edges
+     8. vignette   gentle edge darkening
    ══════════════════════════════════════════ */
+
 .sky-scene {
   position: fixed;
   inset: 0;
@@ -424,136 +434,759 @@ body {
   isolation: isolate;
 }
 
-/* 1. Base wash — bg1 at top, bg2 deeper toward bottom. */
+/* ── 1. Base sky ───────────────────────────────────────── */
+
 .sky-scene__base {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
-  transition: background 1.2s var(--ease-snappy);
+  background: linear-gradient(180deg, #0d1017 0%, #11141b 100%);
+  transition: background 12s ease;
 }
 
-/* 2. Glow halo — warm/cool radials. The warm halo follows the sun;
-      the cool halo sits at the bottom edge for atmospheric depth.
-      Alphas tuned for full-viewport: prototype's 0.50/0.45 read as
-      restrained inside a 900px frame but flood at fullscreen, so we
-      hold the warm halo at ~0.30 and the cool well at ~0.22. */
-.sky-scene__glow {
+/* Matte palette — every phase is desaturated and pushed slightly toward
+ * gray. Reads as "weather painted on canvas" instead of "neon poster". */
+.sky-scene[data-phase="night"]   .sky-scene__base {
+  background: linear-gradient(180deg, #0d1118 0%, #131720 60%, #0f1219 100%);
+}
+.sky-scene[data-phase="dawn"]    .sky-scene__base {
+  background: linear-gradient(180deg, #2c2c3c 0%, #4a3e44 55%, #5e463c 100%);
+}
+.sky-scene[data-phase="day"]     .sky-scene__base {
+  background: linear-gradient(180deg, #3b4a5e 0%, #4d5f78 55%, #5e7390 100%);
+}
+.sky-scene[data-phase="dusk"]    .sky-scene__base {
+  background: linear-gradient(180deg, #2a2436 0%, #4a3640 50%, #5e3a30 100%);
+}
+.sky-scene[data-phase="evening"] .sky-scene__base {
+  background: linear-gradient(180deg, #131524 0%, #1c1c30 60%, #161422 100%);
+}
+
+/* ── 2. Stars ─────────────────────────────────────────── */
+
+.sky-scene__stars {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse 38% 32% at var(--sun-x) var(--sun-y),
-      rgba(var(--glow1), 0.30), transparent 70%),
-    radial-gradient(ellipse 70% 26% at 50% 100%,
-      rgba(var(--glow2), 0.22), transparent 75%);
-  filter: blur(10px);
-  transition: background 1.2s var(--ease-snappy);
+  opacity: 0;
+  transition: opacity 12s ease;
 }
+.sky-scene[data-phase="night"]   .sky-scene__stars { opacity: 1.00; }
+.sky-scene[data-phase="evening"] .sky-scene__stars { opacity: 0.85; }
+.sky-scene[data-phase="dawn"]    .sky-scene__stars { opacity: 0.35; }
+.sky-scene[data-phase="dusk"]    .sky-scene__stars { opacity: 0.20; }
+.sky-scene[data-phase="day"]     .sky-scene__stars { opacity: 0; }
 
-/* 3. Sun/moon body — pseudo-elements paint the disc and corona. The
-      wrapper carries position; ::before is the wide soft halo and
-      ::after is the bright core. mix-blend-mode: screen keeps it
-      reading as light, not paint. */
-.sky-scene__body {
-  position: absolute;
-  left: var(--sun-x);
-  top: var(--sun-y);
-  transform: translate(-50%, -50%);
-  width: 240px;
-  height: 240px;
-  opacity: var(--sun-opacity);
-  mix-blend-mode: screen;
-  transition: left 0.6s var(--ease-snappy),
-              top 0.6s var(--ease-snappy),
-              opacity 0.8s linear;
-}
-.sky-scene__body::before,
-.sky-scene__body::after {
-  content: '';
+.star {
   position: absolute;
   border-radius: 50%;
-  transition: background 1.2s var(--ease-snappy),
-              box-shadow 1.2s var(--ease-snappy);
+  background: rgba(240, 246, 255, 0.85);
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+  /* Two animations: twinkle (opacity) + drift (subtle translate). The
+   * `animationDelay` prop in SkyScene.tsx provides a different delay for
+   * each. */
+  animation:
+    star-twinkle 4.5s ease-in-out infinite,
+    star-drift 22s ease-in-out infinite;
+  will-change: transform, opacity;
 }
-.sky-scene__body::before {
-  inset: 0;
+.star--sm { width: 2px; height: 2px; --twinkle-base: 0.35; }
+.star--md { width: 3px; height: 3px; --twinkle-base: 0.55; }
+.star--lg { width: 4px; height: 4px; --twinkle-base: 0.70; }
+
+@keyframes star-twinkle {
+  0%, 100% { opacity: var(--twinkle-base, 0.6); }
+  50%      { opacity: 1; }
 }
 
-/* Sun — five layers of breath in the corona, cream→gold disc.
-   Per the philosophy: the disc is "a hole in the sky", never pure white
-   at the heart and never deep orange at the rim. Each corona stop is
-   tuned so no edge is visible — fade to almost nothing before you can
-   name where it ended. */
-.sky-scene__body--sun::before {
-  background: radial-gradient(circle,
-    rgba(255, 240, 195, 0.38) 0%,    /* 1. inner brightness pressing on disc */
-    rgba(255, 220, 160, 0.22) 18%,   /* 2. mid yellow */
-    rgba(255, 195, 125, 0.12) 36%,   /* 3. softening to peach */
-    rgba(255, 180, 105, 0.05) 55%,   /* 4. far amber, thinning */
-    rgba(255, 180, 105, 0.015) 72%,  /* 5. near-invisible haze */
-    transparent 92%);
+@keyframes star-drift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  25%      { transform: translate3d(2px, -1px, 0); }
+  50%      { transform: translate3d(-1px, 2px, 0); }
+  75%      { transform: translate3d(-2px, -2px, 0); }
 }
-.sky-scene__body--sun::after {
-  width: 38px;
-  height: 38px;
+
+/* ── 3. Sun ──────────────────────────────────────────── */
+
+/* Two-layer sun: outer .sky-scene__sun is the positioning + halo wrapper.
+ * Inside, .sky-scene__sun-rays paints 12 rotating rays via a repeating
+ * conic gradient masked into a ring shape. .sky-scene__sun-disc is the
+ * solid bright body on top with a sphere highlight + faint inset shadow.
+ *
+ * Phase transitions reposition the wrapper (low at dawn/dusk, high at day)
+ * and tint both rays + disc warm-orange at golden hours. */
+.sky-scene__sun {
+  position: absolute;
+  top: 11%;
+  right: 12%;
+  width: 150px;
+  height: 150px;
+  opacity: 0;
+  transition: opacity 12s ease, top 12s ease, right 12s ease;
+}
+
+/* Rays: low-saturation, fewer + thinner. Mask leaves only a soft ring
+ * around the disc so the rays read as "warm haze with hints of beams"
+ * instead of a stamped sun graphic. */
+.sky-scene__sun-rays {
+  position: absolute;
+  inset: -22px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(220, 200, 150, 0.10) 0deg,
+    rgba(220, 200, 150, 0.10) 4deg,
+    transparent 4deg,
+    transparent 30deg
+  );
+  -webkit-mask-image: radial-gradient(circle, transparent 32%, black 44%, black 60%, transparent 82%);
+          mask-image: radial-gradient(circle, transparent 32%, black 44%, black 60%, transparent 82%);
+  filter: blur(2px);
+  animation: sun-rays-rotate 120s linear infinite;
+  will-change: transform;
+}
+
+/* Disc: smaller, softer cream→pale-amber. Big diffuse halo blends it into
+ * the sky instead of stamping a high-contrast circle. No hard sphere
+ * shadow — let the gradient + halo do the depth work. */
+.sky-scene__sun-disc {
+  position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle,
-    #fff7d8 0%,    /* cream — never pure white */
-    #fce9a8 55%,   /* warming */
-    #efc972 92%,   /* pale gold edge — never deep orange */
-    #e6bd62 100%);
-  /* Stacked shadows extend the corona beyond ::before's box, knitting
-     halo into base atmosphere so the eye can't find an edge. */
+  width: 78px;
+  height: 78px;
+  margin-top: -39px;
+  margin-left: -39px;
+  border-radius: 50%;
+  /* Matte sun — duster, less saturated. Cream → muted gold instead of
+   * vivid yellow → orange. */
+  background: radial-gradient(
+    circle at 38% 32%,
+    rgba(245, 240, 218, 0.85) 0%,
+    rgba(228, 210, 156, 0.75) 45%,
+    rgba(196, 160, 96, 0.55) 78%,
+    rgba(160, 120, 60, 0.35) 100%
+  );
   box-shadow:
-    0 0 72px 16px rgba(255, 215, 140, 0.22),
-    0 0 38px 9px  rgba(255, 230, 170, 0.36),
-    0 0 18px 4px  rgba(255, 245, 210, 0.55);
+    0 0 28px 6px rgba(220, 200, 150, 0.18),
+    0 0 64px 22px rgba(200, 180, 130, 0.12),
+    0 0 120px 40px rgba(180, 160, 110, 0.06);
+  filter: blur(0.5px);
+  animation: sun-pulse 10s ease-in-out infinite;
+  will-change: transform;
 }
 
-/* Moon — same logic, temperature inverted. Pale silver center, cool
-   blue-white edge, cool corona that doesn't overstay. */
-.sky-scene__body--moon::before {
-  background: radial-gradient(circle,
-    rgba(225, 235, 252, 0.28) 0%,    /* 1. inner brightness */
-    rgba(215, 228, 248, 0.16) 22%,   /* 2. cool silver */
-    rgba(205, 222, 248, 0.07) 42%,   /* 3. cool blue-white */
-    rgba(205, 222, 248, 0.025) 62%,  /* 4. far cool */
-    transparent 85%);
+@keyframes sun-rays-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
-.sky-scene__body--moon::after {
-  width: 30px;
-  height: 30px;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle,
-    #f6f8fc 0%,    /* pale silver */
-    #e0e7f1 65%,   /* gentle blue-white */
-    #c6d0dd 100%); /* cool edge */
-  box-shadow:
-    0 0 50px 12px rgba(220, 235, 255, 0.18),
-    0 0 26px 7px  rgba(230, 240, 255, 0.30),
-    0 0 12px 3px  rgba(240, 248, 255, 0.45);
+@keyframes sun-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.04); }
 }
 
-/* 4. Grain — barely-there texture so the gradients don't feel like CSS. */
-.sky-scene__grain {
+/* Phase visibility + position. */
+.sky-scene[data-phase="day"] .sky-scene__sun {
+  opacity: 0.95;
+  top: 10%;
+  right: 14%;
+}
+.sky-scene[data-phase="dawn"] .sky-scene__sun {
+  opacity: 0.80;
+  top: 38%;
+  right: 8%;
+}
+.sky-scene[data-phase="dusk"] .sky-scene__sun {
+  opacity: 0.85;
+  top: 44%;
+  right: 6%;
+}
+
+/* Dawn / dusk: warm-shift the disc and rays — still soft, just warmer. */
+.sky-scene[data-phase="dawn"] .sky-scene__sun-disc,
+.sky-scene[data-phase="dusk"] .sky-scene__sun-disc {
+  background: radial-gradient(
+    circle at 38% 32%,
+    rgba(255, 224, 184, 0.95) 0%,
+    rgba(255, 178, 124, 0.80) 45%,
+    rgba(232, 122, 78, 0.55) 78%,
+    rgba(180, 70, 56, 0.35) 100%
+  );
+  box-shadow:
+    0 0 28px 6px rgba(255, 152, 96, 0.28),
+    0 0 64px 22px rgba(232, 110, 70, 0.18),
+    0 0 120px 40px rgba(190, 80, 60, 0.10);
+}
+.sky-scene[data-phase="dawn"] .sky-scene__sun-rays,
+.sky-scene[data-phase="dusk"] .sky-scene__sun-rays {
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(255, 178, 124, 0.18) 0deg,
+    rgba(255, 178, 124, 0.18) 4deg,
+    transparent 4deg,
+    transparent 30deg
+  );
+}
+
+/* ── 4. Moon ─────────────────────────────────────────── */
+
+/* Two-layer moon: outer .sky-scene__moon holds the warm halo + sphere
+ * shadow (these stay fixed so the lighting feels stable). Inner disc
+ * .sky-scene__moon-disc carries the gradient + craters and slowly
+ * rotates. Effect: the moon's surface visibly turns as if it's a 3D
+ * sphere, while the halo around it doesn't tumble. */
+.sky-scene__moon {
+  position: absolute;
+  top: 12%;
+  left: 12%;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  /* Outer halo — muted cream */
+  box-shadow:
+    0 0 0 6px rgba(220, 215, 200, 0.05),
+    0 0 28px 10px rgba(210, 200, 180, 0.12),
+    0 0 60px 24px rgba(200, 190, 170, 0.06);
+  opacity: 0;
+  transition: opacity 12s ease;
+}
+
+.sky-scene__moon-disc {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px);
-  background-size: 3px 3px;
-  mix-blend-mode: overlay;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 32% 30%,
+    #ece8d4 0%,
+    #ddd4b0 35%,
+    #b8ad88 70%,
+    #8a7d5a 100%
+  );
+  /* Subtle inner shadow on the lower-left for sphere depth — rotates with
+   * the disc, but at low intensity so it reads as light play, not a fixed
+   * shadow. */
+  box-shadow: inset -8px -8px 14px rgba(60, 40, 0, 0.22);
+  animation: moon-rotate 50s linear infinite;
+  will-change: transform;
+}
+
+/* Craters — ::before paints three craters in the upper-left, ::after
+ * paints two more in the lower-right. They rotate WITH the disc. */
+.sky-scene__moon-disc::before,
+.sky-scene__moon-disc::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(60, 40, 0, 0.20);
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.18);
+}
+.sky-scene__moon-disc::before {
+  width: 12px;
+  height: 12px;
+  top: 22%;
+  left: 28%;
+  box-shadow:
+    inset 1px 1px 2px rgba(0, 0, 0, 0.18),
+    20px 6px 0 -3px rgba(60, 40, 0, 0.16),
+    8px 26px 0 -2px rgba(60, 40, 0, 0.14);
+}
+.sky-scene__moon-disc::after {
+  width: 7px;
+  height: 7px;
+  bottom: 26%;
+  right: 22%;
+  box-shadow:
+    inset 1px 1px 2px rgba(0, 0, 0, 0.18),
+    -16px -6px 0 -1px rgba(60, 40, 0, 0.12);
+}
+
+@keyframes moon-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.sky-scene[data-phase="night"]   .sky-scene__moon { opacity: 0.95; }
+.sky-scene[data-phase="evening"] .sky-scene__moon { opacity: 0.80; }
+.sky-scene[data-phase="dawn"]    .sky-scene__moon { opacity: 0.20; }
+
+/* ── 5. Clouds ───────────────────────────────────────── */
+
+.sky-scene__clouds {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 12s ease;
+}
+.sky-scene[data-phase="day"]     .sky-scene__clouds { opacity: 0.85; }
+.sky-scene[data-phase="dawn"]    .sky-scene__clouds { opacity: 0.65; }
+.sky-scene[data-phase="dusk"]    .sky-scene__clouds { opacity: 0.65; }
+.sky-scene[data-phase="evening"] .sky-scene__clouds { opacity: 0.40; }
+.sky-scene[data-phase="night"]   .sky-scene__clouds { opacity: 0.30; }
+
+/* Each cloud is a multi-lobed shape: the .cloud element is the base
+ * ellipse, and ::before / ::after are smaller offset circles that act
+ * as additional puffs on the top so the silhouette reads as a cloud
+ * instead of a smooth blob. The whole stack is blurred uniformly. */
+.cloud {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.40);
+  filter: blur(10px);
+  will-change: transform;
+}
+.cloud::before,
+.cloud::after {
+  content: "";
+  position: absolute;
+  background: inherit;
+  border-radius: 50%;
+}
+.cloud::before {
+  top: -45%;
+  left: 18%;
+  width: 55%;
+  height: 85%;
+}
+.cloud::after {
+  top: -30%;
+  left: 55%;
+  width: 45%;
+  height: 70%;
+}
+
+.cloud--1 {
+  top: 22%;
+  left: 8%;
+  width: 220px;
+  height: 70px;
+  animation: cloud-drift-l 90s linear infinite;
+}
+.cloud--2 {
+  top: 9%;
+  left: 45%;
+  width: 280px;
+  height: 80px;
+  animation: cloud-drift-r 120s linear infinite;
+  animation-delay: -40s;
+}
+.cloud--3 {
+  top: 30%;
+  left: 70%;
+  width: 200px;
+  height: 60px;
+  animation: cloud-drift-l 105s linear infinite;
+  animation-delay: -65s;
+}
+.cloud--4 {
+  top: 16%;
+  left: 22%;
+  width: 240px;
+  height: 70px;
+  animation: cloud-drift-r 140s linear infinite;
+  animation-delay: -110s;
+  opacity: 0.8;
+}
+
+@keyframes cloud-drift-l {
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-180px, -10px, 0); }
+}
+@keyframes cloud-drift-r {
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(180px,   8px, 0); }
+}
+
+/* Tint clouds per phase so they don't always look pure white. */
+.sky-scene[data-phase="dusk"] .cloud,
+.sky-scene[data-phase="dawn"] .cloud { background: rgba(255, 200, 170, 0.12); }
+.sky-scene[data-phase="evening"] .cloud,
+.sky-scene[data-phase="night"] .cloud { background: rgba(150, 170, 210, 0.08); }
+
+/* ── 5a. Birds — only visible during day / dawn / dusk ── */
+
+.sky-scene__birds {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 12s ease;
+}
+.sky-scene[data-phase="day"]  .sky-scene__birds { opacity: 0.85; }
+.sky-scene[data-phase="dawn"] .sky-scene__birds { opacity: 0.55; }
+.sky-scene[data-phase="dusk"] .sky-scene__birds { opacity: 0.55; }
+
+.bird {
+  position: absolute;
+  width: 22px;
+  height: auto;
+  color: rgba(15, 18, 28, 0.85);
+  will-change: transform;
+}
+
+.bird__wing {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: bird-flap 0.42s ease-in-out infinite;
+}
+.bird__wing--right { animation-name: bird-flap-mirror; }
+
+@keyframes bird-flap {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(0.45); }
+}
+@keyframes bird-flap-mirror {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(0.45); }
+}
+
+/* Five birds, varying sizes for parallax depth + staggered loose-flock crossings. */
+.bird--1 {
+  top: 18%;
+  left: -8%;
+  width: 24px;
+  animation: bird-cross-a 32s linear infinite;
+}
+.bird--2 {
+  top: 22%;
+  left: -8%;
+  width: 18px;
+  animation: bird-cross-a 32s linear infinite;
+  animation-delay: -3s;
+}
+.bird--3 {
+  top: 26%;
+  left: -8%;
+  width: 22px;
+  animation: bird-cross-a 32s linear infinite;
+  animation-delay: -6s;
+}
+.bird--4 {
+  top: 12%;
+  left: -8%;
+  width: 16px;
+  animation: bird-cross-b 48s linear infinite;
+  animation-delay: -22s;
+}
+.bird--5 {
+  top: 32%;
+  left: -8%;
+  width: 28px;
+  animation: bird-cross-c 56s linear infinite;
+  animation-delay: -10s;
+}
+
+@keyframes bird-cross-a {
+  0%   { transform: translate3d(0, 0, 0)         scale(1); }
+  25%  { transform: translate3d(28vw, -14px, 0)  scale(1.02); }
+  55%  { transform: translate3d(58vw, 8px, 0)    scale(1); }
+  80%  { transform: translate3d(85vw, -10px, 0)  scale(0.98); }
+  100% { transform: translate3d(120vw, 4px, 0)   scale(0.95); }
+}
+@keyframes bird-cross-b {
+  0%   { transform: translate3d(0, 0, 0)         scale(1); }
+  30%  { transform: translate3d(35vw, 10px, 0)   scale(1); }
+  60%  { transform: translate3d(65vw, -18px, 0)  scale(0.98); }
+  100% { transform: translate3d(120vw, 6px, 0)   scale(0.95); }
+}
+@keyframes bird-cross-c {
+  0%   { transform: translate3d(0, 0, 0)         scale(1); }
+  20%  { transform: translate3d(25vw, -8px, 0)   scale(1.02); }
+  50%  { transform: translate3d(55vw, 22px, 0)   scale(1); }
+  78%  { transform: translate3d(82vw, -4px, 0)   scale(0.97); }
+  100% { transform: translate3d(120vw, 10px, 0)  scale(0.94); }
+}
+
+/* ── 5b. Bats — only visible at evening/night ───────── */
+
+.sky-scene__bats {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 12s ease;
+  /* Bats sit between the moon layer and the aurora; this z-index
+   * keeps them from leaking ahead of the vignette. */
+}
+.sky-scene[data-phase="evening"] .sky-scene__bats { opacity: 0.55; }
+.sky-scene[data-phase="night"]   .sky-scene__bats { opacity: 0.75; }
+
+.bat {
+  position: absolute;
+  width: 28px;
+  height: auto;
+  color: #0a0c14;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
+  will-change: transform;
+}
+
+.bat__wing {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: bat-flap 0.36s ease-in-out infinite;
+}
+.bat__wing--right {
+  animation-name: bat-flap-mirror;
+}
+
+@keyframes bat-flap {
+  0%, 100% { transform: scaleY(1)    skewX(0deg); }
+  50%      { transform: scaleY(0.55) skewX(-6deg); }
+}
+@keyframes bat-flap-mirror {
+  0%, 100% { transform: scaleY(1)    skewX(0deg); }
+  50%      { transform: scaleY(0.55) skewX(6deg); }
+}
+
+/* Each bat takes its own curved path across the sky. */
+.bat--1 {
+  top: 15%;
+  left: -10%;
+  animation: bat-cross-1 28s linear infinite;
+}
+.bat--2 {
+  top: 28%;
+  left: -10%;
+  width: 22px;
+  animation: bat-cross-2 36s linear infinite;
+  animation-delay: -8s;
+}
+.bat--3 {
+  top: 42%;
+  left: -10%;
+  width: 32px;
+  animation: bat-cross-3 44s linear infinite;
+  animation-delay: -22s;
+}
+
+@keyframes bat-cross-1 {
+  0%   { transform: translate3d(0, 0, 0)         scale(1); }
+  20%  { transform: translate3d(28vw, -20px, 0)  scale(0.95); }
+  40%  { transform: translate3d(50vw, 15px, 0)   scale(0.9); }
+  60%  { transform: translate3d(75vw, -10px, 0)  scale(0.85); }
+  100% { transform: translate3d(120vw, 12px, 0)  scale(0.8); }
+}
+@keyframes bat-cross-2 {
+  0%   { transform: translate3d(0, 0, 0)        scale(0.9); }
+  25%  { transform: translate3d(30vw, 18px, 0)  scale(0.95); }
+  55%  { transform: translate3d(58vw, -22px, 0) scale(1); }
+  85%  { transform: translate3d(90vw, 8px, 0)   scale(0.95); }
+  100% { transform: translate3d(120vw, 0, 0)    scale(0.9); }
+}
+@keyframes bat-cross-3 {
+  0%   { transform: translate3d(0, 0, 0)         scale(1); }
+  30%  { transform: translate3d(35vw, -15px, 0)  scale(1.05); }
+  60%  { transform: translate3d(70vw, 25px, 0)   scale(1); }
+  100% { transform: translate3d(120vw, -8px, 0)  scale(0.95); }
+}
+
+/* ── 5c. Weather overlay ──────────────────────────────
+ * Single absolute layer; what shows depends on data-weather.
+ * Each weather state is a different background pattern + animation
+ * applied to the same element. Hidden when sunny. */
+
+.sky-scene__weather {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 8s ease;
+  background-repeat: repeat;
+  background-position: 0 0;
+  will-change: background-position;
+}
+
+/* Rain — diagonal streaks, fast. Two layered backgrounds at different
+ * speeds for depth. */
+.sky-scene[data-weather="rainy"]  .sky-scene__weather,
+.sky-scene[data-weather="stormy"] .sky-scene__weather {
+  opacity: 0.42;
+  background-image:
+    repeating-linear-gradient(
+      105deg,
+      transparent 0,
+      transparent 9px,
+      rgba(160, 175, 200, 0.22) 9px,
+      rgba(160, 175, 200, 0.22) 10px
+    ),
+    repeating-linear-gradient(
+      102deg,
+      transparent 0,
+      transparent 16px,
+      rgba(160, 175, 200, 0.12) 16px,
+      rgba(160, 175, 200, 0.12) 17px
+    );
+  animation: weather-rain 0.8s linear infinite;
+}
+.sky-scene[data-weather="stormy"] .sky-scene__weather { opacity: 0.58; }
+
+@keyframes weather-rain {
+  from { background-position: 0 0; }
+  to   { background-position: -22px 80px; }
+}
+
+/* Snow — soft white circles falling slowly. */
+.sky-scene[data-weather="snowy"] .sky-scene__weather {
+  opacity: 0.65;
+  background-image:
+    radial-gradient(rgba(232, 232, 226, 0.40) 1.5px, transparent 2px),
+    radial-gradient(rgba(232, 232, 226, 0.20) 1px,   transparent 2px);
+  background-size: 90px 90px, 50px 50px;
+  background-position: 0 0, 25px 25px;
+  animation: weather-snow 16s linear infinite;
+}
+
+@keyframes weather-snow {
+  from { background-position: 0 0, 25px 25px; }
+  to   { background-position: 30px 240px, -20px 220px; }
+}
+
+/* Hamsin — warm sticky haze. */
+.sky-scene[data-weather="hamsin"] .sky-scene__weather {
+  opacity: 0.42;
+  background-image: linear-gradient(
+    180deg,
+    rgba(186, 162, 108, 0.13) 0%,
+    rgba(150, 118, 78, 0.06) 100%
+  );
+}
+
+/* Cloudy — light extra horizon haze. */
+.sky-scene[data-weather="cloudy"] .sky-scene__weather {
+  opacity: 0.30;
+  background-image: linear-gradient(
+    180deg,
+    rgba(170, 180, 200, 0.12) 0%,
+    rgba(170, 180, 200, 0)    60%
+  );
+}
+
+/* Windy — slight horizontal streaks. */
+.sky-scene[data-weather="windy"] .sky-scene__weather {
+  opacity: 0.22;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent 80px,
+    rgba(255, 255, 255, 0.10) 80px,
+    rgba(255, 255, 255, 0.10) 82px
+  );
+  animation: weather-wind 14s linear infinite;
+}
+
+@keyframes weather-wind {
+  from { background-position: 0 0; }
+  to   { background-position: -160px 0; }
+}
+
+/* Sunny: hidden (default opacity 0). */
+
+/* ── 6. Aurora — subtle constant motion ─────────────── */
+
+.sky-scene__aurora {
+  position: absolute;
+  top: -20%;
+  left: -10%;
+  right: -10%;
+  height: 70%;
+  background:
+    radial-gradient(40% 60% at 30% 40%, rgba(118, 132, 168, 0.05) 0%, rgba(118, 132, 168, 0) 70%),
+    radial-gradient(35% 50% at 70% 35%, rgba(176, 156, 116, 0.03) 0%, rgba(176, 156, 116, 0) 70%);
+  filter: blur(28px);
+  will-change: transform;
+  animation: sky-aurora-drift 22s ease-in-out infinite;
+}
+
+@keyframes sky-aurora-drift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(40px, 12px, 0); }
+}
+
+/* ── 7. Grid texture ─────────────────────────────────── */
+
+/* Faint dot grid for dark phases only. On day/dawn/dusk the bright sky
+ * makes the white dots stand out as noise, so we hide it then. */
+.sky-scene__grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0;
+  transition: opacity 12s ease;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, black 40%, transparent 90%);
+          mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, black 40%, transparent 90%);
+}
+.sky-scene[data-phase="evening"] .sky-scene__grid { opacity: 0.5; }
+.sky-scene[data-phase="night"]   .sky-scene__grid { opacity: 0.7; }
+
+/* ── 8. Vignette ─────────────────────────────────────── */
+
+.sky-scene__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 100% 80% at 50% 50%, transparent 50%, rgba(0, 0, 0, 0.40) 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sky-scene__base,
-  .sky-scene__glow,
-  .sky-scene__body,
-  .sky-scene__body::before,
-  .sky-scene__body::after {
-    transition: none !important;
+  .sky-scene__aurora,
+  .star,
+  .cloud,
+  .bat,
+  .bat__wing,
+  .bird,
+  .bird__wing,
+  .sky-scene__moon-disc,
+  .sky-scene__sun-rays,
+  .sky-scene__sun-disc,
+  .sky-scene__weather { animation: none; }
+}
+
+/* Dashboard layout — make sure every direct child of .qa stacks above
+ * the SkyScene (which sits at z-index: 0 with its own stacking context).
+ * Without this, on bright phases the sidebar / mobile-header / main
+ * backgrounds get overpainted by the sky and become unreadable. The
+ * Sidebar component wraps its <aside> in a div, so we can't just
+ * target aside — covering all direct children except the sky itself
+ * is more robust. */
+.qa > *:not(.sky-scene):not(script):not(style) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Hide the browser text-insertion caret on every non-input surface so
+ * users don't see a stray blinking cursor on headings, cards, etc. when
+ * they happen to click on selectable text. Real inputs / textareas /
+ * contenteditable surfaces opt back in. */
+.qa,
+.qa * {
+  caret-color: transparent;
+}
+.qa input,
+.qa textarea,
+.qa [contenteditable="true"],
+.qa [contenteditable="plaintext-only"] {
+  caret-color: auto;
+}
+
+/* ══════════════════════════════════════════
+   ScrollReveal utility — pair with components/ScrollReveal.tsx.
+   Drop `.reveal` on any block; it fades + slides up the first time
+   it scrolls into view, then stays static. Staggered children get
+   `style="--reveal-delay: 80ms;"` etc.
+   ══════════════════════════════════════════ */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 600ms cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms),
+    transform 600ms cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }
 
@@ -568,11 +1201,14 @@ body {
 /* ── Glass cards: hairline glass with top-edge shimmer ── */
 .qa .glass,
 .qa .glass-sm {
-  background: rgba(255, 255, 255, 0.04);
-  border: 0.5px solid rgba(255, 255, 255, 0.09);
-  box-shadow: none;
+  /* Matte glass — slightly more opaque, no saturation boost, soft shadow. */
+  background: rgba(28, 33, 44, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 4px 14px rgba(0, 0, 0, 0.22);
   position: relative;
   overflow: hidden;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   transition: transform 280ms var(--ease-spring),
               border-color 280ms var(--ease-spring),
               background 280ms var(--ease-spring);
@@ -948,13 +1584,18 @@ body {
   position: relative;
   overflow: hidden;
   border-radius: 16px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(28, 33, 44, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 4px 14px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   transition: border-color 0.35s ease, box-shadow 0.35s ease;
 }
 .glow-card:hover {
-  border-color: rgba(99,102,241,0.2);
-  box-shadow: 0 0 30px rgba(99,102,241,0.06);
+  border-color: rgba(160, 175, 195, 0.20);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 6px 18px rgba(0, 0, 0, 0.28);
 }
 
 /* Internal spotlight following the cursor */
@@ -1502,7 +2143,7 @@ html.light .animated-border-inner {
 
 /* Gradient text — slightly darker for contrast on white */
 html.light .gradient-text {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed, #8b5cf6);
+  background: linear-gradient(135deg, #0284c7, #0ea5e9, #38bdf8);
   -webkit-background-clip: text;
   background-clip: text;
 }
@@ -1712,6 +2353,164 @@ html.light .badge-danger {
   background: rgba(220,38,38,0.08);
   color: #dc2626;
   border-color: rgba(220,38,38,0.18);
+}
+
+/* ══════════════════════════════════════════
+   LIGHT THEME — happy-day overrides.
+   The `.qa .glass` matte rules outrank the bare-class light defaults,
+   so re-bind them at higher specificity (`html.light .qa ...`). Same
+   goes for the sky scene — daylight gets warm pastels instead of slate.
+   ══════════════════════════════════════════ */
+
+/* Cards — restore warm off-white in light mode (beats .qa specificity). */
+html.light .qa .glass,
+html.light .qa .glass-sm {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86) 0%, rgba(248, 250, 255, 0.78) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 1px 2px rgba(15, 17, 23, 0.04),
+    0 10px 28px -10px rgba(99, 102, 241, 0.16);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+}
+html.light .qa .glass:hover,
+html.light .qa .glass-sm:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(252, 253, 255, 0.86) 100%);
+  border-color: rgba(99, 102, 241, 0.26);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 1px 2px rgba(15, 17, 23, 0.05),
+    0 14px 36px -12px rgba(99, 102, 241, 0.22);
+}
+html.light .qa .glow-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86) 0%, rgba(248, 250, 255, 0.78) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 8px 24px -10px rgba(99, 102, 241, 0.18);
+}
+html.light .qa .glow-card:hover {
+  border-color: rgba(99, 102, 241, 0.30);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 14px 36px -12px rgba(99, 102, 241, 0.24);
+}
+
+/* Sky scene — warm, cheerful palette in light mode. Day is the
+ * common case; dawn/dusk get peach, evening lavender, night stays
+ * close to its dark colors so the moon still reads. */
+html.light .sky-scene[data-phase="day"] .sky-scene__base {
+  background: linear-gradient(180deg, #a3d4f5 0%, #c5e4f4 55%, #fde6c8 100%);
+}
+html.light .sky-scene[data-phase="dawn"] .sky-scene__base {
+  background: linear-gradient(180deg, #fdc8b3 0%, #fcd9c4 55%, #fbe7d2 100%);
+}
+html.light .sky-scene[data-phase="dusk"] .sky-scene__base {
+  background: linear-gradient(180deg, #f5b9a8 0%, #f5cebf 55%, #f3dccc 100%);
+}
+html.light .sky-scene[data-phase="evening"] .sky-scene__base {
+  background: linear-gradient(180deg, #b8aacf 0%, #c8b6cf 55%, #d6c2cb 100%);
+}
+html.light .sky-scene[data-phase="night"] .sky-scene__base {
+  background: linear-gradient(180deg, #2c3654 0%, #3a4566 55%, #4a567a 100%);
+}
+
+/* Brighten sun + soften vignette for light mode. */
+html.light .sky-scene__sun-disc {
+  background:
+    radial-gradient(circle at 35% 35%, #fff7d4 0%, #ffe79a 35%, #fdc964 65%, #f4a93a 100%);
+  box-shadow:
+    0 0 60px rgba(252, 211, 77, 0.35),
+    0 0 120px rgba(252, 211, 77, 0.20);
+}
+html.light .sky-scene__sun-rays {
+  opacity: 0.18;
+}
+html.light .sky-scene__moon-disc {
+  background:
+    radial-gradient(circle at 35% 35%, #fffaf0 0%, #f6ecd6 40%, #d9c89c 80%, #b09a6e 100%);
+}
+html.light .sky-scene__vignette {
+  background: radial-gradient(ellipse 100% 80% at 50% 50%, transparent 55%, rgba(99, 102, 241, 0.12) 100%);
+}
+/* Grid is meant for dark phases — hide it under bright light sky. */
+html.light .sky-scene[data-phase="day"]   .sky-scene__grid,
+html.light .sky-scene[data-phase="dawn"]  .sky-scene__grid,
+html.light .sky-scene[data-phase="dusk"]  .sky-scene__grid {
+  opacity: 0;
+}
+
+/* Stars — keep them but only on night/evening; hide for day. */
+html.light .sky-scene[data-phase="day"]   .star,
+html.light .sky-scene[data-phase="dawn"]  .star,
+html.light .sky-scene[data-phase="dusk"]  .star {
+  opacity: 0;
+}
+
+/* Clouds — soft white over warm sky, less murky than the dark version. */
+html.light .cloud {
+  background: rgba(255, 255, 255, 0.78);
+  filter: blur(6px);
+  opacity: 0.85;
+}
+
+/* Sidebar in light mode — slightly warmer + a hint of indigo. */
+html.light .qa aside {
+  background: linear-gradient(180deg, #fdfcff 0%, #f0eef8 100%) !important;
+  border-left: 1px solid rgba(99, 102, 241, 0.16) !important;
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.6),
+    -8px 0 32px rgba(99, 102, 241, 0.10) !important;
+  backdrop-filter: blur(12px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(120%) !important;
+}
+
+/* Sidebar nav: zinc-300 grays bake in too dark on white — lift them. */
+html.light .qa aside nav .text-zinc-300 { color: #475569 !important; }
+html.light .qa aside nav .text-zinc-400 { color: #64748b !important; }
+html.light .qa aside nav a:hover { color: #4338ca !important; }
+
+/* Drive banner amber — keep it bright but readable on white. */
+html.light .qa .from-amber-500\/15,
+html.light .qa .from-amber-500\/10 {
+  --tw-gradient-from: rgb(251 191 36 / 0.18) var(--tw-gradient-from-position) !important;
+}
+
+/* ── Drive connection banner — readable in both themes ── */
+.qa-drive-banner {
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.94) 0%, rgba(254, 243, 199, 0.90) 100%);
+  border: 1px solid rgba(217, 119, 6, 0.30);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 6px 18px rgba(217, 119, 6, 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.qa-drive-banner__title { color: #92400e; }
+.qa-drive-banner__body { color: #78350f; }
+.qa-drive-banner__reload {
+  background: rgba(217, 119, 6, 0.10);
+  color: #92400e;
+}
+.qa-drive-banner__reload:hover {
+  background: rgba(217, 119, 6, 0.18);
+  color: #78350f;
+}
+
+/* Dark mode — invert: deep amber wash, light text. */
+html:not(.light) .qa-drive-banner {
+  background: linear-gradient(180deg, rgba(50, 28, 8, 0.78) 0%, rgba(40, 22, 6, 0.80) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.32);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 6px 18px rgba(0, 0, 0, 0.30);
+}
+html:not(.light) .qa-drive-banner__title { color: #fcd34d; }
+html:not(.light) .qa-drive-banner__body  { color: #d4d4d8; }
+html:not(.light) .qa-drive-banner__reload {
+  background: rgba(255, 255, 255, 0.05);
+  color: #d4d4d8;
+}
+html:not(.light) .qa-drive-banner__reload:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: #ffffff;
 }
 
 /* ── Reduced motion: disable new animations ── */

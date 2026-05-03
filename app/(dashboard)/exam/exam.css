@@ -1,0 +1,259 @@
+/* TEEPO Exam — Duolingo-energy on TEEPO tokens.
+ *
+ * Goals:
+ *   1. Match TEEPO's existing palette (no new colors).
+ *   2. But use it with confidence — solid saturated CTAs, strong cards,
+ *      bold borders, playful hover/press states.
+ *   3. No decorative scenes. The dashboard's SkyScene shows through.
+ *
+ * Two kinds of style here:
+ *   A) Tailwind retint — overrides for the `from-fuchsia-X / to-blue-X /
+ *      to-cyan-X / border-fuchsia-X / text-fuchsia-X` classes used in
+ *      legacy markup so existing JSX picks up the new palette without
+ *      file-by-file edits.
+ *   B) Identity primitives — `.exam-card`, `.exam-cta`, `.exam-hero`,
+ *      etc. for new code.
+ */
+
+.teepo-exam {
+  /* Matte palette — desaturated, no neon, no glow. */
+  --exam-clay:    176, 156, 116;     /* dusty gold */
+  --exam-accent:  118, 132, 168;     /* muted indigo */
+  --exam-success: 96, 138, 112;      /* sage */
+  --exam-warn:    198, 156, 80;      /* dusty amber */
+  --exam-danger:  186, 96, 96;       /* terracotta */
+  --exam-paper:   232, 224, 208;     /* muted paper */
+  --exam-paper-edge: rgba(176, 156, 116, 0.20);
+  --exam-card-bg:  rgba(28, 33, 44, 0.62);
+  --exam-card-border: rgba(255, 255, 255, 0.08);
+  --exam-card-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 4px 14px rgba(0,0,0,0.22);
+  --exam-cta-shadow: 0 2px 0 rgba(0,0,0,0.30), 0 4px 10px rgba(0,0,0,0.20);
+}
+
+/* ── Identity primitives ──────────────────────────────── */
+
+.teepo-exam .exam-card {
+  background: var(--exam-card-bg);
+  border: 1px solid var(--exam-card-border);
+  border-radius: 1rem;
+  box-shadow: var(--exam-card-shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.teepo-exam .exam-card-strong {
+  background: linear-gradient(180deg, rgba(30, 35, 48, 0.90), rgba(22, 27, 39, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 6px 18px rgba(0,0,0,0.24);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Solid CTA — Duolingo-style: chunky, rounded, with a baked-in shadow that
+ * "lifts" on hover and "presses" on active. */
+.teepo-exam .exam-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.875rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background: rgb(var(--exam-accent));
+  color: #f3f4f8;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.28), 0 4px 10px rgba(0,0,0,0.18);
+  transition: transform 100ms ease, box-shadow 100ms ease, filter 200ms;
+}
+.teepo-exam .exam-cta:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 rgba(0,0,0,0.28), 0 6px 12px rgba(0,0,0,0.22);
+}
+.teepo-exam .exam-cta:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.14);
+}
+.teepo-exam .exam-cta:disabled {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.teepo-exam .exam-cta-success {
+  background: rgb(var(--exam-success));
+  box-shadow: 0 2px 0 rgba(0,0,0,0.28), 0 4px 10px rgba(0,0,0,0.18);
+}
+
+.teepo-exam .exam-cta-warn {
+  background: rgb(var(--exam-warn));
+  box-shadow: 0 2px 0 rgba(0,0,0,0.28), 0 4px 10px rgba(0,0,0,0.18);
+}
+
+.teepo-exam .exam-cta-clay {
+  background: rgb(var(--exam-clay));
+  box-shadow: 0 2px 0 rgba(0,0,0,0.28), 0 4px 10px rgba(0,0,0,0.18);
+}
+
+/* Quiet ghost button */
+.teepo-exam .exam-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  transition: background 200ms;
+}
+.teepo-exam .exam-ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Heading emphasis */
+.teepo-exam .exam-emphasis {
+  background: linear-gradient(90deg, rgb(var(--exam-clay)) 0%, rgb(var(--exam-accent)) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Hero card — used for the today/plan card and rank card.
+ * Indigo-tinted glass over a dark base so the card reads on any sky. */
+.teepo-exam .exam-hero {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(118, 132, 168, 0.16) 0%, rgba(118, 132, 168, 0.04) 100%),
+    rgba(28, 33, 44, 0.68);
+  border: 1px solid rgba(118, 132, 168, 0.22);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 6px 18px rgba(0,0,0,0.24);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Pill chip */
+.teepo-exam .exam-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ── Tailwind palette retint (legacy markup) ────────── */
+
+.teepo-exam .from-fuchsia-500,
+.teepo-exam .from-fuchsia-400 {
+  --tw-gradient-from: rgb(var(--exam-clay)) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(var(--exam-clay) / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.teepo-exam .to-blue-500,
+.teepo-exam .to-cyan-400,
+.teepo-exam .to-cyan-500 {
+  --tw-gradient-to: rgb(var(--exam-accent)) var(--tw-gradient-to-position);
+}
+.teepo-exam .from-fuchsia-500\/10,
+.teepo-exam .from-fuchsia-500\/15 {
+  --tw-gradient-from: rgb(var(--exam-clay) / 0.10) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(var(--exam-clay) / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.teepo-exam .to-blue-500\/10,
+.teepo-exam .to-blue-500\/15 {
+  --tw-gradient-to: rgb(var(--exam-accent) / 0.10) var(--tw-gradient-to-position);
+}
+.teepo-exam .border-fuchsia-400 {
+  border-color: rgb(var(--exam-clay));
+}
+.teepo-exam .ring-fuchsia-300 {
+  --tw-ring-color: rgb(var(--exam-clay) / 0.5);
+}
+.teepo-exam .text-fuchsia-300,
+.teepo-exam .text-fuchsia-200 {
+  color: rgb(var(--exam-clay));
+}
+.teepo-exam .bg-white\/5 {
+  background-color: rgb(255 255 255 / 0.03);
+}
+.teepo-exam .border-white\/10 {
+  border-color: rgb(255 255 255 / 0.07);
+}
+
+/* Status tones for stat cards / heatmap */
+.teepo-exam .stat-good { color: rgb(var(--exam-success)); }
+.teepo-exam .stat-warn { color: rgb(var(--exam-warn)); }
+.teepo-exam .stat-bad  { color: rgb(var(--exam-danger)); }
+
+/* ── Light-mode overrides ─────────────────────────────
+ * The matte dark tokens above keep the page legible against the dark sky.
+ * In light mode the same dark cards blow up against the bright sky, so
+ * re-bind the surface tokens and core surface classes with happier
+ * off-white tones and dark ink. */
+html.light .teepo-exam {
+  --exam-card-bg: rgba(255, 255, 255, 0.86);
+  --exam-card-border: rgba(99, 102, 241, 0.16);
+  --exam-card-shadow: 0 1px 0 rgba(255,255,255,0.7) inset, 0 6px 18px -4px rgba(99, 102, 241, 0.15);
+  --exam-cta-shadow: 0 2px 0 rgba(0,0,0,0.10), 0 4px 10px rgba(0,0,0,0.10);
+}
+html.light .teepo-exam .exam-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 255, 0.88) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.16);
+  color: #1a1d28;
+}
+html.light .teepo-exam .exam-card-strong {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 255, 0.94) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.20);
+  color: #1a1d28;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset, 0 8px 22px -6px rgba(99, 102, 241, 0.18);
+}
+html.light .teepo-exam .exam-hero {
+  background:
+    linear-gradient(180deg, rgba(186, 230, 253, 0.55) 0%, rgba(255, 255, 255, 0.85) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.30);
+  color: #0c4a6e;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.7) inset, 0 8px 22px -6px rgba(56, 189, 248, 0.22);
+}
+
+/* CTA buttons need readable foreground in light mode. */
+html.light .teepo-exam .exam-cta { color: #ffffff; }
+html.light .teepo-exam .exam-ghost {
+  background: rgba(15, 17, 23, 0.05);
+  border: 1px solid rgba(15, 17, 23, 0.10);
+  color: #1a1d28;
+}
+html.light .teepo-exam .exam-ghost:hover {
+  background: rgba(15, 17, 23, 0.08);
+}
+
+/* In-card text/inputs that relied on dark-mode defaults. */
+html.light .teepo-exam .text-zinc-50,
+html.light .teepo-exam .text-zinc-100,
+html.light .teepo-exam .text-zinc-200 { color: #1a1d28 !important; }
+html.light .teepo-exam .text-zinc-300 { color: #334155 !important; }
+html.light .teepo-exam .text-zinc-400 { color: #475569 !important; }
+html.light .teepo-exam .text-zinc-500 { color: #64748b !important; }
+html.light .teepo-exam .bg-zinc-700\/60,
+html.light .teepo-exam .bg-zinc-800,
+html.light .teepo-exam .bg-zinc-800\/60,
+html.light .teepo-exam .bg-zinc-900\/40 {
+  background-color: rgba(15, 17, 23, 0.06) !important;
+}
+
+/* Heatmap / inline progress bars that bake in dark fills. */
+html.light .teepo-exam .bg-white\/5,
+html.light .teepo-exam .bg-white\/10 {
+  background-color: rgba(15, 17, 23, 0.05) !important;
+}
+html.light .teepo-exam .border-white\/10 {
+  border-color: rgba(15, 17, 23, 0.08) !important;
+}

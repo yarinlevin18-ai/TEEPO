@@ -82,6 +82,9 @@ interface ExamStore {
     planId?: string
     meta?: Record<string, unknown>
   }) => Promise<void>
+
+  unlockedAchievements: string[]
+  markAchievementsUnlocked: (ids: string[]) => Promise<void>
 }
 
 export function useExamStore(): ExamStore {
@@ -95,6 +98,7 @@ export function useExamStore(): ExamStore {
   const [localFlashcards, setLocalFlashcards] = useState<Record<string, Flashcard[]>>({})
   const [localSimulations, setLocalSimulations] = useState<Record<string, Simulation[]>>({})
   const [localPointEvents, setLocalPointEvents] = useState<PointEvent[]>([])
+  const [localUnlocked, setLocalUnlocked] = useState<string[]>([])
 
   // Lazy-load all examIds we know about from localStorage on first mount.
   // We don't have an index — we discover keys directly.
@@ -125,6 +129,12 @@ export function useExamStore(): ExamStore {
     setLocalExams(exams)
     setLocalPlans(plans)
     setLocalPointEvents(lsLoadPoints())
+    try {
+      const raw = window.localStorage.getItem('teepo_exam_unlocked')
+      setLocalUnlocked(raw ? (JSON.parse(raw) as string[]) : [])
+    } catch {
+      setLocalUnlocked([])
+    }
   }, [driveBacked])
 
   // ── Reads ────────────────────────────────────────────────
@@ -155,6 +165,10 @@ export function useExamStore(): ExamStore {
   const pointEvents = useMemo<PointEvent[]>(() => {
     return driveBacked ? db.db.point_events ?? [] : localPointEvents
   }, [driveBacked, db.db.point_events, localPointEvents])
+
+  const unlockedAchievements = useMemo<string[]>(() => {
+    return driveBacked ? db.db.achievements_unlocked ?? [] : localUnlocked
+  }, [driveBacked, db.db.achievements_unlocked, localUnlocked])
 
   // ── Helpers ──────────────────────────────────────────────
 
@@ -323,6 +337,26 @@ export function useExamStore(): ExamStore {
     [driveBacked, db],
   )
 
+  const markAchievementsUnlocked = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return
+      if (driveBacked) {
+        await db.markAchievementsUnlocked(ids)
+      } else {
+        setLocalUnlocked((prev) => {
+          const set = new Set(prev)
+          for (const id of ids) set.add(id)
+          const next = Array.from(set)
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem('teepo_exam_unlocked', JSON.stringify(next))
+          }
+          return next
+        })
+      }
+    },
+    [driveBacked, db],
+  )
+
   return {
     ready: driveBacked ? db.ready : true,
     driveBacked,
@@ -341,5 +375,7 @@ export function useExamStore(): ExamStore {
     saveSimulation,
     pointEvents,
     awardPoints,
+    unlockedAchievements,
+    markAchievementsUnlocked,
   }
 }

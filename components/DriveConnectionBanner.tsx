@@ -46,24 +46,29 @@ export default function DriveConnectionBanner() {
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
-        className="qa-drive-banner mx-4 sm:mx-6 lg:mx-8 mt-4 p-4 rounded-2xl flex items-start gap-3 relative z-[2]"
-        style={{
-          background: 'rgba(var(--glow1), 0.07)',
-          border: '0.5px solid rgba(var(--glow1), 0.32)',
-          backdropFilter: 'blur(14px)',
-        }}
+        className="qa-drive-banner mx-4 sm:mx-6 lg:mx-8 mt-4 p-4 rounded-2xl flex items-start gap-3 relative z-[2] overflow-hidden"
       >
+        {/* Side rail — amber accent without bathing the whole card in it. */}
+        <span
+          aria-hidden
+          className="absolute top-3 bottom-3 right-0 w-[3px] rounded-full"
+          style={{ background: 'linear-gradient(180deg, #fbbf24 0%, #d97706 100%)' }}
+        />
+
         <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'rgba(var(--glow1), 0.14)' }}
+          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ring-1"
+          style={{
+            background: 'rgba(245, 158, 11, 0.18)',
+            boxShadow: '0 0 0 1px rgba(245, 158, 11, 0.32) inset',
+          }}
         >
-          <AlertTriangle size={18} style={{ color: 'var(--accent)' }} />
+          <AlertTriangle size={18} style={{ color: '#f59e0b' }} />
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-medium" style={{ color: 'var(--accent)' }}>
+          <h4 className="qa-drive-banner__title text-sm font-bold">
             Google Drive לא מחובר
           </h4>
-          <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">
+          <p className="qa-drive-banner__body text-xs mt-0.5 leading-relaxed">
             {message}
           </p>
         </div>
@@ -71,7 +76,7 @@ export default function DriveConnectionBanner() {
           {!driveMissing && (
             <button
               onClick={reload}
-              className="p-2 rounded-lg bg-white/5 text-ink-muted hover:text-ink hover:bg-white/10 transition-all"
+              className="qa-drive-banner__reload p-2 rounded-lg transition-all"
               title="נסה שוב"
             >
               <RefreshCw size={14} />
@@ -80,7 +85,12 @@ export default function DriveConnectionBanner() {
           <button
             onClick={handleReconnect}
             disabled={reconnecting}
-            className="btn-gradient px-4 py-2 rounded-lg text-xs text-white font-medium flex items-center gap-1.5 disabled:opacity-50"
+            className="px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
+            style={{
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              color: '#1c1409',
+              boxShadow: '0 2px 0 rgba(0,0,0,0.20), 0 4px 12px rgba(245, 158, 11, 0.28)',
+            }}
           >
             {reconnecting
               ? <Loader2 size={13} className="animate-spin" />

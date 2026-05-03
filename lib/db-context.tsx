@@ -90,6 +90,8 @@ interface DBContextType {
   upsertFlashcards: (cards: Flashcard[]) => Promise<void>
   upsertSimulation: (sim: Simulation) => Promise<void>
   appendPointEvent: (event: PointEvent) => Promise<void>
+  /** Adds the given IDs to `achievements_unlocked` (no duplicates). */
+  markAchievementsUnlocked: (ids: string[]) => Promise<void>
 }
 
 const DBContext = createContext<DBContextType | undefined>(undefined)
@@ -630,6 +632,15 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     mutate(d => ({ ...d, point_events: [event, ...(d.point_events ?? [])] }))
   }, [mutate])
 
+  const markAchievementsUnlocked = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return
+    mutate(d => {
+      const existing = new Set(d.achievements_unlocked ?? [])
+      for (const id of ids) existing.add(id)
+      return { ...d, achievements_unlocked: Array.from(existing) }
+    })
+  }, [mutate])
+
   const driveConnected = !!googleToken && ready && !error
   const driveMissing = !!user && !googleToken
 
@@ -649,6 +660,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     upsertFlashcards: upsertFlashcardsImpl,
     upsertSimulation,
     appendPointEvent,
+    markAchievementsUnlocked,
   }), [
     db, ready, loading, error, driveConnected, driveMissing, reload,
     createCourse, updateCourse, deleteCourse,
@@ -662,7 +674,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     upsertExam, removeExam,
     upsertStudyPlan, removeStudyPlan,
     upsertPracticeSession, upsertFlashcardsImpl, upsertSimulation,
-    appendPointEvent,
+    appendPointEvent, markAchievementsUnlocked,
   ])
 
   return <DBContext.Provider value={value}>{children}</DBContext.Provider>
