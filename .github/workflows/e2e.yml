@@ -1,0 +1,83 @@
+name: E2E (Playwright)
+
+# Runs the Playwright smoke suite. Auth flows are skipped unless test
+# credentials are present in repo secrets — see e2e/auth/*.spec.ts.
+#
+# Two triggers:
+#   schedule  — nightly, full suite (auth tests run if creds are configured)
+#   workflow_dispatch — manual run from the Actions tab when needed
+#
+# Deliberately NOT on every PR — Playwright + browser install is expensive
+# and these tests run a real Next.js dev server. Per-PR coverage is what
+# `npm test` (Vitest) is for.
+
+on:
+  schedule:
+    - cron: '23 4 * * *'   # 04:23 UTC daily — odd minute avoids the herd
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Auth tests pick these up via process.env. Empty = skip cleanly.
+      E2E_TEST_GOOGLE_EMAIL: ${{ secrets.E2E_TEST_GOOGLE_EMAIL }}
+      E2E_TEST_GOOGLE_PASSWORD: ${{ secrets.E2E_TEST_GOOGLE_PASSWORD }}
+      E2E_TEST_BGU_USERNAME: ${{ secrets.E2E_TEST_BGU_USERNAME }}
+      E2E_TEST_BGU_PASSWORD: ${{ secrets.E2E_TEST_BGU_PASSWORD }}
+      # Public Supabase keys still needed so /dashboard SSR doesn't crash.
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Next.js
+        run: npm run build
+
+      - name: Start Next.js + run Playwright
+        env:
+          CI: '1'
+        run: |
+          npm start &
+          NEXT_PID=$!
+          # Wait for the server to be reachable before kicking off Playwright
+          for i in {1..30}; do
+            if curl -sf http://localhost:3000/ > /dev/null; then break; fi
+            sleep 1
+          done
+          npx playwright test
+          STATUS=$?
+          kill $NEXT_PID || true
+          exit $STATUS
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
