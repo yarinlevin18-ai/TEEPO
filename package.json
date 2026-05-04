@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
     "@supabase/ssr": "^0.3.0",
@@ -35,6 +38,7 @@
     "zod": "^3.23.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
