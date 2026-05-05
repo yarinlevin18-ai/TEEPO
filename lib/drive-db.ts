@@ -151,7 +151,10 @@ function classify403(status: number, body: string): DriveScopeError {
   return new DriveScopeError('unknown', body)
 }
 
-async function driveFetch(
+export const DRIVE_API_INTERNAL = DRIVE_API
+export const DRIVE_UPLOAD_INTERNAL = DRIVE_UPLOAD
+
+export async function driveFetch(
   token: string,
   url: string,
   init: RequestInit = {},
@@ -206,7 +209,7 @@ export async function probeTokenScopes(token: string): Promise<{
 }
 
 /** Find a file/folder by exact name within an optional parent. Returns the first match. */
-async function findByName(
+export async function findByName(
   token: string,
   name: string,
   mimeType?: string,

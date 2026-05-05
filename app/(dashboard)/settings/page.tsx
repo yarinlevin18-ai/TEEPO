@@ -9,6 +9,7 @@ import { useDB } from '@/lib/db-context'
 import { useTheme } from '@/lib/theme-context'
 import Link from 'next/link'
 import GlowCard from '@/components/ui/GlowCard'
+import BackupRestore from '@/components/settings/BackupRestore'
 import type { UniversityCode } from '@/types'
 
 export default function SettingsPage() {
@@ -545,6 +546,15 @@ export default function SettingsPage() {
           </AnimatePresence>
         </div>
         </GlowCard>
+        </motion.div>
+
+        {/* Backup & Restore — versioned snapshots of the Drive DB */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+        >
+          <BackupRestore />
         </motion.div>
 
         {/* Drive Storage — how big is the user's db.json and where is the weight? */}
