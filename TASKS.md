@@ -2,10 +2,13 @@
 
 הקובץ הזה הוא מקור האמת היחיד למה כל אחד מאיתנו עושה. כל שינוי אליו עובר ב-PR. לפני שמתחילים משימה — מסתכלים פה. אחרי שגומרים — PR קטן שמסמן ✅.
 
+> **עדכון 2026-05-05:** כל 20 משימות v2.1 הליבה הושלמו. נשארה רק סקירה ויזואלית (#21).
+> Tzvi לא זמין כרגע — Yarin מתקדם סולו. ראה סעיף "מצב צוות" למטה.
+
 ## איך עובדים עם הקובץ
 
 - כל שורה בטבלה = משימה אחת = branch אחד = PR אחד.
-- הלייין קבוע: **Tzvi = backend, Yarin = frontend**. אם משימה חוצה לייינים — מסומנת ★ ודורשת תיאום.
+- הלייין הקבוע (Tzvi=backend / Yarin=frontend) מוקפא כל עוד Tzvi לא זמין — Yarin עובד על כל הלייינים בינתיים.
 - כשמתחילים משימה: PR קטן שמשנה סטטוס ל"בעבודה" + מספר ה-PR (`#42`).
 - כשגומרים: PR קטן שמשנה ל-✅.
 - משימות ★ חוסמות אחרות. עושים אותן ראשון.
@@ -17,84 +20,124 @@ git checkout master && git pull         # 1. הבא את האחרון
 git checkout -b <prefix>/<short-name>   # 2. branch למשימה (prefix: feature/fix/chore/refactor)
 # ...עובדים, commits...                 # 3. שומרים
 git push -u origin <branch>             # 4. מעלים ל-GitHub
-gh pr create --draft                    # 5. PR — השותף מאשר → merge
+gh pr create --draft                    # 5. PR — מאשר ומוזג בעצמך כל עוד Tzvi לא חוזר
 ```
 
 אחרי merge: `git checkout master && git pull` וחוזרים לשלב 1.
 
 ## חוקי תיאום
 
-1. **לייין אישי** — אתה עורך רק בתיקיות שלך. Tzvi: `backend/`, `chrome-extension/`, GitHub Actions, SQL migrations. Yarin: `app/`, `components/`, `lib/`, `public/catalog*.json`.
-2. **קבצים משותפים** (★) — `types/index.ts`, `lib/drive-db.ts`, `lib/api-client.ts`. הוסף שדה / שינה חוזה? ספר לשותף לפני שאתה דוחף.
-3. **אסור push ישיר ל-master.** הכל דרך PR + אישור של השותף.
-4. **אסור למזג PR של עצמך.** השותף מאשר וממזג.
+1. **לייין אישי** (כשהצוות מלא) — Tzvi: `backend/`, `chrome-extension/`, GitHub Actions, SQL migrations. Yarin: `app/`, `components/`, `lib/`, `public/catalog*.json`.
+2. **קבצים משותפים** (★) — `types/index.ts`, `lib/drive-db.ts`, `lib/api-client.ts`. הוסף שדה / שינה חוזה? תעד היטב ב-PR.
+3. **אסור push ישיר ל-master.** הכל דרך PR.
+4. **Branch protection** — כרגע 0 אישורים נדרשים (כי Tzvi לא זמין לאשר). כשהוא חוזר — להחזיר ל-1.
 5. **branch קצר חיים.** אם branch חי יותר משבוע — `git rebase master` או סגור.
+
+## מצב צוות (2026-05-05)
+
+| מצב | פעולה |
+|-----|-------|
+| Tzvi הוסר זמנית מ-collaborators | Yarin עובד סולו |
+| Branch protection: 0 אישורים | Yarin ממזג בעצמו |
+| Render = Hobby (ללא team members) | Yarin שולט ב-deploy |
+
+כשTzvi חוזר:
+1. הוסף אותו חזרה ב-Settings → Collaborators (Write)
+2. החזר branch protection ל-1 אישור
+3. החזר את הלייינים: Tzvi=backend, Yarin=frontend
 
 ## גישות (מצב נוכחי)
 
 | שירות | Tzvi | Yarin |
 |-------|------|-------|
-| GitHub | ✅ | ✅ |
-| Supabase | ✅ | ✅ |
+| GitHub | ❌ (הוסר) | ✅ |
+| Supabase | (תלוי בהזמנה) | ✅ |
 | Render (backend deploy + logs + env) | ❌ — Hobby tier לא תומך ב-team members | ✅ |
 | Vercel (frontend deploy) | לא נדרש | ✅ |
 
-ירין מטפל ב-env vars / logs / deploy verification של ה-backend עד ששדרוג Render ל-Pro יתאפשר (משימה pre-launch). Tzvi מפתח מקומית עם `python backend/app.py` ומקבל מירין logs/verification דרך הצ'אט.
-
 ---
 
-## רשימת המשימות (21 משימות)
+## רשימת המשימות (21 משימות) — 20 הושלמו ✅
 
-### יסודות ★ — חוסמות את השאר
+### יסודות ★
 
 | # | מי | משימה | קבצים | סטטוס |
 |---|----|-------|-------|--------|
-| 1★ | Yarin | עדכון types ל-v2.1: `Grade.source/component/updated_at`, `Course.lecturer_email/syllabus_url/teaching_assistants/course_links/portal_metadata`, חדש `TeachingAssistant`, `UserSettings.university/theme`, העברת `StudentProfile`+`StudentCourse` מ-`drive-db.ts` ל-types | `types/index.ts` | פתוח |
-| 2★ | Yarin | Drive DB v1→v2 migration + debounce 30 שניות | `lib/drive-db.ts` | פתוח |
-| 3★ | Tzvi | `migrate_003.sql`: שדות חדשים ל-`courses` + `'manual'` ל-`student_grades.source` | `backend/migrate_003.sql` | ✅ |
+| 1★ | Yarin | עדכון types ל-v2.1 (Grade.source/component/updated_at, Course.lecturer_email/syllabus_url/teaching_assistants/course_links/portal_metadata, TeachingAssistant חדש, UserSettings.university/theme, העברת StudentProfile+StudentCourse) | `types/index.ts` | ✅ #19 |
+| 2★ | Yarin | Drive DB v1→v2 migration + debounce 30 שניות | `lib/drive-db.ts` | ✅ #21 |
+| 3★ | Tzvi | `migrate_003.sql` — שדות חדשים ל-courses + 'manual' ל-student_grades.source | `backend/migrate_003.sql` | ✅ #20 |
 
-### Backend (Tzvi) — 10 משימות
+### Backend — 10 משימות
 
-| # | משימה | קבצים | תלוי ב | סטטוס |
-|---|-------|-------|--------|--------|
-| 4 ⚠️ | Render keep-alive (`/health` ping כל 13 דק') — **חריג: Yarin** (כי Render רק אצלו) | `.github/workflows/render-keepalive.yml`, `backend/routes/health.py` | — | פתוח |
-| 5 | `POST /api/grades/manual` endpoint | `backend/routes/api.py` | 3 | פתוח |
-| 6 | קליטת `lecturer_email`/`syllabus_url`/TAs/links ב-Moodle scraper | `backend/services/moodle_scraper.py` | 3 | פתוח |
-| 7 | חיזוק Portal scraper (BGU) — discovery דינמי במקום URLs קשיחים | `backend/services/moodle_scraper.py` | — | פתוח |
-| 8 | TAU Moodle scraper (refactor university-agnostic + selectors חדשים) | `backend/services/moodle_scraper.py`, `backend/services/tau_selectors.py` | — | פתוח |
-| 9 | TAU Portal scraper (חדש לגמרי) | `backend/services/tau_portal_scraper.py` | — | פתוח |
-| 10 | נתוני TAU catalog (mandatory/electives/tracks/credits) | `backend/migrate_004.sql` | — | פתוח |
-| 11 | TAU academic advisor variant (refactor knowledge base מהקוד) | `backend/agents/academic_agent.py` | — | פתוח |
-| 12 | "TEEPO מתעורר..." event ב-WebSocket אחרי cold start | `backend/routes/websocket.py` | — | פתוח |
-| 13 | Google Calendar read-only endpoint | `backend/services/google_calendar.py`, `backend/routes/api.py` | — | פתוח |
+| # | משימה | קבצים | סטטוס |
+|---|-------|-------|--------|
+| 4 ⚠️ | Render keep-alive (`/health` ping כל 13 דק') — **חריג: Yarin** | `.github/workflows/render-keepalive.yml` | ✅ #44 |
+| 5 | `POST /api/grades/manual` endpoint | `backend/routes/api.py` | ✅ #29 |
+| 6 | קליטת lecturer_email/syllabus_url/TAs/links ב-Moodle scraper | `backend/services/moodle_scraper.py` | ✅ #30 |
+| 7 | חיזוק Portal scraper (BGU) — discovery דינמי במקום URLs קשיחים | `backend/services/moodle_scraper.py` | ✅ #31 |
+| 8 | TAU Moodle scraper (refactor university-agnostic + selectors) | `backend/services/moodle_scraper.py`, `backend/services/tau_selectors.py` | ✅ #35 |
+| 9 | TAU Portal scraper | `backend/services/tau_portal_scraper.py` | ✅ #37 |
+| 10 | נתוני TAU catalog | `backend/migrate_004.sql` | ✅ #36 |
+| 11 | TAU academic advisor variant | `backend/agents/academic_agent.py` | ✅ #34 |
+| 12 | "TEEPO מתעורר..." event ב-WebSocket אחרי cold start | `backend/routes/websocket.py` | ✅ #32 + frontend ב-#43 |
+| 13 | Google Calendar read-only endpoint | `backend/services/google_calendar.py`, `backend/routes/api.py` | ✅ #33 |
 
-### Frontend (Yarin) — 8 משימות
+### Frontend — 8 משימות
 
-| # | משימה | קבצים | תלוי ב | סטטוס |
-|---|-------|-------|--------|--------|
-| 14 | בורר אוניברסיטה (BGU/TAU) ב-onboarding | `app/auth/page.tsx`, `components/onboarding/UniversitySelector.tsx`, `lib/auth-context.tsx` | 1 | פתוח |
-| 15 | תצוגת ברירת-מחדל למטלות = חודש (לא שבוע) | `app/(dashboard)/tasks/page.tsx` + dashboard widget | — | פתוח |
-| 16 | תצוגת שדות v2.1 בעמוד סרוס (lecturer email/syllabus/TAs/links) | `app/(dashboard)/courses/[id]/page.tsx`, `components/course/*` | 1 | פתוח |
-| 17 | תג מקור ציון (Moodle/Portal/Manual) + UI הזנה ידנית | `app/(dashboard)/credits/page.tsx`, course detail | 1+5 | פתוח |
-| 18 | Settings: שדה אוניברסיטה, theme toggle, takes_summer | `app/(dashboard)/settings/page.tsx` | 1 | פתוח |
-| 19 | הסרת BGU hardcoded מ-UI strings, שימוש ב-`userSettings.university` | `lib/university.ts`, `components/Sidebar.tsx`, landing page | 1 | פתוח |
-| 20 | טעינת catalog לפי אוניברסיטה (`catalog.bgu.json` / `catalog.tau.json`) | `lib/catalog.ts`, `public/catalog.bgu.json`, `public/catalog.tau.json` | 10 | פתוח |
-| 21 | סקירת mobile + dark mode (regression sweep אחרי v2.1 fields) | (visual sweep, אין קבצים ספציפיים) | רוב המשימות הקודמות | פתוח (אחרון) |
+| # | משימה | קבצים | סטטוס |
+|---|-------|-------|--------|
+| 14 | בורר אוניברסיטה (BGU/TAU) ב-onboarding | `app/auth/page.tsx`, `components/onboarding/UniversitySelector.tsx`, `lib/auth-context.tsx` | ✅ #24 |
+| 15 | תצוגת ברירת-מחדל למטלות = חודש (לא שבוע) | `app/(dashboard)/tasks/page.tsx` + dashboard widget | ✅ #22 |
+| 16 | תצוגת שדות v2.1 בעמוד קורס (lecturer/syllabus/TAs/links) | `app/(dashboard)/courses/[id]/page.tsx` | ✅ #25 + wiring ב-#40 |
+| 17 | תג מקור ציון (Moodle/Portal/Manual) + UI הזנה ידנית | `app/(dashboard)/credits/page.tsx`, course detail | ✅ #41 |
+| 18 | Settings: שדה אוניברסיטה, theme toggle, takes_summer | `app/(dashboard)/settings/page.tsx` | ✅ #26 |
+| 19 | הסרת BGU hardcoded מ-UI strings, שימוש ב-userSettings.university | `lib/university.ts`, `components/Sidebar.tsx` | ✅ #23 |
+| 20 | טעינת catalog לפי אוניברסיטה (`catalog.bgu.json` / `catalog.tau.json`) | `lib/catalog.ts`, `public/catalog.{bgu,tau}.json` | ✅ #42 |
+| 21 | סקירת mobile + dark mode (regression sweep) | visual sweep | 🟡 חלקי — light-mode טופל ב-#45; mobile sweep פתוח |
 
 ---
 
+## משימות נוספות שהושלמו (מעבר ל-21 המקוריות)
+
+| משימה | PR | תיאור |
+|-------|-----|-------|
+| הסרת מחברות AI | #28 | הוסר ה-feature הסטנד-אלון לפי בקשה |
+| תיקון לולאת render אינסופית ב-useNotifications | #27 + #38 | באג שצף בעקבות #16 |
+| Vitest + 5 בדיקות יסוד | #46 | תשתית בדיקות frontend |
+| Playwright E2E scaffold | #47 | smoke tests + placeholders ל-auth flows |
+| גיבוי ושחזור Drive DB | #48 | snapshots ב-`TEEPO/.backups/`, UI ב-/settings |
+
+---
+
+## מה עוד נשאר (Pre-launch)
+
+לא חלק מ-21 המקוריות, אבל נדרש לפני השקה:
+
+- [ ] **#21 — mobile sweep** (light-mode כבר נעשה ב-#45)
+- [ ] **OAuth refresh-token** מנגנון רחב יותר — דורש backend (storage של refresh token ב-Supabase) → מחכה ל-Tzvi
+- [ ] **בדיקות E2E ל-auth + course-import** — דורש credentials של חשבון Google ייעודי + BGU
+- [ ] **Pytest backend setup + 5 בדיקות** — Tzvi's lane, מחכה לחזרתו
+- [ ] **דומיין מותאם** ב-Vercel + Render
+- [ ] **Supabase Pro / Render Starter** — שדרוג בתשלום לפני השקה
+- [ ] **סקירה משפטית** של privacy policy + terms
+
 ## מצב נוכחי לעומת v2.1
 
-לפי audit שעשינו לקוד:
-- **Frontend ~95% מוכן.** רוב הר'ציפים בנויים. החסרים: שדות v2.1 בקבצי תצוגה, בורר אוניברסיטה ב-onboarding, תג מקור ציון, היפטרות מ-BGU hardcoded.
-- **Backend ~70% מוכן.** 54+ endpoints, 8 AI agents, Moodle scraper מלא ל-BGU, Whisper/Recorder pipeline. החסרים: Portal scrapers (BGU חלקי, TAU בכלל לא), manual grade entry, keep-alive ל-Render, קליטת lecturer/TA/links, תמיכת TAU מלאה, cold-start UX, Calendar endpoint.
+**הליבה הושלמה.** כל v2.1 surface חי ב-master:
+- ✅ Multi-university (BGU + TAU): scrapers, catalogs, advisor variants, picker
+- ✅ Manual grade entry + source badges
+- ✅ Drive DB v2 + 30s debounce + גיבויים
+- ✅ Cold-start UX (banner + Render keep-alive)
+- ✅ v2.1 course enrichment fields end-to-end
+- ✅ Theme toggle (light/dark)
+- ✅ Vitest + Playwright scaffolds
 
 האפיון המלא של v2.1 נמצא ב-`docs/TEEPO_SPEC.md` (וגם `docs/TEEPO_SPEC.docx`).
 
 ## מה Claude עושה כשנכנסים לריפו
 
 1. קורא את `CLAUDE.md` (חוקי workflow) ואת הקובץ הזה (משימות).
-2. מזהה מי משתמש בו (אם לא ברור — שואל את המשתמש).
-3. מסתכל ברשימה למעלה, מציע את המשימה הפתוחה הבאה לפי העדיפות (יסודות ★ ראשונות, אחרי זה לפי סדר).
-4. לפני עריכת קובץ — בודק שהוא בלייין של המשתמש. לא? עוצר ומציע משימה משותפת ★ במקום.
+2. מזהה מי משתמש בו (אם לא ברור — שואל).
+3. מסתכל ב"מה עוד נשאר" למעלה, מציע את המשימה הבאה לפי עדיפות.
+4. אם Tzvi חזר — מחזיר את הלייינים ובודק מי עובד על מה לפני נגיעה בקוד.
 5. אחרי שגומרים משימה: PR קטן שמסמן ✅ ברשימה.
