@@ -25,16 +25,16 @@ class TestRefreshGoogle:
         assert "error" in body
 
     def test_returns_400_when_no_body(self, client, monkeypatch):
-        """No JSON body at all → missing_refresh_token."""
-        # Stub in fake creds so we exercise the body-validation branch
-        # rather than the missing-config branch.
-        monkeypatch.setenv("GOOGLE_CLIENT_ID", "fake")
-        monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "fake")
-        # The route imports from config at module load, so we have to
-        # patch there too:
-        import config
-        monkeypatch.setattr(config, "GOOGLE_CLIENT_ID", "fake")
-        monkeypatch.setattr(config, "GOOGLE_CLIENT_SECRET", "fake")
+        """No JSON body at all → missing_refresh_token.
+
+        `routes.auth` imports the credential constants at module load
+        (`from config import GOOGLE_CLIENT_ID, ...`), so by the time the
+        test runs they're already bound inside that module. Patching
+        `config` is too late — patch `routes.auth` directly.
+        """
+        import routes.auth as auth_module
+        monkeypatch.setattr(auth_module, "GOOGLE_CLIENT_ID", "fake")
+        monkeypatch.setattr(auth_module, "GOOGLE_CLIENT_SECRET", "fake")
 
         res = client.post("/api/auth/refresh-google", json={})
         assert res.status_code == 400
@@ -43,9 +43,9 @@ class TestRefreshGoogle:
 
     def test_returns_400_when_refresh_token_empty_string(self, client, monkeypatch):
         """Empty string is no better than missing."""
-        import config
-        monkeypatch.setattr(config, "GOOGLE_CLIENT_ID", "fake")
-        monkeypatch.setattr(config, "GOOGLE_CLIENT_SECRET", "fake")
+        import routes.auth as auth_module
+        monkeypatch.setattr(auth_module, "GOOGLE_CLIENT_ID", "fake")
+        monkeypatch.setattr(auth_module, "GOOGLE_CLIENT_SECRET", "fake")
 
         res = client.post(
             "/api/auth/refresh-google",
