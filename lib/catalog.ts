@@ -2,12 +2,22 @@
  * Course Catalog — client-side loader.
  *
  * Static reference data (tracks, departments, courses) bundled with the
- * frontend and loaded lazily from /public/catalog.json. The operator swaps
- * the JSON contents per-deploy to match their university's shnaton.
+ * frontend. v2.1 made the platform multi-university — each catalog lives
+ * in its own file:
+ *
+ *   /public/catalog.bgu.json — Ben-Gurion University
+ *   /public/catalog.tau.json — Tel Aviv University
+ *   /public/catalog.json     — legacy fallback (== BGU)
+ *
+ * The active catalog is picked from `settings.university`. Code paths
+ * that don't have access to user settings (background jobs, anonymous
+ * pages) fall through to the legacy `/catalog.json`.
  *
  * Matches the project migration direction: Supabase is auth-only, per-user
  * data lives in Drive, and static reference data lives with the frontend.
  */
+
+import type { UniversityCode } from '@/types'
 
 export type CatalogTrack = {
   id: string
@@ -50,44 +60,77 @@ type CatalogFile = {
   courses: CatalogCourse[]
 }
 
-let _cache: Promise<CatalogFile> | null = null
+// One promise per university key — switching schools doesn't blow away the
+// other school's cache, so a roommate-style shared device stays fast.
+const _cacheByUni: Map<string, Promise<CatalogFile>> = new Map()
 
-async function loadCatalog(): Promise<CatalogFile> {
-  if (!_cache) {
-    _cache = (async () => {
-      const res = await fetch('/catalog.json', { cache: 'force-cache' })
-      if (!res.ok) throw new Error(`לא הצלחנו לטעון את קטלוג הקורסים (${res.status})`)
-      const raw = await res.json()
-      // Normalize: ensure every track has `details`, every course has `prerequisites`.
-      const tracks: CatalogTrack[] = (raw.tracks || []).map((t: any) => ({
-        ...t,
-        details: t.details ?? {},
-      }))
-      const courses: CatalogCourse[] = (raw.courses || []).map((c: any) => ({
-        ...c,
-        prerequisites: c.prerequisites ?? [],
-        tracks: c.tracks ?? [],
-      }))
-      return {
-        metadata: raw.metadata,
-        departments: raw.departments || [],
-        tracks,
-        courses,
-      }
-    })()
-    // If loading fails, clear cache so subsequent retries can succeed.
-    _cache.catch(() => { _cache = null })
-  }
-  return _cache
+/**
+ * Resolve which catalog file to load. We try the per-school file first,
+ * then fall through to the legacy `/catalog.json` so older deploys (or
+ * unconfigured users) keep working.
+ */
+function catalogPathsFor(university?: UniversityCode | null): string[] {
+  if (university === 'bgu') return ['/catalog.bgu.json', '/catalog.json']
+  if (university === 'tau') return ['/catalog.tau.json']
+  return ['/catalog.json'] // legacy / fallback
 }
 
-export async function getTracks(): Promise<CatalogTrack[]> {
-  const c = await loadCatalog()
+async function loadCatalog(university?: UniversityCode | null): Promise<CatalogFile> {
+  const cacheKey = university || 'legacy'
+  const existing = _cacheByUni.get(cacheKey)
+  if (existing) return existing
+
+  const paths = catalogPathsFor(university)
+  const promise = (async () => {
+    let raw: any = null
+    let lastError: Error | null = null
+    for (const path of paths) {
+      try {
+        const res = await fetch(path, { cache: 'force-cache' })
+        if (res.ok) {
+          raw = await res.json()
+          break
+        }
+        lastError = new Error(`לא הצלחנו לטעון את קטלוג הקורסים (${res.status})`)
+      } catch (e: any) {
+        lastError = e
+      }
+    }
+    if (!raw) throw lastError ?? new Error('קטלוג קורסים לא נמצא')
+
+    // Normalize: ensure every track has `details`, every course has `prerequisites`.
+    const tracks: CatalogTrack[] = (raw.tracks || []).map((t: any) => ({
+      ...t,
+      details: t.details ?? {},
+    }))
+    const courses: CatalogCourse[] = (raw.courses || []).map((c: any) => ({
+      ...c,
+      prerequisites: c.prerequisites ?? [],
+      tracks: c.tracks ?? [],
+    }))
+    return {
+      metadata: raw.metadata,
+      departments: raw.departments || [],
+      tracks,
+      courses,
+    }
+  })()
+  // If loading fails, clear cache so subsequent retries can succeed.
+  promise.catch(() => { _cacheByUni.delete(cacheKey) })
+  _cacheByUni.set(cacheKey, promise)
+  return promise
+}
+
+export async function getTracks(university?: UniversityCode | null): Promise<CatalogTrack[]> {
+  const c = await loadCatalog(university)
   return c.tracks
 }
 
-export async function getTrackWithCourses(trackId: string): Promise<{ track: CatalogTrack; courses: CatalogCourse[] }> {
-  const c = await loadCatalog()
+export async function getTrackWithCourses(
+  trackId: string,
+  university?: UniversityCode | null,
+): Promise<{ track: CatalogTrack; courses: CatalogCourse[] }> {
+  const c = await loadCatalog(university)
   const track = c.tracks.find(t => t.id === trackId)
   if (!track) throw new Error('מסלול לא נמצא')
   const courses = c.courses.filter(co => co.tracks?.includes(trackId))
@@ -101,13 +144,18 @@ export async function getTrackWithCourses(trackId: string): Promise<{ track: Cat
   return { track, courses: uiCourses }
 }
 
-export async function getDepartments(): Promise<CatalogDepartment[]> {
-  const c = await loadCatalog()
+export async function getDepartments(university?: UniversityCode | null): Promise<CatalogDepartment[]> {
+  const c = await loadCatalog(university)
   return c.departments
 }
 
-export async function searchCatalogCourses(query: string, dept?: string, trackId?: string): Promise<CatalogCourse[]> {
-  const c = await loadCatalog()
+export async function searchCatalogCourses(
+  query: string,
+  dept?: string,
+  trackId?: string,
+  university?: UniversityCode | null,
+): Promise<CatalogCourse[]> {
+  const c = await loadCatalog(university)
   const q = query.trim().toLowerCase()
   const results = c.courses.filter(co => {
     if (dept && co.department !== dept) return false
@@ -131,8 +179,9 @@ export async function computeCreditSummary(
   trackId: string,
   myCourses: Array<{ credits: number; status: string; grade?: number }>,
   currentYear?: number,
+  university?: UniversityCode | null,
 ) {
-  const { track } = await getTrackWithCourses(trackId)
+  const { track } = await getTrackWithCourses(trackId, university)
   const completed = myCourses.filter(c => c.status === 'completed')
   const inProgress = myCourses.filter(c => c.status === 'in_progress')
   const completedCredits = completed.reduce((s, c) => s + (c.credits || 0), 0)

@@ -1,0 +1,10 @@
+{
+  "metadata": {
+    "source": "TAU placeholder",
+    "generated": "2026-05-01",
+    "description": "Tel Aviv University course catalog. Backend has the real TAU catalog tables (Tzvi #36) — this file is a frontend placeholder; populate before TAU users go live."
+  },
+  "departments": [],
+  "tracks": [],
+  "courses": []
+}
