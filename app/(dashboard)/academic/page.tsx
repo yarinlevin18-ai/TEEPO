@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import { GraduationCap, Loader2, Sparkles, BookOpen } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import ErrorAlert from '@/components/ui/ErrorAlert'
-import { useUniversityName } from '@/lib/use-university'
+import { useUniversityName, useUniversityCode } from '@/lib/use-university'
 
 type AdviceResult = {
   advice: string
@@ -23,6 +23,7 @@ export default function AcademicPage() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AdviceResult | null>(null)
   const universityName = useUniversityName()
+  const universityCode = useUniversityCode()
 
   const getAdvice = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,7 +35,8 @@ export default function AcademicPage() {
       const data = await api.academic.advise(
         courseName,
         major,
-        courses.split('\n').filter(Boolean)
+        courses.split('\n').filter(Boolean),
+        universityCode,
       )
       setResult(data)
     } catch (err: any) {
