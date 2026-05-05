@@ -53,6 +53,11 @@ desktop.ini
 # TypeScript build info
 *.tsbuildinfo
 
+# Playwright
+playwright-report/
+test-results/
+playwright/.cache/
+
 # Claude local state
 .claude/scheduled_tasks.lock
 .claude/local-agent-mode-sessions/
