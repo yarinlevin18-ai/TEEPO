@@ -452,7 +452,7 @@ export default function CoursesPage() {
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                   viewMode === 'year-semester'
                     ? 'bg-indigo-500/20 text-indigo-300'
-                    : 'text-slate-400 hover:text-slate-300'
+                    : 'text-ink-muted hover:text-ink-muted'
                 }`}
                 title="קיבוץ לפי שנה וסמסטר"
               >
@@ -463,7 +463,7 @@ export default function CoursesPage() {
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                   viewMode === 'department'
                     ? 'bg-indigo-500/20 text-indigo-300'
-                    : 'text-slate-400 hover:text-slate-300'
+                    : 'text-ink-muted hover:text-ink-muted'
                 }`}
                 title="קיבוץ לפי מחלקה"
               >
@@ -500,7 +500,7 @@ export default function CoursesPage() {
       {/* Search bar */}
       {courses.length > 0 && (
         <div className="relative">
-          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
