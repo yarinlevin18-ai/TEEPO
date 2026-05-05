@@ -26,6 +26,10 @@ import type {
 
 interface DBContextType {
   db: DriveDB
+  /** Drive DB handle (folder + file ids). Null until the DB has loaded. Exposed
+   *  so feature code that needs to write sibling files (backup snapshots, etc.)
+   *  can do so without re-resolving the handle. */
+  handle: DriveDBHandle | null
   ready: boolean
   loading: boolean
   error: string | null
@@ -561,7 +565,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const driveMissing = !!user && !googleToken
 
   const value = useMemo<DBContextType>(() => ({
-    db, ready, loading, error, driveConnected, driveMissing, reload,
+    db, handle, ready, loading, error, driveConnected, driveMissing, reload,
     createCourse, updateCourse, deleteCourse,
     createLesson, updateLesson, deleteLesson,
     createTask, updateTask, deleteTask,
@@ -571,7 +575,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
     syncCourseFolders, syncAllCourseFolders,
   }), [
-    db, ready, loading, error, driveConnected, driveMissing, reload,
+    db, handle, ready, loading, error, driveConnected, driveMissing, reload,
     createCourse, updateCourse, deleteCourse,
     createLesson, updateLesson, deleteLesson,
     createTask, updateTask, deleteTask,
