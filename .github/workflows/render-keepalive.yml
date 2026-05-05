@@ -1,0 +1,63 @@
+name: Render keep-alive
+
+# Pings the backend's /health endpoint every 13 minutes so Render free-tier
+# doesn't spin our service down (Render free spins after 15 min idle).
+#
+# Cron is in UTC. We run every 13 minutes around the clock — slight overkill
+# but cheaper than chasing waking-hours configuration. GitHub Actions free
+# tier easily covers this (~110 runs/day, < 30s each).
+#
+# Required repo secret:
+#   BACKEND_HEALTH_URL  - full URL incl. /health, e.g.
+#                         https://bgu-study-backend.onrender.com/health
+#
+# Replace with a paid Render tier upgrade once we launch (Starter $7/mo
+# eliminates the spin-down entirely and we delete this workflow).
+
+on:
+  schedule:
+    # Every 13 minutes — odd cadence so we don't all share GitHub's :00 herd.
+    # The 15-min sleep timeout means we keep at least 2 minutes of headroom.
+    - cron: '*/13 * * * *'
+  workflow_dispatch:  # allow manual runs from the Actions tab
+
+# Cancel an in-flight run if a new schedule kicks in early — avoids stacking.
+concurrency:
+  group: render-keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Wake Render backend
+        env:
+          BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
+        run: |
+          if [ -z "$BACKEND_HEALTH_URL" ]; then
+            echo "::error::BACKEND_HEALTH_URL secret is missing"
+            exit 1
+          fi
+
+          # First request can take 30-60s if the service was sleeping.
+          # We DON'T --fail here because any 2xx OR 5xx still "wakes" the
+          # dyno; we just care that the request reached the server.
+          # 90s curl timeout handles the worst-case cold start.
+          start=$(date +%s)
+          response=$(curl --silent --show-error \
+            --max-time 90 \
+            --connect-timeout 30 \
+            -o /dev/null -w "%{http_code}" \
+            "$BACKEND_HEALTH_URL" || echo "000")
+          end=$(date +%s)
+          elapsed=$((end - start))
+
+          echo "Render responded: HTTP $response in ${elapsed}s"
+          echo "Pinged at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+          # Anything other than "couldn't reach the server" counts as success.
+          if [ "$response" = "000" ]; then
+            echo "::error::No response from $BACKEND_HEALTH_URL within 90s"
+            exit 1
+          fi
