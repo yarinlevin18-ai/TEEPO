@@ -7,6 +7,7 @@ import { DBProvider } from '@/lib/db-context'
 import { LivingDayProvider } from '@/lib/living-day-context'
 import Sidebar from '@/components/layout/Sidebar'
 import DriveConnectionBanner from '@/components/DriveConnectionBanner'
+import WakeupBanner from '@/components/WakeupBanner'
 import SkyScene from '@/components/SkyScene'
 import Image from 'next/image'
 import { Menu } from 'lucide-react'
@@ -66,6 +67,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
         <main className="flex-1 overflow-auto relative z-[1] pt-14 lg:pt-0">
           <DriveConnectionBanner />
+          <WakeupBanner />
           {children}
         </main>
       </div>
