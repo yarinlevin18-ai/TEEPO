@@ -211,10 +211,10 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mb-4">
                 <GraduationCap className="w-8 h-8 text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-slate-100 mb-2">
+              <h1 className="text-2xl font-bold text-ink mb-2">
                 בוא נתחיל!
               </h1>
-              <p className="text-slate-400">
+              <p className="text-ink-muted">
                 ספר לנו מה אתה לומד כדי שנחשב את הנק"ז שלך
               </p>
             </div>
@@ -239,13 +239,13 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -50 }}
                 >
-                  <h2 className="text-lg font-semibold text-slate-200 mb-4">
+                  <h2 className="text-lg font-semibold text-ink mb-4">
                     מה אתה לומד?
                   </h2>
 
                   {dualTracks.length > 0 && (
                     <>
-                      <p className="text-sm text-slate-400 mb-3">תוכניות דו-מחלקתיות (שילובים)</p>
+                      <p className="text-sm text-ink-muted mb-3">תוכניות דו-מחלקתיות (שילובים)</p>
                       <div className="space-y-2 mb-6">
                         {dualTracks.map(t => (
                           <button
@@ -254,11 +254,11 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                             className={`w-full text-right p-4 rounded-xl border transition-all ${
                               selectedTrack === t.id
                                 ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                                : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20'
+                                : 'border-white/10 bg-white/5 text-ink-muted hover:border-white/20'
                             }`}
                           >
                             <div className="font-medium">{t.name}</div>
-                            <div className="text-sm text-slate-500 mt-1">
+                            <div className="text-sm text-ink-subtle mt-1">
                               {t.total_credits} נק"ז | {t.type === 'dual' ? 'דו-מחלקתי' : 'חד-מחלקתי'}
                             </div>
                           </button>
@@ -269,7 +269,7 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
 
                   {singleTracks.length > 0 && (
                     <>
-                      <p className="text-sm text-slate-400 mb-3">מסלולים חד-מחלקתיים</p>
+                      <p className="text-sm text-ink-muted mb-3">מסלולים חד-מחלקתיים</p>
                       <div className="space-y-2 mb-6">
                         {singleTracks.map(t => (
                           <button
@@ -278,11 +278,11 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                             className={`w-full text-right p-4 rounded-xl border transition-all ${
                               selectedTrack === t.id
                                 ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                                : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20'
+                                : 'border-white/10 bg-white/5 text-ink-muted hover:border-white/20'
                             }`}
                           >
                             <div className="font-medium">{t.name}</div>
-                            <div className="text-sm text-slate-500 mt-1">
+                            <div className="text-sm text-ink-subtle mt-1">
                               {t.total_credits} נק"ז
                             </div>
                           </button>
@@ -292,7 +292,7 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   )}
 
                   {tracksLoading && tracks.length === 0 && !tracksError && (
-                    <div className="text-center py-8 text-slate-500">
+                    <div className="text-center py-8 text-ink-subtle">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                       טוען מסלולים...
                       <p className="text-xs text-slate-600 mt-2">
@@ -326,7 +326,7 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   )}
 
                   {!tracksLoading && !tracksError && tracks.length === 0 && (
-                    <div className="text-center py-8 text-slate-500 text-sm">
+                    <div className="text-center py-8 text-ink-subtle text-sm">
                       אין מסלולים זמינים כרגע
                     </div>
                   )}
@@ -349,27 +349,27 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -50 }}
                 >
-                  <h2 className="text-lg font-semibold text-slate-200 mb-4">
+                  <h2 className="text-lg font-semibold text-ink mb-4">
                     פרטים נוספים
                   </h2>
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm text-slate-400 mb-1">שנת התחלה</label>
+                      <label className="block text-sm text-ink-muted mb-1">שנת התחלה</label>
                       <select
                         value={startYear}
                         onChange={e => setStartYear(Number(e.target.value))}
                         style={{ colorScheme: 'dark' }}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-200 focus:border-indigo-500 focus:outline-none"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-ink focus:border-indigo-500 focus:outline-none"
                       >
                         {Array.from({ length: 8 }, (_, i) => currentYearOptions - i).map(y => (
-                          <option key={y} value={y} className="bg-slate-900 text-slate-100">{y}</option>
+                          <option key={y} value={y} className="bg-slate-900 text-ink">{y}</option>
                         ))}
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-sm text-slate-400 mb-1">באיזה שנה אתה עכשיו?</label>
+                      <label className="block text-sm text-ink-muted mb-1">באיזה שנה אתה עכשיו?</label>
                       <div className="flex gap-2">
                         {[1, 2, 3, 4].map(y => (
                           <button
@@ -378,7 +378,7 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                             className={`flex-1 py-3 rounded-xl border font-medium transition-all ${
                               currentYear === y
                                 ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                                : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/20'
+                                : 'border-white/10 bg-white/5 text-ink-muted hover:border-white/20'
                             }`}
                           >
                             שנה {y === 1 ? "א'" : y === 2 ? "ב'" : y === 3 ? "ג'" : "ד'"}
@@ -391,7 +391,7 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   <div className="flex gap-3 mt-8">
                     <button
                       onClick={() => setStep(1)}
-                      className="flex-1 py-3 rounded-xl border border-white/10 text-slate-400 hover:bg-white/5 transition-all"
+                      className="flex-1 py-3 rounded-xl border border-white/10 text-ink-muted hover:bg-white/5 transition-all"
                     >
                       <ChevronRight className="inline w-4 h-4 ml-1" />
                       חזרה
@@ -577,11 +577,11 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">
+            <h1 className="text-2xl font-bold text-ink">
               מעקב נק&quot;ז
             </h1>
             <div className="flex items-center gap-2 mt-1">
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-ink-muted">
                 {track?.name || 'מסלול לא מוגדר'}
               </p>
               <button
@@ -669,7 +669,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
       <GlowCard>
         <div className="p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-slate-400">התקדמות לתואר</span>
+            <span className="text-sm text-ink-muted">התקדמות לתואר</span>
             <span className="text-sm font-medium text-indigo-400">{progressPercent.toFixed(0)}%</span>
           </div>
           <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
@@ -680,7 +680,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
               className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
             />
           </div>
-          <div className="flex justify-between mt-1 text-xs text-slate-500">
+          <div className="flex justify-between mt-1 text-xs text-ink-subtle">
             <span>{completedCredits} נק&quot;ז</span>
             <span>{totalRequired} נק&quot;ז</span>
           </div>
@@ -691,7 +691,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
       {semesterBreakdown.length > 0 && (
         <GlowCard>
           <div className="p-4">
-            <h2 className="text-lg font-semibold text-slate-200 mb-4">פירוט לפי סמסטר</h2>
+            <h2 className="text-lg font-semibold text-ink mb-4">פירוט לפי סמסטר</h2>
             <div className="space-y-3">
               {semesterBreakdown.map(sem => {
                 const total = sem.completed + sem.inProgress + sem.planned
@@ -700,8 +700,8 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                 return (
                   <div key={sem.semester} className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-300 font-medium">{sem.semester}</span>
-                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                      <span className="text-ink-muted font-medium">{sem.semester}</span>
+                      <div className="flex items-center gap-3 text-xs text-ink-subtle">
                         {sem.completed > 0 && (
                           <span className="text-emerald-400">{sem.completed} הושלמו</span>
                         )}
@@ -709,7 +709,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                           <span className="text-indigo-400">{sem.inProgress} בתהליך</span>
                         )}
                         {sem.planned > 0 && (
-                          <span className="text-slate-400">{sem.planned} מתוכנן</span>
+                          <span className="text-ink-muted">{sem.planned} מתוכנן</span>
                         )}
                       </div>
                     </div>
@@ -745,7 +745,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
             className="glass rounded-xl p-4 overflow-hidden"
           >
             <div className="flex items-center gap-2 mb-3">
-              <Search className="w-5 h-5 text-slate-500" />
+              <Search className="w-5 h-5 text-ink-subtle" />
               <input
                 type="text"
                 value={searchQuery}
@@ -755,7 +755,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                 autoFocus
               />
               <button onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults([]) }}>
-                <X className="w-5 h-5 text-slate-500 hover:text-slate-300" />
+                <X className="w-5 h-5 text-ink-subtle hover:text-ink-muted" />
               </button>
             </div>
             {searching && <Loader2 className="w-5 h-5 animate-spin text-indigo-400 mx-auto" />}
@@ -769,8 +769,8 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                       className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/8 transition-all"
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm text-slate-200 truncate">{c.name}</div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-sm text-ink truncate">{c.name}</div>
+                        <div className="text-xs text-ink-subtle">
                           {c.course_id} | {c.credits} נק&quot;ז
                           {c.type === 'mandatory' && <span className="text-indigo-400 mr-2">חובה</span>}
                         </div>
@@ -791,7 +791,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
               </div>
             )}
             {searchQuery.length >= 2 && searchResults.length === 0 && !searching && (
-              <p className="text-center text-sm text-slate-500 py-4">לא נמצאו קורסים</p>
+              <p className="text-center text-sm text-ink-subtle py-4">לא נמצאו קורסים</p>
             )}
           </motion.div>
         )}
@@ -800,9 +800,9 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
       {/* My Courses — with color-coded status badges */}
       <GlowCard>
         <div className="p-4">
-          <h2 className="text-lg font-semibold text-slate-200 mb-4">הקורסים שלי</h2>
+          <h2 className="text-lg font-semibold text-ink mb-4">הקורסים שלי</h2>
           {myCourses.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">
+            <p className="text-center text-ink-subtle py-8">
               עדיין לא נוספו קורסים. לחץ &quot;הוסף קורס&quot; למעלה
             </p>
           ) : (
@@ -827,11 +827,11 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                   </button>
                   <div className="flex-1 min-w-0">
                     <div className={`text-sm truncate ${
-                      c.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-200'
+                      c.status === 'completed' ? 'text-ink-muted line-through' : 'text-ink'
                     }`}>
                       {c.course_name}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-ink-subtle">
                       {c.credits} נק&quot;ז
                       {c.grade && <span className="text-emerald-400 mr-2">ציון: {c.grade}</span>}
                     </div>
@@ -845,7 +845,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                         ? 'bg-emerald-500/15 text-emerald-300'
                         : c.status === 'in_progress'
                         ? 'bg-indigo-500/15 text-indigo-300'
-                        : 'bg-white/[0.08] text-slate-400'
+                        : 'bg-white/[0.08] text-ink-muted'
                     }`}
                     whileTap={{ scale: 0.92 }}
                   >
@@ -863,7 +863,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                   </motion.button>
                   <button
                     onClick={() => removeCourse(c.course_id)}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-500 hover:text-red-400 transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-ink-subtle hover:text-red-400 transition-all"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -885,7 +885,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
           <div className="flex gap-3 justify-end">
             <button
               onClick={() => setEditOpen(false)}
-              className="px-4 py-2 rounded-xl border border-white/10 text-slate-400 hover:bg-white/5 text-sm transition-all"
+              className="px-4 py-2 rounded-xl border border-white/10 text-ink-muted hover:bg-white/5 text-sm transition-all"
             >
               ביטול
             </button>
@@ -902,7 +902,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
         <div className="space-y-5">
           {/* Track selection */}
           <div>
-            <label className="block text-sm text-slate-400 mb-2">מסלול לימודים</label>
+            <label className="block text-sm text-ink-muted mb-2">מסלול לימודים</label>
             {editTracks.length === 0 ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
@@ -916,11 +916,11 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                     className={`w-full text-right p-3 rounded-xl border transition-all text-sm ${
                       editTrackId === t.id
                         ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                        : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20'
+                        : 'border-white/10 bg-white/5 text-ink-muted hover:border-white/20'
                     }`}
                   >
                     <span className="font-medium">{t.name}</span>
-                    <span className="text-slate-500 mr-2">{t.total_credits} נק&quot;ז</span>
+                    <span className="text-ink-subtle mr-2">{t.total_credits} נק&quot;ז</span>
                   </button>
                 ))}
               </div>
@@ -929,22 +929,22 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
 
           {/* Start year */}
           <div>
-            <label className="block text-sm text-slate-400 mb-1">שנת התחלה</label>
+            <label className="block text-sm text-ink-muted mb-1">שנת התחלה</label>
             <select
               value={editStartYear}
               onChange={e => setEditStartYear(Number(e.target.value))}
               style={{ colorScheme: 'dark' }}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-200 focus:border-indigo-500 focus:outline-none"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-ink focus:border-indigo-500 focus:outline-none"
             >
               {Array.from({ length: 8 }, (_, i) => editYearOptions - i).map(y => (
-                <option key={y} value={y} className="bg-slate-900 text-slate-100">{y}</option>
+                <option key={y} value={y} className="bg-slate-900 text-ink">{y}</option>
               ))}
             </select>
           </div>
 
           {/* Current year */}
           <div>
-            <label className="block text-sm text-slate-400 mb-1">באיזה שנה אתה עכשיו?</label>
+            <label className="block text-sm text-ink-muted mb-1">באיזה שנה אתה עכשיו?</label>
             <div className="flex gap-2">
               {[1, 2, 3, 4].map(y => (
                 <button
@@ -953,7 +953,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                   className={`flex-1 py-3 rounded-xl border font-medium transition-all text-sm ${
                     editCurrentYear === y
                       ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                      : 'border-white/10 bg-white/5 text-slate-400 hover:border-white/20'
+                      : 'border-white/10 bg-white/5 text-ink-muted hover:border-white/20'
                   }`}
                 >
                   שנה {y === 1 ? "א'" : y === 2 ? "ב'" : y === 3 ? "ג'" : "ד'"}
@@ -984,8 +984,8 @@ function StatCard({ icon, label, value, sub, color }: {
         <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${colors[color]} flex items-center justify-center mb-2`}>
           {icon}
         </div>
-        <div className="text-xl font-bold text-slate-100">{value}</div>
-        <div className="text-xs text-slate-500">{sub}</div>
+        <div className="text-xl font-bold text-ink">{value}</div>
+        <div className="text-xs text-ink-subtle">{sub}</div>
       </div>
     </GlowCard>
   )

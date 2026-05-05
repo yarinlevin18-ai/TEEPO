@@ -245,7 +245,7 @@ function StackCard({
         {/* Content */}
         <div className="relative h-full flex flex-col px-8 pr-14 py-6">
           {/* Chapter label */}
-          <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-bold">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-ink-subtle font-bold">
             פרק {index + 1} / {total}
           </p>
 
@@ -276,7 +276,7 @@ function StackCard({
                 {lesson.content!.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()}
               </p>
             ) : (
-              <p className="text-slate-400 italic">
+              <p className="text-ink-muted italic">
                 הפרק ריק. לחץ כדי להתחיל לכתוב.
               </p>
             )}

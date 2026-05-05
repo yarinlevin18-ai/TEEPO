@@ -185,7 +185,7 @@ export default function AssignmentsPage() {
   const pillClass = (active: boolean) =>
     active
       ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-      : 'bg-white/5 text-slate-400 border border-white/[0.08] hover:bg-white/[0.08]'
+      : 'bg-white/5 text-ink-muted border border-white/[0.08] hover:bg-white/[0.08]'
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto space-y-6 animate-fade-in">
@@ -210,7 +210,7 @@ export default function AssignmentsPage() {
         >
           {/* Row 1: Status filter */}
           <div className="flex flex-wrap gap-3 items-center min-h-[36px]">
-            <span className="text-xs font-medium text-slate-400 ml-1">סטטוס:</span>
+            <span className="text-xs font-medium text-ink-muted ml-1">סטטוס:</span>
             {statusFilterOptions.map(opt => (
               <button
                 key={opt.value}
@@ -224,7 +224,7 @@ export default function AssignmentsPage() {
 
           {/* Row 2: Priority filter */}
           <div className="flex flex-wrap gap-3 items-center min-h-[36px]">
-            <span className="text-xs font-medium text-slate-400 ml-1">עדיפות:</span>
+            <span className="text-xs font-medium text-ink-muted ml-1">עדיפות:</span>
             {priorityFilterOptions.map(opt => (
               <button
                 key={opt.value}
@@ -238,28 +238,28 @@ export default function AssignmentsPage() {
 
           {/* Row 3: Sort + Search */}
           <div className="flex flex-wrap gap-3 items-center">
-            <span className="text-xs font-medium text-slate-400 ml-1">מיון:</span>
+            <span className="text-xs font-medium text-ink-muted ml-1">מיון:</span>
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as SortOption)}
-              className="bg-white/5 border border-white/[0.08] text-slate-300 text-xs rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500/40 transition-colors"
+              className="bg-white/5 border border-white/[0.08] text-ink-muted text-xs rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500/40 transition-colors"
               style={{ color: '#f1f5f9' }}
             >
               {sortOptions.map(opt => (
-                <option key={opt.value} value={opt.value} className="bg-slate-900 text-slate-200">
+                <option key={opt.value} value={opt.value} className="bg-slate-900 text-ink">
                   {opt.label}
                 </option>
               ))}
             </select>
 
             <div className="relative flex-1 min-w-[180px]">
-              <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle pointer-events-none" />
               <input
                 type="text"
                 placeholder="חיפוש מטלה..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-white/5 border border-white/[0.08] text-sm rounded-lg pr-9 pl-3 py-1.5 outline-none placeholder:text-slate-500 focus:border-indigo-500/40 transition-colors"
+                className="w-full bg-white/5 border border-white/[0.08] text-sm rounded-lg pr-9 pl-3 py-1.5 outline-none placeholder:text-ink-subtle focus:border-indigo-500/40 transition-colors"
                 style={{ color: '#f1f5f9' }}
               />
             </div>
