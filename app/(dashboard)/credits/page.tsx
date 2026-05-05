@@ -15,6 +15,7 @@ import { computeCreditSummary } from '@/lib/catalog'
 import GlowCard from '@/components/ui/GlowCard'
 import Modal from '@/components/ui/Modal'
 import ErrorAlert from '@/components/ui/ErrorAlert'
+import GradesList from '@/components/credits/GradesList'
 
 // ── Types ──────────────────────────────────────────────────────
 type Track = {
@@ -637,6 +638,9 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
           color="violet"
         />
       </div>
+
+      {/* Grades list with source badges + manual entry (task #17) */}
+      <GradesList />
 
       {/* Off-Track Warning */}
       <AnimatePresence>
