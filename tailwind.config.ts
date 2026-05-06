@@ -28,44 +28,52 @@ const config: Config = {
         'overline':  ['0.625rem',  { lineHeight: '1.4',  fontWeight: '600' }],
       },
       colors: {
-        base: '#0f1117',
+        /* TEEPO design tokens — locked-in cream palette per
+           teepo-design/SESSION_HANDOFF.md (warm paper-feel base). */
+        base:    '#f5ead2',  /* warm saturated cream — body bg */
+        elev:    '#efe0bc',  /* deeper warm cream */
+        hover:   '#f1e3c4',
+        line: {
+          DEFAULT: '#e0cda8',
+          soft:    '#ead8b3',
+        },
         surface: {
-          DEFAULT: '#161b27',
-          50:  '#1e2535',
-          100: '#252d40',
-          200: '#2d3748',
+          /* Cards lift off the paper texture with shadow + opaque cream */
+          DEFAULT: '#fdf6e3',
+          50:  '#fdf6e3',  /* primary card */
+          100: '#fbeed1',  /* tinted card variant */
+          200: '#f1e3c4',  /* hover */
         },
-        /* Warm "paper" cream — for typography on dark */
         paper: {
-          DEFAULT: '#f4ede0',
-          muted:   '#d4c9b4',
-          subtle:  '#8a8270',
+          DEFAULT: '#fdf6e3',
+          muted:   '#fbeed1',
+          subtle:  '#f1e3c4',
         },
-        /* Aged-gold editorial accent — replaces indigo→violet spam */
-        clay: {
-          DEFAULT: '#c8a96a',
-          400:     '#d4bd85',
-          500:     '#c8a96a',
-          600:     '#a88c52',
-        },
+        /* Brand: leaf green → lime gradient (no orange — Moodle uses orange) */
         accent: {
-          DEFAULT: '#6366f1',
-          50:  '#eef2ff',
-          100: '#e0e7ff',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
+          DEFAULT: '#16a34a',
+          soft:    '#dcfce7',
+          deep:    '#14532d',
+          50:  '#dcfce7',
+          100: '#bbf7d0',
+          400: '#4ade80',
+          500: '#16a34a',
+          600: '#15803d',
+          700: '#14532d',
         },
-        violet: {
-          400: '#a78bfa',
-          500: '#8b5cf6',
-          600: '#7c3aed',
+        coral: '#84cc16',  /* lime — secondary brand */
+        clay: {
+          DEFAULT: '#d97706',
+          400:     '#f59e0b',
+          500:     '#d97706',
+          600:     '#b45309',
         },
+        /* Warm dark text on cream */
         ink: {
-          DEFAULT: '#f1f5f9',
-          muted:  '#64748b',
-          subtle: '#334155',
+          DEFAULT: '#2d1810',
+          soft:    '#5c3f2f',
+          muted:   '#8a7261',
+          subtle:  '#b39c81',
         },
         /* Semantic status colors */
         success: {
@@ -107,7 +115,8 @@ const config: Config = {
         },
       },
       backgroundImage: {
-        'gradient-accent':   'linear-gradient(135deg, #6366f1, #8b5cf6)',
+        'gradient-accent':   'linear-gradient(135deg, #16a34a 0%, #84cc16 100%)',
+        'gradient-warm':     'linear-gradient(135deg, #16a34a 0%, #84cc16 100%)',
         'gradient-mesh':     'radial-gradient(ellipse at 20% 50%, rgba(99,102,241,0.18) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(139,92,246,0.14) 0%, transparent 60%), radial-gradient(ellipse at 50% 80%, rgba(56,189,248,0.08) 0%, transparent 60%)',
         'shimmer':           'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%)',
       },

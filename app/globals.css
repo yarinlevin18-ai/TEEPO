@@ -2,29 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ────────────────────────────────────────────────────────────────
+   TEEPO design tokens — locked palette per teepo-design/SESSION_HANDOFF.md
+   Sunsama-calm + warm paper feel. Cream + leaf-green.
+   ──────────────────────────────────────────────────────────────── */
 :root {
-  --font-heebo:  'Heebo', sans-serif;
-  --font-serif:  'Frank Ruhl Libre', Georgia, serif;
-  --font-script: 'Caveat', cursive;
+  /* Warm cream palette */
+  --bg: #f5ead2;
+  --bg-elev: #efe0bc;
+  --bg-card: #fdf6e3;
+  --bg-card-2: #fbeed1;
+  --bg-hover: #f1e3c4;
 
-  /* ── Quiet Atmosphere — time-of-day palette ──
-     Defaults to the מילה (deep night) phase; LivingDayProvider
-     overrides these per-minute via inline style on <html>. */
-  --bg1: rgb(8, 16, 30);
-  --bg2: rgb(13, 22, 40);
-  --glow1: 32, 160, 140;        /* RGB triplet, used as rgba(var(--glow1), α) */
-  --glow2: 20, 60, 110;
-  --accent: #20dca0;
-  --accent-2: #4dd9b8;
+  /* Warm dark text */
+  --ink: #2d1810;
+  --ink-soft: #5c3f2f;
+  --muted: #8a7261;
+  --faint: #b39c81;
 
-  /* Sun/moon position; updated by LivingDayProvider on a 60s cadence. */
+  /* Warm borders */
+  --line: #e0cda8;
+  --line-soft: #ead8b3;
+
+  /* Brand: leaf green → lime gradient */
+  --accent: #16a34a;
+  --accent-soft: #dcfce7;
+  --accent-deep: #14532d;
+  --coral: #84cc16;
+  --gradient-warm: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
+
+  /* Course color palette (no conflict with brand) */
+  --rose: #e11d48;
+  --teal: #0d9488;
+  --indigo: #6366f1;
+  --amber: #d97706;
+  --plum: #a21caf;
+  --violet: #8b5cf6;
+
+  /* Shadows that lift cards off paper */
+  --shadow-sm: 0 2px 6px rgba(120,70,30,0.08), 0 1px 2px rgba(120,70,30,0.05);
+  --shadow:    0 8px 20px -4px rgba(120,70,30,0.14), 0 3px 8px rgba(120,70,30,0.08);
+  --shadow-lg: 0 24px 50px -10px rgba(120,70,30,0.22), 0 8px 20px rgba(120,70,30,0.1);
+
+  /* Backwards compatibility — legacy code still references these. Kept as
+     thin aliases pointing at the new tokens so we don't have to retire
+     every reference at once. */
+  --font-heebo:  'Assistant', sans-serif;
+  --font-serif:  'Assistant', sans-serif;
+  --font-script: 'Assistant', sans-serif;
+  --bg1: var(--bg);
+  --bg2: var(--bg-elev);
+  --glow1: 22, 163, 74;
+  --glow2: 132, 204, 22;
+  --accent-2: #84cc16;
   --sun-x: 88%;
   --sun-y: 78%;
   --sun-opacity: 1;
-
-  /* Standard easings for the atmosphere. */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-snappy: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Paper-texture background — applied to body so it sits behind every page.
+   Matches teepo-design/CLAUDE_CODE_PROMPT.md "Paper-texture background". */
+body {
+  font-family: 'Assistant', sans-serif;
+  background-color: var(--bg);
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.18  0 0 0 0 0.10  0 0 0 0 0.06  0 0 0 0.18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
+  background-attachment: fixed;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
 }
 
 * { box-sizing: border-box; }
@@ -1717,4 +1764,924 @@ html.light .badge-danger {
 /* ── Reduced motion: disable new animations ── */
 @media (prefers-reduced-motion: reduce) {
   .task-complete-strike { animation: none; text-decoration-color: currentColor; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   TEEPO Landing + Login — direct port of the locked mockups in
+   teepo-design/. Class names match the mockup HTML so any future visual
+   refinement can paste back in cleanly.
+   ════════════════════════════════════════════════════════════════════ */
+
+.teepo-landing,
+.teepo-login {
+  font-family: 'Assistant', sans-serif;
+  color: var(--ink);
+  line-height: 1.55;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.teepo-landing .wrap,
+.teepo-login .wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 32px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Background glows used by both landing + login */
+.bg-glow {
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 50%;
+}
+.bg-glow-1 {
+  top: -300px;
+  right: -150px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(22,163,74,0.18) 0%, transparent 60%);
+}
+.bg-glow-2 {
+  bottom: -300px;
+  left: -150px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(132,204,22,0.15) 0%, transparent 60%);
+}
+
+/* Landing buttons */
+.teepo-landing .btn {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.teepo-landing .btn-primary { background: var(--gradient-warm); color: white; }
+.teepo-landing .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -10px var(--accent); }
+.teepo-landing .btn-lg { padding: 13px 24px; font-size: 15px; }
+
+/* Hero */
+.teepo-landing .hero { padding: 100px 0 80px; text-align: center; }
+.teepo-landing .hero h1 {
+  font-size: clamp(38px, 5vw, 64px);
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1.05;
+  margin-bottom: 22px;
+  max-width: 880px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.teepo-landing .accent {
+  background: var(--gradient-warm);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.teepo-landing .hero-sub {
+  font-size: 19px;
+  color: var(--ink-soft);
+  max-width: 620px;
+  margin: 0 auto 36px;
+  line-height: 1.55;
+}
+.teepo-landing .hero-cta {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+/* Product preview */
+.teepo-landing .preview { margin: 80px auto 0; max-width: 1000px; position: relative; }
+.teepo-landing .preview::before {
+  content: '';
+  position: absolute;
+  inset: -30px;
+  background: var(--gradient-warm);
+  border-radius: 24px;
+  opacity: 0.18;
+  filter: blur(50px);
+  z-index: -1;
+}
+.teepo-landing .preview-frame {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 1px;
+  box-shadow: 0 40px 80px -25px rgba(120,70,30,0.30), 0 16px 30px -10px rgba(120,70,30,0.18);
+  overflow: hidden;
+}
+.teepo-landing .preview-bar {
+  background: rgba(253,246,227,0.8);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.teepo-landing .dot { width: 11px; height: 11px; border-radius: 50%; }
+.teepo-landing .dot-r { background: #ff5f57; }
+.teepo-landing .dot-y { background: #ffbd2e; }
+.teepo-landing .dot-g { background: #28c840; }
+.teepo-landing .preview-iframe-wrap {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+  aspect-ratio: 1380 / 1100;
+  container-type: inline-size;
+}
+.teepo-landing .preview-iframe {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1380px;
+  height: 1100px;
+  border: 0;
+  transform-origin: top right;
+  transform: scale(0.72);
+  pointer-events: none;
+}
+@container (min-width: 900px) {
+  .teepo-landing .preview-iframe { transform: scale(calc(100cqw / 1380)); }
+}
+@container (max-width: 700px) {
+  .teepo-landing .preview-iframe { transform: scale(0.5); }
+}
+@container (max-width: 500px) {
+  .teepo-landing .preview-iframe { transform: scale(0.36); }
+}
+
+/* Sections */
+.teepo-landing .section { padding: 100px 0; }
+.teepo-landing .section-head { text-align: center; margin-bottom: 60px; }
+.teepo-landing .section-eyebrow {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.teepo-landing .section-head h2 {
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 800;
+  letter-spacing: -1.2px;
+  line-height: 1.1;
+  margin-bottom: 14px;
+}
+.teepo-landing .section-head > p {
+  color: var(--ink-soft);
+  font-size: 17px;
+  max-width: 580px;
+  margin: 0 auto;
+}
+
+/* Featured row + features grid */
+.teepo-landing .featured-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+.teepo-landing .feat-big {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 36px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.teepo-landing .feat-big::after {
+  content: '';
+  position: absolute;
+  top: -100px;
+  left: -100px;
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle, var(--accent) 0%, transparent 60%);
+  opacity: 0.1;
+}
+.teepo-landing .feat-big-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  background: var(--gradient-warm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 22px;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 8px 20px -8px var(--accent);
+}
+.teepo-landing .feat-big-icon svg { width: 24px; height: 24px; color: white; }
+.teepo-landing .feat-big h3 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  letter-spacing: -0.5px;
+  position: relative;
+  z-index: 1;
+}
+.teepo-landing .feat-big p {
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.6;
+  position: relative;
+  z-index: 1;
+  max-width: 460px;
+}
+.teepo-landing .features {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.teepo-landing .feature {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 26px 22px;
+  transition: all 0.2s;
+  box-shadow: var(--shadow-sm);
+}
+.teepo-landing .feature:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+  border-color: var(--accent);
+}
+.teepo-landing .feature-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.teepo-landing .feature-icon svg { width: 20px; height: 20px; color: var(--accent-deep); }
+.teepo-landing .feature h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: -0.2px;
+}
+.teepo-landing .feature p {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+/* Steps */
+.teepo-landing .steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.teepo-landing .step { text-align: right; padding: 0 8px; }
+.teepo-landing .step-num {
+  font-size: 64px;
+  font-weight: 800;
+  letter-spacing: -3px;
+  line-height: 1;
+  background: var(--gradient-warm);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+.teepo-landing .step h3 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: -0.3px;
+}
+.teepo-landing .step p {
+  color: var(--ink-soft);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+/* Final CTA */
+.teepo-landing .cta {
+  background: var(--gradient-warm);
+  border-radius: 24px;
+  padding: 60px 48px;
+  text-align: center;
+  margin: 80px 0;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.teepo-landing .cta::after {
+  content: '';
+  position: absolute;
+  top: -100px;
+  right: -100px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 60%);
+}
+.teepo-landing .cta > * { position: relative; z-index: 1; }
+.teepo-landing .cta h2 {
+  font-size: clamp(26px, 4vw, 40px);
+  font-weight: 800;
+  letter-spacing: -1.2px;
+  margin-bottom: 12px;
+  color: white;
+  line-height: 1.1;
+}
+.teepo-landing .cta p {
+  color: rgba(255,255,255,0.9);
+  font-size: 17px;
+  margin-bottom: 28px;
+}
+.teepo-landing .cta-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.teepo-landing .btn-on-grad { background: white; color: var(--accent-deep); }
+.teepo-landing .btn-on-grad:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px -8px rgba(0,0,0,0.2);
+}
+
+/* Footer */
+.teepo-landing .landing-footer {
+  padding: 32px 0 60px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  border-top: 1px solid var(--line);
+}
+.teepo-landing .landing-foot-mark {
+  font-weight: 700;
+}
+.teepo-landing .landing-foot-mark .accent {
+  background: var(--gradient-warm);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .teepo-landing .preview { margin-top: 48px; }
+  .teepo-landing .featured-row { grid-template-columns: 1fr; }
+  .teepo-landing .features { grid-template-columns: repeat(2, 1fr); }
+  .teepo-landing .steps { grid-template-columns: 1fr; }
+  .teepo-landing .cta { padding: 36px 24px; margin: 48px 0; }
+  .teepo-landing .section { padding: 64px 0; }
+}
+
+/* ──────────── LOGIN ──────────── */
+
+.teepo-login {
+  display: flex;
+  flex-direction: column;
+}
+.teepo-login .topnav {
+  padding: 22px 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+.teepo-login .logo {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--ink);
+  position: relative;
+  display: inline-block;
+  padding-top: 4px;
+  text-decoration: none;
+}
+.teepo-login .logo .accent {
+  background: var(--gradient-warm);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.teepo-login .spacer { flex: 1; }
+.teepo-login .back-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+.teepo-login .back-link:hover { color: var(--ink); }
+.teepo-login .center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+  z-index: 1;
+}
+.teepo-login .auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 44px 40px 36px;
+  box-shadow: 0 40px 80px -25px rgba(120,70,30,0.32),
+              0 16px 30px -10px rgba(120,70,30,0.18),
+              inset 0 1px 0 rgba(255,255,255,0.7);
+  position: relative;
+  overflow: hidden;
+  animation: fadeUp 0.5s ease both;
+}
+.teepo-login .auth-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(22,163,74,0.5), transparent);
+}
+.teepo-login .auth-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 18px;
+}
+.teepo-login .auth-eyebrow .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.teepo-login .auth-card h1 {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1.15;
+  margin-bottom: 10px;
+}
+.teepo-login .auth-card h1 .accent {
+  background: var(--gradient-warm);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.teepo-login .auth-card .sub {
+  color: var(--ink-soft);
+  font-size: 15px;
+  margin-bottom: 28px;
+  line-height: 1.55;
+}
+.teepo-login .google-btn {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: white;
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  transition: all 0.15s;
+  box-shadow: var(--shadow-sm);
+}
+.teepo-login .google-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: var(--ink-soft);
+}
+.teepo-login .google-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.teepo-login .google-btn .g-logo { width: 20px; height: 20px; flex-shrink: 0; }
+.teepo-login .bgu-restriction {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(22,163,74,0.06);
+  border: 1px solid rgba(22,163,74,0.2);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--accent-deep);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.teepo-login .bgu-restriction svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+.teepo-login .login-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(225,29,72,0.08);
+  border: 1px solid rgba(225,29,72,0.25);
+  border-radius: 10px;
+  font-size: 13px;
+  color: #9f1239;
+}
+.teepo-login .divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 26px 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.teepo-login .divider::before,
+.teepo-login .divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.teepo-login .next-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+}
+.teepo-login .next-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+.teepo-login .next-list .check {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.teepo-login .next-list .check svg { width: 13px; height: 13px; }
+.teepo-login .auth-foot {
+  text-align: center;
+  margin-top: 28px;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.teepo-login .auth-foot a {
+  color: var(--accent-deep);
+  text-decoration: none;
+  font-weight: 500;
+}
+.teepo-login .auth-foot a:hover { text-decoration: underline; }
+.teepo-login .login-footer {
+  padding: 24px 32px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  font-size: 12px;
+  color: var(--muted);
+  position: relative;
+  z-index: 1;
+  flex-wrap: wrap;
+}
+.teepo-login .login-footer .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.4);
+  border: 1px solid var(--line);
+}
+.teepo-login .login-footer .ico {
+  width: 13px;
+  height: 13px;
+  color: var(--accent);
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 480px) {
+  .teepo-login .auth-card { padding: 32px 24px 28px; border-radius: 18px; }
+  .teepo-login .auth-card h1 { font-size: 24px; }
+}
+
+/* ──────────── DEMO (landing iframe) ──────────── */
+
+.teepo-demo {
+  font-family: 'Assistant', sans-serif;
+  color: var(--ink);
+  min-height: 100vh;
+}
+.teepo-demo .demo-nav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 32px;
+  background: rgba(245,234,210,0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--line);
+}
+.teepo-demo .demo-logo {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--ink);
+}
+.teepo-demo .demo-logo .accent {
+  background: var(--gradient-warm);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.teepo-demo .demo-nav-links {
+  display: flex;
+  gap: 1px;
+  margin-right: 14px;
+}
+.teepo-demo .demo-link {
+  padding: 8px 13px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: var(--muted);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.teepo-demo .demo-link.active {
+  background: var(--gradient-warm);
+  color: white;
+  font-weight: 600;
+}
+.teepo-demo .demo-link .count {
+  font-size: 10px;
+  padding: 1px 7px;
+  background: var(--bg-elev);
+  border-radius: 999px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.teepo-demo .demo-link.active .count {
+  background: rgba(255,255,255,0.18);
+  color: var(--bg);
+}
+.teepo-demo .demo-spacer { flex: 1; }
+.teepo-demo .demo-pill {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.teepo-demo .demo-user {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.teepo-demo .demo-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+/* Hero */
+.teepo-demo .demo-hero { margin-bottom: 28px; }
+.teepo-demo .demo-hero-eyebrow {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.teepo-demo .demo-hero h1 {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+.teepo-demo .demo-hero-sub {
+  color: var(--ink-soft);
+  font-size: 15px;
+  margin-bottom: 24px;
+}
+.teepo-demo .demo-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.teepo-demo .demo-stat {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: var(--shadow-sm);
+}
+.teepo-demo .demo-stat-num {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: var(--gradient-warm);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.teepo-demo .demo-stat-label {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Calendar sketch */
+.teepo-demo .demo-cal {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 22px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow-sm);
+}
+.teepo-demo .demo-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.teepo-demo .demo-card-head h2 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.teepo-demo .demo-card-sub {
+  color: var(--muted);
+  font-size: 13px;
+}
+.teepo-demo .demo-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+.teepo-demo .demo-cal-col {
+  background: var(--bg-card-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 12px 10px;
+  min-height: 130px;
+}
+.teepo-demo .demo-cal-day {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.teepo-demo .demo-cal-num {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.teepo-demo .demo-cal-num.today {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--gradient-warm);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+.teepo-demo .demo-cal-event {
+  background: white;
+  border-right: 2px solid;
+  padding: 6px 10px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 4px;
+  box-shadow: var(--shadow-sm);
+}
+.teepo-demo .demo-cal-event strong { font-weight: 600; }
+.teepo-demo .demo-cal-event.rose { border-color: var(--rose); }
+.teepo-demo .demo-cal-event.teal { border-color: var(--teal); }
+.teepo-demo .demo-cal-event.indigo { border-color: var(--indigo); }
+
+/* Bottom row */
+.teepo-demo .demo-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+.teepo-demo .demo-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: var(--shadow-sm);
+}
+.teepo-demo .demo-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+}
+.teepo-demo .demo-course,
+.teepo-demo .demo-task {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-card-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+}
+.teepo-demo .demo-course strong,
+.teepo-demo .demo-task strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+.teepo-demo .demo-course small,
+.teepo-demo .demo-task small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.teepo-demo .demo-task {
+  justify-content: space-between;
+}
+.teepo-demo .demo-course-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.teepo-demo .demo-course-dot.rose { background: var(--rose); }
+.teepo-demo .demo-course-dot.teal { background: var(--teal); }
+.teepo-demo .demo-course-dot.indigo { background: var(--indigo); }
+.teepo-demo .demo-course-dot.amber { background: var(--amber); }
+.teepo-demo .demo-tag {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  white-space: nowrap;
+}
+.teepo-demo .demo-tag.urgent {
+  background: #ffd9e0;
+  color: #9f1239;
+}
+
+.teepo-demo .demo-cta-row {
+  text-align: center;
+}
+.teepo-demo .demo-cta {
+  display: inline-block;
+  padding: 12px 22px;
+  border-radius: 10px;
+  background: var(--gradient-warm);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
 }

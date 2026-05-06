@@ -6,29 +6,24 @@ import { ThemeProvider } from '@/lib/theme-context'
 import ErrorBoundary from '@/components/ErrorBoundary'
 
 export const metadata: Metadata = {
-  title: 'TEEPO — מערכת לימודים חכמה',
-  description: 'TEEPO — מארגן לימודים אישי עם בינה מלאכותית',
+  title: 'TEEPO — הסמסטר שלך, מאורגן',
+  description: 'פלטפורמת לימודים חכמה לסטודנטים. הסמסטר שלך — במקום אחד.',
   manifest: '/manifest.json',
   icons: {
-    icon: '/logo-48.png',
-    apple: '/logo-512.png',
+    icon: '/brand/teepo-256px.png',
+    apple: '/brand/teepo-512px.png',
   },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="he" dir="rtl" className="dark">
+    <html lang="he" dir="rtl">
       <head>
-        {/* Inline script restores persisted theme before first paint to avoid flash-of-dark on light users. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('smartdesk_theme');if(t==='light'){document.documentElement.classList.remove('dark');document.documentElement.classList.add('light');document.documentElement.style.colorScheme='light';}else{document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}}catch(e){}})();`,
-          }}
-        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* Assistant — only font per locked design tokens (SESSION_HANDOFF.md §1) */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&family=Caveat:wght@500;600&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
       </head>
