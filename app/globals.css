@@ -2685,3 +2685,356 @@ html.light .badge-danger {
   font-size: 14px;
   text-decoration: none;
 }
+
+/* ══════════════════════════════════════════
+   TEEPO TOP NAV
+   Sticky navbar that replaces the legacy left sidebar.
+   Matches teepo-design/mockup_dashboard.html.
+   ══════════════════════════════════════════ */
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(245, 234, 210, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--line);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Assistant', sans-serif;
+}
+.tn-logo {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+  text-decoration: none;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+.tn-logo .accent {
+  background: var(--gradient-warm);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.tn-section {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: nowrap;
+}
+.tn-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--line);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+.tn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+.tn-link:hover {
+  background: var(--bg-elev);
+  color: var(--ink);
+}
+.tn-link.active {
+  background: var(--gradient-warm);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 4px 12px -4px var(--coral);
+}
+.tn-link .ico {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.tn-link.active .ico { opacity: 1; }
+.tn-link .count {
+  font-size: 10px;
+  padding: 1px 7px;
+  background: var(--bg-elev);
+  border-radius: 999px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-inline-start: 2px;
+}
+.tn-link.active .count {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+.tn-spacer { flex: 1; }
+.tn-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.tn-icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+  color: var(--ink-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.tn-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+  border-color: var(--ink-subtle, #b39c81);
+}
+.user-pill {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  cursor: default;
+  transition: background 0.15s;
+}
+.user-pill:hover { background: var(--bg-hover); }
+.user-pill .info { line-height: 1.15; text-align: start; }
+.user-pill .info strong {
+  font-size: 12px;
+  font-weight: 600;
+  display: block;
+  color: var(--ink);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-pill .info small {
+  font-size: 10px;
+  color: var(--muted);
+  display: block;
+}
+.user-pill .av {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--ink);
+  color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* Mobile / drawer */
+.tn-mobile-only { display: none; }
+@media (max-width: 1100px) {
+  .tn-desktop { display: none !important; }
+  .tn-mobile-only { display: inline-flex; }
+  .topnav { padding: 10px 16px; }
+}
+.tn-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(45, 24, 16, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 40;
+}
+.tn-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 0;
+  width: 280px;
+  background: var(--bg-card);
+  border-inline-end: 1px solid var(--line);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 12px;
+  box-shadow: 0 24px 60px rgba(45, 24, 16, 0.18);
+}
+.tn-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.tn-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tn-drawer-section .tn-link {
+  width: 100%;
+  justify-content: flex-start;
+}
+.tn-drawer-divider {
+  height: 1px;
+  background: var(--line-soft);
+  margin: 4px 0;
+}
+.tn-drawer-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* ══════════════════════════════════════════
+   QUIET ATMOSPHERE — CREAM OVERRIDES
+   These rules SUPERSEDE the dark `.qa .glass` / `.qa .clay` /
+   `.qa .gradient-text` block defined earlier in this file. Same
+   selectors, declared later → win the cascade. The dashboard JSX
+   carrying `.glass`, `.glass-sm`, `.clay`, `.clay-coral`, etc. now
+   reads as cream paper instead of dark glass.
+   ══════════════════════════════════════════ */
+.qa .glass,
+.qa .glass-sm {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--line) !important;
+  color: var(--ink);
+  box-shadow: 0 2px 6px rgba(120, 70, 30, 0.06), 0 1px 2px rgba(120, 70, 30, 0.04);
+  position: relative;
+  overflow: hidden;
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+.qa .glass    { border-radius: 14px; }
+.qa .glass-sm { border-radius: 12px; }
+.qa .glass::before,
+.qa .glass-sm::before {
+  /* Kill the white shimmer line — it reads as a hairline crack on cream. */
+  display: none !important;
+}
+.qa .glass:hover,
+.qa .glass-sm:hover {
+  transform: translateY(-1px);
+  border-color: rgba(120, 70, 30, 0.18);
+  background: var(--bg-card-2, #fbeed1) !important;
+  box-shadow: 0 8px 20px -4px rgba(120, 70, 30, 0.14), 0 3px 8px rgba(120, 70, 30, 0.08);
+}
+
+/* Claymorphism cards — repaint as cream paper with warm-toned accents.
+   The mockup uses a single card style; we keep the variant API so
+   existing JSX (clay-coral, clay-mint, etc.) still works, but every
+   variant lands as cream + a subtle left-edge accent. */
+.qa .clay {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 2px 6px rgba(120, 70, 30, 0.06), 0 1px 2px rgba(120, 70, 30, 0.04);
+  color: var(--ink);
+}
+.qa .clay:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px -8px rgba(120, 70, 30, 0.18), 0 4px 12px rgba(120, 70, 30, 0.08);
+}
+.qa .clay-coral,
+.qa .clay-mint,
+.qa .clay-sunny,
+.qa .clay-sky,
+.qa .clay-lavender,
+.qa .clay-peach {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--line) !important;
+  box-shadow: 0 2px 6px rgba(120, 70, 30, 0.06), 0 1px 2px rgba(120, 70, 30, 0.04) !important;
+}
+.qa .clay:hover.clay-coral,
+.qa .clay:hover.clay-mint,
+.qa .clay:hover.clay-sunny,
+.qa .clay:hover.clay-sky,
+.qa .clay:hover.clay-lavender,
+.qa .clay:hover.clay-peach {
+  background: var(--bg-card-2, #fbeed1) !important;
+  box-shadow: 0 14px 32px -8px rgba(120, 70, 30, 0.18) !important;
+}
+
+/* Gradient text — drop the indigo/violet ramp; use the locked
+   leaf-green→lime ramp so accents in the dashboard match landing/login. */
+.qa .gradient-text {
+  background: var(--gradient-warm) !important;
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: qa-shimmer 4s linear infinite;
+}
+.qa .gradient-text-white {
+  background: var(--gradient-warm) !important;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Buttons / typing dots / shimmer — repaint warmth. */
+.qa .btn-gradient {
+  background: var(--gradient-warm) !important;
+  border: 0 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px -4px var(--coral) !important;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+.qa .btn-gradient:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -6px var(--coral) !important;
+}
+.qa .btn-gradient:active { transform: translateY(0); }
+.qa .typing-dot { background: var(--accent) !important; }
+.qa .shimmer {
+  background: linear-gradient(90deg,
+    rgba(45, 24, 16, 0.04) 0%,
+    rgba(45, 24, 16, 0.08) 50%,
+    rgba(45, 24, 16, 0.04) 100%);
+}
+
+/* The dashboard previously sat on top of `.sky-scene`. Now there's no
+   sky scene, so any aurora-mesh / gradient-mesh chrome inside the
+   dashboard tree should fade rather than dominate. */
+.qa .aurora-mesh,
+.qa .bg-gradient-mesh {
+  display: none !important;
+}
+
+/* Heading weights — the original `.qa` block dropped them to 500/300.
+   On cream, slightly heavier weights read better. Keep h1 at 700 to
+   match the mockup's "ירין. השבוע שלך מאוזן." treatment. */
+.qa .text-heading-1,
+.qa .text-display-1,
+.qa .text-display-2 { font-weight: 700; color: var(--ink); }
+.qa .text-heading-2 { font-weight: 600; color: var(--ink); }
+.qa .text-heading-3 { font-weight: 600; color: var(--ink); }
+.qa .text-body,
+.qa .text-body-sm   { font-weight: 400; color: var(--ink-soft); }
+.qa .text-caption   { font-weight: 500; color: var(--muted); }
+
+/* Some legacy dashboard buttons set `text-white` on accent backgrounds.
+   On cream those become invisible — keep white text only when the
+   background is a real accent. */
+.qa .bg-base { background-color: var(--bg) !important; }
+.qa .bg-elev,
+.qa .bg-surface,
+.qa .bg-paper { background-color: var(--bg-card) !important; }
+
