@@ -218,7 +218,11 @@ html {
   font-family: var(--font-heebo), system-ui, sans-serif;
 }
 
-body {
+/* Dark-theme body fallback — scoped to html.dark so it only applies when
+   the user has explicitly opted into dark mode. The site default (TEEPO
+   locked design) is the cream + paper-texture body declared earlier in
+   this file. */
+html.dark body {
   background: #0f1117;
   color: #f1f5f9;
   min-height: 100vh;
@@ -1466,12 +1470,15 @@ body {
    Applied when <html> has class "light".
    ══════════════════════════════════════════ */
 html.light body {
-  background:
-    radial-gradient(ellipse at 15% 0%, rgba(99,102,241,0.08) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 100%, rgba(167,139,250,0.07) 0%, transparent 55%),
-    linear-gradient(180deg, #eef0fa 0%, #e6e9f5 100%);
+  /* Light theme — TEEPO locked cream + paper texture. The legacy lavender
+     gradient was replaced when the v2 design landed; we re-assert the
+     cream values here so the html.light selector wins over any lingering
+     html.dark rules in CSS that loads later. */
+  background-color: var(--bg);
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.18  0 0 0 0 0.10  0 0 0 0 0.06  0 0 0 0.18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
   background-attachment: fixed;
-  color: #1a1d28;
+  color: var(--ink);
 }
 
 html.light ::-webkit-scrollbar-track { background: #dde0ec; }
