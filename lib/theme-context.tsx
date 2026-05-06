@@ -24,8 +24,10 @@ function applyTheme(t: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Default to dark to match the existing design; rehydrate from localStorage on mount.
-  const [theme, setThemeState] = useState<Theme>('dark')
+  // Default to light — TEEPO locked design is cream + paper. Users who
+  // previously opted into dark via localStorage stay on dark; everyone
+  // else gets cream.
+  const [theme, setThemeState] = useState<Theme>('light')
 
   useEffect(() => {
     try {
@@ -34,10 +36,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setThemeState(stored)
         applyTheme(stored)
       } else {
-        applyTheme('dark')
+        applyTheme('light')
       }
     } catch {
-      applyTheme('dark')
+      applyTheme('light')
     }
   }, [])
 
