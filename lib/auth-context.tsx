@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback } f
 import { supabase } from './supabase'
 import type { User, Session } from '@supabase/supabase-js'
 import { isDevAuthBypassEnabled, FAKE_USER, FAKE_SESSION } from './dev-auth-bypass'
+import { storeGoogleRefreshToken, refreshGoogleAccessToken } from './auth-backend'
 
 const GOOGLE_TOKEN_KEY = 'smartdesk_google_token'
 const GOOGLE_REFRESH_KEY = 'smartdesk_google_refresh_token'
@@ -120,37 +121,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // Stage 2 OAuth: mirror the Google refresh token into encrypted backend
+  // storage so any future device with a valid Supabase JWT can refresh
+  // without re-OAuth. Best-effort: never blocks sign-in.
+  // Backend contract: `backend/routes/auth.py` + migrate_005.sql.
+  const storeRefreshTokenOnBackend = useCallback(
+    async (refreshToken: string, jwt: string): Promise<void> => {
+      await storeGoogleRefreshToken(refreshToken, jwt, { backendUrl: BACKEND })
+    },
+    []
+  )
+
   // Call our backend to exchange the refresh token for a fresh access token.
   // Supabase does NOT rotate the Google provider_token on refreshSession(),
   // so we talk to Google directly via the backend (which holds the client secret).
+  // Resolution ladder (JWT → body) lives in lib/auth-backend.ts.
   const refreshViaBackend = useCallback(async (): Promise<string | null> => {
-    let refreshToken: string | null = null
-    try { refreshToken = localStorage.getItem(GOOGLE_REFRESH_KEY) } catch {}
-    if (!refreshToken) return null
+    let localRefreshToken: string | null = null
+    try { localRefreshToken = localStorage.getItem(GOOGLE_REFRESH_KEY) } catch {}
 
+    let jwt: string | null = null
     try {
-      const res = await fetch(`${BACKEND}/api/auth/refresh-google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-        signal: AbortSignal.timeout(10000),
-      })
-      if (!res.ok) {
-        // 401 = refresh token invalid/revoked → user must sign in again.
-        if (res.status === 401) {
-          // Keep the stored access token (may still have a few seconds left),
-          // but drop the refresh token so callers know to force-reconnect.
-          try { localStorage.removeItem(GOOGLE_REFRESH_KEY) } catch {}
-        }
-        return null
-      }
-      const data = await res.json()
-      if (data?.access_token) {
-        persistGoogleToken(data.access_token, refreshToken, data.expires_in)
-        return data.access_token
-      }
-    } catch {
-      // Network error / CORS / backend cold-start — caller will fall back.
+      const { data } = await supabase.auth.getSession()
+      jwt = data?.session?.access_token ?? null
+    } catch {}
+
+    const result = await refreshGoogleAccessToken({
+      jwt,
+      refreshToken: localRefreshToken,
+      backendUrl: BACKEND,
+    })
+
+    if (result.ok) {
+      persistGoogleToken(
+        result.accessToken,
+        localRefreshToken ?? undefined,
+        result.expiresIn
+      )
+      return result.accessToken
+    }
+    if (result.revoked) {
+      // Refresh token revoked at the source. Drop local copy so callers
+      // force a reconnect — backend row will be re-upserted on next sign-in.
+      try { localStorage.removeItem(GOOGLE_REFRESH_KEY) } catch {}
     }
     return null
   }, [persistGoogleToken])
@@ -234,6 +247,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           persistGoogleToken(session.provider_token, session.provider_refresh_token ?? null, realExpiry)
         }
+        // Stage 2 OAuth: mirror the refresh token into encrypted backend storage.
+        // Supabase only hands us provider_refresh_token on the first sign-in
+        // event after consent — calling here covers both the redirect-back
+        // case and a returning user whose Supabase session still carries it.
+        if (session.provider_refresh_token && session.access_token) {
+          void storeRefreshTokenOnBackend(session.provider_refresh_token, session.access_token)
+        }
       } else if (session) {
         // Returning user — see if stored token is still fresh, else refresh.
         const stored = loadStoredGoogleToken()
@@ -264,6 +284,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             session.provider_refresh_token ?? null,
             realExpiry ?? 300
           )
+          // Stage 2 OAuth: same as the initial-session path — push the refresh
+          // token into encrypted backend storage so a future fresh device can
+          // refresh without re-OAuth. Idempotent on the backend.
+          if (session.provider_refresh_token && session.access_token) {
+            void storeRefreshTokenOnBackend(session.provider_refresh_token, session.access_token)
+          }
           scheduleRefresh()
         }
 
