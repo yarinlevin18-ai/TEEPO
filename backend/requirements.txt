@@ -14,6 +14,9 @@ httpx>=0.27.0
 duckduckgo-search>=7.0.0
 pypdf>=4.2.0
 openai>=1.30.0
+# AES-256-GCM for the encrypted refresh-token table (services/token_crypto.py).
+# Pure-Python with native bindings; well-maintained; ~20s install in CI.
+cryptography>=42.0.0
 
 # Testing — pytest is the runtime, pytest-mock provides the `mocker` fixture
 # we use to stub out Supabase / Anthropic / Selenium so unit tests don't
