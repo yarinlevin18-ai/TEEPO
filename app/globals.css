@@ -1996,12 +1996,12 @@ html.light .badge-danger {
 .landing-page .features-bar {
   position: relative;
   z-index: 10;
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 80px auto 0;
   padding: 0 24px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
 }
 .landing-page .feature-card {
   background: var(--lp-bg-card);
@@ -2082,11 +2082,241 @@ html.light .badge-danger {
 }
 .landing-page .footer-links a:hover { color: var(--lp-accent); }
 
+/* === Top nav (sticky, blurred cream) === */
+.landing-page .lp-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 32px;
+  background: rgba(245, 234, 210, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(224, 205, 168, 0.5);
+}
+.landing-page .lp-nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  direction: ltr;
+  transition: opacity .15s ease;
+}
+.landing-page .lp-nav-brand:hover { opacity: .85; }
+.landing-page .lp-nav-icon {
+  width: 32px;
+  height: auto;
+  flex-shrink: 0;
+  transform: rotate(-5deg);
+  filter: drop-shadow(0 2px 4px rgba(91, 70, 52, .15));
+}
+.landing-page .lp-nav-word {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--lp-brand-teal);
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.landing-page .lp-nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Assistant', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--lp-ink);
+  text-decoration: none;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-bg-card);
+  transition: all .15s ease;
+}
+.landing-page .lp-nav-cta:hover {
+  background: var(--lp-accent);
+  border-color: var(--lp-accent);
+  color: #fff;
+}
+
+/* === Trust badges row (between Google CTA and restriction pill) === */
+.landing-page .trust-row {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lp-ink-soft);
+}
+.landing-page .trust-row li { line-height: 1.2; }
+
+/* === "How it works" section === */
+.landing-page .how-section {
+  position: relative;
+  z-index: 10;
+  max-width: 1100px;
+  margin: 100px auto 0;
+  padding: 0 24px;
+}
+.landing-page .section-head {
+  text-align: center;
+  margin-bottom: 48px;
+}
+.landing-page .section-eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--lp-accent);
+  margin-bottom: 12px;
+}
+.landing-page .section-head h2 {
+  font-family: 'Heebo', sans-serif;
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 900;
+  letter-spacing: -1px;
+  line-height: 1.15;
+  color: var(--lp-ink);
+}
+.landing-page .steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.landing-page .step-card {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 18px;
+  padding: 28px 24px;
+  text-align: right;
+  box-shadow: var(--lp-shadow);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.landing-page .step-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--lp-shadow-lg);
+}
+.landing-page .step-num {
+  font-family: 'Heebo', sans-serif;
+  font-size: 56px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -3px;
+  background: var(--lp-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 12px;
+}
+.landing-page .step-card h3 {
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--lp-ink);
+}
+.landing-page .step-card p {
+  font-size: 14.5px;
+  color: var(--lp-ink-soft);
+  line-height: 1.65;
+}
+
+/* === Final CTA — warm gradient panel before footer === */
+.landing-page .final-cta {
+  position: relative;
+  z-index: 10;
+  max-width: 1100px;
+  margin: 100px auto 0;
+  padding: 0 24px;
+}
+.landing-page .final-cta-inner {
+  background: var(--lp-gradient);
+  border-radius: 24px;
+  padding: 56px 40px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--lp-shadow-lg);
+}
+.landing-page .final-cta-inner::after {
+  content: '';
+  position: absolute;
+  top: -100px;
+  right: -100px;
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, rgba(255,255,255,0.28) 0%, transparent 60%);
+  pointer-events: none;
+}
+.landing-page .final-cta-inner > * { position: relative; z-index: 1; }
+.landing-page .final-cta h2 {
+  font-family: 'Heebo', sans-serif;
+  font-size: clamp(26px, 3.5vw, 38px);
+  font-weight: 900;
+  letter-spacing: -1px;
+  line-height: 1.15;
+  color: #fff;
+  margin-bottom: 12px;
+}
+.landing-page .final-cta p {
+  font-size: 17px;
+  color: rgba(255, 255, 255, .92);
+  margin-bottom: 28px;
+}
+.landing-page .final-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  color: #14532d;
+  font-family: 'Assistant', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  padding: 14px 32px;
+  border-radius: 14px;
+  text-decoration: none;
+  box-shadow: 0 8px 20px -4px rgba(0,0,0,.18);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.landing-page .final-cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -4px rgba(0,0,0,.24);
+}
+
+/* === sr-only utility (visually hidden, screen-reader visible) === */
+.landing-page .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* === Responsive === */
+@media (max-width: 1100px) {
+  .landing-page .features-bar { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 780px) {
   .landing-page .features-bar { grid-template-columns: 1fr; gap: 14px; }
+  .landing-page .steps-grid { grid-template-columns: 1fr; gap: 14px; }
   .landing-page .ui-footer { max-width: 94%; }
   .landing-page .content-wrapper { padding-top: 170px; }
+  .landing-page .lp-nav { padding: 10px 18px; }
+  .landing-page .lp-nav-word { font-size: 20px; }
+  .landing-page .final-cta-inner { padding: 40px 24px; }
 }
 
 /* Reduced motion — freeze the slow background drift */

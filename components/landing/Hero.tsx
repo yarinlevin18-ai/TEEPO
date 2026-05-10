@@ -13,10 +13,10 @@ export default function Hero() {
         פלטפורמת לימודים <span className="accent">חכמה</span> לסטודנטים.
       </h1>
       <p className="subline">
-        פלטפורמה אחת ל<strong>הכל</strong>. כל הקבצים והסיכומים שלך נשמרים ב-
-        <strong>Google Drive</strong>.
+        קורסים, ציונים ומטלות נשאבים אוטומטית מ-<strong>Moodle</strong> ומפורטל
+        האוניברסיטה. הקבצים והסיכומים נשמרים ב-<strong>Google Drive</strong> שלך.
       </p>
-      <p className="subline">החיים האקדמיים בשליטה שלך.</p>
+      <p className="subline">החיים האקדמיים בשליטה שלך — בלי לעבור בין עשרה אתרים.</p>
 
       <Link href="/auth" className="google-btn">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
@@ -42,6 +42,14 @@ export default function Hero() {
         </svg>
         הירשם עם Google
       </Link>
+
+      <ul className="trust-row" aria-label="עקרונות המוצר">
+        <li>חינם</li>
+        <li aria-hidden>·</li>
+        <li>ללא פרסומות</li>
+        <li aria-hidden>·</li>
+        <li>הנתונים אצלך ב-Drive</li>
+      </ul>
 
       <div className="restriction-note">
         <span aria-hidden>🎓</span>
