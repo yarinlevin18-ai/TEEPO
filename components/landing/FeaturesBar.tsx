@@ -34,19 +34,22 @@ const FEATURES = [
 
 export default function FeaturesBar() {
   return (
-    <section className="features-bar" aria-labelledby="lp-features-heading">
-      <h2 id="lp-features-heading" className="sr-only">
-        מה TEEPO עושה
-      </h2>
-      {FEATURES.map((f) => (
-        <div className="feature-card" key={f.title}>
-          <div className="feature-icon" aria-hidden>
-            {f.icon}
+    <section className="features-section" aria-labelledby="lp-features-heading">
+      <div className="section-head">
+        <div className="section-eyebrow">מה כלול</div>
+        <h2 id="lp-features-heading">כל מה שצריך לסמסטר. בלי כלום מיותר.</h2>
+      </div>
+      <div className="features-bar">
+        {FEATURES.map((f) => (
+          <div className="feature-card" key={f.title}>
+            <div className="feature-icon" aria-hidden>
+              {f.icon}
+            </div>
+            <h3>{f.title}</h3>
+            <p>{f.body}</p>
           </div>
-          <h3>{f.title}</h3>
-          <p>{f.body}</p>
-        </div>
-      ))}
+        ))}
+      </div>
     </section>
   )
 }

@@ -1940,6 +1940,11 @@ html.light .badge-danger {
   color: var(--lp-ink);
   margin-bottom: 24px;
   letter-spacing: -1px;
+  /* Balance the line breaks so we don't strand "לסטודנטים" alone */
+  text-wrap: balance;
+  max-width: 14ch;
+  margin-left: auto;
+  margin-right: auto;
 }
 .landing-page h1.tagline .accent {
   background: var(--lp-gradient);
@@ -1952,8 +1957,27 @@ html.light .badge-danger {
   line-height: 1.7;
   color: var(--lp-ink-soft);
   margin-bottom: 8px;
+  text-wrap: pretty;
+  max-width: 56ch;
+  margin-left: auto;
+  margin-right: auto;
 }
 .landing-page .subline strong { color: var(--lp-ink); font-weight: 700; }
+
+/* Block-level row containers — each one is its own line, the inline-flex
+   children inside center themselves. This fixes the "everything ends up on
+   the same baseline" bug that happens when google-btn / trust-row /
+   restriction-note are siblings without block wrappers. */
+.landing-page .hero-cta-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 36px;
+}
+.landing-page .restriction-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
 
 .landing-page .google-btn {
   display: inline-flex;
@@ -1967,7 +1991,6 @@ html.light .badge-danger {
   font-weight: 700;
   border-radius: 14px;
   cursor: pointer;
-  margin-top: 40px;
   font-family: 'Assistant', sans-serif;
   text-decoration: none;
   box-shadow: 0 8px 20px -4px rgba(22,163,74,.4), 0 3px 8px rgba(22,163,74,.2);
@@ -1992,13 +2015,17 @@ html.light .badge-danger {
   border: 1px solid var(--lp-line);
 }
 
-/* === Features bar === */
-.landing-page .features-bar {
+/* === Features section (wraps the cards + visible heading) === */
+.landing-page .features-section {
   position: relative;
   z-index: 10;
   max-width: 1200px;
-  margin: 80px auto 0;
+  margin: 100px auto 0;
   padding: 0 24px;
+}
+.landing-page .features-section .section-head { margin-bottom: 40px; }
+
+.landing-page .features-bar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 18px;
@@ -2146,9 +2173,9 @@ html.light .badge-danger {
 /* === Trust badges row (between Google CTA and restriction pill) === */
 .landing-page .trust-row {
   list-style: none;
-  margin: 16px 0 0;
+  margin: 18px 0 0;
   padding: 0;
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
@@ -2187,6 +2214,10 @@ html.light .badge-danger {
   letter-spacing: -1px;
   line-height: 1.15;
   color: var(--lp-ink);
+  text-wrap: balance;
+  max-width: 22ch;
+  margin-left: auto;
+  margin-right: auto;
 }
 .landing-page .steps-grid {
   display: grid;
