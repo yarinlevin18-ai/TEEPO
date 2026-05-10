@@ -9,9 +9,13 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans:    ['Heebo', 'system-ui', 'sans-serif'],
-        serif:   ['"Frank Ruhl Libre"', 'Georgia', 'serif'],
-        script:  ['Caveat', 'cursive'],
+        /* Locked landing typography (teepo-design/CLAUDE_CODE_HANDOFF.md):
+           sans    = body/UI (Assistant primary, Heebo fallback)
+           display = hero headlines (Heebo Black/900)
+           brand   = wordmark only (Fredoka SemiBold/600) */
+        sans:    ['Assistant', 'Heebo', 'system-ui', 'sans-serif'],
+        display: ['Heebo', 'Assistant', 'system-ui', 'sans-serif'],
+        brand:   ['Fredoka', 'Assistant', 'sans-serif'],
       },
       /* ── Typography Scale ──
          Modular scale (~1.25 ratio) optimized for Hebrew readability.

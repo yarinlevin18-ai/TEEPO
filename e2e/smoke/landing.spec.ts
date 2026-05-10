@@ -32,7 +32,7 @@ test('clicking sign-in CTA goes to /auth', async ({ page }) => {
 
   // Heuristic: the sign-in button is the first link/button on the landing page
   // that points at /auth. We don't bind to text because copy can change.
-  const cta = page.getByRole('link', { name: /התחבר|התחל|sign in|login/i }).first()
+  const cta = page.getByRole('link', { name: /התחבר|התחל|הירשם|sign in|sign up|login/i }).first()
   if (await cta.count()) {
     await cta.click()
     await expect(page).toHaveURL(/\/auth/)

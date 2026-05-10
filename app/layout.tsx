@@ -21,9 +21,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Assistant — only font per locked design tokens (SESSION_HANDOFF.md §1) */}
+        {/* Locked landing typography (teepo-design/CLAUDE_CODE_HANDOFF.md):
+            Assistant — body/UI; Heebo — hero headlines (900); Fredoka — wordmark only */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&family=Heebo:wght@400;700;800;900&family=Fredoka:wght@500;600;700&display=swap"
           rel="stylesheet"
         />
       </head>
