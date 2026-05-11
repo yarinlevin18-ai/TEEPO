@@ -1840,6 +1840,10 @@ html.light .badge-danger {
   --lp-shadow:    0 8px 20px -4px rgba(120,70,30,.14), 0 3px 8px rgba(120,70,30,.08);
   --lp-shadow-lg: 0 24px 50px -10px rgba(120,70,30,.22), 0 8px 20px rgba(120,70,30,.1);
 
+  /* Defensive: hide any text caret bleed-through on non-input elements
+     (some browsers + Caret Browsing render a hairline on focused regions) */
+  caret-color: transparent;
+
   font-family: 'Assistant', 'Heebo', sans-serif;
   color: var(--lp-ink);
   background-color: var(--lp-bg);
@@ -1884,7 +1888,7 @@ html.light .badge-danger {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 220px 24px 100px;
+  padding: 240px 40px 120px;
   text-align: center;
 }
 
@@ -1929,21 +1933,21 @@ html.light .badge-danger {
 
 /* === Hero === */
 .landing-page main.hero {
-  max-width: 720px;
+  max-width: 980px;
+  width: 100%;
   animation: lpFadeUp 1s ease .15s both;
 }
 .landing-page h1.tagline {
   font-family: 'Heebo', sans-serif;
-  font-size: clamp(36px, 5vw, 56px);
+  font-size: clamp(42px, 6vw, 72px);
   font-weight: 900;
-  line-height: 1.2;
+  line-height: 1.15;
   color: var(--lp-ink);
-  margin: 0 auto 28px;
-  letter-spacing: -1px;
-  /* Balance the line breaks so we don't strand a single word.
-     Width is generous enough to fit on one line at desktop widths. */
+  margin: 0 auto 32px;
+  letter-spacing: -1.5px;
+  /* Wider so the headline fits on one line at desktop, balances on two on tablet */
   text-wrap: balance;
-  max-width: 18ch;
+  max-width: 24ch;
 }
 .landing-page h1.tagline .accent {
   background: var(--lp-gradient);
@@ -1952,12 +1956,12 @@ html.light .badge-danger {
   -webkit-text-fill-color: transparent;
 }
 .landing-page .subline {
-  font-size: 19px;
+  font-size: 20px;
   line-height: 1.75;
   color: var(--lp-ink-soft);
   margin: 0 auto 12px;
   text-wrap: pretty;
-  max-width: 60ch;
+  max-width: 64ch;
 }
 .landing-page .subline strong { color: var(--lp-ink); font-weight: 700; }
 .landing-page .subline + .subline { margin-bottom: 0; }
@@ -2017,16 +2021,16 @@ html.light .badge-danger {
 .landing-page .features-section {
   position: relative;
   z-index: 10;
-  max-width: 1200px;
-  margin: 140px auto 0;
-  padding: 0 24px;
+  max-width: 1320px;
+  margin: 160px auto 0;
+  padding: 0 40px;
 }
-.landing-page .features-section .section-head { margin-bottom: 56px; }
+.landing-page .features-section .section-head { margin-bottom: 64px; }
 
 .landing-page .features-bar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 22px;
+  gap: 24px;
 }
 .landing-page .feature-card {
   background: var(--lp-bg-card);
@@ -2189,9 +2193,9 @@ html.light .badge-danger {
 .landing-page .how-section {
   position: relative;
   z-index: 10;
-  max-width: 1100px;
-  margin: 140px auto 0;
-  padding: 0 24px;
+  max-width: 1320px;
+  margin: 160px auto 0;
+  padding: 0 40px;
 }
 .landing-page .section-head {
   text-align: center;
@@ -2227,7 +2231,7 @@ html.light .badge-danger {
 .landing-page .steps-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: 28px;
 }
 .landing-page .step-card {
   background: var(--lp-bg-card);
@@ -2270,9 +2274,9 @@ html.light .badge-danger {
 .landing-page .final-cta {
   position: relative;
   z-index: 10;
-  max-width: 1100px;
-  margin: 140px auto 0;
-  padding: 0 24px;
+  max-width: 1320px;
+  margin: 160px auto 0;
+  padding: 0 40px;
 }
 .landing-page .final-cta-inner {
   background: var(--lp-gradient);
@@ -2346,13 +2350,16 @@ html.light .badge-danger {
   .landing-page .features-bar { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 780px) {
-  .landing-page .features-bar { grid-template-columns: 1fr; gap: 14px; }
-  .landing-page .steps-grid { grid-template-columns: 1fr; gap: 14px; }
-  .landing-page .ui-footer { max-width: 94%; }
-  .landing-page .content-wrapper { padding-top: 170px; }
+  .landing-page .features-bar { grid-template-columns: 1fr; gap: 16px; }
+  .landing-page .steps-grid { grid-template-columns: 1fr; gap: 16px; }
+  .landing-page .features-section,
+  .landing-page .how-section,
+  .landing-page .final-cta { padding: 0 20px; margin-top: 100px; }
+  .landing-page .ui-footer { max-width: 94%; margin-top: 100px; }
+  .landing-page .content-wrapper { padding: 180px 20px 80px; }
   .landing-page .lp-nav { padding: 10px 18px; }
   .landing-page .lp-nav-word { font-size: 20px; }
-  .landing-page .final-cta-inner { padding: 40px 24px; }
+  .landing-page .final-cta-inner { padding: 56px 24px; }
 }
 
 /* Reduced motion — freeze the slow background drift */
