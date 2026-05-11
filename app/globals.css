@@ -2581,38 +2581,14 @@ html.light .badge-danger {
   text-align: center;
 }
 
-/* === Logo: open book + teepo wordmark === */
+/* Landing logo row — wraps the shared <Logo variant="hero" /> in a
+   centered fadeUp container. Inner sizing handled by .brand-logo--hero. */
 .landing-page .logo-row {
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 72px;
   animation: lpFadeUp .8s ease both;
-}
-.landing-page .logo-mark {
-  display: inline-flex;
-  align-items: center;
-  gap: clamp(10px, 1.8vw, 18px);
-  direction: ltr;
-}
-.landing-page .logo-icon {
-  width: clamp(72px, 11vw, 130px);
-  height: auto;
-  flex-shrink: 0;
-  transform: rotate(-5deg);
-  filter: drop-shadow(0 5px 12px rgba(91, 70, 52, .18));
-  transition: transform .4s ease;
-}
-.landing-page .logo-mark:hover .logo-icon {
-  transform: rotate(0deg) scale(1.04);
-}
-.landing-page .logo-text {
-  font-family: 'Fredoka', sans-serif;
-  font-size: clamp(72px, 12vw, 148px);
-  font-weight: 600;
-  color: #4a6b4f;
-  letter-spacing: -2px;
-  line-height: .85;
 }
 
 @keyframes lpFadeUp {

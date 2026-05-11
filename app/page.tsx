@@ -35,7 +35,7 @@ export default function LandingPage() {
 
       <div className="content-wrapper">
         <div className="logo-row">
-          <Logo />
+          <Logo variant="hero" />
         </div>
         <Hero />
       </div>
