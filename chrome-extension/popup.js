@@ -135,7 +135,77 @@ function renderReady(scan) {
     `
     list.appendChild(li)
   })
+  // Course picker — if the scraper didn't extract a courseId from the page,
+  // load the user's course list and show a dropdown so they can choose.
+  hydrateCoursePicker(scan)
   showState('ready')
+}
+
+let userCourses = null // populated lazily on first picker render
+
+async function hydrateCoursePicker(scan) {
+  const sel = $('[data-bind="course-select"]')
+  const hint = $('[data-bind="course-hint"]')
+  if (!sel) return
+  sel.innerHTML = '<option value="">— בחר קורס —</option>'
+  hint.hidden = true
+
+  if (!userCourses) {
+    sel.disabled = true
+    try {
+      userCourses = await fetchCourseList()
+    } catch (e) {
+      console.warn('[popup] courses fetch failed', e)
+      userCourses = []
+      hint.textContent = 'לא הצלחנו לטעון את רשימת הקורסים. נסה רענון.'
+      hint.hidden = false
+    }
+    sel.disabled = false
+  }
+
+  if (!userCourses?.length) {
+    hint.textContent = 'אין קורסים ב-TEEPO. צור קורס באתר ואחר כך חזור.'
+    hint.hidden = false
+    return
+  }
+
+  // Render
+  for (const c of userCourses) {
+    const opt = document.createElement('option')
+    opt.value = c.id
+    const sem = c.semester ? `· סמסטר ${c.semester}` : ''
+    const year = c.year_of_study ? `· שנה ${c.year_of_study}` : ''
+    opt.textContent = `${c.title} ${year} ${sem}`.trim()
+    if (!c.provisioned) {
+      opt.textContent += ' · ⚠ ללא תיקייה'
+      opt.dataset.unprovisioned = '1'
+    }
+    sel.appendChild(opt)
+  }
+
+  // Pre-pick if the scraper extracted a courseId AND it's in the user's DB.
+  const fromScanner = scan?.courseId
+  if (fromScanner && userCourses.some(c => c.id === fromScanner)) {
+    sel.value = fromScanner
+  }
+}
+
+async function fetchCourseList() {
+  const token = await getDriveToken()
+  if (!token) return []
+  const { teepoBase } = await chrome.storage.local.get('teepoBase')
+  const base = teepoBase || 'http://localhost:3000'
+  const res = await fetch(`${base}/api/drive/courses`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(`courses ${res.status}`)
+  return res.json()
+}
+
+async function getDriveToken() {
+  return new Promise((resolve) => {
+    chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null))
+  })
 }
 
 function escapeHtml(s) {
@@ -223,6 +293,25 @@ function showError(message) {
 
 async function doUpload() {
   if (!lastScan?.files?.length) return
+
+  // Resolve the courseId — either from the picker, or from the scraper.
+  const sel = $('[data-bind="course-select"]')
+  const pickedCourse = sel?.value || lastScan?.courseId || null
+  const hint = $('[data-bind="course-hint"]')
+  if (!pickedCourse) {
+    hint.textContent = 'בחר קורס כדי להמשיך'
+    hint.hidden = false
+    sel?.focus()
+    return
+  }
+  // Check that the picked course actually has a provisioned folder.
+  const courseRecord = userCourses?.find(c => c.id === pickedCourse)
+  if (courseRecord && !courseRecord.provisioned) {
+    hint.textContent = 'התיקייה של הקורס לא נוצרה. פתח את "המוח" באתר ולחץ "סנכרון Drive".'
+    hint.hidden = false
+    return
+  }
+
   const checked = $$('.pop-file-list input[type="checkbox"]')
     .map((cb) => ({ keep: cb.checked, i: Number(cb.dataset.i) }))
     .filter((x) => x.keep)
@@ -233,15 +322,22 @@ async function doUpload() {
   showState('uploading')
   setProgress(0, checked.length)
 
-  // Each file: resolve folder → upload. Folders cached server-side per courseId.
+  // Map each file's `kind` to a target subfolder. Drive folders are
+  // lessons / assignments / notes; sheets, slides, pdf, video all go to
+  // `lessons` by default. The user can move them in Drive afterwards.
+  const kindToFolder = (kind) => {
+    if (kind === 'doc' && /(?:homework|hw|exercise|תרגיל)/i.test('')) return 'assignments'
+    return 'lessons'
+  }
+
   let uploaded = 0
   let failed = []
   for (const f of checked) {
     try {
       const folder = await bg({
         type: 'RESOLVE_FOLDER',
-        courseId: f.courseId || lastScan.courseId,
-        kind: f.kind === 'pdf' || f.kind === 'pptx' || f.kind === 'docx' ? 'lessons' : 'lessons',
+        courseId: pickedCourse,
+        kind: kindToFolder(f.kind),
       })
       if (!folder?.ok) throw new Error(folder?.error || 'folder failed')
 

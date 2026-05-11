@@ -138,6 +138,39 @@ body { padding: 14px 16px 16px; }
   margin: 0 0 12px;
   font-weight: 600;
 }
+
+.pop-course-picker {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pop-course-picker label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.pop-course-picker select {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+}
+.pop-course-picker select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pop-course-picker select:disabled { opacity: .6; cursor: not-allowed; }
+.pop-course-hint {
+  font-size: 10.5px;
+  color: var(--rose);
+  margin-top: 2px;
+}
 .pop-file-list {
   list-style: none;
   display: flex;

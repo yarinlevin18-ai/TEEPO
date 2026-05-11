@@ -46,6 +46,15 @@
       קבצים נמצאו בדף
     </h1>
     <p class="pop-source" data-bind="source">—</p>
+
+    <div class="pop-course-picker" data-bind="course-picker">
+      <label for="pop-course-select">לאיזה קורס לשייך?</label>
+      <select id="pop-course-select" data-bind="course-select">
+        <option value="">— בחר קורס —</option>
+      </select>
+      <small class="pop-course-hint" data-bind="course-hint" hidden></small>
+    </div>
+
     <ul class="pop-file-list" data-bind="files"></ul>
     <div class="pop-actions">
       <button class="pop-secondary" data-action="select-all">בחר הכל</button>
