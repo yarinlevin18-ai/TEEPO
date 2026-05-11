@@ -2508,6 +2508,463 @@ html.light .badge-danger {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   Dashboard v2 — app/(dashboard)/dashboard/page.tsx
+   Source: teepo-design/mockup_dashboard.html (.main, .hero, .calendar-card,
+   .bottom-row, individual card styles).
+   ════════════════════════════════════════════════════════════════════ */
+.dashboard-v2 .dash-main { padding: 48px 40px 80px; min-width: 0; }
+.dashboard-v2 .dash-wrap { max-width: 1200px; margin: 0 auto; position: relative; z-index: 10; }
+
+/* ----- Hero ----- */
+.dashboard-v2 .dash-hero {
+  margin-bottom: 44px;
+  padding: 28px 32px 32px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 32px;
+  flex-wrap: wrap;
+  animation: fadeUp .5s ease .1s both;
+}
+.dashboard-v2 .hero-content { flex: 1; min-width: 0; }
+.dashboard-v2 .hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  animation: fadeUp .7s ease .05s both;
+}
+.dashboard-v2 .dash-h1 {
+  font-family: 'Heebo', sans-serif;
+  font-size: clamp(44px, 5.5vw, 64px);
+  font-weight: 900;
+  letter-spacing: -2.5px;
+  line-height: 1;
+  color: var(--lp-ink);
+  margin: 0;
+  animation: fadeUp .8s ease .35s both;
+}
+.dashboard-v2 .dash-h1 .accent {
+  position: relative;
+  display: inline-block;
+  font-weight: 900;
+}
+/* Each letter has its OWN gradient — background-clip:text doesn't pass
+   through inline-block children, so the wave needs per-letter spans. */
+.dashboard-v2 .dash-h1 .accent .letter {
+  display: inline-block;
+  background: var(--lp-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: letterWave 2.4s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+@keyframes letterWave {
+  0%, 60%, 100% { transform: translateY(0) rotate(0); }
+  15%           { transform: translateY(-8px) rotate(-3deg); }
+  30%           { transform: translateY(0)    rotate(2deg); }
+  45%           { transform: translateY(-3px) rotate(-1deg); }
+}
+.dashboard-v2 .dash-h1 .accent::before {
+  content: '';
+  position: absolute;
+  top: -10px; left: -6%; right: -6%; bottom: -8px;
+  background: radial-gradient(ellipse at center, rgba(132,204,22,.20), transparent 65%);
+  filter: blur(10px);
+  z-index: -1;
+  animation: glowBreathe 4s ease-in-out infinite;
+}
+@keyframes glowBreathe {
+  0%, 100% { opacity: .55; }
+  50%      { opacity: 1; }
+}
+.dashboard-v2 .dash-h1 .accent::after {
+  content: '';
+  position: absolute;
+  bottom: -16px; left: -10%; right: -10%;
+  height: 12px;
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='12' viewBox='0 0 80 12'%3E%3Cpath d='M0 6 Q 20 0, 40 6 T 80 6' fill='none' stroke='%2316a34a' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 80px 12px;
+  background-position-y: center;
+  pointer-events: none;
+  opacity: .85;
+  -webkit-mask-image: linear-gradient(to left, transparent 0%, black 18%, black 82%, transparent 100%);
+  mask-image: linear-gradient(to left, transparent 0%, black 18%, black 82%, transparent 100%);
+  animation: waveFlow 9s linear infinite;
+}
+@keyframes waveFlow {
+  from { background-position-x: 0; }
+  to   { background-position-x: -80px; }
+}
+
+/* ----- Puzzle zone — instructions card + sliding puzzle widget ----- */
+.dashboard-v2 .puzzle-zone {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  flex-shrink: 0;
+  animation: fadeUp .6s ease .3s both;
+}
+.dashboard-v2 .puzzle-instructions {
+  width: 160px;
+  background: rgba(22, 163, 74, .07);
+  border: 1px solid rgba(22, 163, 74, .25);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  backdrop-filter: blur(6px);
+}
+.dashboard-v2 .puzzle-instructions .pi-title {
+  font-family: 'Frank Ruhl Libre', serif;
+  font-size: 14px;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--lp-accent);
+  letter-spacing: -.2px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(22, 163, 74, .2);
+}
+.dashboard-v2 .puzzle-instructions ol {
+  margin: 0;
+  padding-right: 16px;
+  font-size: 11.5px;
+  color: var(--lp-ink-soft);
+  line-height: 1.5;
+  font-weight: 500;
+}
+.dashboard-v2 .puzzle-instructions ol li { margin-bottom: 4px; }
+.dashboard-v2 .puzzle-instructions ol li strong { color: var(--lp-ink); font-weight: 700; }
+.dashboard-v2 .puzzle-instructions .pi-goal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px solid rgba(22, 163, 74, .2);
+  font-size: 11px;
+  color: var(--lp-ink-soft);
+}
+.dashboard-v2 .puzzle-instructions .pi-goal-mini {
+  display: grid;
+  grid-template-columns: repeat(3, 12px);
+  grid-template-rows: repeat(3, 12px);
+  gap: 1px;
+  background: rgba(58, 74, 61, .12);
+  padding: 1.5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  direction: ltr;
+}
+.dashboard-v2 .puzzle-instructions .pi-goal-mini span {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line-soft);
+  font-size: 7px;
+  font-weight: 700;
+  color: var(--lp-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.5px;
+  line-height: 1;
+}
+.dashboard-v2 .puzzle-instructions .pi-goal-mini span.empty {
+  background: transparent;
+  border-color: transparent;
+}
+
+@media (max-width: 980px) {
+  .dashboard-v2 .dash-hero { flex-direction: column; align-items: flex-start; }
+}
+
+/* ----- Calendar card ----- */
+.dashboard-v2 .calendar-card-v2 {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 16px;
+  margin-bottom: 32px;
+  overflow: hidden;
+  box-shadow: var(--lp-shadow-sm);
+  animation: fadeUp .55s ease .25s both;
+}
+.dashboard-v2 .cal-head {
+  padding: 16px 22px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--lp-line-soft);
+}
+.dashboard-v2 .cal-head .gcal-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #4285f4, #34a853 50%, #fbbc04 75%, #ea4335);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 800;
+  font-size: 11px;
+}
+.dashboard-v2 .cal-head h3 { font-size: 14px; font-weight: 600; flex: 1; color: var(--lp-ink); }
+.dashboard-v2 .cal-head .month { color: var(--lp-muted); font-size: 12px; }
+.dashboard-v2 .cal-head a {
+  font-size: 12px;
+  color: var(--lp-accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+.dashboard-v2 .cal-grid {
+  display: grid;
+  grid-template-columns: 50px repeat(7, 1fr);
+  border-top: 1px solid var(--lp-line-soft);
+  background: linear-gradient(180deg, rgba(255,255,255,.4) 0%, rgba(255,255,255,.15) 100%);
+}
+.dashboard-v2 .cal-day-head {
+  padding: 12px 6px;
+  text-align: center;
+  border-right: 1px solid rgba(255,255,255,.5);
+}
+.dashboard-v2 .cal-day-head:last-child { border-right: 0; }
+.dashboard-v2 .cal-day-head .dn {
+  font-size: 10px;
+  color: var(--lp-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+.dashboard-v2 .cal-day-head .dnum { font-size: 15px; font-weight: 600; margin-top: 4px; color: var(--lp-ink); }
+.dashboard-v2 .cal-day-head.today {
+  background: linear-gradient(180deg, rgba(22,163,74,.18) 0%, rgba(132,204,22,.08) 100%);
+  border-bottom: 2px solid var(--lp-accent);
+}
+.dashboard-v2 .cal-day-head.today .dnum {
+  color: white;
+  font-weight: 700;
+  background: var(--lp-gradient);
+  width: 26px;
+  height: 26px;
+  line-height: 26px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 4px 10px -2px var(--lp-accent);
+}
+.dashboard-v2 .cal-empty { background: rgba(0,0,0,.02); }
+.dashboard-v2 .cal-body {
+  display: grid;
+  grid-template-columns: 50px repeat(7, 1fr);
+  background: var(--lp-bg);
+}
+.dashboard-v2 .cal-time {
+  padding: 6px 8px;
+  font-size: 10px;
+  color: var(--lp-muted);
+  text-align: left;
+  border-right: 1px solid var(--lp-line-soft);
+  border-bottom: 1px solid var(--lp-line-soft);
+  height: 42px;
+}
+.dashboard-v2 .cal-cell {
+  border-right: 1px solid var(--lp-line-soft);
+  border-bottom: 1px solid var(--lp-line-soft);
+  position: relative;
+  height: 42px;
+}
+.dashboard-v2 .cal-cell:hover { background: var(--lp-bg-elev); }
+.dashboard-v2 .cal-event {
+  position: absolute;
+  inset: 3px;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  border: 0;
+  border-right: 2px solid;
+  background: rgba(255,255,255,.5);
+  backdrop-filter: blur(6px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: var(--lp-ink-soft);
+  line-height: 1.2;
+}
+.dashboard-v2 .cal-event small {
+  display: block;
+  font-weight: 500;
+  opacity: .65;
+  font-size: 10px;
+  line-height: 1.2;
+  margin-top: 1px;
+}
+.dashboard-v2 .ev-amber  { border-color: #d97706; background: linear-gradient(90deg, rgba(254,230,138,.4), rgba(255,255,255,.5)); }
+.dashboard-v2 .ev-blue   { border-color: #6366f1; background: linear-gradient(90deg, rgba(224,231,255,.5), rgba(255,255,255,.5)); }
+.dashboard-v2 .ev-green  { border-color: #0d9488; background: linear-gradient(90deg, rgba(204,251,241,.5), rgba(255,255,255,.5)); }
+.dashboard-v2 .ev-rose   { border-color: #e11d48; background: linear-gradient(90deg, rgba(255,217,224,.5), rgba(255,255,255,.5)); }
+.dashboard-v2 .ev-purple { border-color: #8b5cf6; background: linear-gradient(90deg, rgba(237,233,254,.5), rgba(255,255,255,.5)); }
+
+/* ----- Bottom row 3 cards ----- */
+.dashboard-v2 .bottom-row-v2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+}
+.dashboard-v2 .dcard {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: transform .2s ease, box-shadow .2s ease;
+  box-shadow: var(--lp-shadow-sm);
+  animation: fadeUp .55s ease .4s both;
+}
+.dashboard-v2 .dcard:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--lp-shadow-lg);
+}
+.dashboard-v2 .dcard-head {
+  padding: 18px 22px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--lp-line-soft);
+}
+.dashboard-v2 .dcard-head h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lp-ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dashboard-v2 .dcard-head .badge-num {
+  background: var(--lp-bg-elev);
+  color: var(--lp-muted);
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.dashboard-v2 .dcard-head a {
+  color: var(--lp-accent);
+  font-size: 12px;
+  text-decoration: none;
+  font-weight: 500;
+}
+.dashboard-v2 .dcard-head a:hover { color: var(--lp-accent-deep); }
+
+/* Schedule rows */
+.dashboard-v2 .sch-row {
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--lp-line-soft);
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  transition: background .15s;
+}
+.dashboard-v2 .sch-row:hover { background: var(--lp-bg-hover); }
+.dashboard-v2 .sch-row:last-child { border: 0; }
+.dashboard-v2 .sch-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lp-muted);
+  width: 50px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.dashboard-v2 .sch-bar {
+  width: 3px;
+  align-self: stretch;
+  min-height: 24px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.dashboard-v2 .sch-info strong { font-size: 13.5px; font-weight: 600; display: block; color: var(--lp-ink); }
+.dashboard-v2 .sch-info small  { font-size: 11.5px; color: var(--lp-muted); }
+
+/* Course/assignment rows */
+.dashboard-v2 .course {
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--lp-line-soft);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: background .15s;
+}
+.dashboard-v2 .course:hover { background: var(--lp-bg-hover); }
+.dashboard-v2 .course:last-child { border: 0; }
+.dashboard-v2 .course-bar { width: 3px; height: 28px; border-radius: 2px; flex-shrink: 0; }
+.dashboard-v2 .course-info { flex: 1; min-width: 0; }
+.dashboard-v2 .course-info strong { font-size: 13.5px; font-weight: 600; display: block; color: var(--lp-ink); }
+.dashboard-v2 .course-info small  { font-size: 11.5px; color: var(--lp-muted); }
+.dashboard-v2 .course-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+/* Task rows + status tags */
+.dashboard-v2 .task {
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--lp-line-soft);
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  transition: background .15s;
+}
+.dashboard-v2 .task:hover { background: var(--lp-bg-hover); }
+.dashboard-v2 .task:last-child { border: 0; }
+.dashboard-v2 .task .checkbox {
+  width: 17px;
+  height: 17px;
+  border: 1.5px solid var(--lp-line);
+  border-radius: 5px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: all .15s;
+}
+.dashboard-v2 .task .checkbox:hover { border-color: var(--lp-accent); }
+.dashboard-v2 .task-info { flex: 1; min-width: 0; }
+.dashboard-v2 .task-info strong { font-size: 13.5px; font-weight: 600; display: block; margin-bottom: 2px; color: var(--lp-ink); }
+.dashboard-v2 .task-info small  { color: var(--lp-muted); font-size: 11.5px; }
+.dashboard-v2 .task-tag {
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.dashboard-v2 .t-rose  { background: #ffd9e0; color: #9f1239; }
+.dashboard-v2 .t-amber { background: #fde68a; color: #92400e; }
+.dashboard-v2 .t-blue  { background: #e0e7ff; color: #3730a3; }
+.dashboard-v2 .t-soft  { background: var(--lp-bg-elev); color: var(--lp-ink-soft); }
+
+/* Bottom-row staggered entry */
+.dashboard-v2 .bottom-row-v2 .dcard:nth-child(1) { animation-delay: .4s; }
+.dashboard-v2 .bottom-row-v2 .dcard:nth-child(2) { animation-delay: .5s; }
+.dashboard-v2 .bottom-row-v2 .dcard:nth-child(3) { animation-delay: .6s; }
+
+@media (max-width: 980px) {
+  .dashboard-v2 .bottom-row-v2 { grid-template-columns: 1fr; }
+  .dashboard-v2 .dash-main { padding: 32px 20px 60px; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    TEEPO Landing v2 — locked design 2026-05-11.
    Direct port of teepo-design/mockup_landing.html. All visual changes
    to the landing page should be made here (or in the source mockup,
