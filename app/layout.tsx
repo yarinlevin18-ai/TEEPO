@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import './teepo.css'
 import { AuthProvider } from '@/lib/auth-context'
 import { ThemeProvider } from '@/lib/theme-context'
 import ErrorBoundary from '@/components/ErrorBoundary'
