@@ -58,20 +58,61 @@ async function activeTab() {
 }
 
 /**
- * Ask the content script of the active tab what it sees. The content script
- * is injected per the manifest matches; for sites that don't match, we
- * inject a generic scanner on demand (commit 3).
+ * Ask the content script of the active tab what it sees. Moodle/portal pages
+ * get the auto-injected scrapers via the manifest. For every other URL we
+ * inject content/generic.js on demand — that requires <all_urls> host
+ * permission, which we request the first time the user clicks "סרוק שוב".
  */
 async function scanPage() {
   const tab = await activeTab()
   if (!tab?.id) return { source: null, files: [] }
+
+  // First try the message channel — works on pre-matched pages.
   try {
     const reply = await chrome.tabs.sendMessage(tab.id, { type: 'TEEPO_SCAN' })
-    return reply || { source: null, files: [] }
+    if (reply) return reply
   } catch {
-    // No content script on this page (URL not matched). Generic injection
-    // hook lands in a later commit.
-    return { source: null, files: [] }
+    // ignore — no content script on this URL, fall through to injection.
+  }
+
+  // Generic injection path. Needs host permission for the active tab's origin.
+  const granted = await ensureHostPermission(tab.url)
+  if (!granted) {
+    return {
+      source: null,
+      files: [],
+      error: 'הרשאה לסרוק את הדף לא ניתנה',
+    }
+  }
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content/generic.js'],
+    })
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => window.__teepoScan || null,
+    })
+    return result || { source: null, files: [] }
+  } catch (e) {
+    console.warn('[popup] generic scan failed', e)
+    return { source: null, files: [], error: String(e?.message || e) }
+  }
+}
+
+/**
+ * Request optional host permission for the active tab's origin. Chrome
+ * caches the grant per origin so we only prompt once per site.
+ */
+async function ensureHostPermission(url) {
+  if (!url || /^chrome:/.test(url) || /^about:/.test(url)) return false
+  try {
+    const origin = new URL(url).origin + '/*'
+    return new Promise((resolve) => {
+      chrome.permissions.request({ origins: [origin] }, (granted) => resolve(!!granted))
+    })
+  } catch {
+    return false
   }
 }
 
