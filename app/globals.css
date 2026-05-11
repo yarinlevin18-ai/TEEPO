@@ -3196,6 +3196,348 @@ html.light .badge-danger {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   Summaries (המוח) — app/(dashboard)/summaries/page.tsx
+   Source: teepo-design/mockup_summaries.html — simplified single-degree tree.
+   ════════════════════════════════════════════════════════════════════ */
+.summaries-page .sum-main {
+  padding: 36px 32px 60px;
+  max-width: 1300px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 10;
+}
+
+.summaries-page .sum-head {
+  text-align: center;
+  margin-bottom: 32px;
+  padding: 26px 28px 30px;
+}
+.summaries-page .sum-eyebrow {
+  font-family: 'Frank Ruhl Libre', serif;
+  font-style: italic;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--lp-accent);
+  letter-spacing: .3px;
+  margin-bottom: 8px;
+}
+.summaries-page .sum-h1 {
+  font-family: 'Heebo', sans-serif;
+  font-size: clamp(38px, 5vw, 54px);
+  font-weight: 900;
+  letter-spacing: -2px;
+  line-height: 1.1;
+  color: var(--lp-ink);
+  margin-bottom: 14px;
+}
+.summaries-page .sum-h1 .accent {
+  background: var(--lp-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.summaries-page .sum-sub {
+  font-size: 15px;
+  color: var(--lp-ink-soft);
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* Tree wrapper */
+.summaries-page .tree-wrap {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 22px;
+  padding: 44px 32px 36px;
+  box-shadow: var(--lp-shadow);
+  margin-bottom: 28px;
+  position: relative;
+}
+.summaries-page .tree-root {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  padding-bottom: 32px;
+}
+.summaries-page .tree-root::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  height: 32px;
+  background: var(--lp-line);
+  animation: lineInY .4s ease-out .15s both;
+}
+.summaries-page .degree-header {
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+.summaries-page .degree-to-sems {
+  position: absolute;
+  bottom: -32px;
+  left: 50%;
+  width: 2px;
+  height: 32px;
+  background: var(--lp-line);
+  animation: lineInY .4s ease-out .4s both;
+}
+@keyframes lineInY { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+/* Generic node */
+.summaries-page .node {
+  background: var(--lp-bg-card);
+  border: 1.5px solid var(--lp-line);
+  border-radius: 11px;
+  padding: 11px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  transition: all .2s cubic-bezier(.4,0,.2,1);
+  box-shadow: var(--lp-shadow-sm);
+  white-space: nowrap;
+  font-family: inherit;
+  color: var(--lp-ink);
+  text-align: right;
+}
+.summaries-page .node:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--lp-shadow);
+  border-color: var(--lp-accent);
+}
+.summaries-page .node .folder-ico { width: 16px; height: 16px; flex-shrink: 0; color: var(--lp-ink-soft); }
+.summaries-page .node .name { font-weight: 600; font-size: 13px; flex: 1; text-align: right; }
+.summaries-page .node .count {
+  font-size: 10.5px;
+  padding: 2px 8px;
+  background: var(--lp-bg-elev);
+  color: var(--lp-muted);
+  border-radius: 999px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.summaries-page .node.root {
+  background: var(--lp-gradient);
+  color: white;
+  border-color: transparent;
+  padding: 14px 26px;
+  box-shadow: 0 12px 28px -6px var(--lp-accent);
+}
+.summaries-page .node.root .name { font-size: 16px; font-weight: 700; }
+.summaries-page .node.root .folder-ico { width: 19px; height: 19px; color: white; }
+.summaries-page .node.root .count { background: rgba(255,255,255,.22); color: white; }
+
+.summaries-page .node.degree {
+  background: var(--lp-bg-card);
+  border: 2px solid var(--lp-line);
+  padding: 13px 22px;
+  font-size: 14px;
+  margin-top: 32px;
+}
+.summaries-page .node.degree .name { font-weight: 700; font-size: 14.5px; }
+.summaries-page .node.degree .folder-ico { width: 18px; height: 18px; color: var(--lp-accent); }
+
+.summaries-page .sem-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  width: 100%;
+  padding-top: 32px;
+  margin-top: 12px;
+  position: relative;
+}
+.summaries-page .sem-grid::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 2px;
+  background: var(--lp-line);
+  animation: lineInX2 .4s ease-out .45s both;
+}
+@keyframes lineInX2 { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.summaries-page .sem-chip-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.summaries-page .sem-chip-wrap::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  width: 2px;
+  height: 20px;
+  background: var(--lp-line);
+  animation: lineInY .3s ease-out .5s both;
+}
+.summaries-page .sem-chip-wrap.active::before { background: var(--lp-accent); }
+
+.summaries-page .node.sem {
+  padding: 9px 12px;
+  font-size: 12.5px;
+  width: 100%;
+  justify-content: flex-start;
+}
+.summaries-page .node.sem .name { font-size: 12.5px; font-weight: 600; }
+.summaries-page .node.sem .folder-ico { width: 14px; height: 14px; }
+.summaries-page .node.sem .count { font-size: 10px; padding: 1px 7px; }
+
+.summaries-page .node.active {
+  background: var(--lp-accent-soft);
+  border-color: var(--lp-accent);
+  color: var(--lp-accent-deep);
+  box-shadow: 0 6px 18px -4px var(--lp-accent);
+}
+.summaries-page .node.active .folder-ico { color: var(--lp-accent-deep); }
+.summaries-page .node.active .count { background: var(--lp-accent); color: white; }
+
+/* Course panel */
+.summaries-page .connector-line {
+  height: 28px;
+  margin: -8px auto 16px;
+  width: 2px;
+  background: var(--lp-accent);
+  border-radius: 1px;
+  animation: lineInY .4s ease-out .7s both;
+}
+.summaries-page .course-panel {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 22px;
+  padding: 28px 32px 32px;
+  box-shadow: var(--lp-shadow);
+  margin-bottom: 24px;
+  animation: fadeUp .55s ease .9s both;
+}
+.summaries-page .course-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 26px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--lp-line-soft);
+}
+.summaries-page .course-panel-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--lp-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 6px 14px -4px var(--lp-accent);
+}
+.summaries-page .course-panel-icon svg { width: 22px; height: 22px; color: white; }
+.summaries-page .course-panel-head .meta { flex: 1; }
+.summaries-page .course-panel-head .crumb { font-size: 12px; color: var(--lp-muted); margin-bottom: 4px; }
+.summaries-page .course-panel-head h2 { font-size: 22px; font-weight: 700; letter-spacing: -.5px; color: var(--lp-ink); }
+.summaries-page .course-panel-head .count-pill {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--lp-accent-soft);
+  color: var(--lp-accent-deep);
+  font-size: 12.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.summaries-page .course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.summaries-page .course-card {
+  background: white;
+  border: 1px solid var(--lp-line-soft);
+  border-radius: 14px;
+  padding: 16px 18px;
+  transition: all .2s;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: var(--lp-shadow-sm);
+}
+.summaries-page .course-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--lp-shadow);
+  border-color: var(--course-color, var(--lp-accent));
+}
+.summaries-page .course-card .top { display: flex; align-items: center; gap: 10px; }
+.summaries-page .course-card .ico-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--course-soft, var(--lp-accent-soft));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.summaries-page .course-card .ico-wrap svg { width: 18px; height: 18px; color: var(--course-color, var(--lp-accent)); }
+.summaries-page .course-card h3 {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -.2px;
+  line-height: 1.3;
+  color: var(--lp-ink);
+}
+.summaries-page .course-card small { font-size: 11.5px; color: var(--lp-muted); }
+.summaries-page .course-card .folders {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--lp-line-soft);
+}
+.summaries-page .folder-row {
+  background: var(--lp-bg);
+  border-radius: 8px;
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--lp-ink-soft);
+}
+.summaries-page .folder-row:hover {
+  background: var(--course-soft, var(--lp-accent-soft));
+  color: var(--course-color, var(--lp-accent));
+}
+.summaries-page .folder-row svg { width: 12px; height: 12px; color: var(--course-color, var(--lp-accent)); flex-shrink: 0; }
+.summaries-page .folder-row .label { flex: 1; font-weight: 600; }
+.summaries-page .folder-row .num {
+  font-size: 10.5px;
+  padding: 1px 7px;
+  background: var(--lp-bg-card);
+  border-radius: 999px;
+  font-weight: 700;
+  color: var(--lp-muted);
+}
+
+.summaries-page .empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--lp-muted);
+}
+.summaries-page .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: .4; }
+.summaries-page .empty-state h3 { font-size: 16px; font-weight: 600; color: var(--lp-ink-soft); margin-bottom: 6px; }
+.summaries-page .empty-state p { font-size: 13px; }
+
+@media (max-width: 760px) {
+  .summaries-page .sem-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    TEEPO Landing v2 — locked design 2026-05-11.
    Direct port of teepo-design/mockup_landing.html. All visual changes
    to the landing page should be made here (or in the source mockup,
