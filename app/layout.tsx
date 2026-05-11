@@ -21,10 +21,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Locked landing typography (teepo-design/CLAUDE_CODE_HANDOFF.md):
-            Assistant — body/UI; Heebo — hero headlines (900); Fredoka — wordmark only */}
+        {/* v2 locked design typography (teepo-design/CLAUDE_CODE_HANDOFF.md):
+            Assistant — body/UI; Heebo — hero headlines (900);
+            Frank Ruhl Libre — elegant italic accents (puzzle titles, eyebrows);
+            VT323 — LCD clock + timers; Fredoka — legacy wordmark fallback. */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&family=Heebo:wght@400;700;800;900&family=Fredoka:wght@500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&family=Heebo:wght@400;700;800;900&family=Fredoka:wght@500;600;700&family=Frank+Ruhl+Libre:wght@500;700;900&family=VT323&display=swap"
           rel="stylesheet"
         />
       </head>
