@@ -2965,6 +2965,237 @@ html.light .badge-danger {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   Todos page — app/(dashboard)/todos/page.tsx
+   Source: teepo-design/mockup_todos.html
+   ════════════════════════════════════════════════════════════════════ */
+.todos-page .todos-main { padding: 36px 32px 60px; max-width: 880px; margin: 0 auto; position: relative; z-index: 10; }
+
+.todos-head {
+  margin-bottom: 28px;
+  padding: 20px 8px 4px;
+}
+.todos-eyebrow {
+  font-family: 'Frank Ruhl Libre', serif;
+  font-size: 14px;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--lp-accent);
+  letter-spacing: .2px;
+  margin-bottom: 6px;
+  animation: fadeUp .5s ease .05s both;
+}
+.todos-h1 {
+  font-family: 'Heebo', sans-serif;
+  font-size: clamp(38px, 5vw, 54px);
+  font-weight: 900;
+  letter-spacing: -2px;
+  line-height: 1.05;
+  color: var(--lp-ink);
+  animation: fadeUp .55s ease .15s both;
+}
+.todos-h1 .accent {
+  background: var(--lp-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.todos-summary {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  animation: fadeUp .55s ease .25s both;
+}
+.todos-summary .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 13px;
+  border-radius: 99px;
+  background: rgba(253, 246, 227, .55);
+  border: 1px solid rgba(224, 205, 168, .55);
+  backdrop-filter: blur(8px);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--lp-ink-soft);
+}
+.todos-summary .pill .num { font-weight: 800; color: var(--lp-ink); }
+.todos-summary .pill.today { color: var(--lp-ink); }
+.todos-summary .pill.done  { color: var(--lp-accent); }
+
+/* Quick add */
+.todos-quick-add {
+  margin-bottom: 24px;
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 14px;
+  padding: 4px 6px 4px 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: var(--lp-shadow-sm);
+  transition: border-color .15s, box-shadow .15s;
+}
+.todos-quick-add:focus-within {
+  border-color: var(--lp-accent);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, .12);
+}
+.todos-quick-add input {
+  flex: 1;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--lp-ink);
+  outline: none;
+}
+.todos-quick-add input::placeholder { color: var(--lp-muted); }
+.todos-quick-add button {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--lp-gradient);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .15s;
+}
+.todos-quick-add button:hover { transform: scale(1.06); }
+
+/* Sections */
+.todo-section { margin-bottom: 28px; animation: fadeUp .55s ease .35s both; }
+.todo-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 0 4px;
+}
+.todo-section-eyebrow {
+  font-family: 'Frank Ruhl Libre', serif;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--lp-muted);
+  letter-spacing: .3px;
+}
+.todo-section h2 {
+  font-family: 'Heebo', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -.8px;
+  color: var(--lp-ink);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.todo-section-count {
+  font-size: 12px;
+  color: var(--lp-muted);
+  font-weight: 600;
+  background: var(--lp-bg-elev);
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+.todo-empty {
+  font-size: 13px;
+  color: var(--lp-muted);
+  padding: 14px 18px;
+  background: var(--lp-bg-card);
+  border: 1px dashed var(--lp-line);
+  border-radius: 12px;
+  text-align: center;
+}
+
+/* List items */
+.todo-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 12px;
+  box-shadow: var(--lp-shadow-sm);
+  transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease;
+}
+.todo-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--lp-shadow);
+}
+.todo-item.done {
+  opacity: .55;
+}
+.todo-item.done .todo-body strong { text-decoration: line-through; color: var(--lp-muted); }
+
+.todo-check {
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--lp-line);
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: background .15s, border-color .15s, transform .15s;
+}
+.todo-check:hover { border-color: var(--lp-accent); }
+.todo-item.done .todo-check {
+  background: var(--lp-accent);
+  border-color: var(--lp-accent);
+}
+
+.todo-body { flex: 1; min-width: 0; line-height: 1.3; }
+.todo-body strong { display: block; font-size: 14.5px; font-weight: 600; color: var(--lp-ink); }
+.todo-body small {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--lp-muted);
+  margin-top: 3px;
+}
+.todo-course-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--lp-accent-soft);
+  color: var(--lp-accent-deep);
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.todo-due {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.todo-due.today { background: #ffd9e0; color: #9f1239; }
+.todo-due.week  { background: #fde68a; color: #92400e; }
+.todo-due.later { background: var(--lp-bg-elev); color: var(--lp-ink-soft); }
+.todo-due.done  { background: var(--lp-accent-soft); color: var(--lp-accent-deep); }
+
+@media (max-width: 640px) {
+  .todos-page .todos-main { padding: 28px 18px 60px; }
+  .todo-item { padding: 12px 14px; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    TEEPO Landing v2 — locked design 2026-05-11.
    Direct port of teepo-design/mockup_landing.html. All visual changes
    to the landing page should be made here (or in the source mockup,

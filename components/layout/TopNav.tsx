@@ -60,12 +60,12 @@ export default function TopNav({ mobileOpen = false, onMobileToggle }: Props) {
     return () => { document.body.style.overflow = prev }
   }, [mobileOpen])
 
-  // /tasks shows academic assignments (still called "מטלות" in UI). /todos
-  // is the personal v2 page added in commit 9. Use is_completed (DB schema)
-  // not the loose `completed` field that doesn't exist on these entities.
+  // /tasks shows academic assignments (label: "מטלות"). /todos shows
+  // personal study tasks (label: "משימות"). Both data shapes use
+  // is_completed (per types/index.ts).
   const counts = {
     tasks: db?.assignments?.filter((a: any) => !a.is_completed).length,
-    todos: db?.todos?.filter((t: any) => !t.is_completed).length,
+    todos: db?.tasks?.filter((t: any) => !t.is_completed).length,
   } as Record<string, number | undefined>
 
   const isActive = (href: string) =>
