@@ -2221,6 +2221,202 @@ html.light .badge-danger {
 .analog-clock line { transform-origin: 50px 50px; }
 
 /* ════════════════════════════════════════════════════════════════════
+   <CountryClock /> — daily flag clock + guess input.
+   Source: teepo-design/mockup_dashboard.html .country-clock-widget block.
+   ════════════════════════════════════════════════════════════════════ */
+.country-clock-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.country-guess {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.country-guess input {
+  width: 80px;
+  font-size: 11px;
+  padding: 3px 7px;
+  border: 1px solid #e0cda8;
+  border-radius: 5px;
+  background: #fdf6e3;
+  text-align: center;
+  font-family: 'Heebo', sans-serif;
+  font-weight: 600;
+  color: #2d1810;
+  direction: rtl;
+  outline: none;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.country-guess input::placeholder { color: #8a7261; font-weight: 500; }
+.country-guess input:focus { border-color: #16a34a; }
+.country-guess button {
+  width: 21px;
+  height: 21px;
+  background: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .15s;
+}
+.country-guess button:hover { transform: scale(1.08); }
+.country-guess.correct input {
+  border-color: #16a34a;
+  background: #dcfce7;
+  color: #14532d;
+}
+.country-guess.wrong input {
+  border-color: #e11d48;
+  animation: shakeWrong .3s ease-in-out;
+}
+@keyframes shakeWrong {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  75%      { transform: translateX(4px); }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   <SlidingPuzzle /> — 3×3 daily puzzle.
+   Source: teepo-design/mockup_dashboard.html .puzzle-mini block.
+   ════════════════════════════════════════════════════════════════════ */
+.puzzle-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 14px 16px;
+  background: rgba(253, 246, 227, .55);
+  border: 1px solid rgba(224, 205, 168, .6);
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  direction: ltr;
+  transition: background .15s, border-color .15s;
+  width: 240px;
+  flex-shrink: 0;
+}
+.puzzle-mini:hover {
+  background: rgba(253, 246, 227, .85);
+  border-color: #e0cda8;
+}
+.puzzle-mini .pm-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  direction: rtl;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #ead8b3;
+}
+.puzzle-mini .pm-label {
+  font-family: 'Frank Ruhl Libre', serif;
+  font-size: 14px;
+  font-weight: 700;
+  font-style: italic;
+  color: #2d1810;
+  letter-spacing: -.2px;
+}
+.puzzle-mini .pm-difficulty {
+  font-size: 10px;
+  color: #d97706;
+  letter-spacing: 1px;
+}
+.puzzle-mini .pm-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 3px;
+  aspect-ratio: 1 / 1;
+  direction: ltr;
+}
+.puzzle-mini .slide-tile {
+  background: #fdf6e3;
+  border: 1px solid #e0cda8;
+  border-radius: 5px;
+  font-family: 'Heebo', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2d1810;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  line-height: 1;
+  transition: background .15s, color .15s, border-color .15s, transform .25s ease;
+  padding: 0;
+}
+.puzzle-mini .slide-tile:hover:not(.empty):not(:disabled) {
+  background: #efe0bc;
+}
+.puzzle-mini .slide-tile.empty {
+  background: rgba(58, 74, 61, .06);
+  border-style: dashed;
+  cursor: default;
+}
+.puzzle-mini .slide-tile.solved {
+  color: #16a34a;
+  border-color: #16a34a;
+  animation: tileWin .5s ease both;
+}
+@keyframes tileWin {
+  0%   { transform: scale(.92); }
+  60%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.puzzle-mini .pm-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  direction: rtl;
+  padding-top: 4px;
+  border-top: 1px solid #ead8b3;
+}
+.puzzle-mini .pm-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-family: 'Heebo', sans-serif;
+  font-size: 11px;
+  color: #5c3f2f;
+  line-height: 1.2;
+}
+.puzzle-mini .pm-info strong { color: #2d1810; font-weight: 700; font-size: 12px; }
+.puzzle-mini .pm-info small  { color: #8a7261; font-size: 10px; }
+.puzzle-mini .pm-controls { display: flex; gap: 4px; }
+.puzzle-mini .pm-shuffle {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid #e0cda8;
+  color: #5c3f2f;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .15s;
+  font-size: 12px;
+}
+.puzzle-mini .pm-shuffle:hover {
+  background: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
+  color: white;
+  border-color: transparent;
+}
+.puzzle-mini .pm-shuffle svg { width: 12px; height: 12px; }
+
+@media (max-width: 780px) {
+  .puzzle-mini { width: 100%; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    TEEPO Landing v2 — locked design 2026-05-11.
    Direct port of teepo-design/mockup_landing.html. All visual changes
    to the landing page should be made here (or in the source mockup,
