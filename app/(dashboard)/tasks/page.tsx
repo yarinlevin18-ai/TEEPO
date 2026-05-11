@@ -151,25 +151,30 @@ export default function TasksPage() {
   const MotivIcon = motivation.icon
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto space-y-6 animate-fade-in">
+    <div className="cream-page p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto space-y-6 animate-fade-in">
 
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/15 flex items-center justify-center">
-              <CheckSquare size={18} className="text-indigo-400" />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                 style={{ background: 'var(--lp-accent-soft, #dcfce7)' }}>
+              <CheckSquare size={18} style={{ color: 'var(--lp-accent-deep, #14532d)' }} />
             </div>
-            המשימות שלי
+            המטלות שלי
           </h1>
-          <p className="text-sm text-ink-muted mt-1">{getDateLabel(selectedDate)}</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--lp-muted, #8a7261)' }}>{getDateLabel(selectedDate)}</p>
         </div>
         <button
           onClick={() => setAddingTask(true)}
-          className="btn-gradient px-4 py-2.5 rounded-xl text-sm text-white font-medium flex items-center gap-2 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all"
+          className="px-4 py-2.5 rounded-xl text-sm text-white font-medium flex items-center gap-2 transition-all"
+          style={{
+            background: 'var(--lp-gradient, linear-gradient(135deg, #16a34a 0%, #84cc16 100%))',
+            boxShadow: '0 4px 12px -4px var(--lp-accent, #16a34a)',
+          }}
         >
           <Plus size={16} />
-          משימה חדשה
+          מטלה חדשה
         </button>
       </div>
 
