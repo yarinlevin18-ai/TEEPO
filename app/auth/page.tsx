@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
+import Logo from '@/components/Logo'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -43,9 +44,7 @@ export default function LoginPage() {
       <div className="bg-glow bg-glow-2" aria-hidden />
 
       <nav className="topnav">
-        <Link href="/" className="logo">
-          teep<span className="accent">o</span>
-        </Link>
+        <Logo variant="large" href="/" />
         <div className="spacer" />
         <Link href="/" className="back-link">
           ← חזרה לדף הבית
