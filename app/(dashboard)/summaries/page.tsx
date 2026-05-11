@@ -18,9 +18,10 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Folder, BookOpen, FileText, StickyNote, Mic, GraduationCap, Brain } from 'lucide-react'
+import { Folder, BookOpen, FileText, StickyNote, Mic, GraduationCap, Brain, ChevronDown } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
 import { useUniversityName } from '@/lib/use-university'
+import CourseDrivePanel from '@/components/summaries/CourseDrivePanel'
 import type { Course } from '@/types'
 
 interface SemesterBucket {
@@ -71,6 +72,7 @@ export default function SummariesPage() {
   const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
   const buckets = useMemo(() => bucketize(courses), [courses])
   const [activeSem, setActiveSem] = useState<string | null>(buckets[0]?.key ?? null)
+  const [expandedCourse, setExpandedCourse] = useState<string | null>(null)
 
   // If the active semester disappears (courses re-bucketed), fall back to first.
   const safeActive = buckets.find(b => b.key === activeSem) ?? buckets[0] ?? null
@@ -154,43 +156,62 @@ export default function SummariesPage() {
                 <div className="course-grid">
                   {safeActive.courses.map((c, i) => {
                     const palette = COURSE_PALETTE[i % COURSE_PALETTE.length]
+                    const expanded = expandedCourse === c.id
+                    const folderIds = (c as any).drive_folder_ids ?? null
                     return (
-                      <Link
-                        href={`/courses/${c.id}`}
+                      <div
                         key={c.id}
-                        className="course-card"
+                        className={`course-card ${expanded ? 'expanded' : ''}`}
                         style={{ ['--course-color' as any]: palette.color, ['--course-soft' as any]: palette.soft }}
                       >
-                        <div className="top">
-                          <div className="ico-wrap"><BookOpen /></div>
-                          <div>
-                            <h3>{c.name}</h3>
-                            <small>{(c as any).code ?? ''}</small>
+                        <button
+                          type="button"
+                          className="course-card-trigger"
+                          onClick={() => setExpandedCourse(expanded ? null : c.id)}
+                          aria-expanded={expanded}
+                          aria-controls={`course-panel-${c.id}`}
+                        >
+                          <div className="top">
+                            <div className="ico-wrap"><BookOpen /></div>
+                            <div>
+                              <h3>{(c as any).title ?? c.name}</h3>
+                              <small>{(c as any).shortname ?? (c as any).code ?? ''}</small>
+                            </div>
+                            <ChevronDown
+                              className="course-card-chevron"
+                              size={18}
+                              style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}
+                            />
                           </div>
-                        </div>
-                        <div className="folders">
-                          <span className="folder-row">
-                            <Mic />
-                            <span className="label">הרצאות</span>
-                            <span className="num">{(c as any).lessons?.length ?? 0}</span>
-                          </span>
-                          <span className="folder-row">
-                            <FileText />
-                            <span className="label">סיכומים</span>
-                            <span className="num">{(c as any).summaries?.length ?? 0}</span>
-                          </span>
-                          <span className="folder-row">
-                            <Folder />
-                            <span className="label">קבצים</span>
-                            <span className="num">{(c as any).files?.length ?? 0}</span>
-                          </span>
-                          <span className="folder-row">
-                            <StickyNote />
-                            <span className="label">הערות</span>
-                            <span className="num">{(c as any).notes?.length ?? 0}</span>
-                          </span>
-                        </div>
-                      </Link>
+                          <div className="folders">
+                            <span className="folder-row">
+                              <Mic />
+                              <span className="label">שיעורים</span>
+                            </span>
+                            <span className="folder-row">
+                              <Folder />
+                              <span className="label">מטלות</span>
+                            </span>
+                            <span className="folder-row">
+                              <StickyNote />
+                              <span className="label">סיכומים</span>
+                            </span>
+                            <Link
+                              href={`/courses/${c.id}`}
+                              className="folder-row link"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <FileText />
+                              <span className="label">פתח קורס →</span>
+                            </Link>
+                          </div>
+                        </button>
+                        {expanded && (
+                          <div id={`course-panel-${c.id}`} className="course-card-panel">
+                            <CourseDrivePanel folderIds={folderIds} />
+                          </div>
+                        )}
+                      </div>
                     )
                   })}
                 </div>

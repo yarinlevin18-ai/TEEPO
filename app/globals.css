@@ -3538,6 +3538,276 @@ html.light .badge-danger {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   Course card expansion + <CourseDrivePanel /> for /summaries.
+   ════════════════════════════════════════════════════════════════════ */
+.summaries-page .course-card {
+  /* override the previous flex-column so the trigger button has full reach */
+  padding: 0;
+  position: relative;
+}
+.summaries-page .course-card.expanded {
+  grid-column: 1 / -1; /* take the full row when open so the panel has room */
+  background: var(--lp-bg-card);
+  border-color: var(--course-color, var(--lp-accent));
+  box-shadow: var(--lp-shadow);
+}
+.summaries-page .course-card-trigger {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  text-align: right;
+  border-radius: 14px;
+  transition: background .15s;
+}
+.summaries-page .course-card-trigger:hover { background: var(--course-soft, var(--lp-accent-soft)); }
+.summaries-page .course-card.expanded .course-card-trigger { background: transparent; }
+.summaries-page .course-card-chevron {
+  margin-inline-start: auto;
+  color: var(--lp-muted);
+  transition: transform .2s ease;
+  flex-shrink: 0;
+}
+.summaries-page .folder-row.link {
+  background: var(--lp-accent-soft);
+  color: var(--lp-accent-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+.summaries-page .folder-row.link:hover {
+  background: var(--lp-accent);
+  color: white;
+}
+.summaries-page .course-card-panel {
+  border-top: 1px solid var(--lp-line-soft);
+  padding: 18px 22px 22px;
+  animation: fadeUp .25s ease both;
+}
+
+/* Inside the panel */
+.drive-panel { display: flex; flex-direction: column; gap: 18px; }
+.drive-panel--empty {
+  padding: 22px 18px;
+  background: rgba(253, 246, 227, .6);
+  border: 1px dashed var(--lp-line);
+  border-radius: 12px;
+  color: var(--lp-ink-soft);
+  font-size: 14px;
+  text-align: center;
+  line-height: 1.65;
+}
+
+.drive-section {
+  background: rgba(255, 255, 255, .55);
+  border: 1px solid var(--lp-line-soft);
+  border-radius: 12px;
+  padding: 14px 16px;
+  backdrop-filter: blur(4px);
+}
+.drive-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--lp-line-soft);
+  margin-bottom: 10px;
+}
+.drive-section-title { flex: 1; min-width: 0; }
+.drive-section-title h4 {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -.2px;
+  color: var(--lp-ink);
+}
+.drive-section-title small {
+  font-size: 11px;
+  color: var(--lp-muted);
+  display: block;
+  margin-top: 1px;
+}
+.drive-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.drive-count {
+  background: var(--lp-bg-elev);
+  color: var(--lp-muted);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+
+.drive-icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-bg-card);
+  color: var(--lp-ink-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .15s;
+  text-decoration: none;
+}
+.drive-icon-btn:hover {
+  background: var(--lp-bg-elev);
+  color: var(--lp-ink);
+  border-color: var(--lp-line);
+}
+.drive-icon-btn:disabled { opacity: .45; cursor: not-allowed; }
+.drive-icon-btn--danger:hover { color: #b91c1c; border-color: #fecaca; background: #fee2e2; }
+.drive-icon-btn .spin { animation: driveSpin .8s linear infinite; }
+
+.drive-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--lp-gradient);
+  color: white;
+  border: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  font-family: inherit;
+  box-shadow: 0 3px 8px -2px rgba(22, 163, 74, .35);
+}
+.drive-upload-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px -2px rgba(22, 163, 74, .5);
+}
+.drive-upload-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+.drive-empty {
+  font-size: 12.5px;
+  color: var(--lp-muted);
+  padding: 8px 4px;
+  text-align: center;
+}
+.drive-error {
+  font-size: 12.5px;
+  color: #b91c1c;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.drive-file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.drive-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line-soft);
+  transition: border-color .15s, background .15s;
+}
+.drive-file:hover {
+  border-color: var(--lp-line);
+  background: var(--lp-bg-hover);
+}
+.drive-file-icon { flex-shrink: 0; }
+.drive-file-icon.kind-pdf   { color: #dc2626; }
+.drive-file-icon.kind-doc   { color: #2563eb; }
+.drive-file-icon.kind-slide { color: #ea580c; }
+.drive-file-icon.kind-sheet { color: #16a34a; }
+.drive-file-icon.kind-image { color: #7c3aed; }
+.drive-file-icon.kind-video { color: #9333ea; }
+.drive-file-icon.kind-audio { color: #db2777; }
+.drive-file-icon.kind-archive { color: #ca8a04; }
+.drive-file-icon.kind-link  { color: var(--lp-accent); }
+.drive-file-icon.kind-other { color: var(--lp-muted); }
+
+.drive-file-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.drive-file-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lp-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drive-file-name:hover { color: var(--lp-accent); text-decoration: underline; }
+.drive-file-body small {
+  font-size: 10.5px;
+  color: var(--lp-muted);
+}
+.drive-file-spinner {
+  color: var(--lp-accent);
+  animation: driveSpin .8s linear infinite;
+}
+
+.drive-confirm {
+  margin-top: 10px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.drive-confirm p {
+  font-size: 13px;
+  color: var(--lp-ink-soft);
+  margin-bottom: 10px;
+  line-height: 1.55;
+}
+.drive-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.drive-confirm-actions button {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-bg-card);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.drive-confirm-actions .danger {
+  background: #dc2626;
+  color: white;
+  border-color: #b91c1c;
+}
+.drive-confirm-actions .danger:hover { background: #b91c1c; }
+
+@keyframes driveSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ════════════════════════════════════════════════════════════════════
    TEEPO Landing v2 — locked design 2026-05-11.
    Direct port of teepo-design/mockup_landing.html. All visual changes
    to the landing page should be made here (or in the source mockup,
