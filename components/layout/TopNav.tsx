@@ -77,7 +77,9 @@ export default function TopNav({ mobileOpen = false, onMobileToggle }: Props) {
   })()
   const displayName = ((user?.user_metadata?.display_name as string) || user?.email || '').split('@')[0]
   const universityShort = universityCode === 'tau' ? 'TAU' : universityCode === 'bgu' ? 'BGU' : ''
-  const moodleConnected = !!db?.moodleConnected
+  // Moodle connection state isn't part of DriveDB yet — settings carries
+  // it under an unstructured slot until /moodle gets its v2 wiring.
+  const moodleConnected = Boolean((db?.settings as any)?.moodle_connected)
 
   function NavLink({ href, icon: Icon, label, count }: any) {
     const active = isActive(href)

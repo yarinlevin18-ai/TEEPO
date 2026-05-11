@@ -174,7 +174,7 @@ export default function SummariesPage() {
                           <div className="top">
                             <div className="ico-wrap"><BookOpen /></div>
                             <div>
-                              <h3>{(c as any).title ?? c.name}</h3>
+                              <h3>{c.title}</h3>
                               <small>{(c as any).shortname ?? (c as any).code ?? ''}</small>
                             </div>
                             <ChevronDown

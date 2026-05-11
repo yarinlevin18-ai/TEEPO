@@ -80,10 +80,11 @@ export default function DashboardPage() {
     ]
   }, [db])
 
-  const todos = useMemo(() => {
-    const real = (db?.todos ?? []).filter((t: any) => !t.is_completed).slice(0, 4)
+  const todos: Array<{ title: string; meta: string; tag: string; tagClass: string }> = useMemo(() => {
+    // /todos surfaces personal StudyTasks; mirror that on the dashboard.
+    const real = (db?.tasks ?? []).filter((t: any) => !t.is_completed).slice(0, 4)
     if (real.length) {
-      return real.map((t: any) => ({ title: t.title, meta: t.note ?? '', tag: t.due ?? '', tagClass: 't-soft' }))
+      return real.map((t: any) => ({ title: t.title, meta: t.description ?? '', tag: t.scheduled_date ?? '', tagClass: 't-soft' }))
     }
     return [
       { title: 'בוחן — חדו"א 2',           meta: 'בניין 28, חדר 101',          tag: 'מחר',     tagClass: 't-rose' },
