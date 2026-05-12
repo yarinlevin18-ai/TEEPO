@@ -181,25 +181,60 @@ export async function POST(req: NextRequest) {
 
 // ── Drive helpers ────────────────────────────────────────────────────────
 
+/**
+ * Initial shape for a freshly-created db.json. Mirrors EMPTY_DB in
+ * lib/drive-db.ts but inlined so this route doesn't depend on a client
+ * module (drive-db.ts is 'use client' adjacent and pulls in browser-only
+ * Drive helpers via the existing imports).
+ */
+const EMPTY_DB = {
+  version: 2,
+  updated_at: new Date(0).toISOString(),
+  courses: [],
+  lessons: [],
+  tasks: [],
+  assignments: [],
+  notes: [],
+  settings: {},
+  student_courses: [],
+}
+
+/**
+ * Load (or bootstrap) the user's TEEPO/db.json.
+ *
+ * Previously this threw drive_404 when either the TEEPO/ folder or db.json
+ * was missing, forcing the user to "open the website first so DBProvider
+ * creates it". That's a leaky abstraction — the extension's import flow
+ * should be self-contained. So now, if either is missing we create it
+ * inline using the same Drive API surface the web app uses.
+ */
 async function loadDriveDB(token: string): Promise<{ folderId: string; dbFileId: string; db: any }> {
+  // 1. TEEPO/ folder — find or create.
   const rootQ = "name = 'TEEPO' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
   const rootRes = await driveFetch(
     token,
     `${DRIVE_API}/files?q=${encodeURIComponent(rootQ)}&spaces=drive&fields=files(id)`,
   )
   const rootData = await rootRes.json()
-  const folderId = rootData.files?.[0]?.id
-  if (!folderId) throw new Error('drive_404: TEEPO root missing')
+  let folderId: string | undefined = rootData.files?.[0]?.id
+  if (!folderId) {
+    folderId = await createFolder(token, 'TEEPO')
+  }
 
+  // 2. db.json — find or create with EMPTY_DB.
   const dbQ = `'${folderId}' in parents and name = 'db.json' and trashed = false`
   const metaRes = await driveFetch(
     token,
     `${DRIVE_API}/files?q=${encodeURIComponent(dbQ)}&spaces=drive&fields=files(id)`,
   )
   const meta = await metaRes.json()
-  const dbFileId = meta.files?.[0]?.id
-  if (!dbFileId) throw new Error('drive_404: db.json missing')
+  let dbFileId: string | undefined = meta.files?.[0]?.id
+  if (!dbFileId) {
+    dbFileId = await createDBFile(token, folderId)
+    return { folderId, dbFileId, db: { ...EMPTY_DB } }
+  }
 
+  // 3. Download existing content.
   const contentRes = await driveFetch(token, `${DRIVE_API}/files/${dbFileId}?alt=media`)
   const db = await contentRes.json()
   return { folderId, dbFileId, db }
@@ -218,6 +253,55 @@ async function uploadDB(token: string, fileId: string, db: any): Promise<void> {
     const t = await res.text().catch(() => '')
     throw new Error(`drive_${res.status}: ${t.slice(0, 160)}`)
   }
+}
+
+/** Create a new folder at the Drive root and return its id. */
+async function createFolder(token: string, name: string): Promise<string> {
+  const res = await fetch(`${DRIVE_API}/files`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name,
+      mimeType: 'application/vnd.google-apps.folder',
+    }),
+  })
+  if (!res.ok) {
+    const t = await res.text().catch(() => '')
+    throw new Error(`drive_${res.status}: ${t.slice(0, 160)}`)
+  }
+  const data = await res.json()
+  if (!data.id) throw new Error('drive_500: createFolder returned no id')
+  return data.id as string
+}
+
+/** Create db.json inside the given folder, seeded with EMPTY_DB. */
+async function createDBFile(token: string, folderId: string): Promise<string> {
+  const boundary = `teepo-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const meta = { name: 'db.json', mimeType: 'application/json', parents: [folderId] }
+  const body =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
+    JSON.stringify(meta) +
+    `\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n` +
+    JSON.stringify({ ...EMPTY_DB, updated_at: new Date().toISOString() }) +
+    `\r\n--${boundary}--`
+  const res = await fetch(`${DRIVE_UPLOAD}?uploadType=multipart&fields=id`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': `multipart/related; boundary=${boundary}`,
+    },
+    body,
+  })
+  if (!res.ok) {
+    const t = await res.text().catch(() => '')
+    throw new Error(`drive_${res.status}: ${t.slice(0, 160)}`)
+  }
+  const data = await res.json()
+  if (!data.id) throw new Error('drive_500: createDBFile returned no id')
+  return data.id as string
 }
 
 async function driveFetch(token: string, url: string): Promise<Response> {
