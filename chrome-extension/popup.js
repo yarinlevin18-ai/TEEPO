@@ -435,8 +435,12 @@ async function doImportDiscovered() {
       typeof data.folders_created === 'number'
         ? ` · ${data.folders_created} תיקיות נוצרו ב-Drive`
         : ''
+    const classMsg =
+      typeof data.classified === 'number' && data.classified > 0
+        ? ` · ${data.classified} סווגו לסמסטר`
+        : ''
     setText('done-text',
-      `${data.added ?? 0} נוספו · ${data.updated ?? 0} עודכנו · סה"כ ${data.total ?? selected.length}${folderMsg}`,
+      `${data.added ?? 0} נוספו · ${data.updated ?? 0} עודכנו · סה"כ ${data.total ?? selected.length}${folderMsg}${classMsg}`,
     )
     showState('done')
   } catch (e) {

@@ -27,6 +27,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { classifyCourse, computeYearOfStudy, type Semester } from '@/lib/semester-classifier'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -52,6 +53,7 @@ interface CourseRecord {
   status?: string
   year_of_study?: number
   semester?: 'א' | 'ב' | 'קיץ'
+  academic_year?: string
   drive_folder_ids?: { course: string; lessons: string; assignments: string; notes: string }
   drive_folder_path?: string
   [k: string]: unknown
@@ -181,7 +183,41 @@ export async function POST(req: NextRequest) {
     let added = 0
     let updated = 0
     let skipped = 0
+    let classified = 0
     const needsFolders: CourseRecord[] = []
+
+    // Degree-start setting drives year_of_study computation. Without it we
+    // can still set semester+academic_year (folder lands at "תואר ראשון/ללא שנה/סמסטר X/<title>"),
+    // we just can't compute שנה א'/ב'/ג'.
+    const degreeStart = (() => {
+      const yearRaw = db?.settings?.degree_start_year
+      const monthRaw = db?.settings?.degree_start_month
+      const year = typeof yearRaw === 'number' ? yearRaw : parseInt(String(yearRaw ?? ''), 10)
+      const month = typeof monthRaw === 'number' ? monthRaw : parseInt(String(monthRaw ?? ''), 10)
+      if (Number.isFinite(year) && year > 1990) {
+        return { year, month: Number.isFinite(month) && month >= 1 && month <= 12 ? month : 10 }
+      }
+      return null
+    })()
+
+    // Apply classifier output onto a course record. Only fill fields that
+    // weren't already set so we don't clobber a manual classification the
+    // user made on /courses.
+    const applyClassification = (c: CourseRecord): void => {
+      if (c.classified_manually) return
+      const cls = classifyCourse({
+        title: c.title,
+        shortname: c.shortname,
+      })
+      let touched = false
+      if (cls.semester && !c.semester) { c.semester = cls.semester as Semester; touched = true }
+      if (cls.academic_year && !c.academic_year) { c.academic_year = cls.academic_year; touched = true }
+      if (degreeStart && cls.academic_year && !c.year_of_study) {
+        const yos = computeYearOfStudy(degreeStart, parseInt(cls.academic_year, 10))
+        if (yos) { c.year_of_study = yos; touched = true }
+      }
+      if (touched) classified++
+    }
 
     for (const inc of incoming) {
       const title = (inc.title ?? '').trim()
@@ -209,6 +245,7 @@ export async function POST(req: NextRequest) {
           created_at: new Date().toISOString(),
           ...(inc.moodle_id ? { moodle_id: inc.moodle_id } : {}),
         }
+        applyClassification(newCourse)
         courses.unshift(newCourse)
         added++
         needsFolders.push(newCourse)
@@ -220,6 +257,9 @@ export async function POST(req: NextRequest) {
         if (!existing.shortname && inc.shortname) merged.shortname = inc.shortname
         if (inc.moodle_id && !(existing as any).moodle_id) (merged as any).moodle_id = inc.moodle_id
         if (!existing.source) merged.source = 'bgu'
+        // Try to classify if we still haven't (e.g. earlier import predated
+        // the classifier, or the user hasn't manually classified).
+        applyClassification(merged)
         // Only count as updated if at least one field actually changed.
         if (JSON.stringify(merged) !== JSON.stringify(existing)) {
           courses[idx] = merged
@@ -227,8 +267,11 @@ export async function POST(req: NextRequest) {
         } else {
           skipped++
         }
-        // Reprovision folders if the existing record never got them.
-        if (!existing.drive_folder_ids) needsFolders.push(courses[idx])
+        // Reprovision folders if the existing record never got them, OR if
+        // classification just changed its target path.
+        const currentPath = pathForCourseRecord(courses[idx]).join('/')
+        const stalePath = existing.drive_folder_path && existing.drive_folder_path !== currentPath
+        if (!existing.drive_folder_ids || stalePath) needsFolders.push(courses[idx])
       }
     }
 
@@ -268,6 +311,7 @@ export async function POST(req: NextRequest) {
         added,
         updated,
         skipped,
+        classified,
         total: courses.length,
         folderId,
         folders_created: foldersCreated,
