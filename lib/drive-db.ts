@@ -186,6 +186,7 @@ export async function driveFetch(
 export async function probeTokenScopes(token: string): Promise<{
   scopes: string[]
   hasDriveFile: boolean
+  hasCalendar: boolean
   expiresIn: number | null
   error?: string
 }> {
@@ -195,16 +196,18 @@ export async function probeTokenScopes(token: string): Promise<{
     )
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      return { scopes: [], hasDriveFile: false, expiresIn: null, error: data?.error_description || data?.error || `tokeninfo ${res.status}` }
+      return { scopes: [], hasDriveFile: false, hasCalendar: false, expiresIn: null, error: data?.error_description || data?.error || `tokeninfo ${res.status}` }
     }
     const scopes: string[] = typeof data.scope === 'string' ? data.scope.split(' ') : []
     return {
       scopes,
       hasDriveFile: scopes.includes('https://www.googleapis.com/auth/drive.file'),
+      hasCalendar:  scopes.includes('https://www.googleapis.com/auth/calendar.readonly')
+                 || scopes.includes('https://www.googleapis.com/auth/calendar'),
       expiresIn: data.expires_in ? Number(data.expires_in) : null,
     }
   } catch (e: any) {
-    return { scopes: [], hasDriveFile: false, expiresIn: null, error: e?.message || 'probe failed' }
+    return { scopes: [], hasDriveFile: false, hasCalendar: false, expiresIn: null, error: e?.message || 'probe failed' }
   }
 }
 

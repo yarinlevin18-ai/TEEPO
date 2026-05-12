@@ -3235,6 +3235,201 @@ html.light .badge-danger {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   /diagnostics — integration health panel.
+   ════════════════════════════════════════════════════════════════════ */
+.diag-page .diag-main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 24px 60px;
+  position: relative;
+  z-index: 10;
+}
+.diag-head {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.diag-eyebrow {
+  font-family: 'Frank Ruhl Libre', serif;
+  font-style: italic;
+  font-weight: 700;
+  color: var(--lp-accent);
+  font-size: 14px;
+  letter-spacing: .3px;
+  margin-bottom: 8px;
+}
+.diag-h1 {
+  font-family: 'Heebo', sans-serif;
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  color: var(--lp-ink);
+  line-height: 1.1;
+  margin-bottom: 10px;
+}
+.diag-h1 .accent {
+  background: var(--lp-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.diag-sub {
+  font-size: 15px;
+  color: var(--lp-ink-soft);
+  line-height: 1.6;
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+.diag-section {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin-bottom: 14px;
+  box-shadow: var(--lp-shadow-sm);
+}
+.diag-section h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'Heebo', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -.3px;
+  color: var(--lp-ink);
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--lp-line-soft);
+  text-transform: uppercase;
+}
+.diag-section-refresh {
+  background: transparent;
+  border: 1px solid var(--lp-line);
+  border-radius: 7px;
+  padding: 4px 8px;
+  color: var(--lp-muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.diag-section-refresh:hover:not(:disabled) {
+  background: var(--lp-bg-elev);
+  color: var(--lp-ink);
+}
+.diag-section-refresh:disabled { opacity: .5; cursor: not-allowed; }
+
+.diag-row {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  font-size: 13.5px;
+  border-bottom: 1px dashed rgba(224, 205, 168, .4);
+}
+.diag-row:last-child { border-bottom: 0; }
+.diag-row-status {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--lp-bg-elev);
+  color: var(--lp-muted);
+}
+.diag-row.status-ok       .diag-row-status { background: var(--lp-accent);    color: white; }
+.diag-row.status-error    .diag-row-status { background: #fee2e2;             color: #b91c1c; }
+.diag-row.status-checking .diag-row-status { background: var(--lp-bg-elev);   color: var(--lp-muted); }
+.diag-row.status-pending  .diag-row-status { background: var(--lp-bg-elev); }
+.diag-row-label {
+  font-weight: 600;
+  color: var(--lp-ink-soft);
+}
+.diag-row-value {
+  color: var(--lp-ink);
+  font-weight: 500;
+  text-align: left;
+  direction: ltr;
+  font-size: 13px;
+  word-break: break-word;
+}
+.diag-aside { color: var(--lp-muted); font-size: 12px; }
+.diag-pending-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lp-line);
+}
+.diag-error {
+  margin-top: 10px;
+  padding: 9px 12px;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+.diag-clip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  background: var(--lp-bg);
+  border: 1px solid var(--lp-line);
+  border-radius: 999px;
+  font-family: 'VT323', monospace;
+  font-size: 13px;
+  color: var(--lp-ink);
+  cursor: pointer;
+  transition: background .15s;
+}
+.diag-clip:hover { background: var(--lp-bg-elev); }
+.diag-clip code { background: transparent; padding: 0; }
+.diag-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-bg-card);
+  color: var(--lp-ink);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: background .15s;
+}
+.diag-cta:hover { background: var(--lp-bg-elev); }
+.diag-cta.primary {
+  background: var(--lp-gradient);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 4px 10px -2px rgba(22, 163, 74, .35);
+}
+.diag-cta.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px -2px rgba(22, 163, 74, .5);
+}
+.diag-link {
+  color: var(--lp-accent);
+  text-decoration: none;
+  font-weight: 700;
+}
+.diag-link:hover { text-decoration: underline; }
+
+.diag-foot {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+
+/* ════════════════════════════════════════════════════════════════════
    /moodle — v2 cream-toned override.
    Surgical: scope all GlowCard/indigo-flavored chrome inside .moodle-v2
    to cream tokens without rewriting the whole 600-line page. The
