@@ -2954,6 +2954,36 @@ html.light .badge-danger {
 .dashboard-v2 .bottom-row-v2 .dcard:nth-child(2) { animation-delay: .5s; }
 .dashboard-v2 .bottom-row-v2 .dcard:nth-child(3) { animation-delay: .6s; }
 
+/* Empty-state body inside a dashboard card — shown when the user has no
+   real data of that kind yet. Replaces the v1 mockup-data fallback. */
+.dashboard-v2 .dcard-empty {
+  padding: 28px 22px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.dashboard-v2 .dcard-empty p {
+  font-size: 13.5px;
+  color: var(--lp-muted, #8a7261);
+  line-height: 1.55;
+}
+.dashboard-v2 .dcard-empty-cta {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--lp-accent-deep, #14532d);
+  background: var(--lp-accent-soft, #dcfce7);
+  padding: 6px 14px;
+  border-radius: 999px;
+  text-decoration: none;
+  transition: background .15s, color .15s;
+}
+.dashboard-v2 .dcard-empty-cta:hover {
+  background: var(--lp-accent, #16a34a);
+  color: white;
+}
+
 @media (max-width: 980px) {
   .dashboard-v2 .bottom-row-v2 { grid-template-columns: 1fr; }
   .dashboard-v2 .dash-main { padding: 32px 20px 60px; }
