@@ -208,7 +208,7 @@ export default function UniversityConnectPage() {
         if (existingId) {
           // Update existing course with fresh metadata + classification.
           // Respect manual classification: don't overwrite semester/year if user set them.
-          const existing = db.courses.find(x => x.id === existingId)
+          const existing = db.courses.find((x: any) => x.id === existingId)
           const isManual = existing?.classified_manually === true
 
           await updateCourse(existingId, {
