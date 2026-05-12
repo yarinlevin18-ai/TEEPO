@@ -70,7 +70,7 @@
   ],
 
   "oauth2": {
-    "client_id": "REPLACE_WITH_YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "client_id": "157877045941-lnm2cna90npvefkmcmem9up5ml516d8d.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/drive.file",
       "openid",
