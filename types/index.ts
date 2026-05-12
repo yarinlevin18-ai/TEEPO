@@ -17,6 +17,13 @@ export interface UserSettings {
   degree_start_month?: number
   /** True if the user does summer semesters (shows קיץ slots even if empty) */
   takes_summer?: boolean
+  /** Loose moodle-connection mirror for the TopNav pill. Authoritative state
+   *  lives in the backend; this is set after a successful /api/university/connect
+   *  so the pill stays green across page loads without a refetch. */
+  moodle_connected?: boolean
+  /** True once the user finished or dismissed the /setup first-run wizard.
+   *  When unset AND the user has zero courses, the dashboard redirects to /setup. */
+  setup_seen?: boolean
 }
 
 /**

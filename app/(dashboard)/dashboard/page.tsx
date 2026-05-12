@@ -19,7 +19,8 @@
  */
 
 import Link from 'next/link'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
 import { useWeekCalendar, type WeekCalendarSlot } from '@/lib/use-week-calendar'
@@ -39,9 +40,23 @@ function pad2(n: number): string {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { user } = useAuth()
-  const { db } = useDB()
+  const { db, ready } = useDB()
   const greetName = firstName(user)
+
+  // First-run redirect: a brand-new account (DB loaded, no courses, hasn't
+  // dismissed the wizard) lands on /setup instead of staring at an empty
+  // dashboard. `setup_seen` is set when the user finishes or skips the
+  // wizard, so this only fires once.
+  useEffect(() => {
+    if (!ready) return
+    const noCourses = (db?.courses?.length ?? 0) === 0
+    const seenSetup = Boolean(db?.settings?.setup_seen)
+    if (noCourses && !seenSetup) {
+      router.replace('/setup')
+    }
+  }, [ready, db?.courses?.length, db?.settings?.setup_seen, router])
 
   // Three card data — derived from the real DB only. Empty arrays render
   // a CTA (see EmptyHint below) instead of fake mockup rows.
