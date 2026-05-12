@@ -66,7 +66,7 @@ export default function CourseDrivePanel({ folderIds }: PanelProps) {
   )
 }
 
-function FolderSection({
+export function FolderSection({
   label,
   hint,
   folderId,

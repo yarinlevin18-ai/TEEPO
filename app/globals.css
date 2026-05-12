@@ -4278,6 +4278,148 @@ html.light .badge-danger {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   /summaries — drill-down tree levels (course row, folder row) and
+   the below-tree panels they reveal.
+   ════════════════════════════════════════════════════════════════════ */
+.summaries-page .tree-divider-line {
+  width: 2px;
+  height: 18px;
+  background: var(--lp-line);
+  margin: 4px auto;
+  border-radius: 999px;
+}
+
+.summaries-page .course-row,
+.summaries-page .folder-row-tree {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  position: relative;
+}
+
+.summaries-page .node.course {
+  background: var(--course-soft, var(--lp-accent-soft));
+  border-color: color-mix(in srgb, var(--course-color, var(--lp-accent)) 35%, transparent);
+}
+.summaries-page .node.course .folder-ico { color: var(--course-color, var(--lp-accent)); }
+.summaries-page .node.course:hover {
+  border-color: var(--course-color, var(--lp-accent));
+}
+.summaries-page .node.course.active {
+  background: var(--course-color, var(--lp-accent));
+  border-color: var(--course-color, var(--lp-accent));
+  color: white;
+}
+.summaries-page .node.course.active .folder-ico { color: white; }
+
+.summaries-page .node.folder {
+  background: rgba(255, 255, 255, .65);
+}
+.summaries-page .node.folder.active {
+  background: var(--lp-accent);
+  border-color: var(--lp-accent);
+  color: white;
+}
+.summaries-page .node.folder.active .folder-ico { color: white; }
+
+/* Folder-overview tiles (shown when a course is selected but no folder yet) */
+.summaries-page .folder-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.summaries-page .folder-overview-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: right;
+  transition: border-color .15s, transform .15s, box-shadow .15s;
+}
+.summaries-page .folder-overview-card:hover {
+  border-color: var(--lp-accent);
+  transform: translateY(-1px);
+  box-shadow: var(--lp-shadow);
+}
+.summaries-page .folder-overview-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--lp-accent-soft);
+  color: var(--lp-accent-deep);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.summaries-page .folder-overview-icon svg { width: 20px; height: 20px; }
+.summaries-page .folder-overview-body { flex: 1; min-width: 0; }
+.summaries-page .folder-overview-body h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--lp-ink);
+  margin: 0 0 2px;
+}
+.summaries-page .folder-overview-body small { font-size: 12px; color: var(--lp-muted); }
+.summaries-page .folder-overview-arrow { color: var(--lp-muted); transform: scaleX(-1); flex-shrink: 0; }
+
+/* Back-pill in the panel header */
+.summaries-page .back-pill {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--lp-ink-soft);
+  transition: background .15s, color .15s, border-color .15s;
+  flex-shrink: 0;
+}
+.summaries-page .back-pill:hover {
+  background: var(--lp-accent-soft);
+  border-color: var(--lp-accent);
+  color: var(--lp-accent-deep);
+}
+
+/* Course-card hint row inside the semester panel grid */
+.summaries-page .folder-shortcut-row {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--course-color, var(--lp-accent));
+  margin-top: 6px;
+}
+
+/* "Pick a semester first" empty placeholder */
+.summaries-page .sum-empty {
+  text-align: center;
+  padding: 60px 24px;
+  color: var(--lp-muted);
+}
+.summaries-page .sum-empty svg { width: 56px; height: 56px; opacity: .35; margin-bottom: 14px; }
+.summaries-page .sum-empty h3 { font-size: 17px; font-weight: 600; color: var(--lp-ink-soft); }
+
+/* The drill-down page uses .course-card as a plain button (no inner
+   trigger), so restore the padding that the legacy expansion override
+   below zeros out. */
+.summaries-page .course-grid > .course-card {
+  padding: 16px 18px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: right;
+}
+
+/* ════════════════════════════════════════════════════════════════════
    Course card expansion + <CourseDrivePanel /> for /summaries.
    ════════════════════════════════════════════════════════════════════ */
 .summaries-page .course-card {
