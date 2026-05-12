@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, WifiOff, RefreshCw,
@@ -37,7 +38,8 @@ async function authHeaders(): Promise<Record<string, string>> {
 type Status = { moodle: boolean; portal: boolean; login_status: Record<string, string> }
 
 export default function UniversityConnectPage() {
-  const { db, ready, createCourse, updateCourse } = useDB()
+  const router = useRouter()
+  const { db, ready, createCourse, updateCourse, updateSettings } = useDB() as any
   const universityName = useUniversityName()
   const [status, setStatus] = useState<Status>({ moodle: false, portal: false, login_status: {} })
   const [loading, setLoading] = useState<Record<string, boolean>>({})
@@ -46,6 +48,18 @@ export default function UniversityConnectPage() {
   const [serverMode, setServerMode] = useState(false)
   const [lmsInfo, setLmsInfo] = useState<LmsInfo>(EMPTY_INFO)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Mirror moodle connection state into db.settings so the TopNav pill
+  // shows green/grey without each page having to refetch. Writes only when
+  // the value actually flipped (avoid spam-writing to Drive).
+  useEffect(() => {
+    if (!ready || typeof updateSettings !== 'function') return
+    const current = Boolean(db?.settings?.moodle_connected)
+    const live = Boolean(status.moodle)
+    if (current !== live) {
+      void updateSettings({ moodle_connected: live }).catch(() => {})
+    }
+  }, [ready, status.moodle, db?.settings?.moodle_connected, updateSettings])
 
   const fetchStatus = async () => {
     try {
@@ -247,6 +261,12 @@ export default function UniversityConnectPage() {
       if (updated > 0) parts.push(`${updated} עודכנו`)
       if (parts.length === 0) parts.push('לא נמצאו שינויים')
       setSyncResult(`סנכרון הושלם: ${parts.join(', ')} (סה״כ נמשכו ${scraped.length}) ✓`)
+
+      // If we actually pulled new courses, send the user to /courses so they
+      // can confirm the import. 2s gives the success banner time to register.
+      if (added > 0) {
+        setTimeout(() => router.push('/courses'), 2000)
+      }
     } catch (e: any) {
       if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
         setSyncResult('השרת לא הגיב — נסה שוב בעוד דקה')
@@ -262,17 +282,17 @@ export default function UniversityConnectPage() {
   const loginStatus = (site: string) => status.login_status?.[site] || 'idle'
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto space-y-8 animate-fade-in">
+    <div className="cream-page moodle-v2 p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto space-y-8 animate-fade-in">
 
       {/* Header */}
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-glow-sm"
-             style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+             style={{ background: 'linear-gradient(135deg, #16a34a, #84cc16)', boxShadow: '0 6px 14px -4px rgba(22,163,74,.45)' }}>
           <GraduationCap size={24} className="text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-ink">חיבור Moodle</h1>
-          <p className="text-ink-muted text-sm">התחבר ל-Moodle של {universityName}</p>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--lp-ink, #2d1810)' }}>חיבור Moodle</h1>
+          <p className="text-sm" style={{ color: 'var(--lp-ink-soft, #5c3f2f)' }}>התחבר ל-Moodle של {universityName}</p>
         </div>
       </div>
 
