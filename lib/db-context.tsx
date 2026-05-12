@@ -19,7 +19,7 @@ import {
   saveDBDebounced, flushPendingSave, hasPendingSave, probeTokenScopes,
   StudentProfile, StudentCourse,
 } from './drive-db'
-import { ensureCourseFolders, pathForCourse } from './drive-folders'
+import { ensureCourseFolders, ensurePath, moveFolder, pathForCourse, sanitizeFolderName } from './drive-folders'
 import type {
   Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings,
 } from '@/types'
@@ -82,6 +82,14 @@ interface DBContextType {
   syncAllCourseFolders: (
     onProgress?: (done: number, total: number, title: string) => void,
   ) => Promise<{ created: number; skipped: number; failed: number }>
+  /** Set classification (year_of_study/semester) on a course and MOVE its
+   *  Drive folder to the new path (instead of creating a duplicate at the
+   *  new path while orphaning the old). If the course has no existing
+   *  folder, this falls back to a fresh provision. Marks classified_manually. */
+  reclassifyCourse: (
+    courseId: string,
+    patch: { semester?: Course['semester']; year_of_study?: Course['year_of_study']; academic_year?: string },
+  ) => Promise<void>
 }
 
 const DBContext = createContext<DBContextType | undefined>(undefined)
@@ -587,6 +595,67 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     return { created, skipped, failed }
   }, [handle, db.courses, withToken, mutate])
 
+  const reclassifyCourse = useCallback(async (
+    courseId: string,
+    patch: { semester?: Course['semester']; year_of_study?: Course['year_of_study']; academic_year?: string },
+  ) => {
+    if (!handle) throw new Error('מסד הנתונים טרם נטען.')
+    const existing = db.courses.find(c => c.id === courseId)
+    if (!existing) throw new Error('קורס לא נמצא.')
+
+    // Compose the updated course locally (don't rely on React state catch-up).
+    const next: Course = {
+      ...existing,
+      ...patch,
+      classified_manually: true,
+    }
+    const oldPath = pathForCourse(existing)
+    const newPath = pathForCourse(next)
+    const samePath = oldPath.join('/') === newPath.join('/')
+    const teepoFolderId = handle.folderId
+    const existingCourseFolderId = existing.drive_folder_ids?.course
+
+    // Path didn't change AND we already have folders — just persist the
+    // classification (no Drive work needed).
+    if (samePath && existingCourseFolderId) {
+      await mutate(d => ({
+        ...d,
+        courses: d.courses.map(c => (c.id === courseId ? next : c)),
+      }))
+      return
+    }
+
+    // No existing folder at all → fresh provision at the new path.
+    if (!existingCourseFolderId) {
+      await mutate(d => ({
+        ...d,
+        courses: d.courses.map(c => (c.id === courseId ? next : c)),
+      }))
+      // syncCourseFolders reads from db state, which we just updated.
+      await syncCourseFolders(courseId)
+      return
+    }
+
+    // Existing folder + path changed → MOVE it. This avoids the duplicate
+    // empty-folder problem we'd get from just calling ensureCourseFolders
+    // again at the new path.
+    const cache = new Map<string, string>()
+    const parentSegments = newPath.slice(0, -1) // all but the course title
+    const courseFolderName = newPath[newPath.length - 1] // sanitized title
+    const newParentId = await withToken(t => ensurePath(t, teepoFolderId, parentSegments, cache))
+    await withToken(t => moveFolder(t, existingCourseFolderId, newParentId, courseFolderName))
+
+    const newPathStr = newPath.join('/')
+    await mutate(d => ({
+      ...d,
+      courses: d.courses.map(c =>
+        c.id === courseId
+          ? { ...next, drive_folder_path: newPathStr }
+          : c,
+      ),
+    }))
+  }, [handle, db.courses, withToken, mutate, syncCourseFolders])
+
   const driveConnected = !!googleToken && ready && !error
   const driveMissing = !!user && !googleToken
 
@@ -599,7 +668,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createNote, updateNote, deleteNote,
     updateSettings, replaceCourses,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
-    syncCourseFolders, syncAllCourseFolders,
+    syncCourseFolders, syncAllCourseFolders, reclassifyCourse,
   }), [
     db, handle, ready, loading, error, driveConnected, driveMissing, reload,
     createCourse, updateCourse, deleteCourse,
@@ -609,7 +678,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createNote, updateNote, deleteNote,
     updateSettings, replaceCourses,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
-    syncCourseFolders, syncAllCourseFolders,
+    syncCourseFolders, syncAllCourseFolders, reclassifyCourse,
   ])
 
   return <DBContext.Provider value={value}>{children}</DBContext.Provider>

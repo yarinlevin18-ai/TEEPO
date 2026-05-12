@@ -115,6 +115,26 @@ async function ensureFolder(
   return id
 }
 
+/**
+ * Walk a path of folder names starting at `rootId`, creating segments along
+ * the way. Returns the ID of the last folder in the path. Unlike
+ * ensureCourseFolders, this does NOT also create the שיעורים/מטלות/סיכומים
+ * subfolders — it just makes the parent path exist. Used by reclassify so
+ * we can ensure the new parent before moving an existing course folder.
+ */
+export async function ensurePath(
+  token: string,
+  rootId: string,
+  segments: string[],
+  cache: Map<string, string> = new Map(),
+): Promise<string> {
+  let parent = rootId
+  for (const segment of segments) {
+    parent = await ensureFolder(token, segment, parent, cache)
+  }
+  return parent
+}
+
 /** Rename or move a folder. Used when a course is reclassified. */
 export async function moveFolder(
   token: string,
