@@ -512,26 +512,63 @@ export default function CoursesPage() {
         </div>
       )}
 
-      {courses.length === 0 ? (
-        <GlowCard className="text-center">
-        <div className="p-12">
-          <BookOpen size={32} className="text-white/10 mx-auto mb-4" />
-          <p className="text-ink-muted mb-2">עדיין לא הוספת קורסים</p>
-          <p className="text-ink-subtle text-sm mb-4">חבר את חשבון ה-Moodle שלך או הוסף קורס מ-Udemy/Coursera</p>
-          <div className="flex gap-3 justify-center">
-            <Link href="/moodle">
-              <button className="px-4 py-2 border border-white/10 rounded-xl text-sm text-ink-muted hover:text-ink hover:border-white/15 transition-colors">
-                חבר Moodle
-              </button>
+      {dbError ? (
+        <div className="courses-error-banner" role="alert">
+          <div className="courses-error-icon" aria-hidden>
+            <FolderTree size={28} />
+          </div>
+          <div className="courses-error-body">
+            <h2>החיבור ל-Google Drive נכשל</h2>
+            <p>{dbError}</p>
+            <small>
+              ייתכן ש-Drive API לא מופעל ב-Google Cloud Console שלך, או שהtoken פג.
+              כדאי לרענן את הדף — הdpProvider ינסה שוב אוטומטית.
+            </small>
+          </div>
+          <button
+            type="button"
+            className="courses-error-retry"
+            onClick={() => window.location.reload()}
+          >
+            <RefreshCw size={16} /> נסה שוב
+          </button>
+        </div>
+      ) : null}
+
+      {courses.length === 0 && !dbError ? (
+        <div className="courses-empty">
+          <div className="courses-empty-illo" aria-hidden>
+            <BookOpen size={56} strokeWidth={1.5} />
+          </div>
+          <h2>עוד לא הוספת קורסים</h2>
+          <p>
+            יש שלוש דרכים להתחיל. הכל יוצר את התיקיות ב-Drive שלך אוטומטית
+            כדי שהתוסף יוכל להעלות אליהן קבצים מ-Moodle.
+          </p>
+          <div className="courses-empty-options">
+            <Link href="/courses/extract" className="courses-empty-card primary">
+              <div className="ico-wrap" aria-hidden><Plus size={22} /></div>
+              <div>
+                <strong>הוסף קורס ידנית</strong>
+                <small>שם + סמסטר + שנה. שניות.</small>
+              </div>
             </Link>
-            <Link href="/courses/extract">
-              <button className="btn-gradient px-4 py-2 rounded-xl text-sm font-medium text-white">
-                הוסף קורס ידנית
-              </button>
+            <Link href="/moodle" className="courses-empty-card">
+              <div className="ico-wrap" aria-hidden><RefreshCw size={22} /></div>
+              <div>
+                <strong>חבר Moodle</strong>
+                <small>הכל מסתנכרן אוטומטית — קורסים, ציונים, מטלות.</small>
+              </div>
+            </Link>
+            <Link href="/setup" className="courses-empty-card">
+              <div className="ico-wrap" aria-hidden><Sparkles size={22} /></div>
+              <div>
+                <strong>מדריך התחלה</strong>
+                <small>הגדרה מלאה ב-3 צעדים.</small>
+              </div>
             </Link>
           </div>
         </div>
-        </GlowCard>
       ) : filteredCourses.length === 0 ? (
         <GlowCard className="text-center">
           <div className="p-12">
