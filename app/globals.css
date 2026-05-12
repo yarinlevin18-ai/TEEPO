@@ -4135,7 +4135,11 @@ html.light .badge-danger {
   width: 2px;
   background: var(--lp-accent);
   border-radius: 1px;
-  animation: lineInY .4s ease-out .7s both;
+  /* No fill-mode: keep this purely as a transient flourish. If the
+     animation fails to start (prefers-reduced-motion, hydration
+     glitch, etc.) the element stays visible at its default state
+     rather than disappearing at opacity 0. */
+  animation: lineInY .4s ease-out .7s;
 }
 .summaries-page .course-panel {
   background: var(--lp-bg-card);
@@ -4144,7 +4148,12 @@ html.light .badge-danger {
   padding: 28px 32px 32px;
   box-shadow: var(--lp-shadow);
   margin-bottom: 24px;
-  animation: fadeUp .55s ease .9s both;
+  /* Same precaution as .connector-line above. The previous `both`
+     fill-mode with a 0.9s delay kept the panel invisible whenever
+     the animation was suppressed — so users with reduced motion or
+     who hit a hydration race were staring at a blank page below the
+     tree. Drop the fill-mode so the panel is visible by default. */
+  animation: fadeUp .55s ease .9s;
 }
 .summaries-page .course-panel-head {
   display: flex;
