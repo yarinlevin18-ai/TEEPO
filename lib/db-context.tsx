@@ -227,10 +227,36 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
       started_at: input.started_at,
       completed_at: input.completed_at,
       created_at: new Date().toISOString(),
-    }
+      // Optional fields the form might pass through
+      ...(input.year_of_study  ? { year_of_study:  input.year_of_study  } : {}),
+      ...(input.semester       ? { semester:       input.semester       } : {}),
+      ...(input.academic_year  ? { academic_year:  input.academic_year  } : {}),
+    } as Course
     mutate(d => ({ ...d, courses: [course, ...d.courses] }))
+
+    // Fire-and-forget: provision the Drive folder hierarchy so the Chrome
+    // extension can upload to it without the user clicking "Sync Drive"
+    // manually. Errors are swallowed — the user can retry from /courses.
+    if (handle) {
+      const smartDeskId = handle.folderId
+      const path = pathForCourse(course).join('/')
+      withToken(t => ensureCourseFolders(t, smartDeskId, course))
+        .then(ids => {
+          mutate(d => ({
+            ...d,
+            courses: d.courses.map(c =>
+              c.id === course.id ? { ...c, drive_folder_ids: ids, drive_folder_path: path } : c,
+            ),
+          }))
+          console.info('[createCourse] folders ready:', course.title)
+        })
+        .catch(e => {
+          console.warn('[createCourse] folder provision failed for', course.title, e)
+        })
+    }
+
     return course
-  }, [mutate, user])
+  }, [mutate, user, handle, withToken])
 
   const updateCourse = useCallback(async (id: string, patch: Partial<Course>) => {
     mutate(d => ({

@@ -16,7 +16,7 @@
  * (lessons / summaries / files / notes per spec §3.3).
  */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Folder, BookOpen, FileText, StickyNote, Mic, GraduationCap, Brain, ChevronDown } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
@@ -66,7 +66,7 @@ const COURSE_PALETTE = [
 ]
 
 export default function SummariesPage() {
-  const { db } = useDB()
+  const { db, syncCourseFolders } = useDB() as any
   const universityName = useUniversityName()
 
   const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
@@ -77,6 +77,24 @@ export default function SummariesPage() {
   // If the active semester disappears (courses re-bucketed), fall back to first.
   const safeActive = buckets.find(b => b.key === activeSem) ?? buckets[0] ?? null
   const activeKey = safeActive?.key
+
+  // Auto-heal: any course in the visible semester that's missing its Drive
+  // folder ids gets one provision attempt on page load. Once per courseId
+  // per browser tab (the `provisionedRef` set prevents loops if the action
+  // fails — user can still retry manually from /courses).
+  const provisionedRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!safeActive || typeof syncCourseFolders !== 'function') return
+    for (const c of safeActive.courses) {
+      const hasIds = Boolean((c as any).drive_folder_ids?.course)
+      if (hasIds) continue
+      if (provisionedRef.current.has(c.id)) continue
+      provisionedRef.current.add(c.id)
+      syncCourseFolders(c.id).catch((e: unknown) => {
+        console.warn('[summaries] auto-provision failed for', c.title, e)
+      })
+    }
+  }, [safeActive, syncCourseFolders])
 
   return (
     <div className="cream-page summaries-page">
