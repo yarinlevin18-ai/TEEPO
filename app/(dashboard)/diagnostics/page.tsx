@@ -33,7 +33,8 @@ async function authHeaders(): Promise<Record<string, string>> {
 interface ScopeInfo {
   hasDriveFile?: boolean
   hasCalendar?: boolean
-  expiresIn?: number
+  /** number = seconds until expiry; null when tokeninfo doesn't include it. */
+  expiresIn?: number | null
   error?: string
 }
 
