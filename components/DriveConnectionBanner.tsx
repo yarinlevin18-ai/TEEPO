@@ -12,8 +12,9 @@
  */
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { AlertTriangle, RefreshCw, Loader2 } from 'lucide-react'
+import { AlertTriangle, RefreshCw, Loader2, Stethoscope } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
 
@@ -68,6 +69,13 @@ export default function DriveConnectionBanner() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <Link
+            href="/diagnostics"
+            className="p-2 rounded-lg bg-white/5 text-ink-muted hover:text-ink hover:bg-white/10 transition-all"
+            title="פרטי אבחון"
+          >
+            <Stethoscope size={14} />
+          </Link>
           {!driveMissing && (
             <button
               onClick={reload}
