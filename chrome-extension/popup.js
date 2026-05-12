@@ -281,7 +281,9 @@ document.addEventListener('click', async (e) => {
   }
 
   if (action === 'open-teepo') {
-    chrome.tabs.create({ url: 'http://localhost:3000/summaries' })
+    const { teepoBase } = await chrome.storage.local.get('teepoBase')
+    const base = teepoBase || 'http://localhost:3000'
+    chrome.tabs.create({ url: `${base}/summaries` })
     return
   }
 })

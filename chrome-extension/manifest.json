@@ -22,7 +22,9 @@
     "https://moodle.tau.ac.il/*",
     "https://www.googleapis.com/*",
     "https://oauth2.googleapis.com/*",
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "https://*.vercel.app/*",
+    "https://teepo.app/*"
   ],
 
   "optional_host_permissions": ["<all_urls>"],

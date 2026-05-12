@@ -79,16 +79,26 @@ with your real client ID.
 5. Go back to Google Cloud Console (step 1) and paste the Extension ID
    into the OAuth client's **Application ID** field. Save.
 
-### 4. Configure where the extension talks to TEEPO
+### 4. Point the extension at the right backend
 
-By default the extension hits `http://localhost:3000`. To point at a
-different backend (staging / prod), open the extension's
-service worker console (`chrome://extensions` → TEEPO → service worker →
-inspect) and run:
+By default the extension talks to `http://localhost:3000`. For any
+other URL — Vercel preview, staging, prod — set `teepoBase` in
+extension storage:
+
+1. Open `chrome://extensions`
+2. Find TEEPO → click the **service worker** "inspect" link
+3. In the console paste:
 
 ```js
+// Vercel preview (changes per PR):
+chrome.storage.local.set({ teepoBase: 'https://teepo-git-feature-drive-sync-yarinlevin18-6288s-projects.vercel.app' })
+
+// Or production once master is deployed:
 chrome.storage.local.set({ teepoBase: 'https://teepo.app' })
 ```
+
+The extension's `host_permissions` already covers `*.vercel.app/*` and
+`teepo.app/*` so no extra approval prompt is needed.
 
 ### 5. Make sure the web app provisioned your folders
 
