@@ -11,8 +11,9 @@
 <body>
   <header class="pop-head">
     <div class="pop-brand" aria-hidden>
-      <img src="icons/icon48.png" alt="" class="pop-icon" />
-      <span class="pop-word">teepo</span>
+      <!-- The 256px brand asset already contains the book + wordmark; rendering
+           a separate <span>teepo</span> next to it doubled the wordmark. -->
+      <img src="icons/icon48.png" alt="teepo" class="pop-brand-mark" />
     </div>
     <button class="pop-signout" data-action="signout" hidden>יציאה</button>
   </header>
@@ -37,6 +38,27 @@
     <h1>אין קבצים בדף הזה</h1>
     <p>פתחו דף קורס ב-Moodle או בפורטל ולחצו על הסמל שוב.</p>
     <button class="pop-scan" data-action="scan">סרוק שוב</button>
+
+    <div class="pop-discover-hint" data-bind="discover-hint" hidden>
+      <small>זה דף הקורסים שלך ב-Moodle. אפשר לייבא הכל בבת אחת:</small>
+      <button class="pop-primary" data-action="discover" style="margin-top:8px">
+        גלה את הקורסים שלי
+      </button>
+    </div>
+  </section>
+
+  <!-- Discovered courses preview before import -->
+  <section class="pop-state" data-state="discovered" hidden>
+    <h1>
+      <span data-bind="discover-count">0</span>
+      קורסים נמצאו
+    </h1>
+    <p class="pop-source" data-bind="discover-source">—</p>
+    <ul class="pop-file-list" data-bind="discover-list"></ul>
+    <div class="pop-actions">
+      <button class="pop-secondary" data-action="discover-cancel">ביטול</button>
+      <button class="pop-primary" data-action="discover-import">ייבא לTEEPO</button>
+    </div>
   </section>
 
   <!-- Authed + content script found files -->
