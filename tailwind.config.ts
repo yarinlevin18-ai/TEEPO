@@ -9,9 +9,18 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans:    ['Heebo', 'system-ui', 'sans-serif'],
+        /* v2 locked design typography — teepo-design/CLAUDE_CODE_HANDOFF.md.
+           sans    = body/UI (Assistant + Heebo fallback)
+           display = hero headlines (Heebo 800/900)
+           serif   = elegant accents (Frank Ruhl Libre italic — puzzle titles, eyebrows)
+           mono    = LCD clock + timers (VT323)
+           brand   = legacy wordmark (Fredoka) — kept for fallback only; the
+                     production wordmark is /brand/teepo-wordmark.svg. */
+        sans:    ['Assistant', 'Heebo', 'system-ui', 'sans-serif'],
+        display: ['Heebo', 'Assistant', 'system-ui', 'sans-serif'],
         serif:   ['"Frank Ruhl Libre"', 'Georgia', 'serif'],
-        script:  ['Caveat', 'cursive'],
+        mono:    ['VT323', '"Share Tech Mono"', 'monospace'],
+        brand:   ['Fredoka', 'Assistant', 'sans-serif'],
       },
       /* ── Typography Scale ──
          Modular scale (~1.25 ratio) optimized for Hebrew readability.
@@ -104,30 +113,40 @@ const config: Config = {
           500: '#3b82f6',
           600: '#2563eb',
         },
-        // Keep primary alias so any leftover classes don't break
+        /* Brand-aware palette — extra tokens used by the v2 mockups */
+        'brand-teal':    '#4a6b4f',
+        'book-spine':    '#7fb069',
+        'book-spine-soft': '#a3c98a',
+        'bookmark':      '#d97706',
+        'rose':          '#e11d48',
+        'amber':         '#d97706',
+        'indigo':        '#6366f1', /* still used in calendar pills */
+        /* primary alias = leaf green now (was indigo). Old classes won't break. */
         primary: {
-          50:  '#eef2ff',
-          100: '#e0e7ff',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          900: '#312e81',
+          50:  '#dcfce7',
+          100: '#bbf7d0',
+          500: '#16a34a',
+          600: '#15803d',
+          700: '#14532d',
+          900: '#052e16',
         },
       },
       backgroundImage: {
         'gradient-accent':   'linear-gradient(135deg, #16a34a 0%, #84cc16 100%)',
         'gradient-warm':     'linear-gradient(135deg, #16a34a 0%, #84cc16 100%)',
-        'gradient-mesh':     'radial-gradient(ellipse at 20% 50%, rgba(99,102,241,0.18) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(139,92,246,0.14) 0%, transparent 60%), radial-gradient(ellipse at 50% 80%, rgba(56,189,248,0.08) 0%, transparent 60%)',
-        'shimmer':           'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%)',
+        'gradient-page':     'linear-gradient(180deg, #fffaf0 0%, #f5e9c8 100%)',
+        'shimmer':           'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.45) 50%, transparent 100%)',
       },
       boxShadow: {
-        'glow':       '0 0 24px rgba(99,102,241,0.35)',
-        'glow-sm':    '0 0 12px rgba(99,102,241,0.25)',
-        'glow-lg':    '0 0 48px rgba(99,102,241,0.45)',
-        'card':       '0 4px 24px rgba(0,0,0,0.35)',
-        'card-hover': '0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(99,102,241,0.08)',
-        'dropdown':   '0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)',
-        'modal':      '0 24px 80px rgba(0,0,0,0.6), 0 0 60px rgba(99,102,241,0.1)',
+        /* v2 shadows — warm brown drop, no indigo glow */
+        'sm-warm':    '0 2px 6px rgba(120,70,30,0.08), 0 1px 2px rgba(120,70,30,0.05)',
+        'card':       '0 8px 20px -4px rgba(120,70,30,0.14), 0 3px 8px rgba(120,70,30,0.08)',
+        'card-hover': '0 24px 50px -10px rgba(120,70,30,0.22), 0 8px 20px rgba(120,70,30,0.1)',
+        'glow':       '0 0 24px rgba(22,163,74,0.35)',
+        'glow-sm':    '0 0 12px rgba(22,163,74,0.25)',
+        'glow-lg':    '0 0 48px rgba(22,163,74,0.45)',
+        'dropdown':   '0 12px 40px rgba(120,70,30,0.18), 0 0 0 1px rgba(120,70,30,0.05)',
+        'modal':      '0 24px 80px rgba(120,70,30,0.22), 0 0 60px rgba(22,163,74,0.1)',
         'success':    '0 0 16px rgba(16,185,129,0.3)',
         'warning':    '0 0 16px rgba(245,158,11,0.3)',
         'danger':     '0 0 16px rgba(239,68,68,0.3)',

@@ -1,21 +1,87 @@
 {
   "manifest_version": 3,
-  "name": "TEEPO",
-  "version": "1.1",
-  "description": "TEEPO — מסנכרן את חשבון ה-Moodle של האוניברסיטה עם מערכת הלימודים",
-  "permissions": ["cookies", "tabs", "storage", "scripting", "activeTab"],
-  "host_permissions": [
-    "<all_urls>"
+  "name": "TEEPO — Drive Sync",
+  "version": "2.0.0",
+  "description": "מסנכרן קבצים מ-Moodle ומהפורטל ישירות ל-Google Drive שלך, מסודר לפי הקורסים שלך ב-TEEPO.",
+
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab",
+    "downloads",
+    "identity"
   ],
+
+  "optional_permissions": ["cookies"],
+
+  "host_permissions": [
+    "https://*.bgu.ac.il/*",
+    "https://*.tau.ac.il/*",
+    "https://moodle.bgu.ac.il/*",
+    "https://moodle.tau.ac.il/*",
+    "https://www.googleapis.com/*",
+    "https://oauth2.googleapis.com/*",
+    "http://localhost:3000/*",
+    "https://*.vercel.app/*",
+    "https://teepo.app/*"
+  ],
+
+  "optional_host_permissions": ["<all_urls>"],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
   "action": {
     "default_popup": "popup.html",
+    "default_title": "TEEPO — Drive Sync",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },
-  "background": {
-    "service_worker": "background.js"
-  }
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://moodle.bgu.ac.il/*",
+        "https://moodle.tau.ac.il/*"
+      ],
+      "js": ["content/moodle.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.bgu.ac.il/*",
+        "https://portal.bgu.ac.il/*",
+        "https://www.tau.ac.il/*"
+      ],
+      "js": ["content/portal.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "oauth2": {
+    "client_id": "157877045941-lnm2cna90npvefkmcmem9up5ml516d8d.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/drive.file",
+      "openid",
+      "email"
+    ]
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html", "icons/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
