@@ -239,9 +239,24 @@ async function boot() {
   const scan = await scanPage()
   if (scan.files.length === 0) {
     showState('idle')
+    // If the active tab is a Moodle "my courses" homepage, surface the
+    // "Discover my courses" CTA on top of the idle state so the user
+    // doesn't have to know about it from a menu somewhere.
+    void maybeOfferDiscovery()
     return
   }
   renderReady(scan)
+}
+
+/** Show the "discover my courses" CTA inside the idle state if the active
+ *  tab looks like a Moodle homepage (`/my`, `/dashboard`, root domain). */
+async function maybeOfferDiscovery() {
+  const tab = await activeTab()
+  const url = tab?.url || ''
+  const isMoodleHome = /moodle\.(bgu|tau)\.ac\.il\/(moodle\/?(my|\?)?|\?|my|dashboard|$)/i.test(url)
+                    || /moodle\.bgu\.ac\.il\/moodle\/(\?|my|dashboard|index\.php)/i.test(url)
+  const hint = $('[data-bind="discover-hint"]')
+  if (hint) hint.hidden = !isMoodleHome
 }
 
 // ── Actions ─────────────────────────────────────────────────────────────
@@ -286,7 +301,103 @@ document.addEventListener('click', async (e) => {
     chrome.tabs.create({ url: `${base}/summaries` })
     return
   }
+
+  if (action === 'discover') {
+    await doDiscover()
+    return
+  }
+  if (action === 'discover-cancel') {
+    discovered = null
+    await boot()
+    return
+  }
+  if (action === 'discover-import') {
+    await doImportDiscovered()
+    return
+  }
 })
+
+// ── Discover-my-courses flow ────────────────────────────────────────────
+
+/** Result of the last successful scan, kept here so the import handler
+ *  can find it without re-running the content script. */
+let discovered = null
+
+async function doDiscover() {
+  const tab = await activeTab()
+  if (!tab?.id) return
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content/discover-courses.js'],
+    })
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => window.__teepoCourses || null,
+    })
+    if (!result || !Array.isArray(result.courses) || result.courses.length === 0) {
+      showError('לא נמצאו קורסים בדף הזה. ודא שאתה ב-Moodle בעמוד "הקורסים שלי".')
+      return
+    }
+    discovered = result
+    renderDiscovered(result)
+  } catch (e) {
+    console.warn('[popup] discover failed', e)
+    showError('סריקת הקורסים נכשלה: ' + ((e && e.message) || e))
+  }
+}
+
+function renderDiscovered(result) {
+  setText('discover-count', result.courses.length)
+  setText('discover-source', result.source || '—')
+  const list = $('[data-bind="discover-list"]')
+  list.innerHTML = ''
+  for (const c of result.courses) {
+    const li = document.createElement('li')
+    li.innerHTML = `
+      <span class="pop-fname">${escapeHtml(c.title)}</span>
+      <span class="pop-fkind">${escapeHtml(c.shortname || c.moodle_id || '')}</span>
+    `
+    list.appendChild(li)
+  }
+  showState('discovered')
+}
+
+async function doImportDiscovered() {
+  if (!discovered?.courses?.length) return
+  showState('uploading')
+  setProgress(0, discovered.courses.length)
+
+  const token = await getDriveToken()
+  if (!token) {
+    showError('לא ניתן לקבל Drive token. צא והתחבר מחדש.')
+    return
+  }
+  const { teepoBase } = await chrome.storage.local.get('teepoBase')
+  const base = teepoBase || 'http://localhost:3000'
+
+  try {
+    const res = await fetch(`${base}/api/courses/import`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ courses: discovered.courses }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`)
+
+    setProgress(discovered.courses.length, discovered.courses.length)
+    setText('done-text',
+      `${data.added ?? 0} נוספו · ${data.updated ?? 0} עודכנו · סה"כ ${data.total ?? discovered.courses.length}`,
+    )
+    showState('done')
+  } catch (e) {
+    console.warn('[popup] import failed', e)
+    showError('ייבוא נכשל: ' + ((e && e.message) || e))
+  }
+}
 
 function showError(message) {
   setText('err', message)
