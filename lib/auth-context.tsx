@@ -214,39 +214,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      if (session?.provider_token) {
-        // We have a token — but it could be freshly-minted (just signed in) or
-        // stale (returning user, Supabase still holds the old one). Ask Google
-        // for the real remaining lifetime instead of guessing 3600s.
-        const realExpiry = await fetchGoogleTokenInfo(session.provider_token)
-        if (realExpiry === null) {
-          // Token is already dead (or tokeninfo unreachable). Persist anyway so
-          // callers have something to try, but mark as nearly-expired so the
-          // proactive refresh timer fires immediately.
-          persistGoogleToken(session.provider_token, session.provider_refresh_token ?? null, 60)
-          // Kick off an immediate refresh so the next API call has a real token.
-          await refreshGoogleToken()
-        } else {
-          persistGoogleToken(session.provider_token, session.provider_refresh_token ?? null, realExpiry)
-        }
-      } else if (session) {
-        // Returning user — see if stored token is still fresh, else refresh.
-        const stored = loadStoredGoogleToken()
-        const expiry = readExpiry()
-        const nearlyExpired = !expiry || Date.now() > expiry - REFRESH_MARGIN_MS
-        if (!stored || nearlyExpired) {
-          await refreshGoogleToken()
-        }
-      }
-
-      scheduleRefresh()
+    // Hard floor — if the initial-session flow doesn't flip `loading` to
+    // false within this window, force it. Without this, any unhandled
+    // rejection or hanging fetch inside the chain below leaves every
+    // dashboard route stuck on a spinner forever. The dashboard layout
+    // will then redirect to /auth as usual when user is null.
+    const loadingFloor = setTimeout(() => {
+      console.warn('[auth] initial session resolution timed out after 12s — forcing loading=false')
       setLoading(false)
-    })
+    }, 12_000)
+
+    // Get initial session
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        setSession(session)
+        setUser(session?.user ?? null)
+
+        if (session?.provider_token) {
+          // We have a token — but it could be freshly-minted (just signed in) or
+          // stale (returning user, Supabase still holds the old one). Ask Google
+          // for the real remaining lifetime instead of guessing 3600s.
+          const realExpiry = await fetchGoogleTokenInfo(session.provider_token)
+          if (realExpiry === null) {
+            // Token is already dead (or tokeninfo unreachable). Persist anyway so
+            // callers have something to try, but mark as nearly-expired so the
+            // proactive refresh timer fires immediately.
+            persistGoogleToken(session.provider_token, session.provider_refresh_token ?? null, 60)
+            // Kick off an immediate refresh so the next API call has a real token.
+            await refreshGoogleToken()
+          } else {
+            persistGoogleToken(session.provider_token, session.provider_refresh_token ?? null, realExpiry)
+          }
+        } else if (session) {
+          // Returning user — see if stored token is still fresh, else refresh.
+          const stored = loadStoredGoogleToken()
+          const expiry = readExpiry()
+          const nearlyExpired = !expiry || Date.now() > expiry - REFRESH_MARGIN_MS
+          if (!stored || nearlyExpired) {
+            await refreshGoogleToken()
+          }
+        }
+
+        scheduleRefresh()
+      })
+      .catch((e) => {
+        console.error('[auth] initial session resolution failed:', e)
+      })
+      .finally(() => {
+        clearTimeout(loadingFloor)
+        setLoading(false)
+      })
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -254,20 +271,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session)
         setUser(session?.user ?? null)
 
-        if (session?.provider_token) {
-          // Fresh OAuth redirects generally hand us a 3600s-old token, but
-          // TOKEN_REFRESHED events can fire with a provider_token that's already
-          // mid-life or stale. Always verify with Google.
-          const realExpiry = await fetchGoogleTokenInfo(session.provider_token)
-          persistGoogleToken(
-            session.provider_token,
-            session.provider_refresh_token ?? null,
-            realExpiry ?? 300
-          )
-          scheduleRefresh()
+        try {
+          if (session?.provider_token) {
+            // Fresh OAuth redirects generally hand us a 3600s-old token, but
+            // TOKEN_REFRESHED events can fire with a provider_token that's already
+            // mid-life or stale. Always verify with Google.
+            const realExpiry = await fetchGoogleTokenInfo(session.provider_token)
+            persistGoogleToken(
+              session.provider_token,
+              session.provider_refresh_token ?? null,
+              realExpiry ?? 300
+            )
+            scheduleRefresh()
+          }
+        } catch (e) {
+          console.error('[auth] onAuthStateChange handler failed:', e)
+        } finally {
+          // Guarantee loading flips false — same hard guarantee as the initial
+          // session resolution above.
+          setLoading(false)
         }
-
-        setLoading(false)
       }
     )
 
