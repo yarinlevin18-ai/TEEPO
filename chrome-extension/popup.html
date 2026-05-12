@@ -54,10 +54,22 @@
       קורסים נמצאו
     </h1>
     <p class="pop-source" data-bind="discover-source">—</p>
-    <ul class="pop-file-list" data-bind="discover-list"></ul>
+    <p class="pop-hint">סמן רק את אלו שאתה לומד בפועל. הסר את הסימון מקורסים שכרגע לא רלוונטיים.</p>
+    <div class="pop-bulk">
+      <button class="pop-link" data-action="discover-select-all">בחר הכל</button>
+      <span class="pop-link-sep">·</span>
+      <button class="pop-link" data-action="discover-select-none">נקה הכל</button>
+      <span class="pop-bulk-spacer"></span>
+      <span class="pop-selected-count">
+        נבחרו <strong data-bind="discover-selected">0</strong>
+      </span>
+    </div>
+    <ul class="pop-file-list pop-checkable-list" data-bind="discover-list"></ul>
     <div class="pop-actions">
       <button class="pop-secondary" data-action="discover-cancel">ביטול</button>
-      <button class="pop-primary" data-action="discover-import">ייבא לTEEPO</button>
+      <button class="pop-primary" data-action="discover-import" data-bind="discover-import-btn">
+        ייבא <span data-bind="discover-import-count"></span>
+      </button>
     </div>
   </section>
 

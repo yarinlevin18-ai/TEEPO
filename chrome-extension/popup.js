@@ -311,6 +311,16 @@ document.addEventListener('click', async (e) => {
     await boot()
     return
   }
+  if (action === 'discover-select-all') {
+    $$('.pop-checkable-list input[type="checkbox"]').forEach((cb) => { cb.checked = true })
+    updateDiscoverSelectionCount()
+    return
+  }
+  if (action === 'discover-select-none') {
+    $$('.pop-checkable-list input[type="checkbox"]').forEach((cb) => { cb.checked = false })
+    updateDiscoverSelectionCount()
+    return
+  }
   if (action === 'discover-import') {
     await doImportDiscovered()
     return
@@ -352,21 +362,53 @@ function renderDiscovered(result) {
   setText('discover-source', result.source || '—')
   const list = $('[data-bind="discover-list"]')
   list.innerHTML = ''
-  for (const c of result.courses) {
+  result.courses.forEach((c, i) => {
     const li = document.createElement('li')
     li.innerHTML = `
+      <input type="checkbox" data-i="${i}" checked />
       <span class="pop-fname">${escapeHtml(c.title)}</span>
       <span class="pop-fkind">${escapeHtml(c.shortname || c.moodle_id || '')}</span>
     `
     list.appendChild(li)
-  }
+  })
+  updateDiscoverSelectionCount()
   showState('discovered')
 }
 
+/** Recount checked rows + update the "import N" button label + selected pill. */
+function updateDiscoverSelectionCount() {
+  const checked = $$('.pop-checkable-list input[type="checkbox"]:checked').length
+  setText('discover-selected', checked)
+  const countEl = $('[data-bind="discover-import-count"]')
+  if (countEl) countEl.textContent = checked > 0 ? `(${checked})` : ''
+  const btn = $('[data-bind="discover-import-btn"]')
+  if (btn) btn.disabled = checked === 0
+}
+
+/** Re-listen on every render — the checkboxes are recreated, so a single
+ *  document-level listener avoids leaks. Bound once below in module init. */
+function onDiscoverCheckboxChange(e) {
+  const target = e.target
+  if (target?.matches?.('.pop-checkable-list input[type="checkbox"]')) {
+    updateDiscoverSelectionCount()
+  }
+}
+document.addEventListener('change', onDiscoverCheckboxChange)
+
 async function doImportDiscovered() {
   if (!discovered?.courses?.length) return
+
+  // Filter to the user's selection — only checked rows get sent.
+  const checkboxes = $$('.pop-checkable-list input[type="checkbox"]')
+  const selected = checkboxes
+    .map((cb) => ({ keep: cb.checked, i: Number(cb.dataset.i) }))
+    .filter((x) => x.keep)
+    .map((x) => discovered.courses[x.i])
+    .filter(Boolean)
+  if (selected.length === 0) return
+
   showState('uploading')
-  setProgress(0, discovered.courses.length)
+  setProgress(0, selected.length)
 
   const token = await getDriveToken()
   if (!token) {
@@ -383,14 +425,14 @@ async function doImportDiscovered() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ courses: discovered.courses }),
+      body: JSON.stringify({ courses: selected }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`)
 
-    setProgress(discovered.courses.length, discovered.courses.length)
+    setProgress(selected.length, selected.length)
     setText('done-text',
-      `${data.added ?? 0} נוספו · ${data.updated ?? 0} עודכנו · סה"כ ${data.total ?? discovered.courses.length}`,
+      `${data.added ?? 0} נוספו · ${data.updated ?? 0} עודכנו · סה"כ ${data.total ?? selected.length}`,
     )
     showState('done')
   } catch (e) {
