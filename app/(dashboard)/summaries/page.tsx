@@ -1,36 +1,47 @@
 'use client'
 
 /**
- * /summaries (המוח) — degree tree → semester → courses → folder shortcuts.
+ * /summaries (המוח) — Drive folder explorer.
  *
- * Source: teepo-design/mockup_summaries.html.
+ * The tree mirrors the user's TEEPO/ hierarchy in their Drive and grows
+ * down as the user drills in:
  *
- * Simplified vs mockup: the mockup renders two parallel degrees (BGU תואר
- * ראשון + מ"א). Most TEEPO users carry one active degree at a time, so we
- * render a single-degree tree and let the second column appear only when
- * we discover courses tagged for a separate degree (future work).
+ *   TEEPO ─┐
+ *          └─ <University> ─┐
+ *                            └─ Semester chips ─┐ (one selected)
+ *                                                └─ Course chips ─┐ (one selected)
+ *                                                                  └─ Folder chips (lessons/assignments/notes)
  *
- * Path: root "TEEPO" node → degree node → semester chips → course panel.
- * Selecting a semester reveals its courses below; each course card has
- * folder shortcuts into the user's Drive hierarchy
- * (lessons / summaries / files / notes per spec §3.3).
+ * The panel below the tree shows the contents of the deepest selection:
+ *   - At semester level   → list of course tiles in that semester
+ *   - At course level     → 3 folder-overview tiles with live file counts
+ *   - At folder level     → the real Drive file list with upload + delete
+ *
+ * State invariant: selecting a level resets all deeper selections so the
+ * tree never shows a node that lost its parent.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Folder, BookOpen, FileText, StickyNote, Mic, GraduationCap, Brain, ChevronDown } from 'lucide-react'
+import {
+  Folder, BookOpen, FileText, StickyNote, Mic,
+  GraduationCap, Brain, ChevronLeft, Home,
+} from 'lucide-react'
 import { useDB } from '@/lib/db-context'
 import { useUniversityName } from '@/lib/use-university'
-import CourseDrivePanel from '@/components/summaries/CourseDrivePanel'
+import { FolderSection } from '@/components/summaries/CourseDrivePanel'
+import { useDriveFiles } from '@/lib/use-drive-files'
 import type { Course } from '@/types'
 
 interface SemesterBucket {
-  key: string                 // e.g. "2025-A"
-  label: string               // e.g. "שנה א' · סמסטר א'"
+  key: string
+  label: string
   year: number
   semester: 'A' | 'B' | 'C'
   courses: Course[]
 }
+
+type FolderKind = 'lessons' | 'assignments' | 'notes'
 
 /** Group the user's courses into semester buckets, sorted chronologically. */
 function bucketize(courses: Course[]): SemesterBucket[] {
@@ -51,10 +62,16 @@ function bucketize(courses: Course[]): SemesterBucket[] {
     map.get(key)!.courses.push(c)
   }
   return Array.from(map.values()).sort((a, b) => {
-    if (a.year !== b.year) return b.year - a.year     // newest year first
-    return a.semester.localeCompare(b.semester)         // A → B → C inside a year
+    if (a.year !== b.year) return b.year - a.year
+    return a.semester.localeCompare(b.semester)
   })
 }
+
+const FOLDER_DEFS: Array<{ kind: FolderKind; label: string; hint: string; Icon: any }> = [
+  { kind: 'lessons',     label: 'שיעורים',  hint: 'הרצאות, תרגולים, מצגות',        Icon: Mic },
+  { kind: 'assignments', label: 'מטלות',    hint: 'תרגילים, פרויקטים, בחנים',      Icon: Folder },
+  { kind: 'notes',       label: 'סיכומים', hint: 'הסיכומים האישיים שלך',           Icon: StickyNote },
+]
 
 const COURSE_PALETTE = [
   { color: '#8b5cf6', soft: '#ede9fe' },
@@ -71,21 +88,48 @@ export default function SummariesPage() {
 
   const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
   const buckets = useMemo(() => bucketize(courses), [courses])
-  const [activeSem, setActiveSem] = useState<string | null>(buckets[0]?.key ?? null)
-  const [expandedCourse, setExpandedCourse] = useState<string | null>(null)
 
-  // If the active semester disappears (courses re-bucketed), fall back to first.
-  const safeActive = buckets.find(b => b.key === activeSem) ?? buckets[0] ?? null
-  const activeKey = safeActive?.key
+  const [activeSem, setActiveSem] = useState<string | null>(null)
+  const [activeCourseId, setActiveCourseId] = useState<string | null>(null)
+  const [activeFolderKind, setActiveFolderKind] = useState<FolderKind | null>(null)
 
-  // Auto-heal: any course in the visible semester that's missing its Drive
-  // folder ids gets one provision attempt on page load. Once per courseId
-  // per browser tab (the `provisionedRef` set prevents loops if the action
-  // fails — user can still retry manually from /courses).
+  // First load: snap to the first bucket if the user hasn't picked yet.
+  useEffect(() => {
+    if (!activeSem && buckets.length > 0) {
+      setActiveSem(buckets[0].key)
+    }
+  }, [buckets, activeSem])
+
+  const activeBucket = useMemo(
+    () => buckets.find((b) => b.key === activeSem) ?? null,
+    [buckets, activeSem],
+  )
+  const activeCourse = useMemo(
+    () => activeBucket?.courses.find((c) => c.id === activeCourseId) ?? null,
+    [activeBucket, activeCourseId],
+  )
+
+  // Selection handlers reset deeper levels so we never show an orphan node.
+  const pickSem = useCallback((key: string) => {
+    setActiveSem(key)
+    setActiveCourseId(null)
+    setActiveFolderKind(null)
+  }, [])
+  const pickCourse = useCallback((id: string) => {
+    setActiveCourseId((prev) => (prev === id ? null : id))
+    setActiveFolderKind(null)
+  }, [])
+  const pickFolder = useCallback((kind: FolderKind) => {
+    setActiveFolderKind((prev) => (prev === kind ? null : kind))
+  }, [])
+
+  // Auto-heal: missing drive_folder_ids on the visible courses get one
+  // provision attempt per courseId per tab. Same logic as before — moved
+  // up here so we can still hit it after the structural rewrite.
   const provisionedRef = useRef<Set<string>>(new Set())
   useEffect(() => {
-    if (!safeActive || typeof syncCourseFolders !== 'function') return
-    for (const c of safeActive.courses) {
+    if (!activeBucket || typeof syncCourseFolders !== 'function') return
+    for (const c of activeBucket.courses) {
       const hasIds = Boolean((c as any).drive_folder_ids?.course)
       if (hasIds) continue
       if (provisionedRef.current.has(c.id)) continue
@@ -94,7 +138,7 @@ export default function SummariesPage() {
         console.warn('[summaries] auto-provision failed for', c.title, e)
       })
     }
-  }, [safeActive, syncCourseFolders])
+  }, [activeBucket, syncCourseFolders])
 
   return (
     <div className="cream-page summaries-page">
@@ -106,22 +150,25 @@ export default function SummariesPage() {
             הסיכומים <span className="accent">שלי</span>.
           </h1>
           <p className="sum-sub">
-            כל החומר מסודר לפי תואר, סמסטר וקורס — נשמר ב-Google Drive האישי שלך.
+            תצוגת ה-Drive האישי שלך. בחר סמסטר → קורס → תיקייה כדי לראות את הקבצים.
           </p>
         </header>
 
-        {/* ===== Tree ===== */}
+        {/* ===== Tree — TEEPO → degree → semester → course → folder ===== */}
         <div className="tree-wrap">
-          {/* Root node — TEEPO. */}
           <div className="tree-root">
-            <div className="node root">
-              <Folder className="folder-ico" />
+            <button
+              type="button"
+              className="node root"
+              onClick={() => { setActiveSem(buckets[0]?.key ?? null); setActiveCourseId(null); setActiveFolderKind(null) }}
+              title="חזור לתצוגת כל הסמסטרים"
+            >
+              <Home className="folder-ico" />
               <span className="name">TEEPO</span>
               <span className="count">{courses.length}</span>
-            </div>
+            </button>
           </div>
 
-          {/* Single degree column (multi-degree expansion is future work). */}
           <div className="degree-header">
             <div className="degree-to-sems" />
             <div className="node degree">
@@ -133,12 +180,12 @@ export default function SummariesPage() {
 
           {buckets.length > 0 && (
             <div className="sem-grid">
-              {buckets.map(b => (
-                <div className={`sem-chip-wrap ${b.key === activeKey ? 'active' : ''}`} key={b.key}>
+              {buckets.map((b) => (
+                <div className={`sem-chip-wrap ${b.key === activeSem ? 'active' : ''}`} key={b.key}>
                   <button
                     type="button"
-                    className={`node sem ${b.key === activeKey ? 'active' : ''}`}
-                    onClick={() => setActiveSem(b.key)}
+                    className={`node sem ${b.key === activeSem ? 'active' : ''}`}
+                    onClick={() => pickSem(b.key)}
                   >
                     <Folder className="folder-ico" />
                     <span className="name">{b.label}</span>
@@ -148,97 +195,232 @@ export default function SummariesPage() {
               ))}
             </div>
           )}
+
+          {/* Course row — appears only when a semester is selected */}
+          {activeBucket && activeBucket.courses.length > 0 && (
+            <>
+              <div className="tree-divider-line" aria-hidden />
+              <div className="course-row">
+                {activeBucket.courses.map((c, i) => {
+                  const palette = COURSE_PALETTE[i % COURSE_PALETTE.length]
+                  const isActive = c.id === activeCourseId
+                  return (
+                    <button
+                      type="button"
+                      key={c.id}
+                      className={`node course ${isActive ? 'active' : ''}`}
+                      onClick={() => pickCourse(c.id)}
+                      style={{ ['--course-color' as any]: palette.color, ['--course-soft' as any]: palette.soft }}
+                    >
+                      <BookOpen className="folder-ico" />
+                      <span className="name">{c.title}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Folder row — appears only when a course is selected */}
+          {activeCourse && (
+            <>
+              <div className="tree-divider-line" aria-hidden />
+              <div className="folder-row-tree">
+                {FOLDER_DEFS.map(({ kind, label, Icon }) => {
+                  const isActive = activeFolderKind === kind
+                  return (
+                    <button
+                      type="button"
+                      key={kind}
+                      className={`node folder ${isActive ? 'active' : ''}`}
+                      onClick={() => pickFolder(kind)}
+                    >
+                      <Icon className="folder-ico" />
+                      <span className="name">{label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
 
-        {/* ===== Course panel for the active semester ===== */}
-        {safeActive && (
-          <>
-            <div className="connector-line" />
-            <section className="course-panel">
-              <div className="course-panel-head">
-                <div className="course-panel-icon"><Brain /></div>
-                <div className="meta">
-                  <div className="crumb">{universityName || 'התואר שלי'} · {safeActive.label}</div>
-                  <h2>הקורסים של הסמסטר</h2>
-                </div>
-                <span className="count-pill">{safeActive.courses.length} קורסים</span>
-              </div>
-
-              {safeActive.courses.length === 0 ? (
-                <div className="empty-state">
-                  <Folder />
-                  <h3>אין עוד קורסים בסמסטר הזה</h3>
-                  <p>חברו את ה-Moodle או הוסיפו קורס ידנית כדי שהמוח שלכם יתמלא.</p>
-                </div>
-              ) : (
-                <div className="course-grid">
-                  {safeActive.courses.map((c, i) => {
-                    const palette = COURSE_PALETTE[i % COURSE_PALETTE.length]
-                    const expanded = expandedCourse === c.id
-                    const folderIds = (c as any).drive_folder_ids ?? null
-                    return (
-                      <div
-                        key={c.id}
-                        className={`course-card ${expanded ? 'expanded' : ''}`}
-                        style={{ ['--course-color' as any]: palette.color, ['--course-soft' as any]: palette.soft }}
-                      >
-                        <button
-                          type="button"
-                          className="course-card-trigger"
-                          onClick={() => setExpandedCourse(expanded ? null : c.id)}
-                          aria-expanded={expanded}
-                          aria-controls={`course-panel-${c.id}`}
-                        >
-                          <div className="top">
-                            <div className="ico-wrap"><BookOpen /></div>
-                            <div>
-                              <h3>{c.title}</h3>
-                              <small>{(c as any).shortname ?? (c as any).code ?? ''}</small>
-                            </div>
-                            <ChevronDown
-                              className="course-card-chevron"
-                              size={18}
-                              style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}
-                            />
-                          </div>
-                          <div className="folders">
-                            <span className="folder-row">
-                              <Mic />
-                              <span className="label">שיעורים</span>
-                            </span>
-                            <span className="folder-row">
-                              <Folder />
-                              <span className="label">מטלות</span>
-                            </span>
-                            <span className="folder-row">
-                              <StickyNote />
-                              <span className="label">סיכומים</span>
-                            </span>
-                            <Link
-                              href={`/courses/${c.id}`}
-                              className="folder-row link"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <FileText />
-                              <span className="label">פתח קורס →</span>
-                            </Link>
-                          </div>
-                        </button>
-                        {expanded && (
-                          <div id={`course-panel-${c.id}`} className="course-card-panel">
-                            <CourseDrivePanel folderIds={folderIds} />
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </section>
-          </>
+        {/* ===== Below-tree panel: contents of the deepest selection ===== */}
+        {activeCourse && activeFolderKind ? (
+          <FolderContentsPanel
+            course={activeCourse}
+            kind={activeFolderKind}
+            onBack={() => setActiveFolderKind(null)}
+          />
+        ) : activeCourse ? (
+          <CourseFolderOverviewPanel
+            course={activeCourse}
+            onPickFolder={pickFolder}
+            onBack={() => setActiveCourseId(null)}
+          />
+        ) : activeBucket ? (
+          <SemesterCoursesPanel
+            bucket={activeBucket}
+            onPickCourse={pickCourse}
+          />
+        ) : (
+          <div className="sum-empty">
+            <Folder />
+            <h3>בחר סמסטר כדי להתחיל</h3>
+          </div>
         )}
 
       </main>
     </div>
+  )
+}
+
+// ── Below-tree panels ──────────────────────────────────────────────────
+
+function SemesterCoursesPanel({
+  bucket,
+  onPickCourse,
+}: {
+  bucket: SemesterBucket
+  onPickCourse: (id: string) => void
+}) {
+  if (bucket.courses.length === 0) {
+    return (
+      <section className="course-panel">
+        <div className="course-panel-head">
+          <div className="course-panel-icon"><Brain /></div>
+          <div className="meta">
+            <div className="crumb">{bucket.label}</div>
+            <h2>אין עוד קורסים בסמסטר הזה</h2>
+          </div>
+        </div>
+        <div className="empty-state">
+          <Folder />
+          <p>חברו את ה-Moodle או הוסיפו קורס ידנית כדי שהמוח שלכם יתמלא.</p>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section className="course-panel">
+      <div className="course-panel-head">
+        <div className="course-panel-icon"><Brain /></div>
+        <div className="meta">
+          <div className="crumb">{bucket.label}</div>
+          <h2>הקורסים של הסמסטר</h2>
+        </div>
+        <span className="count-pill">{bucket.courses.length} קורסים</span>
+      </div>
+      <div className="course-grid">
+        {bucket.courses.map((c, i) => {
+          const palette = COURSE_PALETTE[i % COURSE_PALETTE.length]
+          return (
+            <button
+              type="button"
+              key={c.id}
+              className="course-card"
+              onClick={() => onPickCourse(c.id)}
+              style={{ ['--course-color' as any]: palette.color, ['--course-soft' as any]: palette.soft }}
+            >
+              <div className="top">
+                <div className="ico-wrap"><BookOpen /></div>
+                <div>
+                  <h3>{c.title}</h3>
+                  <small>{(c as any).shortname ?? ''}</small>
+                </div>
+              </div>
+              <div className="folder-shortcut-row">
+                <span>פתח →</span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function CourseFolderOverviewPanel({
+  course,
+  onPickFolder,
+  onBack,
+}: {
+  course: Course
+  onPickFolder: (k: FolderKind) => void
+  onBack: () => void
+}) {
+  const folderIds = (course as any).drive_folder_ids ?? null
+  return (
+    <section className="course-panel">
+      <div className="course-panel-head">
+        <button type="button" className="back-pill" onClick={onBack} aria-label="חזרה לסמסטר">
+          <ChevronLeft size={16} />
+        </button>
+        <div className="course-panel-icon"><BookOpen /></div>
+        <div className="meta">
+          <div className="crumb">{course.title}</div>
+          <h2>תיקיות הקורס</h2>
+        </div>
+        <Link href={`/courses/${course.id}`} className="count-pill" style={{ textDecoration: 'none' }}>
+          פתח קורס →
+        </Link>
+      </div>
+      {!folderIds?.course ? (
+        <div className="empty-state">
+          <Folder />
+          <p>התיקיות עוד לא נוצרו ב-Drive. ה-DBProvider או דף הקורסים יסדר זאת בטעינה הבאה.</p>
+        </div>
+      ) : (
+        <div className="folder-overview-grid">
+          {FOLDER_DEFS.map(({ kind, label, hint, Icon }) => (
+            <button
+              type="button"
+              key={kind}
+              className="folder-overview-card"
+              onClick={() => onPickFolder(kind)}
+            >
+              <div className="folder-overview-icon"><Icon /></div>
+              <div className="folder-overview-body">
+                <h3>{label}</h3>
+                <small>{hint}</small>
+              </div>
+              <ChevronLeft className="folder-overview-arrow" size={18} />
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function FolderContentsPanel({
+  course,
+  kind,
+  onBack,
+}: {
+  course: Course
+  kind: FolderKind
+  onBack: () => void
+}) {
+  const folderIds = (course as any).drive_folder_ids ?? null
+  const folderId = folderIds?.[kind] ?? null
+  const def = FOLDER_DEFS.find((f) => f.kind === kind)!
+  return (
+    <section className="course-panel">
+      <div className="course-panel-head">
+        <button type="button" className="back-pill" onClick={onBack} aria-label="חזרה לקורס">
+          <ChevronLeft size={16} />
+        </button>
+        <div className="course-panel-icon"><def.Icon /></div>
+        <div className="meta">
+          <div className="crumb">{course.title} · {def.label}</div>
+          <h2>{def.label}</h2>
+        </div>
+      </div>
+      <div className="drive-panel">
+        <FolderSection label={def.label} hint={def.hint} folderId={folderId} />
+      </div>
+    </section>
   )
 }
