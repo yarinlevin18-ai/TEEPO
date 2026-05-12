@@ -2794,6 +2794,22 @@ html.light .badge-danger {
   justify-content: center;
   color: var(--lp-ink-soft);
   line-height: 1.2;
+  text-decoration: none;
+  transition: transform .15s ease;
+}
+.dashboard-v2 .cal-event:hover {
+  transform: scale(1.03);
+  z-index: 2;
+}
+.dashboard-v2 .cal-error {
+  padding: 8px 14px;
+  margin: 0 14px 8px;
+  background: rgba(225, 29, 72, .08);
+  border: 1px solid rgba(225, 29, 72, .25);
+  border-radius: 10px;
+  color: #9f1239;
+  font-size: 12.5px;
+  text-align: center;
 }
 .dashboard-v2 .cal-event small {
   display: block;

@@ -22,6 +22,7 @@ import Link from 'next/link'
 import { useMemo } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
+import { useWeekCalendar, type WeekCalendarSlot } from '@/lib/use-week-calendar'
 import LCDDisplay from '@/components/ui/LCDDisplay'
 import CountryClock from '@/components/dashboard/CountryClock'
 import SlidingPuzzle from '@/components/dashboard/SlidingPuzzle'
@@ -134,7 +135,7 @@ export default function DashboardPage() {
                 פתח →
               </a>
             </div>
-            <CalendarWeekPlaceholder />
+            <CalendarWeek />
           </div>
 
           {/* ===== BOTTOM 3 CARDS ===== */}
@@ -237,19 +238,32 @@ function EmptyCard({ text, ctaHref, ctaText }: { text: string; ctaHref: string; 
 }
 
 /**
- * Empty week-view grid. Real Google Calendar embedding lives in a
- * follow-up — until then we render the structure (50px gutter + 7 day
- * columns + 7 hour rows) with no events so a brand-new account doesn't
- * see fictional lectures.
+ * Live week-view backed by the user's primary Google Calendar.
+ *
+ * - Hour range auto-fits to the events present this week (with a ±1h
+ *   buffer). Empty calendar falls back to 09–15.
+ * - Each event lands at its day-of-week column + hour row, with the
+ *   bar colored deterministically by title-hash so the same lecture
+ *   always renders in the same color across renders.
+ * - Click opens the event directly in Google Calendar.
  */
-function CalendarWeekPlaceholder() {
+function CalendarWeek() {
+  const { slots, hourRange, loading, error } = useWeekCalendar()
+
   const today = new Date()
   const dow = today.getDay()
   const weekStart = new Date(today)
   weekStart.setDate(today.getDate() - dow)
 
   const DAYS = ['א\'', 'ב\'', 'ג\'', 'ד\'', 'ה\'', 'ו\'', 'ש\'']
-  const HOURS = [9, 10, 11, 12, 13, 14, 15]
+  const hours: number[] = []
+  for (let h = hourRange.min; h <= hourRange.max; h++) hours.push(h)
+
+  // Index events by `${dayIndex}-${hour}` so each cell can look up its event in O(1).
+  const slotByCell = new Map<string, WeekCalendarSlot>()
+  for (const s of slots) {
+    slotByCell.set(`${s.dayIndex}-${s.hour}`, s)
+  }
 
   return (
     <>
@@ -268,12 +282,36 @@ function CalendarWeekPlaceholder() {
         })}
       </div>
 
+      {error && !loading && (
+        <div className="cal-error" role="alert">
+          {error.includes('TOKEN_EXPIRED') || error.includes('401')
+            ? 'הטוקן של Google פג. צא והתחבר מחדש כדי לראות את היומן.'
+            : 'הטעינה של היומן נכשלה. נסה לרענן.'}
+        </div>
+      )}
+
       <div className="cal-body">
-        {HOURS.flatMap(h => [
+        {hours.flatMap(h => [
           <div key={`t-${h}`} className="cal-time">{pad2(h)}:00</div>,
-          ...Array.from({ length: 7 }, (_, di) => (
-            <div key={`c-${di}-${h}`} className="cal-cell" />
-          )),
+          ...Array.from({ length: 7 }, (_, di) => {
+            const ev = slotByCell.get(`${di}-${h}`)
+            return (
+              <div key={`c-${di}-${h}`} className="cal-cell">
+                {ev && (
+                  <a
+                    href={ev.htmlLink || 'https://calendar.google.com'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`cal-event ev-${ev.color}`}
+                    title={`${ev.title}${ev.meta ? ' · ' + ev.meta : ''}`}
+                  >
+                    {ev.title}
+                    {ev.meta && <small>{ev.meta}</small>}
+                  </a>
+                )}
+              </div>
+            )
+          }),
         ])}
       </div>
     </>
