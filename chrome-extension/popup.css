@@ -1,0 +1,272 @@
+/**
+ * TEEPO popup — same cream/leaf-green palette as the web app so the
+ * extension feels like a native window of the same product.
+ *
+ * 360px fixed width — Chrome's default popup max-width is 800px, but
+ * 360px keeps the popup compact for laptop screens.
+ */
+:root {
+  --bg:          #f5ead2;
+  --bg-card:     #fdf6e3;
+  --bg-elev:    #efe0bc;
+  --ink:         #2d1810;
+  --ink-soft:    #5c3f2f;
+  --muted:       #8a7261;
+  --line:        #e0cda8;
+  --accent:      #16a34a;
+  --accent-soft: #dcfce7;
+  --accent-deep: #14532d;
+  --rose:        #e11d48;
+  --gradient:    linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 360px;
+  min-height: 220px;
+  font-family: 'Assistant', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.55;
+}
+
+body { padding: 14px 16px 16px; }
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+.pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.pop-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pop-icon { width: 28px; height: 28px; border-radius: 7px; }
+.pop-word {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -.5px;
+  color: var(--ink);
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.pop-signout {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 9px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.pop-signout:hover { background: var(--bg-elev); color: var(--ink); }
+
+/* ── States ───────────────────────────────────────────────────────────── */
+.pop-state { display: block; }
+.pop-state[hidden] { display: none; }
+
+.pop-state h1 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.3px;
+  margin-bottom: 6px;
+}
+.pop-state p {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+.pop-primary, .pop-signin, .pop-scan {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--gradient);
+  color: white;
+  border: 0;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 11px 14px;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  box-shadow: 0 4px 10px -2px rgba(22,163,74,.38);
+}
+.pop-primary:hover, .pop-signin:hover, .pop-scan:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px -2px rgba(22,163,74,.5);
+}
+.pop-secondary {
+  width: 100%;
+  background: var(--bg-card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.pop-secondary:hover { background: var(--bg-elev); }
+
+/* ── File list (ready state) ──────────────────────────────────────────── */
+.pop-source {
+  font-size: 11.5px;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 3px 10px;
+  display: inline-block;
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+
+.pop-course-picker {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pop-course-picker label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.pop-course-picker select {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+}
+.pop-course-picker select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pop-course-picker select:disabled { opacity: .6; cursor: not-allowed; }
+.pop-course-hint {
+  font-size: 10.5px;
+  color: var(--rose);
+  margin-top: 2px;
+}
+.pop-file-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  padding: 2px;
+}
+.pop-file-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--ink);
+}
+.pop-file-list li input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.pop-file-list li .pop-fname {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.pop-file-list li .pop-fkind {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 2px 7px;
+  background: var(--bg-elev);
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.pop-actions { display: flex; gap: 8px; }
+.pop-actions .pop-secondary,
+.pop-actions .pop-primary { flex: 1; }
+
+/* ── Upload progress ─────────────────────────────────────────────────── */
+.pop-progress {
+  height: 8px;
+  background: var(--bg-elev);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.pop-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--gradient);
+  transition: width .25s ease;
+}
+.pop-progress-text {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── Done state ──────────────────────────────────────────────────────── */
+.pop-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-deep);
+}
+.pop-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--gradient);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* ── Error state ─────────────────────────────────────────────────────── */
+.pop-err {
+  color: var(--rose);
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  word-break: break-word;
+}

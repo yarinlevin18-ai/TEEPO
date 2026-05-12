@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { DBProvider } from '@/lib/db-context'
-import { LivingDayProvider } from '@/lib/living-day-context'
 import TopNav from '@/components/layout/TopNav'
 import DriveConnectionBanner from '@/components/DriveConnectionBanner'
 import WakeupBanner from '@/components/WakeupBanner'
@@ -54,16 +53,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <DBProvider>
-      <LivingDayProvider>
-        <div className="qa min-h-screen flex flex-col">
-          <TopNav mobileOpen={mobileOpen} onMobileToggle={() => setMobileOpen(o => !o)} />
-          <main className="flex-1 relative">
-            <DriveConnectionBanner />
-            <WakeupBanner />
-            <OnboardingGate>{children}</OnboardingGate>
-          </main>
-        </div>
-      </LivingDayProvider>
+      <div className="qa min-h-screen flex flex-col cream-page">
+        <TopNav mobileOpen={mobileOpen} onMobileToggle={() => setMobileOpen(o => !o)} />
+        <main className="flex-1 relative">
+          <DriveConnectionBanner />
+          <WakeupBanner />
+          <OnboardingGate>{children}</OnboardingGate>
+        </main>
+      </div>
     </DBProvider>
   )
 }

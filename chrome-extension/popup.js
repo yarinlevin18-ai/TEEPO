@@ -1,283 +1,370 @@
-const DEFAULT_BACKEND = 'https://bgu-study-backend.onrender.com'
+/**
+ * TEEPO popup controller.
+ *
+ * State machine (the `data-state` attribute on each <section>):
+ *   anon       → no auth yet
+ *   idle       → authed but the content script found nothing on this page
+ *   ready      → content script found files; user selects + sends
+ *   uploading  → we're streaming files to Drive via the background worker
+ *   done       → upload finished
+ *   error      → something blew up
+ *
+ * The background worker owns OAuth + Drive uploads + folder resolution.
+ * The popup just orchestrates UI + delegates to bg via chrome.runtime.sendMessage.
+ *
+ * The content script (Moodle/portal/generic) is responsible for sniffing
+ * the page DOM and replying with a list of {filename, sourceUrl, mimeType,
+ * kind} candidates when we ping it.
+ */
 
-const SITES = {
-  moodle: {
-    urls: ['https://moodle.bgu.ac.il/', 'https://bgu.ac.il/'],
-    checkUrl: 'https://moodle.bgu.ac.il/moodle/my/',
-    indicator: 'data-userid',
-  },
-  portal: {
-    urls: ['https://bgu4u22.bgu.ac.il/', 'https://my.bgu.ac.il/', 'https://bgu.ac.il/'],
-    checkUrl: 'https://bgu4u22.bgu.ac.il/',
-    indicator: 'apex',
-  },
+const $ = (sel) => document.querySelector(sel)
+const $$ = (sel) => Array.from(document.querySelectorAll(sel))
+
+function showState(name) {
+  $$('.pop-state').forEach((el) => {
+    el.hidden = el.dataset.state !== name
+  })
+  $('.pop-signout').hidden = name === 'anon' || name === 'error'
 }
 
-// ---------- Load saved state ----------
+function setText(bind, value) {
+  $$(`[data-bind="${bind}"]`).forEach((el) => { el.textContent = String(value) })
+}
 
-async function getBackendUrl() {
-  return new Promise(resolve => {
-    chrome.storage.local.get(['backendUrl'], res => {
-      resolve(res.backendUrl || DEFAULT_BACKEND)
+function setProgress(uploaded, total) {
+  setText('uploaded', uploaded)
+  setText('total', total)
+  const bar = $('[data-bind="progress"]')
+  if (bar) bar.style.width = total ? `${Math.round((uploaded / total) * 100)}%` : '0%'
+}
+
+function bg(message) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      // chrome.runtime.lastError is normal when the bg worker is asleep —
+      // it wakes up on first call and replies right after.
+      if (chrome.runtime.lastError && !response) {
+        resolve({ ok: false, error: chrome.runtime.lastError.message })
+        return
+      }
+      resolve(response || { ok: false, error: 'no response' })
     })
   })
 }
 
-async function init() {
-  const url = await getBackendUrl()
-  document.getElementById('backend-url').value = url
-
-  // Set app link
-  let appUrl = 'https://bgu-study-organizer.vercel.app'
-  if (url.includes('localhost')) appUrl = 'http://localhost:3000'
-  chrome.storage.local.get(['appUrl'], res => {
-    document.getElementById('app-link').href = res.appUrl || appUrl
-  })
-
-  // Check backend status (with wake-up awareness)
-  checkStatus(url)
-}
-
-async function checkStatus(backendUrl) {
-  try {
-    // Give Render 25s to wake up on first check
-    const res = await fetch(`${backendUrl}/api/university/status`, { signal: AbortSignal.timeout(25000) })
-    const data = await res.json()
-    updateStatusUI('moodle', data.moodle)
-    updateStatusUI('portal', data.portal)
-  } catch (e) {
-    // If timeout, show a gentle hint
-    if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
-      showToast('השרת מתעורר... נסה שוב בעוד 30 שניות', 'loading')
-    }
-  }
-}
-
-function updateStatusUI(site, connected) {
-  const dot = document.getElementById(`${site}-dot`)
-  const text = document.getElementById(`${site}-status-text`)
-  const btn = document.getElementById(`${site}-btn`)
-
-  if (connected) {
-    dot.className = 'dot connected'
-    text.textContent = 'מחובר ✓'
-    btn.textContent = 'רענן Session'
-    btn.className = 'btn btn-primary'
-  } else {
-    dot.className = 'dot'
-    text.textContent = 'לא מחובר'
-    btn.textContent = 'שלח Session ל-App'
-    btn.className = 'btn btn-primary'
-  }
-}
-
-// ---------- Cookie sync ----------
-
-async function getCookiesForSite(urls) {
-  const all = []
-  const seen = new Set()
-  for (const url of urls) {
-    const cookies = await chrome.cookies.getAll({ url })
-    for (const c of cookies) {
-      const key = `${c.name}|${c.domain}|${c.path}`
-      if (!seen.has(key)) {
-        seen.add(key)
-        all.push(c)
-      }
-    }
-  }
-  // Debug: if nothing found by URL, try getting ALL cookies and filter manually
-  if (all.length === 0) {
-    const allCookies = await chrome.cookies.getAll({})
-    const bguCookies = allCookies.filter(c =>
-      c.domain.includes('bgu.ac.il') || c.domain.includes('moodle')
-    )
-    return bguCookies
-  }
-  return all
+async function activeTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  return tab
 }
 
 /**
- * Try to capture the HTML of the active tab (if it's a BGU page).
- * Returns the HTML string or null if not on a BGU page.
+ * Ask the content script of the active tab what it sees. Moodle/portal pages
+ * get the auto-injected scrapers via the manifest. For every other URL we
+ * inject content/generic.js on demand — that requires <all_urls> host
+ * permission, which we request the first time the user clicks "סרוק שוב".
  */
-async function captureActiveTabHTML() {
+async function scanPage() {
+  const tab = await activeTab()
+  if (!tab?.id) return { source: null, files: [] }
+
+  // First try the message channel — works on pre-matched pages.
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-    if (!tab || !tab.url) return null
+    const reply = await chrome.tabs.sendMessage(tab.id, { type: 'TEEPO_SCAN' })
+    if (reply) return reply
+  } catch {
+    // ignore — no content script on this URL, fall through to injection.
+  }
 
-    // Only capture BGU pages
-    if (!tab.url.includes('bgu.ac.il')) return null
-
-    const results = await chrome.scripting.executeScript({
+  // Generic injection path. Needs host permission for the active tab's origin.
+  const granted = await ensureHostPermission(tab.url)
+  if (!granted) {
+    return {
+      source: null,
+      files: [],
+      error: 'הרשאה לסרוק את הדף לא ניתנה',
+    }
+  }
+  try {
+    await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: () => {
-        return {
-          html: document.documentElement.outerHTML,
-          url: window.location.href,
-          title: document.title,
-        }
-      },
+      files: ['content/generic.js'],
     })
-
-    if (results && results[0] && results[0].result) {
-      return results[0].result
-    }
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => window.__teepoScan || null,
+    })
+    return result || { source: null, files: [] }
   } catch (e) {
-    console.log('Could not capture tab HTML:', e.message)
-  }
-  return null
-}
-
-async function syncSite(site) {
-  const btn = document.getElementById(`${site}-btn`)
-
-  btn.disabled = true
-  btn.textContent = 'שולח...'
-  showToast('מעביר cookies לאפליקציה...', 'loading')
-
-  try {
-    const backendUrl = await getBackendUrl()
-    const { urls } = SITES[site]
-    const cookies = await getCookiesForSite(urls)
-
-    // Debug info
-    const allCount = (await chrome.cookies.getAll({})).length
-    if (cookies.length === 0) {
-      showToast(`0 cookies של ${site} (סה"כ ${allCount} cookies בדפדפן). נסה להסיר ולהוסיף מחדש את התוסף.`, 'error')
-      btn.disabled = false
-      btn.textContent = 'שלח Session ל-App'
-      return
-    }
-
-    // Update toast to indicate possible wake-up delay
-    showToast(`נמצאו ${cookies.length} cookies. שולח לשרת...`, 'loading')
-
-    // Give Render 45s to wake up + process (free tier cold start can take 30-40s)
-    const timer = setTimeout(() => {
-      showToast('השרת מתעורר מתרדמה... זה עלול לקחת עד 40 שניות בפעם הראשונה', 'loading')
-    }, 8000)
-
-    const res = await fetch(`${backendUrl}/api/university/cookies`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ site, cookies }),
-      signal: AbortSignal.timeout(60000), // 60s to handle Render cold start
-    })
-    clearTimeout(timer)
-
-    const data = await res.json()
-
-    if (data.status === 'success') {
-      showToast(`✓ ${site === 'moodle' ? 'Moodle' : 'פורטל'} מחובר! ${cookies.length} cookies הועברו.`, 'success')
-      updateStatusUI(site, true)
-
-      // If on a BGU page, also capture + send the page HTML for grade parsing
-      const pageData = await captureActiveTabHTML()
-      if (pageData) {
-        showToast('מנתח את הדף לציונים ונק"ז...', 'loading')
-        try {
-          await fetch(`${backendUrl}/api/university/parse-portal`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              html: pageData.html,
-              url: pageData.url,
-              title: pageData.title,
-              site,
-            }),
-            signal: AbortSignal.timeout(30000),
-          })
-          showToast(`✓ ${site === 'moodle' ? 'Moodle' : 'פורטל'} מחובר + דף נותח!`, 'success')
-        } catch {
-          // Page parsing failed, but cookies were sent successfully
-          showToast(`✓ מחובר! (הדף הנוכחי לא הכיל ציונים)`, 'success')
-        }
-      }
-
-      // Re-check status from server to confirm
-      setTimeout(() => checkStatus(backendUrl), 1500)
-    } else {
-      showToast(`שגיאה: ${data.message || 'לא הצלחנו לשמור את ה-session'}`, 'error')
-    }
-  } catch (err) {
-    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
-      showToast('פסק זמן — השרת לא הגיב. נסה שוב בעוד דקה.', 'error')
-    } else {
-      showToast(`שגיאה: ${err.message}`, 'error')
-    }
-  } finally {
-    btn.disabled = false
-    btn.textContent = 'שלח Session ל-App'
+    console.warn('[popup] generic scan failed', e)
+    return { source: null, files: [], error: String(e?.message || e) }
   }
 }
 
 /**
- * Dedicated grade sync — captures the current BGU page and sends it for parsing.
- * User should be on the portal grades page when clicking this.
+ * Request optional host permission for the active tab's origin. Chrome
+ * caches the grant per origin so we only prompt once per site.
  */
-async function syncGrades() {
-  const btn = document.getElementById('grades-btn')
-  btn.disabled = true
-  btn.textContent = 'סורק...'
-
+async function ensureHostPermission(url) {
+  if (!url || /^chrome:/.test(url) || /^about:/.test(url)) return false
   try {
-    const pageData = await captureActiveTabHTML()
-    if (!pageData) {
-      showToast('גלוש קודם לדף הציונים בפורטל האוניברסיטה, ואז לחץ כאן', 'error')
-      return
-    }
-
-    showToast(`סורק את "${pageData.title}"...`, 'loading')
-    const backendUrl = await getBackendUrl()
-
-    const res = await fetch(`${backendUrl}/api/university/parse-portal`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        html: pageData.html,
-        url: pageData.url,
-        title: pageData.title,
-        site: 'portal',
-      }),
-      signal: AbortSignal.timeout(30000),
+    const origin = new URL(url).origin + '/*'
+    return new Promise((resolve) => {
+      chrome.permissions.request({ origins: [origin] }, (granted) => resolve(!!granted))
     })
-
-    const data = await res.json()
-    if (data.status === 'success' && data.grades_found > 0) {
-      showToast(`✓ נמצאו ${data.grades_found} ציונים עם נק"ז!`, 'success')
-    } else if (data.status === 'success') {
-      showToast('הדף נקרא אבל לא נמצאו ציונים. נסה לגלוש לדף הציונים בפורטל.', 'error')
-    } else {
-      showToast(`שגיאה: ${data.message || 'לא הצלחנו לנתח'}`, 'error')
-    }
-  } catch (err) {
-    showToast(`שגיאה: ${err.message}`, 'error')
-  } finally {
-    btn.disabled = false
-    btn.textContent = 'סרוק ציונים מהדף'
+  } catch {
+    return false
   }
 }
 
-function showToast(msg, type) {
-  const toast = document.getElementById('toast')
-  toast.textContent = msg
-  toast.className = `toast ${type}`
+// ── State renderers ─────────────────────────────────────────────────────
+
+let lastScan = { source: null, files: [] }
+
+function renderReady(scan) {
+  lastScan = scan
+  setText('count', scan.files.length)
+  setText('source', scan.source || '—')
+  const list = $('[data-bind="files"]')
+  list.innerHTML = ''
+  scan.files.forEach((f, i) => {
+    const li = document.createElement('li')
+    li.innerHTML = `
+      <input type="checkbox" data-i="${i}" checked />
+      <span class="pop-fname">${escapeHtml(f.filename)}</span>
+      <span class="pop-fkind">${escapeHtml(f.kind || guessKindFromName(f.filename))}</span>
+    `
+    list.appendChild(li)
+  })
+  // Course picker — if the scraper didn't extract a courseId from the page,
+  // load the user's course list and show a dropdown so they can choose.
+  hydrateCoursePicker(scan)
+  showState('ready')
 }
 
-// ---------- Save backend URL ----------
+let userCourses = null // populated lazily on first picker render
 
-async function saveUrl() {
-  const url = document.getElementById('backend-url').value.trim().replace(/\/$/, '')
-  await chrome.storage.local.set({ backendUrl: url })
-  showToast('הכתובת נשמרה', 'success')
-  setTimeout(() => checkStatus(url), 500)
+async function hydrateCoursePicker(scan) {
+  const sel = $('[data-bind="course-select"]')
+  const hint = $('[data-bind="course-hint"]')
+  if (!sel) return
+  sel.innerHTML = '<option value="">— בחר קורס —</option>'
+  hint.hidden = true
+
+  if (!userCourses) {
+    sel.disabled = true
+    try {
+      userCourses = await fetchCourseList()
+    } catch (e) {
+      console.warn('[popup] courses fetch failed', e)
+      userCourses = []
+      hint.textContent = 'לא הצלחנו לטעון את רשימת הקורסים. נסה רענון.'
+      hint.hidden = false
+    }
+    sel.disabled = false
+  }
+
+  if (!userCourses?.length) {
+    hint.textContent = 'אין קורסים ב-TEEPO. צור קורס באתר ואחר כך חזור.'
+    hint.hidden = false
+    return
+  }
+
+  // Render
+  for (const c of userCourses) {
+    const opt = document.createElement('option')
+    opt.value = c.id
+    const sem = c.semester ? `· סמסטר ${c.semester}` : ''
+    const year = c.year_of_study ? `· שנה ${c.year_of_study}` : ''
+    opt.textContent = `${c.title} ${year} ${sem}`.trim()
+    if (!c.provisioned) {
+      opt.textContent += ' · ⚠ ללא תיקייה'
+      opt.dataset.unprovisioned = '1'
+    }
+    sel.appendChild(opt)
+  }
+
+  // Pre-pick if the scraper extracted a courseId AND it's in the user's DB.
+  const fromScanner = scan?.courseId
+  if (fromScanner && userCourses.some(c => c.id === fromScanner)) {
+    sel.value = fromScanner
+  }
 }
 
-// ---------- Boot ----------
-// Script is at end of <body> so DOM is already ready — attach directly
-document.getElementById('moodle-btn').addEventListener('click', () => syncSite('moodle'))
-document.getElementById('portal-btn').addEventListener('click', () => syncSite('portal'))
-document.getElementById('grades-btn').addEventListener('click', syncGrades)
-document.getElementById('save-url-btn').addEventListener('click', saveUrl)
-init()
+async function fetchCourseList() {
+  const token = await getDriveToken()
+  if (!token) return []
+  const { teepoBase } = await chrome.storage.local.get('teepoBase')
+  const base = teepoBase || 'http://localhost:3000'
+  const res = await fetch(`${base}/api/drive/courses`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(`courses ${res.status}`)
+  return res.json()
+}
+
+async function getDriveToken() {
+  return new Promise((resolve) => {
+    chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null))
+  })
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[c])
+}
+
+function guessKindFromName(name) {
+  const ext = name.toLowerCase().split('.').pop()
+  if (!ext) return 'file'
+  if (['pdf'].includes(ext)) return 'pdf'
+  if (['ppt', 'pptx'].includes(ext)) return 'pptx'
+  if (['doc', 'docx'].includes(ext)) return 'docx'
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return 'xlsx'
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) return 'img'
+  if (['mp4', 'mov', 'webm', 'mkv'].includes(ext)) return 'video'
+  if (['mp3', 'wav', 'm4a'].includes(ext)) return 'audio'
+  if (['zip', 'rar', '7z'].includes(ext)) return 'zip'
+  return ext.slice(0, 4)
+}
+
+// ── Boot ────────────────────────────────────────────────────────────────
+
+async function boot() {
+  const auth = await bg({ type: 'AUTH_STATUS' })
+  if (!auth?.authed) {
+    showState('anon')
+    return
+  }
+  const scan = await scanPage()
+  if (scan.files.length === 0) {
+    showState('idle')
+    return
+  }
+  renderReady(scan)
+}
+
+// ── Actions ─────────────────────────────────────────────────────────────
+
+document.addEventListener('click', async (e) => {
+  const action = e.target?.closest('[data-action]')?.dataset.action
+  if (!action) return
+
+  if (action === 'signin') {
+    const r = await bg({ type: 'SIGN_IN' })
+    if (r?.ok && r.authed) await boot()
+    else showError(r?.error || 'התחברות נכשלה')
+    return
+  }
+
+  if (action === 'signout') {
+    await bg({ type: 'SIGN_OUT' })
+    showState('anon')
+    return
+  }
+
+  if (action === 'scan' || action === 'retry') {
+    await boot()
+    return
+  }
+
+  if (action === 'select-all') {
+    const all = $$('.pop-file-list input[type="checkbox"]')
+    const someUnchecked = all.some((c) => !c.checked)
+    all.forEach((c) => { c.checked = someUnchecked })
+    return
+  }
+
+  if (action === 'send') {
+    await doUpload()
+    return
+  }
+
+  if (action === 'open-teepo') {
+    const { teepoBase } = await chrome.storage.local.get('teepoBase')
+    const base = teepoBase || 'http://localhost:3000'
+    chrome.tabs.create({ url: `${base}/summaries` })
+    return
+  }
+})
+
+function showError(message) {
+  setText('err', message)
+  showState('error')
+}
+
+async function doUpload() {
+  if (!lastScan?.files?.length) return
+
+  // Resolve the courseId — either from the picker, or from the scraper.
+  const sel = $('[data-bind="course-select"]')
+  const pickedCourse = sel?.value || lastScan?.courseId || null
+  const hint = $('[data-bind="course-hint"]')
+  if (!pickedCourse) {
+    hint.textContent = 'בחר קורס כדי להמשיך'
+    hint.hidden = false
+    sel?.focus()
+    return
+  }
+  // Check that the picked course actually has a provisioned folder.
+  const courseRecord = userCourses?.find(c => c.id === pickedCourse)
+  if (courseRecord && !courseRecord.provisioned) {
+    hint.textContent = 'התיקייה של הקורס לא נוצרה. פתח את "המוח" באתר ולחץ "סנכרון Drive".'
+    hint.hidden = false
+    return
+  }
+
+  const checked = $$('.pop-file-list input[type="checkbox"]')
+    .map((cb) => ({ keep: cb.checked, i: Number(cb.dataset.i) }))
+    .filter((x) => x.keep)
+    .map((x) => lastScan.files[x.i])
+    .filter(Boolean)
+  if (checked.length === 0) return
+
+  showState('uploading')
+  setProgress(0, checked.length)
+
+  // Map each file's `kind` to a target subfolder. Drive folders are
+  // lessons / assignments / notes; sheets, slides, pdf, video all go to
+  // `lessons` by default. The user can move them in Drive afterwards.
+  const kindToFolder = (kind) => {
+    if (kind === 'doc' && /(?:homework|hw|exercise|תרגיל)/i.test('')) return 'assignments'
+    return 'lessons'
+  }
+
+  let uploaded = 0
+  let failed = []
+  for (const f of checked) {
+    try {
+      const folder = await bg({
+        type: 'RESOLVE_FOLDER',
+        courseId: pickedCourse,
+        kind: kindToFolder(f.kind),
+      })
+      if (!folder?.ok) throw new Error(folder?.error || 'folder failed')
+
+      const up = await bg({
+        type: 'UPLOAD',
+        folderId: folder.folderId,
+        sourceUrl: f.sourceUrl,
+        filename: f.filename,
+        mimeType: f.mimeType,
+      })
+      if (!up?.ok) throw new Error(up?.error || 'upload failed')
+      uploaded++
+    } catch (e) {
+      console.warn('[popup] file failed', f.filename, e)
+      failed.push(f.filename)
+    }
+    setProgress(uploaded, checked.length)
+  }
+
+  setText('done-text',
+    failed.length === 0
+      ? `${uploaded} קבצים הועלו לתיקיית הקורס ב-Drive`
+      : `${uploaded} הועלו · ${failed.length} נכשלו`,
+  )
+  showState('done')
+}
+
+boot()
