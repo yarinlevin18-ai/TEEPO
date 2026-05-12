@@ -50,7 +50,92 @@ interface CourseRecord {
   classified_manually?: boolean
   created_at?: string
   status?: string
+  year_of_study?: number
+  semester?: 'א' | 'ב' | 'קיץ'
+  drive_folder_ids?: { course: string; lessons: string; assignments: string; notes: string }
+  drive_folder_path?: string
   [k: string]: unknown
+}
+
+// ── Folder-path helpers (mirror lib/drive-folders.ts) ────────────────────
+// We inline these so the route doesn't pull in client-typed modules. The
+// shape MUST match lib/drive-folders.ts or the same course will end up at
+// two different paths depending on which code created it.
+
+const FOLDER_MIME = 'application/vnd.google-apps.folder'
+const DEGREE_FOLDER_NAME = 'תואר ראשון'
+const UNCLASSIFIED_FOLDER = 'לא מסווגים'
+const COURSE_SUBFOLDERS = ['שיעורים', 'מטלות', 'סיכומים'] as const
+
+const YEAR_LABEL: Record<number, string> = {
+  1: 'שנה א׳', 2: 'שנה ב׳', 3: 'שנה ג׳', 4: 'שנה ד׳',
+}
+const SEM_LABEL: Record<'א' | 'ב' | 'קיץ', string> = {
+  'א': 'סמסטר א׳', 'ב': 'סמסטר ב׳', 'קיץ': 'קיץ',
+}
+
+function sanitizeFolderName(name: string): string {
+  return name.replace(/[/\\]/g, '-').trim().slice(0, 200) || 'קורס ללא שם'
+}
+
+function pathForCourseRecord(c: CourseRecord): string[] {
+  const title = sanitizeFolderName(c.title)
+  if (!c.year_of_study && !c.semester) return [UNCLASSIFIED_FOLDER, title]
+  const parts = [DEGREE_FOLDER_NAME]
+  parts.push(c.year_of_study && YEAR_LABEL[c.year_of_study] ? YEAR_LABEL[c.year_of_study] : 'ללא שנה')
+  parts.push(c.semester && SEM_LABEL[c.semester] ? SEM_LABEL[c.semester] : 'ללא סמסטר')
+  parts.push(title)
+  return parts
+}
+
+async function findChildFolder(token: string, name: string, parentId: string): Promise<string | null> {
+  const safe = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+  const q = `name = '${safe}' and mimeType = '${FOLDER_MIME}' and '${parentId}' in parents and trashed = false`
+  const url = `${DRIVE_API}/files?q=${encodeURIComponent(q)}&fields=files(id)&spaces=drive`
+  const res = await driveFetch(token, url)
+  const data = await res.json()
+  return data.files?.[0]?.id ?? null
+}
+
+async function createChildFolder(token: string, name: string, parentId: string): Promise<string> {
+  const res = await fetch(`${DRIVE_API}/files`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`drive_${res.status}: ${body.slice(0, 160)}`)
+  }
+  const data = await res.json()
+  if (!data.id) throw new Error('drive_500: createChildFolder returned no id')
+  return data.id as string
+}
+
+async function ensureChildFolder(
+  token: string, name: string, parentId: string, cache: Map<string, string>,
+): Promise<string> {
+  const key = `${parentId}::${name}`
+  const hit = cache.get(key)
+  if (hit) return hit
+  let id = await findChildFolder(token, name, parentId)
+  if (!id) id = await createChildFolder(token, name, parentId)
+  cache.set(key, id)
+  return id
+}
+
+async function ensureCourseFolders(
+  token: string, teepoFolderId: string, course: CourseRecord, cache: Map<string, string>,
+): Promise<{ course: string; lessons: string; assignments: string; notes: string }> {
+  let parent = teepoFolderId
+  for (const segment of pathForCourseRecord(course)) {
+    parent = await ensureChildFolder(token, segment, parent, cache)
+  }
+  const courseFolder = parent
+  const [lessons, assignments, notes] = await Promise.all(
+    COURSE_SUBFOLDERS.map((s) => ensureChildFolder(token, s, courseFolder, cache)),
+  )
+  return { course: courseFolder, lessons, assignments, notes }
 }
 
 function corsHeaders(): Record<string, string> {
@@ -96,6 +181,7 @@ export async function POST(req: NextRequest) {
     let added = 0
     let updated = 0
     let skipped = 0
+    const needsFolders: CourseRecord[] = []
 
     for (const inc of incoming) {
       const title = (inc.title ?? '').trim()
@@ -125,6 +211,7 @@ export async function POST(req: NextRequest) {
         }
         courses.unshift(newCourse)
         added++
+        needsFolders.push(newCourse)
       } else {
         // Existing — merge metadata without overwriting user edits.
         const existing = courses[idx]
@@ -140,6 +227,32 @@ export async function POST(req: NextRequest) {
         } else {
           skipped++
         }
+        // Reprovision folders if the existing record never got them.
+        if (!existing.drive_folder_ids) needsFolders.push(courses[idx])
+      }
+    }
+
+    // Provision the Drive folder hierarchy for any course that doesn't have
+    // one yet. Without this, the user imports → no folders appear → they get
+    // confused. Doing it inline (instead of "you'll get them when you visit
+    // /summaries") keeps the import atomic from the user's perspective.
+    //
+    // Failures are isolated per-course: one bad folder doesn't sink the
+    // whole import. The course just stays unprovisioned and the user can
+    // retry from /courses.
+    let foldersCreated = 0
+    let foldersFailed = 0
+    const folderCache = new Map<string, string>()
+    for (const c of needsFolders) {
+      try {
+        const ids = await ensureCourseFolders(token, folderId, c, folderCache)
+        const path = pathForCourseRecord(c).join('/')
+        c.drive_folder_ids = ids
+        c.drive_folder_path = path
+        foldersCreated++
+      } catch (e) {
+        console.warn('[courses/import] folder provision failed for', c.title, e)
+        foldersFailed++
       }
     }
 
@@ -157,6 +270,8 @@ export async function POST(req: NextRequest) {
         skipped,
         total: courses.length,
         folderId,
+        folders_created: foldersCreated,
+        folders_failed: foldersFailed,
       },
       { headers: corsHeaders() },
     )

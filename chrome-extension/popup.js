@@ -431,8 +431,12 @@ async function doImportDiscovered() {
     if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`)
 
     setProgress(selected.length, selected.length)
+    const folderMsg =
+      typeof data.folders_created === 'number'
+        ? ` · ${data.folders_created} תיקיות נוצרו ב-Drive`
+        : ''
     setText('done-text',
-      `${data.added ?? 0} נוספו · ${data.updated ?? 0} עודכנו · סה"כ ${data.total ?? selected.length}`,
+      `${data.added ?? 0} נוספו · ${data.updated ?? 0} עודכנו · סה"כ ${data.total ?? selected.length}${folderMsg}`,
     )
     showState('done')
   } catch (e) {
