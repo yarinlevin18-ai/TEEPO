@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, WifiOff, RefreshCw,
@@ -296,47 +297,120 @@ export default function UniversityConnectPage() {
         </div>
       </div>
 
-      {/* How it works */}
-      <GlowCard glowColor="rgba(99,102,241,0.10)">
-      <div className="p-5 text-sm space-y-2">
+      {/* How it works — branches on real backend capability:
+          - moodleConfigured: backend has MOODLE_URL set → legacy headless/extension flow can run.
+          - !moodleConfigured: backend can't scrape → push user to the Chrome extension which IS deployed and works. */}
+      <GlowCard glowColor="rgba(22,163,74,0.10)">
+      <div className="p-5 text-sm space-y-3">
         <p className="font-semibold gradient-text mb-3">איך זה עובד?</p>
-        {serverMode ? (
+
+        {!lmsInfo.moodle.enabled ? (
+          // Backend isn't configured for Moodle. Honest path forward.
+          <div className="space-y-3">
+            <div
+              className="p-3 rounded-xl text-xs leading-relaxed"
+              style={{
+                background: 'rgba(217, 119, 6, .08)',
+                border: '1px solid rgba(217, 119, 6, .25)',
+                color: 'var(--lp-ink-soft, #5c3f2f)',
+              }}
+            >
+              <strong style={{ color: '#9a3412' }}>השרת לא מוגדר ל-Moodle של {universityName}.</strong><br />
+              סנכרון אוטומטי מ-Moodle לא יעבוד עד שהגדרת ה-<code dir="ltr">MOODLE_URL</code> תעלה ב-Backend.
+              <br />עד אז, השתמש ב-<strong>תוסף Chrome של TEEPO</strong> — הוא קורא ישירות מדפי Moodle שאתה פותח בדפדפן.
+            </div>
+
+            <div className="space-y-2.5">
+              <div className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                      style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>1</span>
+                <p className="text-ink-muted">
+                  צור קורס ראשון ב-<Link href="/courses/extract" className="underline" style={{ color: 'var(--lp-accent-deep)' }}>/courses/extract</Link>
+                  {' '}או ידנית ב-<Link href="/courses" className="underline" style={{ color: 'var(--lp-accent-deep)' }}>/courses</Link>.
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                      style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>2</span>
+                <p className="text-ink-muted">
+                  התקן את תוסף ה-Chrome של TEEPO לפי
+                  {' '}<a
+                    href="https://github.com/yarinlevin18-ai/TEEPO/blob/master/chrome-extension/README.md"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                    style={{ color: 'var(--lp-accent-deep)' }}
+                  >ההוראות ב-README</a> (5 דקות חד-פעמי — OAuth client + Load unpacked).
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                      style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>3</span>
+                <p className="text-ink-muted">
+                  פתח דף קורס ב-Moodle של האוניברסיטה שלך (BGU / TAU) → לחץ אייקון TEEPO ב-toolbar.
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                      style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>4</span>
+                <p className="text-ink-muted">
+                  בחר את הקורס מה-dropdown ולחץ <strong className="text-ink">"שלח ל-TEEPO"</strong> — הקבצים מועלים ישר ל-Drive שלך.
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                      style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>5</span>
+                <p className="text-ink-muted">
+                  חזור ל-<Link href="/summaries" className="underline" style={{ color: 'var(--lp-accent-deep)' }}>/summaries</Link>
+                  {' '}— הקבצים יופיעו תוך 30 שניות (polling אוטומטי).
+                </p>
+              </div>
+            </div>
+
+            <div
+              className="mt-2 pt-3 flex items-center gap-2 text-xs"
+              style={{ borderTop: '1px solid var(--lp-line-soft)', color: 'var(--lp-accent-deep)' }}
+            >
+              <span>🔒</span>
+              <span>הקבצים זורמים <strong>ישירות מהדפדפן ל-Drive שלך</strong> — לא דרך השרת של TEEPO.</span>
+            </div>
+          </div>
+        ) : serverMode ? (
+          // Backend IS configured + server-mode (extension Session flow).
           <div className="space-y-2.5">
             <div className="flex items-start gap-3">
               <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                    style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>1</span>
+                    style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>1</span>
               <p className="text-ink-muted">לחץ <strong className="text-ink">"התחבר"</strong> — Moodle ייפתח בטאב חדש</p>
             </div>
             <div className="flex items-start gap-3">
               <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                    style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>2</span>
+                    style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>2</span>
               <p className="text-ink-muted">התחבר ל-Moodle <strong className="text-ink">בדפדפן שלך כרגיל</strong></p>
             </div>
             <div className="flex items-start gap-3">
               <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                    style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>3</span>
+                    style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>3</span>
               <p className="text-ink-muted">לחץ על <strong className="text-ink">אייקון התוסף 🎓</strong> בסרגל הדפדפן ← "שלח Session"</p>
             </div>
             <div className="flex items-start gap-3">
               <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                    style={{ background: 'rgba(99,102,241,0.3)', color: '#a5b4fc' }}>4</span>
+                    style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>4</span>
               <p className="text-ink-muted">חזור לכאן ← <strong className="text-ink">סנכרן הכל</strong></p>
             </div>
             <div className="mt-3 pt-3 flex items-center gap-2 text-xs"
-                 style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: '#10b981' }}>
+                 style={{ borderTop: '1px solid var(--lp-line-soft)', color: 'var(--lp-accent-deep)' }}>
               <span>🔒</span>
-              <span>הסיסמה שלך לא נגעת באפליקציה — רק ה-session cookies מועברים</span>
-            </div>
-            <div className="pt-2 text-xs" style={{ color: '#a5b4fc' }}>
-              📱 <strong>מחובר מהטלפון?</strong> לחץ "נייד? התחבר עם סיסמה" למטה — השרת מתחבר ל-Moodle לבד עם הפרטים שלך
+              <span>הסיסמה שלך לא נוגעת באפליקציה — רק ה-session cookies מועברים</span>
             </div>
           </div>
         ) : (
+          // Backend configured + headless flow (legacy local dev mode).
           <>
-            <p className="text-ink-muted">1. לחץ "התחבר" — ייפתח חלון Chrome נפרד</p>
-            <p className="text-ink-muted">2. התחבר עם פרטי הסטודנט שלך כרגיל</p>
-            <p className="text-ink-muted">3. החלון ייסגר אוטומטית וה-session נשמר</p>
-            <p className="text-ink-muted">4. לחץ "סנכרן הכל" — הקורסים והמטלות יופיעו באפליקציה</p>
+            <p className="text-ink-muted">1. לחץ "התחבר" וייפתח טופס שם משתמש/סיסמה של {universityName}.</p>
+            <p className="text-ink-muted">2. הbackend יתחבר ל-Moodle בשמך עם headless Chrome.</p>
+            <p className="text-ink-muted">3. אחרי שמופיע ✓ ירוק, לחץ "סנכרן הכל".</p>
+            <p className="text-ink-muted">4. הקורסים, ציונים ומטלות יופיעו ב-/courses ו-/summaries.</p>
           </>
         )}
       </div>
