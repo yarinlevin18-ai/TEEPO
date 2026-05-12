@@ -3233,6 +3233,74 @@ html.light .badge-danger {
   opacity: .85;
   line-height: 1.4;
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   /moodle — v2 cream-toned override.
+   Surgical: scope all GlowCard/indigo-flavored chrome inside .moodle-v2
+   to cream tokens without rewriting the whole 600-line page. The
+   existing tailwind classes inside the page (text-ink, gradient-text,
+   shadow-glow-sm, etc.) still apply but the wrapping container forces
+   the cream atmosphere.
+   ════════════════════════════════════════════════════════════════════ */
+.moodle-v2 {
+  color: var(--lp-ink);
+}
+.moodle-v2 .glow-card,
+.moodle-v2 .glass {
+  background: var(--lp-bg-card) !important;
+  border: 1px solid var(--lp-line) !important;
+  box-shadow: var(--lp-shadow-sm) !important;
+  backdrop-filter: none !important;
+}
+.moodle-v2 .text-ink         { color: var(--lp-ink) !important; }
+.moodle-v2 .text-ink-muted   { color: var(--lp-ink-soft) !important; }
+.moodle-v2 .text-ink-subtle  { color: var(--lp-muted) !important; }
+.moodle-v2 .gradient-text {
+  background: var(--lp-gradient) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+/* Numbered-step pills inside "איך זה עובד" — re-tone from indigo to leaf */
+.moodle-v2 [style*="background: rgba(99,102,241"]:not(input):not(button) {
+  background: var(--lp-accent-soft) !important;
+}
+.moodle-v2 [style*="color: #a5b4fc"]:not(input):not(button) {
+  color: var(--lp-accent-deep) !important;
+}
+/* Primary buttons (btn-gradient) → leaf-green gradient */
+.moodle-v2 .btn-gradient {
+  background: var(--lp-gradient) !important;
+  box-shadow: 0 4px 12px -4px var(--lp-accent) !important;
+}
+.moodle-v2 .btn-gradient:hover:not(:disabled) {
+  box-shadow: 0 6px 16px -4px var(--lp-accent) !important;
+}
+/* Inputs */
+.moodle-v2 input[type="text"],
+.moodle-v2 input[type="password"],
+.moodle-v2 input[type="email"] {
+  background: var(--lp-bg) !important;
+  border: 1px solid var(--lp-line) !important;
+  color: var(--lp-ink) !important;
+}
+.moodle-v2 input:focus {
+  border-color: var(--lp-accent) !important;
+  outline: 2px solid rgba(22, 163, 74, .25) !important;
+  outline-offset: 0 !important;
+}
+.moodle-v2 input::placeholder {
+  color: var(--lp-muted) !important;
+}
+/* Tonal "border-white/X" pills (loading / minor buttons) */
+.moodle-v2 .border-white\/10,
+.moodle-v2 .border-white\/\[0\.08\] {
+  border-color: var(--lp-line) !important;
+}
+.moodle-v2 .bg-white\/5,
+.moodle-v2 .bg-white\/\[0\.05\] {
+  background: var(--lp-bg) !important;
+}
 .dashboard-v2 .cal-event small {
   display: block;
   font-weight: 500;
