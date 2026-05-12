@@ -33,37 +33,65 @@ import { FolderSection } from '@/components/summaries/CourseDrivePanel'
 import { useDriveFiles } from '@/lib/use-drive-files'
 import type { Course } from '@/types'
 
+type HebSemester = 'א' | 'ב' | 'קיץ'
+
 interface SemesterBucket {
   key: string
   label: string
-  year: number
-  semester: 'A' | 'B' | 'C'
+  year: number              // 0 for unclassified
+  semester: HebSemester | null
   courses: Course[]
+  isUnclassified: boolean
 }
 
 type FolderKind = 'lessons' | 'assignments' | 'notes'
 
-/** Group the user's courses into semester buckets, sorted chronologically. */
+const SEM_ORDER: Record<HebSemester, number> = { 'א': 1, 'ב': 2, 'קיץ': 3 }
+
+/** Group courses into semester buckets. Unclassified courses get their own
+ *  bucket at the end so the user can find and fix them. */
 function bucketize(courses: Course[]): SemesterBucket[] {
   const map = new Map<string, SemesterBucket>()
   for (const c of courses) {
-    const year = (c as any).academic_year ?? (c as any).year ?? new Date().getFullYear()
-    const sem = ((c as any).semester ?? 'A') as 'A' | 'B' | 'C'
+    const sem = c.semester
+    if (!sem) {
+      const k = 'unclassified'
+      if (!map.has(k)) {
+        map.set(k, {
+          key: k,
+          label: 'לא מסווגים',
+          year: 0,
+          semester: null,
+          courses: [],
+          isUnclassified: true,
+        })
+      }
+      map.get(k)!.courses.push(c)
+      continue
+    }
+    const year = c.academic_year ? parseInt(c.academic_year, 10) : 0
+    const yearLabel = year ? `${year}/${(year + 1).toString().slice(-2)} · ` : ''
+    const semLabel = sem === 'קיץ' ? 'קיץ' : `סמסטר ${sem}׳`
     const key = `${year}-${sem}`
     if (!map.has(key)) {
       map.set(key, {
         key,
-        label: `${year} · ${sem === 'A' ? 'סמסטר א\'' : sem === 'B' ? 'סמסטר ב\'' : 'סמסטר קיץ'}`,
+        label: `${yearLabel}${semLabel}`,
         year,
         semester: sem,
         courses: [],
+        isUnclassified: false,
       })
     }
     map.get(key)!.courses.push(c)
   }
   return Array.from(map.values()).sort((a, b) => {
+    if (a.isUnclassified) return 1
+    if (b.isUnclassified) return -1
     if (a.year !== b.year) return b.year - a.year
-    return a.semester.localeCompare(b.semester)
+    const aOrd = a.semester ? SEM_ORDER[a.semester] : 9
+    const bOrd = b.semester ? SEM_ORDER[b.semester] : 9
+    return aOrd - bOrd
   })
 }
 
@@ -366,10 +394,13 @@ function CourseFolderOverviewPanel({
           פתח קורס →
         </Link>
       </div>
+
+      <ClassifyWidget course={course} />
+
       {!folderIds?.course ? (
         <div className="empty-state">
           <Folder />
-          <p>התיקיות עוד לא נוצרו ב-Drive. ה-DBProvider או דף הקורסים יסדר זאת בטעינה הבאה.</p>
+          <p>התיקיות עוד לא נוצרו ב-Drive. סווג את הקורס למעלה כדי שייווצרו אוטומטית.</p>
         </div>
       ) : (
         <div className="folder-overview-grid">
@@ -391,6 +422,105 @@ function CourseFolderOverviewPanel({
         </div>
       )}
     </section>
+  )
+}
+
+const SEMESTER_OPTIONS: Array<{ value: HebSemester; label: string }> = [
+  { value: 'א', label: "סמסטר א'" },
+  { value: 'ב', label: "סמסטר ב'" },
+  { value: 'קיץ', label: 'קיץ' },
+]
+const YEAR_OPTIONS: Array<{ value: 1 | 2 | 3 | 4; label: string }> = [
+  { value: 1, label: "שנה א'" },
+  { value: 2, label: "שנה ב'" },
+  { value: 3, label: "שנה ג'" },
+  { value: 4, label: "שנה ד'" },
+]
+
+/** Inline classify form — set שנה + סמסטר for this course; on save we MOVE
+ *  the existing Drive folder to the new path (or create fresh if it never had one). */
+function ClassifyWidget({ course }: { course: Course }) {
+  const { reclassifyCourse } = useDB() as any
+  const [semester, setSemester] = useState<HebSemester | ''>(course.semester ?? '')
+  const [yearOfStudy, setYearOfStudy] = useState<number | ''>(course.year_of_study ?? '')
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+
+  // Re-sync local state when the user navigates between courses.
+  useEffect(() => {
+    setSemester(course.semester ?? '')
+    setYearOfStudy(course.year_of_study ?? '')
+    setStatus(null)
+  }, [course.id, course.semester, course.year_of_study])
+
+  const dirty =
+    semester !== (course.semester ?? '') ||
+    yearOfStudy !== (course.year_of_study ?? '')
+  const canSave = dirty && !busy && (semester !== '' || yearOfStudy !== '')
+
+  const onSave = async () => {
+    if (!canSave) return
+    setBusy(true)
+    setStatus(null)
+    try {
+      await reclassifyCourse(course.id, {
+        semester: semester || undefined,
+        year_of_study: (yearOfStudy || undefined) as Course['year_of_study'],
+      })
+      setStatus({ kind: 'ok', text: 'נשמר וסודר ב-Drive' })
+    } catch (e: any) {
+      setStatus({ kind: 'err', text: e?.message || 'שגיאה בשמירה' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="classify-widget">
+      <div className="classify-row">
+        <div className="classify-field">
+          <label htmlFor={`yos-${course.id}`}>שנה</label>
+          <select
+            id={`yos-${course.id}`}
+            value={yearOfStudy}
+            onChange={(e) => setYearOfStudy(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+            disabled={busy}
+          >
+            <option value="">—</option>
+            {YEAR_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="classify-field">
+          <label htmlFor={`sem-${course.id}`}>סמסטר</label>
+          <select
+            id={`sem-${course.id}`}
+            value={semester}
+            onChange={(e) => setSemester(e.target.value as HebSemester | '')}
+            disabled={busy}
+          >
+            <option value="">—</option>
+            {SEMESTER_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          className="classify-save"
+          onClick={onSave}
+          disabled={!canSave}
+        >
+          {busy ? 'שומר…' : 'שמור וסדר ב-Drive'}
+        </button>
+      </div>
+      {status && (
+        <div className={`classify-status ${status.kind === 'err' ? 'is-err' : 'is-ok'}`}>
+          {status.text}
+        </div>
+      )}
+    </div>
   )
 }
 
