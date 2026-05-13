@@ -1599,6 +1599,11 @@ html.light .modal-header,
 html.light .modal-footer {
   border-color: rgba(15,17,23,0.07);
 }
+/* Modal.tsx hardcodes `text-white` on the title (designed for the dark panel).
+   On html.light the panel flips to #fff, so the title becomes invisible —
+   force the heading to dark ink to restore contrast. */
+html.light .modal-header h2 { color: #1a1d28; }
+html.light .modal-header p  { color: #475569; }
 html.light .modal-close-btn {
   background: rgba(15,17,23,0.04);
   border: 1px solid rgba(15,17,23,0.08);
