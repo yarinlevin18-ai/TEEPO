@@ -32,13 +32,32 @@ async function getConfig() {
 }
 
 // ── OAuth ────────────────────────────────────────────────────────────────
+//
+// Why two tokens?
+//   * chrome.identity gives a token tied to the EXTENSION'S OAuth client
+//     (Chrome Extension type). It's used for sign-in state / openid info.
+//   * The WEBSITE'S OAuth client (Web Application type, via Supabase) is
+//     what created all the user's Drive folders. With `drive.file` scope,
+//     each OAuth client is a separate "app" — files/folders created by one
+//     are invisible to the other, even within the same Google project.
+//
+// Concretely: if we upload to a folder created by the website using the
+// extension's token, Drive accepts the upload but the website can't see
+// the file afterwards. That's why the user saw "uploaded" in the popup
+// but no files on /summaries.
+//
+// Fix: for any Drive read/write that touches website-owned data, use the
+// website's token instead. We grab it from the website tab's localStorage
+// (key: smartdesk_google_token, set by lib/auth-context.tsx).
+
+const WEB_TOKEN_KEY = 'smartdesk_google_token'
 
 /**
  * Get a Google OAuth token via chrome.identity. Cached by Chrome — the API
  * surfaces a fresh token automatically when the cache expires (~60min).
  *
- * `interactive: true` is required on the first call so Chrome can show
- * the account picker; subsequent calls can pass false.
+ * Used only for the extension's own identity needs (sign-in state, email).
+ * Do NOT use this for Drive operations against website-owned folders.
  */
 function getAuthToken(interactive = false) {
   return new Promise((resolve, reject) => {
@@ -67,6 +86,66 @@ async function signOut() {
     // consent screen instead of silently reusing the prior consent.
     await fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, { method: 'POST' })
   } catch {}
+  // Forget our cached website token too.
+  try { await chrome.storage.local.remove('teepoWebToken') } catch {}
+}
+
+/**
+ * Read the user's Google access_token from an open TEEPO website tab.
+ * Returns null if no TEEPO tab is open or the user isn't signed in.
+ *
+ * The website's auth-context.tsx persists this token to localStorage on
+ * sign-in and refresh, so it's always current as long as the user has
+ * the site open in any tab.
+ */
+async function getWebsiteGoogleToken() {
+  const { teepoBase } = await getConfig()
+  // Build match patterns for the active base + localhost for dev.
+  const baseOrigin = new URL(teepoBase).origin
+  const matches = [`${baseOrigin}/*`, 'http://localhost:3000/*']
+
+  let tabs = []
+  try {
+    tabs = await chrome.tabs.query({ url: matches })
+  } catch (e) {
+    // host_permissions usually cover these but bail out quietly if not.
+    console.warn('[bg] tabs.query failed for', matches, e)
+    return null
+  }
+  if (tabs.length === 0) return null
+
+  for (const tab of tabs) {
+    try {
+      const result = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        world: 'MAIN',
+        func: (key) => {
+          try { return localStorage.getItem(key) } catch { return null }
+        },
+        args: [WEB_TOKEN_KEY],
+      })
+      const token = result?.[0]?.result
+      if (token) return token
+    } catch (e) {
+      // Permission error, tab discarded, etc. — try the next one.
+      console.warn('[bg] readWebToken failed on tab', tab.id, e)
+    }
+  }
+  return null
+}
+
+/**
+ * Get the token to use for Drive operations against website-owned data.
+ * Prefers the website's token (drive.file scope tied to the website's
+ * OAuth client); throws a friendly error if no TEEPO tab is available.
+ */
+async function getDriveToken() {
+  const webToken = await getWebsiteGoogleToken()
+  if (webToken) return webToken
+  const { teepoBase } = await getConfig()
+  throw new Error(
+    `Open ${teepoBase} in a tab and sign in so the extension can use your TEEPO Drive token.`,
+  )
 }
 
 // ── Folder mapping (TEEPO backend) ────────────────────────────────────────
@@ -85,11 +164,16 @@ async function resolveFolder({ courseId, kind = 'lessons' }) {
   }
 
   const { teepoBase } = await getConfig()
-  const token = await getAuthToken(false)
+  // Use the WEBSITE'S Google token — the backend reads TEEPO/db.json and
+  // returns drive_folder_ids that only the website's OAuth client can write
+  // to. Calling with chrome.identity's token would either 404 (can't see
+  // TEEPO root) or hand back a folderId that's invisible to us on upload.
+  const token = await getDriveToken()
   const url = `${teepoBase}/api/drive/folder-for-course?course=${encodeURIComponent(courseId)}&kind=${encodeURIComponent(kind)}`
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
   if (!res.ok) {
-    throw new Error(`Folder resolve ${res.status}`)
+    const body = await res.text().catch(() => '')
+    throw new Error(`Folder resolve ${res.status}: ${body.slice(0, 160)}`)
   }
   const data = await res.json()
   if (!data.folderId) throw new Error('No folderId in response')
@@ -112,7 +196,11 @@ async function resolveFolder({ courseId, kind = 'lessons' }) {
  * stream directly to Drive without a base64 round-trip.
  */
 async function uploadFile({ folderId, sourceUrl, dataUrl, filename, mimeType }) {
-  let token = await getAuthToken(false)
+  // Use the website's Google token so the uploaded file ends up in the
+  // same drive.file-scope namespace as the folder (= visible on /summaries).
+  // chrome.identity's token is the extension's app and would create files
+  // invisible to the website.
+  let token = await getDriveToken()
 
   // Resolve content into a Blob.
   let blob
@@ -152,9 +240,11 @@ async function uploadFile({ folderId, sourceUrl, dataUrl, filename, mimeType }) 
     body,
   })
 
+  // On 401, re-read from the website (the user may have refreshed the tab
+  // since we last fetched). We can't force a refresh of THEIR token —
+  // that's the website's job — so a second 401 is terminal.
   if (res.status === 401) {
-    await clearAuthToken(token)
-    token = await getAuthToken(true)
+    token = await getDriveToken()
     res = await fetch(`${DRIVE_UPLOAD}?uploadType=multipart&fields=id,name`, {
       method: 'POST',
       headers: {
@@ -191,6 +281,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         case 'SIGN_IN': {
           const token = await getAuthToken(true)
           sendResponse({ ok: true, authed: Boolean(token) })
+          break
+        }
+        case 'GET_WEB_TOKEN': {
+          // Returns the website's Google access_token (drive.file scope under
+          // the website's OAuth client). Required for every Drive operation
+          // that touches website-owned folders. Null if no TEEPO tab open.
+          try {
+            const token = await getWebsiteGoogleToken()
+            sendResponse({ ok: true, token })
+          } catch (e) {
+            sendResponse({ ok: false, error: e?.message || 'web-token failed' })
+          }
           break
         }
         case 'SIGN_OUT': {
