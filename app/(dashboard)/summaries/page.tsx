@@ -312,6 +312,68 @@ function SemesterCoursesPanel({
   bucket: SemesterBucket
   onPickCourse: (id: string) => void
 }) {
+  const { reclassifyCourse } = useDB() as any
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkYear, setBulkYear] = useState<number | ''>('')
+  const [bulkSem, setBulkSem] = useState<HebSemester | ''>('')
+  const [bulkStatus, setBulkStatus] = useState<{ done: number; total: number; failed: number } | null>(null)
+  const [bulkErr, setBulkErr] = useState<string | null>(null)
+
+  // Clear selection when the bucket changes (user navigated away and back).
+  useEffect(() => {
+    setSelectedIds(new Set())
+    setBulkStatus(null)
+    setBulkErr(null)
+  }, [bucket.key])
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const selectAll = useCallback(() => {
+    setSelectedIds(new Set(bucket.courses.map(c => c.id)))
+  }, [bucket.courses])
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+
+  const canApply =
+    selectedIds.size > 0 &&
+    (bulkYear !== '' || bulkSem !== '') &&
+    bulkStatus === null
+
+  const applyBulk = async () => {
+    if (!canApply || typeof reclassifyCourse !== 'function') return
+    const ids = Array.from(selectedIds)
+    setBulkErr(null)
+    setBulkStatus({ done: 0, total: ids.length, failed: 0 })
+    let failed = 0
+    let firstError: string | null = null
+    for (let i = 0; i < ids.length; i++) {
+      try {
+        await reclassifyCourse(ids[i], {
+          year_of_study: (bulkYear || undefined) as Course['year_of_study'],
+          semester: (bulkSem || undefined) as Course['semester'],
+        })
+      } catch (e: any) {
+        failed++
+        if (!firstError) firstError = e?.message || 'שגיאה'
+        console.warn('[bulk-classify] failed for', ids[i], e)
+      }
+      setBulkStatus({ done: i + 1, total: ids.length, failed })
+    }
+    if (firstError) setBulkErr(firstError)
+    // Clear selection on success; the now-classified courses move out of this
+    // bucket anyway, so keeping them selected is meaningless.
+    if (failed === 0) setSelectedIds(new Set())
+    // Hide progress after a short delay so success message has time to be seen.
+    setTimeout(() => setBulkStatus(null), 2500)
+  }
+
   if (bucket.courses.length === 0) {
     return (
       <section className="course-panel">
@@ -330,6 +392,9 @@ function SemesterCoursesPanel({
     )
   }
 
+  const allSelected = selectedIds.size === bucket.courses.length
+  const someSelected = selectedIds.size > 0
+
   return (
     <section className="course-panel">
       <div className="course-panel-head">
@@ -340,28 +405,102 @@ function SemesterCoursesPanel({
         </div>
         <span className="count-pill">{bucket.courses.length} קורסים</span>
       </div>
+
+      {/* Bulk classify toolbar — sticky above the grid */}
+      <div className="bulk-bar">
+        <div className="bulk-bar-left">
+          <label className="bulk-checkbox">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected }}
+              onChange={() => (allSelected ? clearSelection() : selectAll())}
+            />
+            <span>בחר הכל</span>
+          </label>
+          <span className="bulk-count">
+            {selectedIds.size > 0 ? `נבחרו ${selectedIds.size}` : 'בחר קורסים לסיווג קבוצתי'}
+          </span>
+        </div>
+        <div className="bulk-bar-right">
+          <select
+            className="bulk-select"
+            value={bulkYear}
+            onChange={(e) => setBulkYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+            disabled={!someSelected || bulkStatus !== null}
+            aria-label="שנה"
+          >
+            <option value="">שנה —</option>
+            {YEAR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <select
+            className="bulk-select"
+            value={bulkSem}
+            onChange={(e) => setBulkSem(e.target.value as HebSemester | '')}
+            disabled={!someSelected || bulkStatus !== null}
+            aria-label="סמסטר"
+          >
+            <option value="">סמסטר —</option>
+            {SEMESTER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <button
+            type="button"
+            className="bulk-apply"
+            onClick={applyBulk}
+            disabled={!canApply}
+          >
+            {bulkStatus
+              ? `מסדר… ${bulkStatus.done}/${bulkStatus.total}`
+              : `סדר ב-Drive (${selectedIds.size})`}
+          </button>
+        </div>
+      </div>
+      {bulkErr && <div className="bulk-error">שגיאה ראשונה: {bulkErr}</div>}
+      {bulkStatus && bulkStatus.done === bulkStatus.total && !bulkErr && (
+        <div className="bulk-success">
+          {bulkStatus.total - bulkStatus.failed} קורסים סודרו ב-Drive
+          {bulkStatus.failed > 0 ? ` · ${bulkStatus.failed} נכשלו` : ''}
+        </div>
+      )}
+
       <div className="course-grid">
         {bucket.courses.map((c, i) => {
           const palette = COURSE_PALETTE[i % COURSE_PALETTE.length]
+          const isSelected = selectedIds.has(c.id)
           return (
-            <button
-              type="button"
+            <div
               key={c.id}
-              className="course-card"
-              onClick={() => onPickCourse(c.id)}
+              className={`course-card ${isSelected ? 'course-card-selected' : ''}`}
               style={{ ['--course-color' as any]: palette.color, ['--course-soft' as any]: palette.soft }}
             >
-              <div className="top">
-                <div className="ico-wrap"><BookOpen /></div>
-                <div>
-                  <h3>{c.title}</h3>
-                  <small>{(c as any).shortname ?? ''}</small>
+              <label
+                className="course-card-pick"
+                onClick={(e) => e.stopPropagation()}
+                title="בחר לסיווג קבוצתי"
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleSelect(c.id)}
+                />
+              </label>
+              <button
+                type="button"
+                className="course-card-body"
+                onClick={() => onPickCourse(c.id)}
+              >
+                <div className="top">
+                  <div className="ico-wrap"><BookOpen /></div>
+                  <div>
+                    <h3>{c.title}</h3>
+                    <small>{(c as any).shortname ?? ''}</small>
+                  </div>
                 </div>
-              </div>
-              <div className="folder-shortcut-row">
-                <span>פתח →</span>
-              </div>
-            </button>
+                <div className="folder-shortcut-row">
+                  <span>פתח →</span>
+                </div>
+              </button>
+            </div>
           )
         })}
       </div>
