@@ -113,6 +113,13 @@ const COURSE_PALETTE = [
 export default function SummariesPage() {
   const { db, syncCourseFolders } = useDB() as any
   const universityName = useUniversityName()
+  // Prefer the user's named degree (e.g. "תואר ראשון - מנע״ס") over the
+  // generic university label. Falls back to university → 'התואר שלי' so
+  // the tree never renders a blank node for users who haven't filled it in.
+  const degreeLabel: string =
+    (db?.settings?.degree_name && String(db.settings.degree_name).trim()) ||
+    universityName ||
+    'התואר שלי'
 
   const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
   const buckets = useMemo(() => bucketize(courses), [courses])
@@ -201,7 +208,7 @@ export default function SummariesPage() {
             <div className="degree-to-sems" />
             <div className="node degree">
               <GraduationCap className="folder-ico" />
-              <span className="name">{universityName || 'התואר שלי'}</span>
+              <span className="name">{degreeLabel}</span>
               <span className="count">{buckets.length} סמסטרים</span>
             </div>
           </div>
