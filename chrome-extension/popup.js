@@ -212,10 +212,21 @@ async function fetchCourseList() {
   return res.json()
 }
 
+/**
+ * Get the Google access token to use for /api/drive/* and /api/courses/import.
+ *
+ * Backend endpoints read TEEPO/db.json + drive_folder_ids — all created
+ * under the WEBSITE'S OAuth client (drive.file scope is per-client). So
+ * we ask the background worker to grab the live token from the user's
+ * TEEPO website tab instead of using chrome.identity (which is the
+ * EXTENSION'S client and would see a different, empty Drive namespace).
+ *
+ * Returns null if no TEEPO tab is open or the user isn't signed in there.
+ * Callers should show a friendly "open TEEPO and sign in" message.
+ */
 async function getDriveToken() {
-  return new Promise((resolve) => {
-    chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null))
-  })
+  const r = await bg({ type: 'GET_WEB_TOKEN' })
+  return r?.ok && r.token ? r.token : null
 }
 
 function escapeHtml(s) {
@@ -421,7 +432,7 @@ async function doImportDiscovered() {
 
   const token = await getDriveToken()
   if (!token) {
-    showError('לא ניתן לקבל Drive token. צא והתחבר מחדש.')
+    showError('פתח את האתר של TEEPO ב-tab ותתחבר עם Google, ואז נסה שוב.')
     return
   }
   const base = await getTeepoBase()
