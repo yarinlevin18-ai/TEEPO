@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, User, GraduationCap, Save, Check, AlertCircle, ArrowRight, CalendarDays, Database, Building2, Sun, Moon } from 'lucide-react'
+import { Settings, User, GraduationCap, Save, Check, AlertCircle, ArrowRight, CalendarDays, Database, Building2, Sun, Moon, Trash2 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 import { useDB } from '@/lib/db-context'
@@ -14,7 +14,7 @@ import type { UniversityCode } from '@/types'
 
 export default function SettingsPage() {
   const { user } = useAuth()
-  const { db, ready, updateSettings } = useDB()
+  const { db, ready, updateSettings, resetAccountData } = useDB()
   const { theme, setTheme } = useTheme()
   const [displayName, setDisplayName] = useState('')
   const [originalName, setOriginalName] = useState('')
@@ -697,7 +697,194 @@ export default function SettingsPage() {
         </div>
         </GlowCard>
         </motion.div>
+
+        {/* Reset account data — destructive. Requires typed confirmation
+            so a misclick doesn't wipe a real semester of work. */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <ResetSection resetAccountData={resetAccountData} ready={ready} />
+        </motion.div>
       </div>
     </div>
+  )
+}
+
+// ── Reset section ────────────────────────────────────────────────────────
+
+function ResetSection({
+  resetAccountData,
+  ready,
+}: {
+  resetAccountData: (opts?: { wipeDriveFolders?: boolean }) => Promise<{ trashedFolders: number }>
+  ready: boolean
+}) {
+  const REQUIRED_PHRASE = 'אפס'
+  const [open, setOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [wipeFolders, setWipeFolders] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<string | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const canReset = ready && !busy && confirmText.trim() === REQUIRED_PHRASE
+
+  const onReset = async () => {
+    if (!canReset) return
+    setBusy(true)
+    setResult(null)
+    setErrorMsg(null)
+    try {
+      const r = await resetAccountData({ wipeDriveFolders: wipeFolders })
+      setResult(
+        wipeFolders
+          ? `המידע נמחק. ${r.trashedFolders} תיקיות הועברו לסל ב-Drive — אפשר לשחזר משם ב-30 ימים הקרובים.`
+          : 'הנתונים אופסו. תיקיות ה-Drive נשארו כפי שהן.',
+      )
+      setConfirmText('')
+      setOpen(false)
+    } catch (e: any) {
+      setErrorMsg(e?.message || 'איפוס נכשל')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <GlowCard glowColor="rgba(239,68,68,0.10)">
+      <div className="p-6">
+        <div className="flex items-center gap-2 mb-2">
+          <Trash2 size={18} style={{ color: '#ef4444' }} />
+          <h2 className="font-semibold text-white">איפוס נתונים</h2>
+        </div>
+        <p className="text-xs text-ink-subtle mb-5">
+          מוחק את כל הקורסים, השיעורים, המטלות והסיכומים מ-TEEPO/db.json,
+          וברירת המחדל גם מעביר את כל תיקיות ה-Drive שמתחת ל-TEEPO/ לסל
+          (ניתן לשחזור 30 ימים). השימושי כשרוצים להתחיל מחדש את הסריקה מ-Moodle.
+        </p>
+
+        {!open && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            disabled={!ready}
+            className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            style={{
+              background: 'rgba(239,68,68,0.12)',
+              color: '#ef4444',
+              border: '1px solid rgba(239,68,68,0.35)',
+              opacity: ready ? 1 : 0.5,
+              cursor: ready ? 'pointer' : 'not-allowed',
+            }}
+          >
+            איפוס המידע שלי…
+          </button>
+        )}
+
+        {open && (
+          <div className="space-y-4">
+            <div
+              className="p-3 rounded-lg text-xs flex items-start gap-2"
+              style={{
+                background: 'rgba(239,68,68,0.10)',
+                border: '1px solid rgba(239,68,68,0.35)',
+                color: '#fca5a5',
+              }}
+            >
+              <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+              <div>
+                פעולה זו מאפסת את כל המידע ב-TEEPO/db.json. אם תסמן גם
+                <strong> מחק תיקיות Drive</strong>, כל התיקיות מתחת ל-TEEPO/
+                (תואר ראשון/, לא מסווגים/ וכו') יועברו לסל. ה-db.json עצמו
+                לא נמחק — רק תוכנו מתאפס.
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm text-ink-muted cursor-pointer">
+              <input
+                type="checkbox"
+                checked={wipeFolders}
+                onChange={(e) => setWipeFolders(e.target.checked)}
+                disabled={busy}
+              />
+              <span>מחק גם את תיקיות ה-Drive (תואר ראשון/, לא מסווגים/, …)</span>
+            </label>
+
+            <div>
+              <label className="block text-xs text-ink-muted mb-1.5">
+                כדי לאשר, הקלד <strong>{REQUIRED_PHRASE}</strong>
+              </label>
+              <input
+                type="text"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                disabled={busy}
+                placeholder={REQUIRED_PHRASE}
+                className="w-full px-3 py-2 rounded-lg text-sm"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: 'white',
+                }}
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onReset}
+                disabled={!canReset}
+                className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                style={{
+                  background: canReset ? '#ef4444' : 'rgba(239,68,68,0.20)',
+                  color: 'white',
+                  opacity: canReset ? 1 : 0.5,
+                  cursor: canReset ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {busy ? 'מאפס…' : 'אפס עכשיו'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  setConfirmText('')
+                  setErrorMsg(null)
+                }}
+                disabled={busy}
+                className="px-4 py-2 rounded-lg text-sm"
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  color: 'rgba(255,255,255,0.8)',
+                }}
+              >
+                ביטול
+              </button>
+            </div>
+
+            {errorMsg && (
+              <div className="text-xs" style={{ color: '#fca5a5' }}>
+                {errorMsg}
+              </div>
+            )}
+          </div>
+        )}
+
+        {result && (
+          <div
+            className="mt-4 p-3 rounded-lg text-xs"
+            style={{
+              background: 'rgba(16,185,129,0.10)',
+              border: '1px solid rgba(16,185,129,0.30)',
+              color: '#6ee7b7',
+            }}
+          >
+            {result}
+          </div>
+        )}
+      </div>
+    </GlowCard>
   )
 }

@@ -90,6 +90,14 @@ interface DBContextType {
     courseId: string,
     patch: { semester?: Course['semester']; year_of_study?: Course['year_of_study']; academic_year?: string },
   ) => Promise<void>
+  /** Destructive: wipe all app-managed state.
+   *  - Replaces TEEPO/db.json with an EMPTY_DB.
+   *  - If wipeDriveFolders=true, trashes every subfolder inside TEEPO/
+   *    (תואר ראשון/, לא מסווגים/, etc.). The folders go to Drive's trash,
+   *    so the user can restore for 30 days if they panic. db.json itself
+   *    is preserved (only its content is reset).
+   *  Returns the count of trashed folders. */
+  resetAccountData: (opts?: { wipeDriveFolders?: boolean }) => Promise<{ trashedFolders: number }>
 }
 
 const DBContext = createContext<DBContextType | undefined>(undefined)
@@ -656,6 +664,64 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     }))
   }, [handle, db.courses, withToken, mutate, syncCourseFolders])
 
+  // ── Destructive: wipe app data so the user can start fresh ──────────────
+  const resetAccountData = useCallback(async (
+    opts: { wipeDriveFolders?: boolean } = {},
+  ): Promise<{ trashedFolders: number }> => {
+    if (!handle) throw new Error('מסד הנתונים טרם נטען.')
+    const teepoFolderId = handle.folderId
+    let trashed = 0
+
+    // 1. Optionally trash every subfolder inside TEEPO/. We DON'T touch
+    //    files (like db.json itself, or user-uploaded stuff sitting at the
+    //    TEEPO/ root if any). Drive's trashed=true is soft delete — 30 days
+    //    to restore from the trash UI.
+    if (opts.wipeDriveFolders) {
+      const FOLDER_MIME = 'application/vnd.google-apps.folder'
+      const q = [
+        `'${teepoFolderId}' in parents`,
+        `mimeType = '${FOLDER_MIME}'`,
+        'trashed = false',
+      ].join(' and ')
+      const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&spaces=drive`
+      const listRes = await withToken(t =>
+        fetch(listUrl, { headers: { Authorization: `Bearer ${t}` } }),
+      )
+      if (!listRes.ok) {
+        const body = await listRes.text().catch(() => '')
+        throw new Error(`רענון תיקיות ב-Drive נכשל (${listRes.status}): ${body.slice(0, 160)}`)
+      }
+      const { files } = await listRes.json() as { files?: Array<{ id: string; name: string }> }
+      for (const f of files ?? []) {
+        try {
+          const patchRes = await withToken(t =>
+            fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
+              method: 'PATCH',
+              headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ trashed: true }),
+            }),
+          )
+          if (patchRes.ok) trashed++
+          else console.warn('[reset] trash failed for', f.name, patchRes.status)
+        } catch (e) {
+          console.warn('[reset] trash threw for', f.name, e)
+        }
+      }
+    }
+
+    // 2. Overwrite db.json with EMPTY_DB. We flush any pending debounced
+    //    save FIRST so it doesn't overwrite us a second later.
+    await withToken(t => flushPendingSave(t))
+    const fresh: DriveDB = { ...EMPTY_DB, updated_at: new Date().toISOString() }
+    await withToken(t => saveDB(t, handle, fresh))
+
+    // 3. Reset in-memory state so the UI shows the wipe immediately,
+    //    without waiting for a page reload.
+    setDb(fresh)
+
+    return { trashedFolders: trashed }
+  }, [handle, withToken])
+
   const driveConnected = !!googleToken && ready && !error
   const driveMissing = !!user && !googleToken
 
@@ -668,7 +734,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createNote, updateNote, deleteNote,
     updateSettings, replaceCourses,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
-    syncCourseFolders, syncAllCourseFolders, reclassifyCourse,
+    syncCourseFolders, syncAllCourseFolders, reclassifyCourse, resetAccountData,
   }), [
     db, handle, ready, loading, error, driveConnected, driveMissing, reload,
     createCourse, updateCourse, deleteCourse,
@@ -678,7 +744,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createNote, updateNote, deleteNote,
     updateSettings, replaceCourses,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
-    syncCourseFolders, syncAllCourseFolders, reclassifyCourse,
+    syncCourseFolders, syncAllCourseFolders, reclassifyCourse, resetAccountData,
   ])
 
   return <DBContext.Provider value={value}>{children}</DBContext.Provider>
