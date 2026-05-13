@@ -35,64 +35,94 @@ import type { Course } from '@/types'
 
 type HebSemester = 'א' | 'ב' | 'קיץ'
 
+/** A leaf bucket — collection of courses inside a single semester (or the
+ *  generic "no year_of_study" bucket). The SemesterCoursesPanel + bulk
+ *  classify UI render against this shape unchanged. */
 interface SemesterBucket {
   key: string
   label: string
-  year: number              // 0 for unclassified
   semester: HebSemester | null
   courses: Course[]
   isUnclassified: boolean
 }
 
+interface YearGroup {
+  yearOfStudy: 1 | 2 | 3 | 4
+  yearKey: string                 // 'y1', 'y2', …
+  label: string                   // "שנה א'", …
+  semesters: SemesterBucket[]
+  courseCount: number
+}
+
+interface DegreeTree {
+  years: YearGroup[]
+  /** Courses missing year_of_study live here regardless of semester. */
+  unclassified: SemesterBucket | null
+}
+
 type FolderKind = 'lessons' | 'assignments' | 'notes'
 
-const SEM_ORDER: Record<HebSemester, number> = { 'א': 1, 'ב': 2, 'קיץ': 3 }
+const YEAR_LABEL: Record<number, string> = { 1: "שנה א'", 2: "שנה ב'", 3: "שנה ג'", 4: "שנה ד'" }
 
-/** Group courses into semester buckets. Unclassified courses get their own
- *  bucket at the end so the user can find and fix them. */
-function bucketize(courses: Course[]): SemesterBucket[] {
-  const map = new Map<string, SemesterBucket>()
+/** Build the tree: courses → years (year_of_study 1-4) → semesters
+ *  (א/ב/קיץ; courses missing semester fall into a 'ללא סמסטר' bucket
+ *  inside their year). Courses missing year_of_study go to a top-level
+ *  לא מסווגים bucket that's a sibling of the year row. */
+function buildTree(courses: Course[]): DegreeTree {
+  const yearMap = new Map<number, Map<string, Course[]>>()
+  const unclassifiedCourses: Course[] = []
+
   for (const c of courses) {
-    const sem = c.semester
-    if (!sem) {
-      const k = 'unclassified'
-      if (!map.has(k)) {
-        map.set(k, {
-          key: k,
-          label: 'לא מסווגים',
-          year: 0,
-          semester: null,
-          courses: [],
-          isUnclassified: true,
+    const yos = c.year_of_study
+    if (!yos) { unclassifiedCourses.push(c); continue }
+    const semKey = c.semester ?? 'no-sem'
+    if (!yearMap.has(yos)) yearMap.set(yos, new Map())
+    const semMap = yearMap.get(yos)!
+    if (!semMap.has(semKey)) semMap.set(semKey, [])
+    semMap.get(semKey)!.push(c)
+  }
+
+  const semOrder: Array<HebSemester | 'no-sem'> = ['א', 'ב', 'קיץ', 'no-sem']
+  const years: YearGroup[] = Array.from(yearMap.keys())
+    .sort((a, b) => a - b)
+    .map((yos) => {
+      const semMap = yearMap.get(yos)!
+      const semesters: SemesterBucket[] = []
+      for (const s of semOrder) {
+        const list = semMap.get(s)
+        if (!list || list.length === 0) continue
+        semesters.push({
+          key: `y${yos}-${s}`,
+          label:
+            s === 'no-sem' ? 'ללא סמסטר' :
+            s === 'קיץ'    ? 'קיץ' :
+                             `סמסטר ${s}׳`,
+          semester: s === 'no-sem' ? null : s,
+          courses: list,
+          isUnclassified: false,
         })
       }
-      map.get(k)!.courses.push(c)
-      continue
-    }
-    const year = c.academic_year ? parseInt(c.academic_year, 10) : 0
-    const yearLabel = year ? `${year}/${(year + 1).toString().slice(-2)} · ` : ''
-    const semLabel = sem === 'קיץ' ? 'קיץ' : `סמסטר ${sem}׳`
-    const key = `${year}-${sem}`
-    if (!map.has(key)) {
-      map.set(key, {
-        key,
-        label: `${yearLabel}${semLabel}`,
-        year,
-        semester: sem,
-        courses: [],
-        isUnclassified: false,
-      })
-    }
-    map.get(key)!.courses.push(c)
+      return {
+        yearOfStudy: yos as 1|2|3|4,
+        yearKey: `y${yos}`,
+        label: YEAR_LABEL[yos] ?? `שנה ${yos}`,
+        semesters,
+        courseCount: semesters.reduce((n, s) => n + s.courses.length, 0),
+      }
+    })
+
+  return {
+    years,
+    unclassified: unclassifiedCourses.length > 0
+      ? {
+          key: 'unclassified',
+          label: 'לא מסווגים',
+          semester: null,
+          courses: unclassifiedCourses,
+          isUnclassified: true,
+        }
+      : null,
   }
-  return Array.from(map.values()).sort((a, b) => {
-    if (a.isUnclassified) return 1
-    if (b.isUnclassified) return -1
-    if (a.year !== b.year) return b.year - a.year
-    const aOrd = a.semester ? SEM_ORDER[a.semester] : 9
-    const bOrd = b.semester ? SEM_ORDER[b.semester] : 9
-    return aOrd - bOrd
-  })
 }
 
 const FOLDER_DEFS: Array<{ kind: FolderKind; label: string; hint: string; Icon: any }> = [
@@ -122,31 +152,59 @@ export default function SummariesPage() {
     'התואר שלי'
 
   const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
-  const buckets = useMemo(() => bucketize(courses), [courses])
+  const tree = useMemo(() => buildTree(courses), [courses])
 
-  const [activeSem, setActiveSem] = useState<string | null>(null)
+  // Selection state — four levels deep: year → semester → course → folder.
+  // activeSemKey is either a "y<N>-<sem>" key inside the active year, OR
+  // the literal 'unclassified' for the top-level unclassified bucket. When
+  // 'unclassified', activeYearKey is irrelevant (set to null).
+  const [activeYearKey, setActiveYearKey] = useState<string | null>(null)
+  const [activeSemKey, setActiveSemKey] = useState<string | null>(null)
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null)
   const [activeFolderKind, setActiveFolderKind] = useState<FolderKind | null>(null)
 
-  // First load: snap to the first bucket if the user hasn't picked yet.
+  // First load: auto-select the first year + its first semester so the
+  // panel below the tree isn't empty.
   useEffect(() => {
-    if (!activeSem && buckets.length > 0) {
-      setActiveSem(buckets[0].key)
+    if (activeYearKey || activeSemKey) return
+    if (tree.years.length > 0) {
+      const y = tree.years[0]
+      setActiveYearKey(y.yearKey)
+      if (y.semesters.length > 0) setActiveSemKey(y.semesters[0].key)
+    } else if (tree.unclassified) {
+      setActiveSemKey('unclassified')
     }
-  }, [buckets, activeSem])
+  }, [tree, activeYearKey, activeSemKey])
 
-  const activeBucket = useMemo(
-    () => buckets.find((b) => b.key === activeSem) ?? null,
-    [buckets, activeSem],
+  const activeYear = useMemo<YearGroup | null>(
+    () => tree.years.find(y => y.yearKey === activeYearKey) ?? null,
+    [tree, activeYearKey],
   )
+  const activeBucket = useMemo<SemesterBucket | null>(() => {
+    if (activeSemKey === 'unclassified') return tree.unclassified
+    return activeYear?.semesters.find(s => s.key === activeSemKey) ?? null
+  }, [tree, activeYear, activeSemKey])
   const activeCourse = useMemo(
     () => activeBucket?.courses.find((c) => c.id === activeCourseId) ?? null,
     [activeBucket, activeCourseId],
   )
 
-  // Selection handlers reset deeper levels so we never show an orphan node.
-  const pickSem = useCallback((key: string) => {
-    setActiveSem(key)
+  // Selection handlers — clicking a level resets all deeper levels so the
+  // tree never displays an orphan node.
+  const pickYear = useCallback((yearKey: string) => {
+    setActiveYearKey(prev => prev === yearKey ? null : yearKey)
+    setActiveSemKey(null)
+    setActiveCourseId(null)
+    setActiveFolderKind(null)
+  }, [])
+  const pickUnclassified = useCallback(() => {
+    setActiveYearKey(null)
+    setActiveSemKey('unclassified')
+    setActiveCourseId(null)
+    setActiveFolderKind(null)
+  }, [])
+  const pickSem = useCallback((semKey: string) => {
+    setActiveSemKey(prev => prev === semKey ? null : semKey)
     setActiveCourseId(null)
     setActiveFolderKind(null)
   }, [])
@@ -159,8 +217,7 @@ export default function SummariesPage() {
   }, [])
 
   // Auto-heal: missing drive_folder_ids on the visible courses get one
-  // provision attempt per courseId per tab. Same logic as before — moved
-  // up here so we can still hit it after the structural rewrite.
+  // provision attempt per courseId per tab.
   const provisionedRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     if (!activeBucket || typeof syncCourseFolders !== 'function') return
@@ -189,14 +246,21 @@ export default function SummariesPage() {
           </p>
         </header>
 
-        {/* ===== Tree — TEEPO → degree → semester → course → folder ===== */}
+        {/* ===== Tree — degree → year → semester → course → folder ===== */}
         <div className="tree-wrap">
           <div className="tree-root">
             <button
               type="button"
               className="node root"
-              onClick={() => { setActiveSem(buckets[0]?.key ?? null); setActiveCourseId(null); setActiveFolderKind(null) }}
-              title="חזור לתצוגת כל הסמסטרים"
+              onClick={() => {
+                // Reset to defaults — go back to first year/semester.
+                const y = tree.years[0]
+                setActiveYearKey(y?.yearKey ?? null)
+                setActiveSemKey(y?.semesters[0]?.key ?? (tree.unclassified ? 'unclassified' : null))
+                setActiveCourseId(null)
+                setActiveFolderKind(null)
+              }}
+              title="חזור לתצוגת כל השנים"
             >
               <Home className="folder-ico" />
               <span className="name">TEEPO</span>
@@ -209,29 +273,70 @@ export default function SummariesPage() {
             <div className="node degree">
               <GraduationCap className="folder-ico" />
               <span className="name">{degreeLabel}</span>
-              <span className="count">{buckets.length} סמסטרים</span>
+              <span className="count">{tree.years.length} שנים</span>
             </div>
           </div>
 
-          {buckets.length > 0 && (
+          {/* Year row — top level under the degree */}
+          {(tree.years.length > 0 || tree.unclassified) && (
             <div className="sem-grid">
-              {buckets.map((b) => (
-                <div className={`sem-chip-wrap ${b.key === activeSem ? 'active' : ''}`} key={b.key}>
+              {tree.years.map((y) => {
+                const isActive = y.yearKey === activeYearKey
+                return (
+                  <div className={`sem-chip-wrap ${isActive ? 'active' : ''}`} key={y.yearKey}>
+                    <button
+                      type="button"
+                      className={`node sem ${isActive ? 'active' : ''}`}
+                      onClick={() => pickYear(y.yearKey)}
+                    >
+                      <Folder className="folder-ico" />
+                      <span className="name">{y.label}</span>
+                      <span className="count">{y.courseCount}</span>
+                    </button>
+                  </div>
+                )
+              })}
+              {tree.unclassified && (
+                <div className={`sem-chip-wrap ${activeSemKey === 'unclassified' ? 'active' : ''}`}>
                   <button
                     type="button"
-                    className={`node sem ${b.key === activeSem ? 'active' : ''}`}
-                    onClick={() => pickSem(b.key)}
+                    className={`node sem ${activeSemKey === 'unclassified' ? 'active' : ''}`}
+                    onClick={pickUnclassified}
                   >
                     <Folder className="folder-ico" />
-                    <span className="name">{b.label}</span>
-                    <span className="count">{b.courses.length}</span>
+                    <span className="name">לא מסווגים</span>
+                    <span className="count">{tree.unclassified.courses.length}</span>
                   </button>
                 </div>
-              ))}
+              )}
             </div>
           )}
 
-          {/* Course row — appears only when a semester is selected */}
+          {/* Semester row — appears only when a (classified) year is selected */}
+          {activeYear && activeYear.semesters.length > 0 && (
+            <>
+              <div className="tree-divider-line" aria-hidden />
+              <div className="course-row">
+                {activeYear.semesters.map((s) => {
+                  const isActive = s.key === activeSemKey
+                  return (
+                    <button
+                      type="button"
+                      key={s.key}
+                      className={`node folder ${isActive ? 'active' : ''}`}
+                      onClick={() => pickSem(s.key)}
+                    >
+                      <Folder className="folder-ico" />
+                      <span className="name">{s.label}</span>
+                      <span className="count">{s.courses.length}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Course row — appears only when a semester (or unclassified) is picked */}
           {activeBucket && activeBucket.courses.length > 0 && (
             <>
               <div className="tree-divider-line" aria-hidden />
@@ -298,10 +403,15 @@ export default function SummariesPage() {
             bucket={activeBucket}
             onPickCourse={pickCourse}
           />
+        ) : activeYear ? (
+          <div className="sum-empty">
+            <Folder />
+            <h3>בחר סמסטר ב{activeYear.label} כדי לראות את הקורסים</h3>
+          </div>
         ) : (
           <div className="sum-empty">
             <Folder />
-            <h3>בחר סמסטר כדי להתחיל</h3>
+            <h3>בחר שנה כדי להתחיל</h3>
           </div>
         )}
 
