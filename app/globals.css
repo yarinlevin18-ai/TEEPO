@@ -4400,6 +4400,154 @@ html.light .badge-danger {
   margin-top: 6px;
 }
 
+/* Bulk classify toolbar shown above the semester course grid */
+.summaries-page .bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--lp-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--lp-accent) 25%, transparent);
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+.summaries-page .bulk-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.summaries-page .bulk-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.summaries-page .bulk-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lp-ink-soft);
+  cursor: pointer;
+  user-select: none;
+}
+.summaries-page .bulk-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--lp-accent);
+}
+.summaries-page .bulk-count {
+  font-size: 12.5px;
+  color: var(--lp-muted);
+  font-weight: 600;
+}
+.summaries-page .bulk-select {
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 8px;
+  color: var(--lp-ink);
+  cursor: pointer;
+  min-width: 96px;
+}
+.summaries-page .bulk-select:disabled { opacity: .55; cursor: not-allowed; }
+.summaries-page .bulk-apply {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  background: var(--lp-gradient);
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s, opacity .15s;
+  box-shadow: 0 3px 8px -2px rgba(22, 163, 74, .35);
+  min-width: 130px;
+}
+.summaries-page .bulk-apply:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px -2px rgba(22, 163, 74, .5);
+}
+.summaries-page .bulk-apply:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.summaries-page .bulk-success {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #16a34a;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(22, 163, 74, .08);
+  border-radius: 8px;
+}
+.summaries-page .bulk-error {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #b91c1c;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #fee2e2;
+  border-radius: 8px;
+}
+
+/* Course card with checkbox slot — split the original button into a
+   checkbox wrapper + clickable body so the checkbox doesn't trigger card open. */
+.summaries-page .course-grid > .course-card {
+  padding: 0;            /* body provides padding */
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.summaries-page .course-card-pick {
+  position: absolute;
+  top: 8px;
+  inset-inline-start: 8px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: var(--lp-bg-card);
+  border-radius: 5px;
+  border: 1px solid var(--lp-line);
+}
+.summaries-page .course-card-pick input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--lp-accent);
+}
+.summaries-page .course-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 16px 18px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  text-align: right;
+  border-radius: 14px;
+}
+.summaries-page .course-card-body:hover {
+  background: var(--course-soft, var(--lp-accent-soft));
+}
+.summaries-page .course-card-selected {
+  border-color: var(--lp-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lp-accent) 25%, transparent);
+}
+
 /* Inline classify form inside the course-folder-overview panel */
 .summaries-page .classify-widget {
   background: var(--lp-accent-soft);
