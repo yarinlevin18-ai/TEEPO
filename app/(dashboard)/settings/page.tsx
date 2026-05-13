@@ -22,6 +22,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   // Degree-start state (local; persisted to Drive settings on change)
+  const [degreeName, setDegreeName] = useState<string>('')
   const [degreeYear, setDegreeYear] = useState<string>('')
   const [degreeMonth, setDegreeMonth] = useState<string>('10')
   const [takesSummer, setTakesSummer] = useState<boolean>(false)
@@ -46,6 +47,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!ready) return
     const s = db.settings || {}
+    if (s.degree_name) setDegreeName(String(s.degree_name))
     if (s.degree_start_year) setDegreeYear(String(s.degree_start_year))
     if (s.degree_start_month) setDegreeMonth(String(s.degree_start_month))
     setTakesSummer(!!s.takes_summer)
@@ -94,6 +96,7 @@ export default function SettingsPage() {
     }
     try {
       await updateSettings({
+        degree_name: degreeName.trim() || undefined,
         degree_start_year: y,
         degree_start_month: m,
         takes_summer: takesSummer,
@@ -475,6 +478,22 @@ export default function SettingsPage() {
           <p className="text-xs text-ink-subtle mb-5">
             משמש לחישוב לאיזו שנה (א/ב/ג/ד) וסמסטר (א/ב/קיץ) שייך כל קורס שמושך מ-Moodle.
           </p>
+
+          <div className="mb-4">
+            <label className="block text-sm text-ink-muted mb-1.5">שם התואר</label>
+            <input
+              type="text"
+              value={degreeName}
+              onChange={(e) => setDegreeName(e.target.value)}
+              placeholder='תואר ראשון - מנע"ס'
+              maxLength={80}
+              className="input-dark"
+              dir="rtl"
+            />
+            <p className="text-xs text-ink-subtle mt-1.5">
+              מופיע בעץ של המוח כקצה השני (אחרי TEEPO). אם ריק, יוצג שם האוניברסיטה.
+            </p>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>

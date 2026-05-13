@@ -15,6 +15,10 @@ export interface UserSettings {
   degree_start_year?: number
   /** Month (1-12) the user started — normally 10 (October). Used to align year-of-study boundaries. */
   degree_start_month?: number
+  /** Human-readable name of the degree (e.g. "תואר ראשון - מנע״ס"). Shown
+   *  as the second node in the /summaries tree, between TEEPO and the
+   *  semester chips. Falls back to the university name when unset. */
+  degree_name?: string
   /** True if the user does summer semesters (shows קיץ slots even if empty) */
   takes_summer?: boolean
   /** Loose moodle-connection mirror for the TopNav pill. Authoritative state
