@@ -56,9 +56,41 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: cors() })
 }
 
+/**
+ * GET — diagnostic. Reports presence + a sanitized fingerprint of the
+ * configured env vars so we can verify they match the Supabase OAuth
+ * client without exposing the full secret. Returns the first 12 + last 15
+ * chars of the client_id (the full thing is public anyway — it ends up
+ * in every OAuth redirect URL) and only the length of the secret.
+ */
+export async function GET() {
+  const rawId = process.env.GOOGLE_CLIENT_ID ?? ''
+  const rawSecret = process.env.GOOGLE_CLIENT_SECRET ?? ''
+  const id = rawId.trim()
+  const secret = rawSecret.trim()
+  return NextResponse.json(
+    {
+      configured: !!id && !!secret,
+      clientIdPresent: !!id,
+      clientIdLen: id.length,
+      clientIdHasWhitespace: rawId !== id,
+      clientIdPrefix: id.slice(0, 12),
+      clientIdSuffix: id.slice(-15),
+      clientSecretPresent: !!secret,
+      clientSecretLen: secret.length,
+      clientSecretHasWhitespace: rawSecret !== secret,
+      clientSecretPrefix: secret.slice(0, 7), // GOCSPX- is public-knowledge prefix
+    },
+    { headers: cors() },
+  )
+}
+
 export async function POST(req: NextRequest) {
-  const clientId = process.env.GOOGLE_CLIENT_ID
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+  // Trim — Vercel's env-var editor preserves trailing newlines when you
+  // paste, which Google treats as part of the credential and rejects with
+  // invalid_client. Cheap to defend.
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim()
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim()
   if (!clientId || !clientSecret) {
     return NextResponse.json(
       {
