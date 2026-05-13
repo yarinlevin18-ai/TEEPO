@@ -8,8 +8,6 @@ import { isDevAuthBypassEnabled, FAKE_USER, FAKE_SESSION } from './dev-auth-bypa
 const GOOGLE_TOKEN_KEY = 'smartdesk_google_token'
 const GOOGLE_REFRESH_KEY = 'smartdesk_google_refresh_token'
 const GOOGLE_EXPIRY_KEY = 'smartdesk_google_token_expires_at' // unix ms
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-
 // Refresh when less than this many ms remain before expiry. 5 minutes keeps
 // us well clear of clock skew + API latency.
 const REFRESH_MARGIN_MS = 5 * 60 * 1000
@@ -128,8 +126,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try { refreshToken = localStorage.getItem(GOOGLE_REFRESH_KEY) } catch {}
     if (!refreshToken) return null
 
+    // Same-origin Next.js route. Used to hit the Python backend on Render
+    // via ${BACKEND}/api/auth/refresh-google — but Render free-tier could be
+    // asleep or down, which silently failed and left the stored token to
+    // expire. The route now lives on Vercel (always up) at /api/auth/refresh-google.
     try {
-      const res = await fetch(`${BACKEND}/api/auth/refresh-google`, {
+      const res = await fetch('/api/auth/refresh-google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refreshToken }),
@@ -150,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return data.access_token
       }
     } catch {
-      // Network error / CORS / backend cold-start — caller will fall back.
+      // Network error — caller will fall back to Supabase refresh.
     }
     return null
   }, [persistGoogleToken])
