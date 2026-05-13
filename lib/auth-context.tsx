@@ -216,6 +216,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
+    // Capture provider tokens from URL hash on first paint after /auth/callback.
+    //
+    // Supabase's exchangeCodeForSession returns the Google provider tokens to the
+    // server, but Supabase does NOT persist them in the session cookie that the
+    // client reads via getSession(). To survive page navigation we forward them
+    // through the URL hash (#provider_token=...&provider_refresh_token=...) in
+    // app/auth/callback/route.ts, and pluck them off here before anything else.
+    //
+    // Doing this synchronously inside useEffect (before getSession resolves)
+    // ensures localStorage is populated before any other code path (drive-db
+    // probe, scheduleRefresh, etc.) reads the token.
+    try {
+      if (typeof window !== 'undefined' && window.location.hash) {
+        const hash = window.location.hash.startsWith('#')
+          ? window.location.hash.slice(1)
+          : window.location.hash
+        const params = new URLSearchParams(hash)
+        const pt = params.get('provider_token')
+        const prt = params.get('provider_refresh_token')
+        if (pt || prt) {
+          // 60s placeholder expiry — the upcoming fetchGoogleTokenInfo call
+          // immediately replaces this with the real value from Google.
+          if (pt) {
+            try { localStorage.setItem(GOOGLE_TOKEN_KEY, pt) } catch {}
+            setGoogleToken(pt)
+          }
+          if (prt) {
+            try { localStorage.setItem(GOOGLE_REFRESH_KEY, prt) } catch {}
+          }
+          if (pt) writeExpiry(60)
+          // Strip the hash from the address bar so a reload doesn't reprocess
+          // (and so secrets don't sit in the URL bar / browser history).
+          const cleanUrl = window.location.pathname + window.location.search
+          try { window.history.replaceState(null, '', cleanUrl) } catch {}
+        }
+      }
+    } catch (e) {
+      console.warn('[auth] failed to pluck provider tokens from URL hash:', e)
+    }
+
     // Hard floor — if the initial-session flow doesn't flip `loading` to
     // false within this window, force it. Without this, any unhandled
     // rejection or hanging fetch inside the chain below leaves every
