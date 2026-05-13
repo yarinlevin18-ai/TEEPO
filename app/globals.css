@@ -206,9 +206,11 @@ body {
   animation: strike 0.3s ease-out forwards;
 }
 
-/* Force native dropdowns into dark color scheme so <option> isn't white-on-white */
-select { color-scheme: dark; }
-select option {
+/* Native dropdowns adopt the page color-scheme. Site default is cream/light
+   so dropdowns render with light chrome; html.dark below opts back into dark. */
+select { color-scheme: light; }
+html.dark select { color-scheme: dark; }
+html.dark select option {
   background-color: #0f1117;
   color: #f1f5f9;
 }
@@ -230,11 +232,22 @@ html.dark body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: #161b27; }
-::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #4a5568; }
+/* ── Scrollbar ──
+   Cream defaults (matches the locked light design); html.dark overrides
+   back to dark below. Firefox uses scrollbar-color (inherited from <html>),
+   WebKit uses ::-webkit-scrollbar pseudo-elements. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #e0cda8 #f5ead2; /* thumb track */
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f5ead2; }
+::-webkit-scrollbar-thumb { background: #e0cda8; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #c9b58a; }
+html.dark { scrollbar-color: #2d3748 #161b27; }
+html.dark ::-webkit-scrollbar-track { background: #161b27; }
+html.dark ::-webkit-scrollbar-thumb { background: #2d3748; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #4a5568; }
 
 /* ── Glass card — claymorphism treatment site-wide ──
    Solid dark gradient + dual inner shadows (highlight + depth)
@@ -1480,13 +1493,6 @@ html.light body {
   background-attachment: fixed;
   color: var(--ink);
 }
-
-html.light ::-webkit-scrollbar-track { background: #dde0ec; }
-html.light ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #b8bdd0, #a8aec5);
-  border-radius: 99px;
-}
-html.light ::-webkit-scrollbar-thumb:hover { background: #8d93a8; }
 
 /* Glass cards: warm off-white with lavender rim + gradient border feel */
 html.light .glass {
