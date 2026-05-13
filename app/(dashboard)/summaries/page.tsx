@@ -47,9 +47,12 @@ interface SemesterBucket {
 }
 
 interface YearGroup {
-  yearOfStudy: 1 | 2 | 3 | 4
-  yearKey: string                 // 'y1', 'y2', …
-  label: string                   // "שנה א'", …
+  /** 1-4 for real years, null for the "ללא שנה" group (courses that have
+   *  a semester set but no year_of_study yet — usually because the user
+   *  hasn't set their degree-start year in /settings). */
+  yearOfStudy: 1 | 2 | 3 | 4 | null
+  yearKey: string                 // 'y1' … 'y4', or 'no-year'
+  label: string                   // "שנה א'", …, "ללא שנה"
   semesters: SemesterBucket[]
   courseCount: number
 }
@@ -64,52 +67,63 @@ type FolderKind = 'lessons' | 'assignments' | 'notes'
 
 const YEAR_LABEL: Record<number, string> = { 1: "שנה א'", 2: "שנה ב'", 3: "שנה ג'", 4: "שנה ד'" }
 
-/** Build the tree: courses → years (year_of_study 1-4) → semesters
- *  (א/ב/קיץ; courses missing semester fall into a 'ללא סמסטר' bucket
- *  inside their year). Courses missing year_of_study go to a top-level
- *  לא מסווגים bucket that's a sibling of the year row. */
+/** Build the tree: courses → years (year_of_study 1-4 + a virtual 'no-year'
+ *  for semester-only courses) → semesters (א/ב/קיץ + 'ללא סמסטר'). Courses
+ *  with neither year_of_study NOR semester land in the top-level
+ *  לא מסווגים bucket — sibling of the year row. */
 function buildTree(courses: Course[]): DegreeTree {
-  const yearMap = new Map<number, Map<string, Course[]>>()
+  // year key is either number 1-4 or the literal 'no-year' for courses
+  // with semester but no year_of_study (very common pre-classifier).
+  type YearKey = number | 'no-year'
+  const yearMap = new Map<YearKey, Map<string, Course[]>>()
   const unclassifiedCourses: Course[] = []
 
   for (const c of courses) {
     const yos = c.year_of_study
-    if (!yos) { unclassifiedCourses.push(c); continue }
-    const semKey = c.semester ?? 'no-sem'
-    if (!yearMap.has(yos)) yearMap.set(yos, new Map())
-    const semMap = yearMap.get(yos)!
+    const sem = c.semester
+    if (!yos && !sem) { unclassifiedCourses.push(c); continue }
+    const yearKey: YearKey = yos ?? 'no-year'
+    const semKey = sem ?? 'no-sem'
+    if (!yearMap.has(yearKey)) yearMap.set(yearKey, new Map())
+    const semMap = yearMap.get(yearKey)!
     if (!semMap.has(semKey)) semMap.set(semKey, [])
     semMap.get(semKey)!.push(c)
   }
 
   const semOrder: Array<HebSemester | 'no-sem'> = ['א', 'ב', 'קיץ', 'no-sem']
-  const years: YearGroup[] = Array.from(yearMap.keys())
-    .sort((a, b) => a - b)
-    .map((yos) => {
-      const semMap = yearMap.get(yos)!
-      const semesters: SemesterBucket[] = []
-      for (const s of semOrder) {
-        const list = semMap.get(s)
-        if (!list || list.length === 0) continue
-        semesters.push({
-          key: `y${yos}-${s}`,
-          label:
-            s === 'no-sem' ? 'ללא סמסטר' :
-            s === 'קיץ'    ? 'קיץ' :
-                             `סמסטר ${s}׳`,
-          semester: s === 'no-sem' ? null : s,
-          courses: list,
-          isUnclassified: false,
-        })
-      }
-      return {
-        yearOfStudy: yos as 1|2|3|4,
-        yearKey: `y${yos}`,
-        label: YEAR_LABEL[yos] ?? `שנה ${yos}`,
-        semesters,
-        courseCount: semesters.reduce((n, s) => n + s.courses.length, 0),
-      }
-    })
+  // Sort: numeric years ascending, then 'no-year' at the end so the visible
+  // sequence reads שנה א', ב', …, ללא שנה, לא מסווגים.
+  const yearKeys = Array.from(yearMap.keys()).sort((a, b) => {
+    if (a === 'no-year') return 1
+    if (b === 'no-year') return -1
+    return (a as number) - (b as number)
+  })
+
+  const years: YearGroup[] = yearKeys.map((yKey) => {
+    const semMap = yearMap.get(yKey)!
+    const semesters: SemesterBucket[] = []
+    for (const s of semOrder) {
+      const list = semMap.get(s)
+      if (!list || list.length === 0) continue
+      semesters.push({
+        key: `${yKey === 'no-year' ? 'ny' : `y${yKey}`}-${s}`,
+        label:
+          s === 'no-sem' ? 'ללא סמסטר' :
+          s === 'קיץ'    ? 'קיץ' :
+                           `סמסטר ${s}׳`,
+        semester: s === 'no-sem' ? null : s,
+        courses: list,
+        isUnclassified: false,
+      })
+    }
+    return {
+      yearOfStudy: yKey === 'no-year' ? null : (yKey as 1|2|3|4),
+      yearKey: yKey === 'no-year' ? 'no-year' : `y${yKey}`,
+      label: yKey === 'no-year' ? 'ללא שנה' : (YEAR_LABEL[yKey as number] ?? `שנה ${yKey}`),
+      semesters,
+      courseCount: semesters.reduce((n, s) => n + s.courses.length, 0),
+    }
+  })
 
   return {
     years,
