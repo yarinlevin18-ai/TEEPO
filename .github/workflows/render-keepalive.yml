@@ -36,8 +36,12 @@ jobs:
           BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
           if [ -z "$BACKEND_HEALTH_URL" ]; then
-            echo "::error::BACKEND_HEALTH_URL secret is missing"
-            exit 1
+            # No backend deployed yet (or secret not configured). Skip
+            # quietly so we don't email a failure every 13 minutes; the
+            # workflow will start working automatically once the secret
+            # is added under Settings → Secrets and variables → Actions.
+            echo "::warning::BACKEND_HEALTH_URL is not set — skipping ping"
+            exit 0
           fi
 
           # First request can take 30-60s if the service was sleeping.

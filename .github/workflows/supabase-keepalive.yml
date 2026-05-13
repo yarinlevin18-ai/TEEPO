@@ -24,8 +24,12 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "::error::SUPABASE_URL or SUPABASE_ANON_KEY secret is missing"
-            exit 1
+            # Secrets not configured. Skip quietly so we don't email a
+            # failure every day; the workflow will start working automatically
+            # once both secrets are added under Settings → Secrets and
+            # variables → Actions.
+            echo "::warning::SUPABASE_URL or SUPABASE_ANON_KEY is not set — skipping ping"
+            exit 0
           fi
 
           # Hit the REST root with the anon key. Any 2xx is a healthy ping.
