@@ -17,6 +17,17 @@
  * kind} candidates when we ping it.
  */
 
+// Production by default. Override via chrome.storage.local for local dev.
+// Previously this defaulted to localhost:3000 in 3 different call sites,
+// which made the popup's "פתח את המוח" button open a localhost tab
+// (broken for most users) and silently target the dev server for imports.
+const DEFAULT_TEEPO_BASE = 'https://bgu-study-organizer.vercel.app'
+
+async function getTeepoBase() {
+  const { teepoBase } = await chrome.storage.local.get('teepoBase')
+  return teepoBase || DEFAULT_TEEPO_BASE
+}
+
 const $ = (sel) => document.querySelector(sel)
 const $$ = (sel) => Array.from(document.querySelectorAll(sel))
 
@@ -193,8 +204,7 @@ async function hydrateCoursePicker(scan) {
 async function fetchCourseList() {
   const token = await getDriveToken()
   if (!token) return []
-  const { teepoBase } = await chrome.storage.local.get('teepoBase')
-  const base = teepoBase || 'http://localhost:3000'
+  const base = await getTeepoBase()
   const res = await fetch(`${base}/api/drive/courses`, {
     headers: { Authorization: `Bearer ${token}` },
   })
@@ -296,8 +306,7 @@ document.addEventListener('click', async (e) => {
   }
 
   if (action === 'open-teepo') {
-    const { teepoBase } = await chrome.storage.local.get('teepoBase')
-    const base = teepoBase || 'http://localhost:3000'
+    const base = await getTeepoBase()
     chrome.tabs.create({ url: `${base}/summaries` })
     return
   }
@@ -415,8 +424,7 @@ async function doImportDiscovered() {
     showError('לא ניתן לקבל Drive token. צא והתחבר מחדש.')
     return
   }
-  const { teepoBase } = await chrome.storage.local.get('teepoBase')
-  const base = teepoBase || 'http://localhost:3000'
+  const base = await getTeepoBase()
 
   try {
     const res = await fetch(`${base}/api/courses/import`, {
@@ -495,6 +503,7 @@ async function doUpload() {
 
   let uploaded = 0
   let failed = []
+  let firstError = null
   for (const f of checked) {
     try {
       const folder = await bg({
@@ -514,17 +523,26 @@ async function doUpload() {
       if (!up?.ok) throw new Error(up?.error || 'upload failed')
       uploaded++
     } catch (e) {
-      console.warn('[popup] file failed', f.filename, e)
-      failed.push(f.filename)
+      const msg = (e && e.message) ? String(e.message) : String(e)
+      console.warn('[popup] file failed', f.filename, msg)
+      failed.push({ filename: f.filename, error: msg })
+      if (!firstError) firstError = msg
     }
     setProgress(uploaded, checked.length)
   }
 
-  setText('done-text',
-    failed.length === 0
-      ? `${uploaded} קבצים הועלו לתיקיית הקורס ב-Drive`
-      : `${uploaded} הועלו · ${failed.length} נכשלו`,
-  )
+  // Build a result message that actually tells the user what went wrong.
+  // Previously this was just "0 הועלו · 18 נכשלו" with no clue — making
+  // failures impossible to diagnose without opening DevTools.
+  let summary
+  if (failed.length === 0) {
+    summary = `${uploaded} קבצים הועלו לתיקיית הקורס ב-Drive`
+  } else if (uploaded === 0) {
+    summary = `${failed.length} נכשלו · שגיאה: ${firstError}`
+  } else {
+    summary = `${uploaded} הועלו · ${failed.length} נכשלו · שגיאה: ${firstError}`
+  }
+  setText('done-text', summary)
   showState('done')
 }
 

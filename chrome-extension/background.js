@@ -16,7 +16,12 @@
  * router/transport layer with no DOM access.
  */
 
-const TEEPO_BASE = 'http://localhost:3000' // overridden by config in storage
+// Production by default. Override via chrome.storage.local for local dev,
+// or via the dev-mode toggle once we wire one. Previously this defaulted
+// to localhost:3000, which made the extension silently target a dev
+// server most users don't have running — surfacing as upload failures
+// and a broken "פתח את המוח ב-TEEPO" link.
+const TEEPO_BASE = 'https://bgu-study-organizer.vercel.app'
 const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files'
 
 // ── Config helpers ────────────────────────────────────────────────────────
