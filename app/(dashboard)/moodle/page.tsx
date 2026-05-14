@@ -40,7 +40,7 @@ type Status = { moodle: boolean; portal: boolean; login_status: Record<string, s
 
 export default function UniversityConnectPage() {
   const router = useRouter()
-  const { db, ready, createCourse, updateCourse, updateSettings } = useDB() as any
+  const { db, ready, createCourse, updateCourse, updateSettings, flushSave } = useDB() as any
   const universityName = useUniversityName()
   const [status, setStatus] = useState<Status>({ moodle: false, portal: false, login_status: {} })
   const [loading, setLoading] = useState<Record<string, boolean>>({})
@@ -256,6 +256,13 @@ export default function UniversityConnectPage() {
           })
           added++
         }
+      }
+      // Flush all the createCourse/updateCourse mutations from the loop
+      // before we navigate. Without this, the 30s debounced save risks
+      // losing the import if the user reloads / closes within the window.
+      // One flush after the loop is much cheaper than flushing per-course.
+      if (typeof flushSave === 'function') {
+        try { await flushSave() } catch { /* surface via syncResult below */ }
       }
       const parts: string[] = []
       if (added > 0) parts.push(`${added} נוספו`)
