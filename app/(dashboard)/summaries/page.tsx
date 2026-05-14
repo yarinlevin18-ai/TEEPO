@@ -260,6 +260,27 @@ export default function SummariesPage() {
           </p>
         </header>
 
+        {/* Nudge: courses sit under "ללא שנה" only because the user
+            hasn't told us when they started their degree. Showing the
+            banner only when both conditions are true so we never nag a
+            properly-set-up user. */}
+        {!db?.settings?.degree_start_year &&
+          tree.years.some(y => y.yearKey === 'no-year') && (
+            <div className="degree-start-nudge" role="status">
+              <div className="degree-start-nudge-icon" aria-hidden>
+                <GraduationCap size={18} />
+              </div>
+              <div className="degree-start-nudge-body">
+                <strong>הקורסים שלך יושבים תחת "ללא שנה".</strong>
+                <p>
+                  כדי שנדע לחלק אותם לשנה א'/ב'/ג'/ד', הגדר מתי התחלת את התואר ב-
+                  <Link href="/settings" className="degree-start-nudge-link">הגדרות</Link>
+                  . אחרי שמירה — חזור לכאן ולחץ "סדר ב-Drive" על קבוצת הקורסים בכל סמסטר.
+                </p>
+              </div>
+            </div>
+          )}
+
         {/* ===== Tree — degree → year → semester → course → folder ===== */}
         <div className="tree-wrap">
           <div className="tree-root">
