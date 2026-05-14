@@ -653,13 +653,28 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     }
 
     // No existing folder at all → fresh provision at the new path.
+    //
+    // CRITICAL: we used to call syncCourseFolders(courseId) here on the
+    // assumption that the just-fired `mutate` made the new classification
+    // visible. It does NOT — syncCourseFolders is a useCallback that
+    // captured `db.courses` at hook-creation time; React state batching
+    // means it still sees the OLD course (no semester/year) until the
+    // next render. Result: folder was created at the OLD path
+    // (לא מסווגים/title) instead of the new (תואר ראשון/שנה X/סמסטר Y/title).
+    //
+    // Fix: compute path + provision folders directly from the `next`
+    // course we already have in hand. No closure dependency.
     if (!existingCourseFolderId) {
+      const ids = await withToken(t => ensureCourseFolders(t, teepoFolderId, next))
+      const newPathStr = newPath.join('/')
       await mutate(d => ({
         ...d,
-        courses: d.courses.map(c => (c.id === courseId ? next : c)),
+        courses: d.courses.map(c =>
+          c.id === courseId
+            ? { ...next, drive_folder_ids: ids, drive_folder_path: newPathStr }
+            : c,
+        ),
       }))
-      // syncCourseFolders reads from db state, which we just updated.
-      await syncCourseFolders(courseId)
       return
     }
 
@@ -681,7 +696,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
           : c,
       ),
     }))
-  }, [handle, db.courses, withToken, mutate, syncCourseFolders])
+  }, [handle, db.courses, withToken, mutate])
 
   // ── Destructive: wipe app data so the user can start fresh ──────────────
   const resetAccountData = useCallback(async (

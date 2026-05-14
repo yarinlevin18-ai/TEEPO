@@ -31,6 +31,7 @@ import { useDB } from '@/lib/db-context'
 import { useUniversityName } from '@/lib/use-university'
 import { FolderSection } from '@/components/summaries/CourseDrivePanel'
 import { useDriveFiles } from '@/lib/use-drive-files'
+import { pathForCourse } from '@/lib/drive-folders'
 import type { Course } from '@/types'
 import {
   buildTree,
@@ -61,7 +62,7 @@ const COURSE_PALETTE = [
 ]
 
 export default function SummariesPage() {
-  const { db, syncCourseFolders } = useDB() as any
+  const { db, reclassifyCourse } = useDB() as any
   const universityName = useUniversityName()
   // Prefer the user's named degree (e.g. "תואר ראשון - מנע״ס") over the
   // generic university label. Falls back to university → 'התואר שלי' so
@@ -141,32 +142,53 @@ export default function SummariesPage() {
   // user navigated to a bucket. User feedback was clear: import should give
   // a list, user classifies, THEN folders are created on demand. Surfaced
   // as an explicit button below the header.
+  //
+  // A course "needs" a folder when:
+  //   (a) it has at least one classification dimension (semester or
+  //       year_of_study), AND
+  //   (b) it either has no folder ids yet, OR its stored drive_folder_path
+  //       no longer matches what pathForCourse computes from the current
+  //       classification (folder is at an obsolete path — typical after a
+  //       reset, a bulk reclassify, or an early bug that planted folders
+  //       under לא מסווגים despite the course being classified).
   const coursesNeedingFolders = useMemo(() =>
-    courses.filter(c =>
-      !c.drive_folder_ids?.course &&
-      (c.semester || c.year_of_study)  // at least partially classified
-    ),
+    courses.filter(c => {
+      if (!c.semester && !c.year_of_study) return false
+      if (!c.drive_folder_ids?.course) return true
+      const currentPath = pathForCourse(c).join('/')
+      return c.drive_folder_path !== currentPath
+    }),
     [courses])
   const [creatingFolders, setCreatingFolders] = useState<
     { done: number; total: number; failed: number } | null
   >(null)
   const handleCreateFolders = useCallback(async () => {
-    if (typeof syncCourseFolders !== 'function') return
+    if (typeof reclassifyCourse !== 'function') return
     const targets = coursesNeedingFolders
     if (targets.length === 0) return
     setCreatingFolders({ done: 0, total: targets.length, failed: 0 })
     let failed = 0
+    // reclassifyCourse handles both cases correctly:
+    //   * no existing folder → creates at the current classification's path
+    //   * folder exists at a different path → moves it (no duplicate)
+    // Passing the course's CURRENT classification values as the patch
+    // means classification doesn't change, only the folder gets aligned.
     for (let i = 0; i < targets.length; i++) {
+      const c = targets[i]
       try {
-        await syncCourseFolders(targets[i].id)
+        await reclassifyCourse(c.id, {
+          semester: c.semester,
+          year_of_study: c.year_of_study,
+          academic_year: c.academic_year,
+        })
       } catch (e) {
         failed++
-        console.warn('[summaries] create folders failed for', targets[i].title, e)
+        console.warn('[summaries] create folders failed for', c.title, e)
       }
       setCreatingFolders({ done: i + 1, total: targets.length, failed })
     }
     setTimeout(() => setCreatingFolders(null), 2500)
-  }, [syncCourseFolders, coursesNeedingFolders])
+  }, [reclassifyCourse, coursesNeedingFolders])
 
   return (
     <div className="cream-page summaries-page">
