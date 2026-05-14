@@ -46,7 +46,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 export default function SetupPage() {
   const router = useRouter()
   const { user, googleToken } = useAuth()
-  const { db, ready, error: dbError, updateSettings } = useDB()
+  const { db, ready, error: dbError, updateSettings, flushSave } = useDB()
   const calendar = useWeekCalendar()
 
   // ── Step 1: Drive ────────────────────────────────────────────────────
@@ -103,7 +103,14 @@ export default function SetupPage() {
   const allDone = driveStatus === 'ok' && calStatus === 'ok'
 
   const onFinish = async () => {
-    try { await updateSettings({ setup_seen: true }) } catch {}
+    try {
+      await updateSettings({ setup_seen: true })
+      // Flush immediately — without this the save sits in the 30s debounce
+      // window and a user who navigates fast (router.push happens right
+      // after) might lose it, causing the setup wizard to reappear next
+      // session.
+      await flushSave()
+    } catch {}
     router.push('/courses')
   }
 
@@ -180,7 +187,17 @@ export default function SetupPage() {
           >
             {allDone ? 'סיום — קח אותי לקורסים' : 'סיים את החיבור כדי להמשיך'}
           </button>
-          <Link href="/courses" className="setup-skip" onClick={() => updateSettings({ setup_seen: true }).catch(() => {})}>
+          <Link href="/courses" className="setup-skip" onClick={() => {
+            // Same persistence concern as onFinish: navigating in <30s
+            // would lose the in-memory save. Fire updateSettings + flush,
+            // ignore errors (the Link will navigate either way).
+            void (async () => {
+              try {
+                await updateSettings({ setup_seen: true })
+                await flushSave()
+              } catch {}
+            })()
+          }}>
             דלג ועבור לקורסים
           </Link>
         </footer>

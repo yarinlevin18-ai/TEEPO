@@ -92,7 +92,7 @@ interface CourseWithMeta extends Course {
 
 export default function CoursesPage() {
   const rawCourses = useCourses()
-  const { db, ready, loading, error: dbError, updateCourse, replaceCourses, updateSettings, syncAllCourseFolders } = useDB()
+  const { db, ready, loading, error: dbError, updateCourse, replaceCourses, updateSettings, syncAllCourseFolders, flushSave } = useDB()
 
   const degreeStart = useMemo(() => {
     const y = db?.settings?.degree_start_year
@@ -143,6 +143,9 @@ export default function CoursesPage() {
         status: updates.status,
         classified_manually: updates.classified_manually,
       })
+      // Explicit user save → flush immediately so closing the modal +
+      // refreshing doesn't lose the edit inside the 30s debounce window.
+      await flushSave()
     } catch (e) {
       console.error('Failed to save course:', e)
       setError('שגיאה בשמירת הקורס. נסה שוב.')
@@ -205,6 +208,7 @@ export default function CoursesPage() {
         }
       })
       await replaceCourses(next)
+      await flushSave()
     } catch (e) {
       console.error('Failed to reclassify all:', e)
       setError('שגיאה בסיווג מחדש של הקורסים.')
@@ -231,6 +235,7 @@ export default function CoursesPage() {
         year_of_study: yos,
         classified_manually: false,
       })
+      await flushSave()
     } catch (e) {
       console.error('Failed to reclassify course:', e)
       setError('שגיאה בסיווג מחדש של הקורס.')
@@ -267,6 +272,7 @@ export default function CoursesPage() {
         academic_year: ay,
         classified_manually: true,
       })
+      await flushSave()
       // Tiny celebration at the drop point
       if (dropX != null && dropY != null) {
         setLastDropCelebration({ x: dropX, y: dropY, key: Date.now() })
@@ -276,7 +282,7 @@ export default function CoursesPage() {
       console.error('Failed to move course:', e)
       setError('שגיאה בהזזת הקורס.')
     }
-  }, [updateCourse, yosToAcademicYear])
+  }, [updateCourse, yosToAcademicYear, flushSave])
 
   // ── Filter courses by search + department ─────────────────────────
   const filteredCourses = useMemo(() => {
@@ -868,6 +874,7 @@ export default function CoursesPage() {
             onClose={() => setGameOpen(false)}
             onClassify={async (id, updates) => {
               await updateCourse(id, updates)
+              await flushSave()
             }}
           />
         )}
