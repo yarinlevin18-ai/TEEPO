@@ -4449,6 +4449,62 @@ html.light .badge-danger {
   color: var(--lp-accent);
 }
 
+/* Create-folders CTA — shown when classified courses don't yet have folders.
+   Matches the degree-start-nudge visual language but uses a stronger
+   gradient + button-led layout since it's an action prompt, not info. */
+.summaries-page .create-folders-cta {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 20px;
+  margin: 0 auto 24px;
+  max-width: 760px;
+  background: var(--lp-bg-card);
+  border: 1px solid color-mix(in srgb, var(--lp-accent) 30%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 4px 14px -4px rgba(22, 163, 74, .18);
+}
+.summaries-page .create-folders-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.summaries-page .create-folders-body strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--lp-ink);
+}
+.summaries-page .create-folders-body small {
+  font-size: 12.5px;
+  color: var(--lp-ink-soft);
+  line-height: 1.55;
+}
+.summaries-page .create-folders-btn {
+  padding: 10px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-family: inherit;
+  background: var(--lp-gradient);
+  color: white;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s, opacity .15s;
+  box-shadow: 0 4px 12px -2px rgba(22, 163, 74, .4);
+  white-space: nowrap;
+}
+.summaries-page .create-folders-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px -2px rgba(22, 163, 74, .55);
+}
+.summaries-page .create-folders-btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 /* Bulk classify toolbar shown above the semester course grid */
 .summaries-page .bulk-bar {
   display: flex;

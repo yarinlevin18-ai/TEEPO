@@ -450,16 +450,22 @@ async function doImportDiscovered() {
     if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`)
 
     setProgress(selected.length, selected.length)
-    const folderMsg =
-      typeof data.folders_created === 'number'
-        ? ` · ${data.folders_created} תיקיות נוצרו ב-Drive`
-        : ''
+    // Folders are no longer pre-created on import — the user classifies on
+    // /summaries first, then clicks 'צור תיקיות ב-Drive' there. Surface
+    // that workflow in the popup so the user knows what to do next instead
+    // of expecting folders to magically appear.
     const classMsg =
       typeof data.classified === 'number' && data.classified > 0
-        ? ` · ${data.classified} סווגו לסמסטר`
+        ? ` · ${data.classified} סווגו אוטומטית`
         : ''
+    const needFolders = typeof data.need_folders === 'number'
+      ? data.need_folders
+      : (data.added ?? 0)
+    const nextStepMsg = needFolders > 0
+      ? ` · ${needFolders} מחכים לסיווג ויצירת תיקיות ב-המוח`
+      : ''
     setText('done-text',
-      `${data.added ?? 0} נוספו · ${data.updated ?? 0} עודכנו · סה"כ ${data.total ?? selected.length}${folderMsg}${classMsg}`,
+      `${data.added ?? 0} נוספו · ${data.updated ?? 0} עודכנו · סה"כ ${data.total ?? selected.length}${classMsg}${nextStepMsg}`,
     )
     showState('done')
   } catch (e) {

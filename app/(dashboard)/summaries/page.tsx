@@ -136,21 +136,37 @@ export default function SummariesPage() {
     setActiveFolderKind((prev) => (prev === kind ? null : kind))
   }, [])
 
-  // Auto-heal: missing drive_folder_ids on the visible courses get one
-  // provision attempt per courseId per tab.
-  const provisionedRef = useRef<Set<string>>(new Set())
-  useEffect(() => {
-    if (!activeBucket || typeof syncCourseFolders !== 'function') return
-    for (const c of activeBucket.courses) {
-      const hasIds = Boolean((c as any).drive_folder_ids?.course)
-      if (hasIds) continue
-      if (provisionedRef.current.has(c.id)) continue
-      provisionedRef.current.add(c.id)
-      syncCourseFolders(c.id).catch((e: unknown) => {
-        console.warn('[summaries] auto-provision failed for', c.title, e)
-      })
+  // Bulk "make folders for everything I've classified" — replaces the
+  // previous auto-heal effect that silently created folders the moment the
+  // user navigated to a bucket. User feedback was clear: import should give
+  // a list, user classifies, THEN folders are created on demand. Surfaced
+  // as an explicit button below the header.
+  const coursesNeedingFolders = useMemo(() =>
+    courses.filter(c =>
+      !c.drive_folder_ids?.course &&
+      (c.semester || c.year_of_study)  // at least partially classified
+    ),
+    [courses])
+  const [creatingFolders, setCreatingFolders] = useState<
+    { done: number; total: number; failed: number } | null
+  >(null)
+  const handleCreateFolders = useCallback(async () => {
+    if (typeof syncCourseFolders !== 'function') return
+    const targets = coursesNeedingFolders
+    if (targets.length === 0) return
+    setCreatingFolders({ done: 0, total: targets.length, failed: 0 })
+    let failed = 0
+    for (let i = 0; i < targets.length; i++) {
+      try {
+        await syncCourseFolders(targets[i].id)
+      } catch (e) {
+        failed++
+        console.warn('[summaries] create folders failed for', targets[i].title, e)
+      }
+      setCreatingFolders({ done: i + 1, total: targets.length, failed })
     }
-  }, [activeBucket, syncCourseFolders])
+    setTimeout(() => setCreatingFolders(null), 2500)
+  }, [syncCourseFolders, coursesNeedingFolders])
 
   return (
     <div className="cream-page summaries-page">
@@ -186,6 +202,35 @@ export default function SummariesPage() {
               </div>
             </div>
           )}
+
+        {/* Create folders CTA — appears once the user has classified courses
+            that don't yet have Drive folders. The import endpoint no longer
+            creates folders eagerly; this is the explicit 'I'm done classifying,
+            make me the folders' gesture. Hides itself when nothing's pending. */}
+        {(coursesNeedingFolders.length > 0 || creatingFolders) && (
+          <div className="create-folders-cta">
+            <div className="create-folders-body">
+              <strong>
+                {creatingFolders
+                  ? `יוצר תיקיות… ${creatingFolders.done}/${creatingFolders.total}`
+                  : `${coursesNeedingFolders.length} קורסים מסווגים מחכים לתיקייה ב-Drive`}
+              </strong>
+              <small>
+                לחץ כשסיימת לסווג — נסדר את התיקיות ב-Drive לפי שנה/סמסטר.
+              </small>
+            </div>
+            <button
+              type="button"
+              className="create-folders-btn"
+              onClick={handleCreateFolders}
+              disabled={!!creatingFolders || coursesNeedingFolders.length === 0}
+            >
+              {creatingFolders
+                ? `${creatingFolders.done}/${creatingFolders.total}`
+                : `צור תיקיות (${coursesNeedingFolders.length})`}
+            </button>
+          </div>
+        )}
 
         {/* ===== Tree — degree → year → semester → course → folder ===== */}
         <div className="tree-wrap">
