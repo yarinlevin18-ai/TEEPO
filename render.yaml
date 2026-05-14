@@ -5,6 +5,13 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     plan: free
+    # Disable auto-deploy on every master push. Most commits these days
+    # only touch the Next.js frontend / chrome extension, yet Render still
+    # tries to rebuild the Python backend image — which has been failing
+    # and spamming the owner's inbox. To deploy backend changes from now
+    # on, push to master and click "Manual Deploy" in the Render dashboard
+    # (or set this back to true when the backend is actively maintained).
+    autoDeploy: false
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false
