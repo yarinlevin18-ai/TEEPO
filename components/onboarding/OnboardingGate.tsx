@@ -23,7 +23,7 @@ import UniversitySelector from './UniversitySelector'
 import type { UniversityCode } from '@/types'
 
 export default function OnboardingGate({ children }: { children: React.ReactNode }) {
-  const { db, ready, updateSettings } = useDB()
+  const { db, ready, updateSettings, flushSave } = useDB()
 
   // Dev bypass — skip the gate entirely so testing UI doesn't get blocked
   // every reload. Devs can still test the gate by disabling the bypass.
@@ -41,9 +41,14 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
 
   const handlePick = async (code: UniversityCode) => {
     await updateSettings({ university: code })
-    // updateSettings persists via the debounced save mechanism. The next
-    // render will pass the `db.settings.university` check above and reveal
-    // the dashboard.
+    // Flush immediately to Drive — without this, the save sits in the
+    // 30s debounce queue. A user who picks then reloads (or hits the
+    // tab close) before the timer fires would lose the choice and see
+    // the picker again on next load. The in-memory state was already
+    // updated by updateSettings, so the next render will hide the gate
+    // either way; flush just makes sure that next-load Drive read also
+    // sees the choice.
+    await flushSave()
   }
 
   return (
