@@ -90,6 +90,11 @@ interface DBContextType {
     courseId: string,
     patch: { semester?: Course['semester']; year_of_study?: Course['year_of_study']; academic_year?: string },
   ) => Promise<void>
+  /** Force any pending debounced save to flush to Drive RIGHT NOW.
+   *  Useful after explicit save actions ("save" buttons) so the user
+   *  doesn't lose their change to a tab close inside the 30s window.
+   *  No-op if there's nothing pending. */
+  flushSave: () => Promise<void>
   /** Destructive: wipe all app-managed state.
    *  - Replaces TEEPO/db.json with an EMPTY_DB.
    *  - If wipeDriveFolders=true, trashes every subfolder inside TEEPO/
@@ -443,6 +448,20 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     mutate(d => ({ ...d, settings: { ...(d.settings || {}), ...patch } }))
   }, [mutate])
 
+  // Forces any debounced save to flush to Drive right now. Returns a Promise
+  // that resolves when the write actually lands, so callers can chain UI
+  // feedback ("saved!") on real persistence instead of in-memory mutation.
+  const flushSave = useCallback(async (): Promise<void> => {
+    if (!handle || !hasPendingSave()) return
+    try {
+      await withToken(t => flushPendingSave(t))
+    } catch (e) {
+      // Surface to error state so callers can react, but don't throw — the
+      // in-memory state is already correct, only the Drive sync failed.
+      setError((e as Error)?.message || 'שמירה ל-Drive נכשלה')
+    }
+  }, [handle, withToken])
+
   const replaceCourses = useCallback(async (courses: Course[]) => {
     mutate(d => ({ ...d, courses }))
   }, [mutate])
@@ -734,7 +753,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createNote, updateNote, deleteNote,
     updateSettings, replaceCourses,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
-    syncCourseFolders, syncAllCourseFolders, reclassifyCourse, resetAccountData,
+    syncCourseFolders, syncAllCourseFolders, reclassifyCourse, resetAccountData, flushSave,
   }), [
     db, handle, ready, loading, error, driveConnected, driveMissing, reload,
     createCourse, updateCourse, deleteCourse,
@@ -744,7 +763,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createNote, updateNote, deleteNote,
     updateSettings, replaceCourses,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
-    syncCourseFolders, syncAllCourseFolders, reclassifyCourse, resetAccountData,
+    syncCourseFolders, syncAllCourseFolders, reclassifyCourse, resetAccountData, flushSave,
   ])
 
   return <DBContext.Provider value={value}>{children}</DBContext.Provider>

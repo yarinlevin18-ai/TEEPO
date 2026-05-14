@@ -10,11 +10,11 @@ import { useTheme } from '@/lib/theme-context'
 import Link from 'next/link'
 import GlowCard from '@/components/ui/GlowCard'
 import BackupRestore from '@/components/settings/BackupRestore'
-import type { UniversityCode } from '@/types'
+import type { UniversityCode, UserSettings } from '@/types'
 
 export default function SettingsPage() {
   const { user } = useAuth()
-  const { db, ready, updateSettings, resetAccountData } = useDB()
+  const { db, ready, updateSettings, resetAccountData, flushSave } = useDB()
   const { theme, setTheme } = useTheme()
   const [displayName, setDisplayName] = useState('')
   const [originalName, setOriginalName] = useState('')
@@ -59,6 +59,7 @@ export default function SettingsPage() {
     if (!code) return
     try {
       await updateSettings({ university: code })
+      await flushSave()
       setUniversitySaved(true)
       setError('')
       setTimeout(() => setUniversitySaved(false), 3000)
@@ -76,6 +77,7 @@ export default function SettingsPage() {
     setTheme(next)
     try {
       await updateSettings({ theme: next })
+      await flushSave()
       setThemeSaved(true)
       setTimeout(() => setThemeSaved(false), 2000)
     } catch {
@@ -84,23 +86,34 @@ export default function SettingsPage() {
   }
 
   const handleDegreeSave = async () => {
-    const y = parseInt(degreeYear, 10)
-    const m = parseInt(degreeMonth, 10)
-    if (!y || y < 2000 || y > 2100) {
-      setError('שנה לא תקינה')
-      return
+    // Previously this bailed out if year OR month were empty — so a user who
+    // only filled שם התואר ended up with nothing saved and a misleading
+    // 'שנה לא תקינה' error. Build the patch field-by-field instead, validate
+    // only what the user actually provided, and flush right after so the
+    // change lands in Drive immediately (not 30s later inside the debounce
+    // window — a reload in that window would discard it).
+    const patch: Partial<UserSettings> = { takes_summer: takesSummer }
+    const trimmedName = degreeName.trim()
+    if (trimmedName) patch.degree_name = trimmedName
+    if (degreeYear.trim()) {
+      const y = parseInt(degreeYear, 10)
+      if (!y || y < 2000 || y > 2100) {
+        setError('שנה לא תקינה')
+        return
+      }
+      patch.degree_start_year = y
     }
-    if (!m || m < 1 || m > 12) {
-      setError('חודש לא תקין')
-      return
+    if (degreeMonth.trim()) {
+      const m = parseInt(degreeMonth, 10)
+      if (!m || m < 1 || m > 12) {
+        setError('חודש לא תקין')
+        return
+      }
+      patch.degree_start_month = m
     }
     try {
-      await updateSettings({
-        degree_name: degreeName.trim() || undefined,
-        degree_start_year: y,
-        degree_start_month: m,
-        takes_summer: takesSummer,
-      })
+      await updateSettings(patch)
+      await flushSave()
       setDegreeSaved(true)
       setError('')
       setTimeout(() => setDegreeSaved(false), 3000)

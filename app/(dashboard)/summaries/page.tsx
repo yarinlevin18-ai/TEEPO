@@ -370,7 +370,7 @@ function SemesterCoursesPanel({
   bucket: SemesterBucket
   onPickCourse: (id: string) => void
 }) {
-  const { reclassifyCourse } = useDB() as any
+  const { reclassifyCourse, flushSave } = useDB() as any
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkYear, setBulkYear] = useState<number | ''>('')
   const [bulkSem, setBulkSem] = useState<HebSemester | ''>('')
@@ -423,6 +423,14 @@ function SemesterCoursesPanel({
         console.warn('[bulk-classify] failed for', ids[i], e)
       }
       setBulkStatus({ done: i + 1, total: ids.length, failed })
+    }
+    // Force the batched mutations to land in Drive immediately instead of
+    // waiting on the 30s debounce — otherwise a quick reload right after
+    // bulk classifying would lose every change but leave the Drive folders
+    // (already moved by reclassifyCourse) at the new path, creating a
+    // mismatch between db.json and the actual Drive layout.
+    if (typeof flushSave === 'function') {
+      try { await flushSave() } catch { /* already surfaced as bulkErr */ }
     }
     if (firstError) setBulkErr(firstError)
     // Clear selection on success; the now-classified courses move out of this
@@ -637,7 +645,7 @@ const YEAR_OPTIONS: Array<{ value: 1 | 2 | 3 | 4; label: string }> = [
 /** Inline classify form — set שנה + סמסטר for this course; on save we MOVE
  *  the existing Drive folder to the new path (or create fresh if it never had one). */
 function ClassifyWidget({ course }: { course: Course }) {
-  const { reclassifyCourse } = useDB() as any
+  const { reclassifyCourse, flushSave } = useDB() as any
   const [semester, setSemester] = useState<HebSemester | ''>(course.semester ?? '')
   const [yearOfStudy, setYearOfStudy] = useState<number | ''>(course.year_of_study ?? '')
   const [busy, setBusy] = useState(false)
@@ -664,6 +672,14 @@ function ClassifyWidget({ course }: { course: Course }) {
         semester: semester || undefined,
         year_of_study: (yearOfStudy || undefined) as Course['year_of_study'],
       })
+      // Force the db.json write to land now instead of waiting on the 30s
+      // debounce. The Drive folder move already happened inside
+      // reclassifyCourse; without an immediate db save we risk a reload
+      // showing stale classification data while the folder sits at the
+      // new path.
+      if (typeof flushSave === 'function') {
+        try { await flushSave() } catch { /* surfaced as status err below */ }
+      }
       setStatus({ kind: 'ok', text: 'נשמר וסודר ב-Drive' })
     } catch (e: any) {
       setStatus({ kind: 'err', text: e?.message || 'שגיאה בשמירה' })
