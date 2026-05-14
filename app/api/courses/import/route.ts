@@ -268,10 +268,59 @@ export async function POST(req: NextRequest) {
           skipped++
         }
         // Reprovision folders if the existing record never got them, OR if
-        // classification just changed its target path.
+        // classification just changed its target path, OR if the folder id
+        // we stored no longer points at a live Drive folder (user trashed
+        // it manually, or it was hard-deleted). The actual existence check
+        // is a single GET below, batched so we don't fan out per-course
+        // sequentially during the loop.
         const currentPath = pathForCourseRecord(courses[idx]).join('/')
         const stalePath = existing.drive_folder_path && existing.drive_folder_path !== currentPath
         if (!existing.drive_folder_ids || stalePath) needsFolders.push(courses[idx])
+      }
+    }
+
+    // Defensive existence check: any course that *thinks* it has Drive
+    // folders gets a quick HEAD-style check. If the course folder id is
+    // 404 or trashed, treat it as missing and re-provision. Common cause
+    // is the user wiping folders via /settings → reset, or manually
+    // dragging them to trash in Drive.
+    const folderExistsCache = new Map<string, boolean>()
+    const checkFolderLive = async (folderId: string): Promise<boolean> => {
+      const cached = folderExistsCache.get(folderId)
+      if (cached !== undefined) return cached
+      try {
+        const res = await fetch(
+          `${DRIVE_API}/files/${folderId}?fields=id,trashed`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        )
+        if (res.status === 404) { folderExistsCache.set(folderId, false); return false }
+        if (!res.ok) {
+          // Inconclusive — treat as live so we don't churn a reprovision on
+          // a transient 5xx. Worst case the user retries.
+          folderExistsCache.set(folderId, true)
+          return true
+        }
+        const data = await res.json().catch(() => ({} as any))
+        const alive = data.id && !data.trashed
+        folderExistsCache.set(folderId, alive)
+        return alive
+      } catch {
+        // Same reasoning as the non-ok branch above.
+        folderExistsCache.set(folderId, true)
+        return true
+      }
+    }
+    for (const c of courses) {
+      const id = c.drive_folder_ids?.course
+      if (!id) continue
+      if (needsFolders.includes(c)) continue // already queued
+      const alive = await checkFolderLive(id)
+      if (!alive) {
+        console.info('[courses/import] reprovisioning', c.title, '— Drive folder', id, 'gone')
+        // Clear stale ids so the provision step below creates fresh ones.
+        delete c.drive_folder_ids
+        c.drive_folder_path = undefined
+        needsFolders.push(c)
       }
     }
 
