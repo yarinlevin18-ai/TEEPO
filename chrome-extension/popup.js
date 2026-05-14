@@ -450,14 +450,10 @@ async function doImportDiscovered() {
     if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`)
 
     setProgress(selected.length, selected.length)
-    // Folders are no longer pre-created on import — the user classifies on
-    // /summaries first, then clicks 'צור תיקיות ב-Drive' there. Surface
-    // that workflow in the popup so the user knows what to do next instead
-    // of expecting folders to magically appear.
-    const classMsg =
-      typeof data.classified === 'number' && data.classified > 0
-        ? ` · ${data.classified} סווגו אוטומטית`
-        : ''
+    // Folders are no longer pre-created on import. Auto-classification on
+    // import was also removed at user request — courses land raw and the
+    // user assigns שנה/סמסטר manually on /summaries, then clicks
+    // "צור תיקיות ב-Drive" there.
     const needFolders = typeof data.need_folders === 'number'
       ? data.need_folders
       : (data.added ?? 0)
@@ -465,7 +461,7 @@ async function doImportDiscovered() {
       ? ` · ${needFolders} מחכים לסיווג ויצירת תיקיות ב-המוח`
       : ''
     setText('done-text',
-      `${data.added ?? 0} נוספו · ${data.updated ?? 0} עודכנו · סה"כ ${data.total ?? selected.length}${classMsg}${nextStepMsg}`,
+      `${data.added ?? 0} נוספו · ${data.updated ?? 0} עודכנו · סה"כ ${data.total ?? selected.length}${nextStepMsg}`,
     )
     showState('done')
   } catch (e) {
