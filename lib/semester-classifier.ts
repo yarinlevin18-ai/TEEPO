@@ -102,6 +102,14 @@ function semesterFromText(text: string): Semester | null {
   const t = text.replace(/\s+/g, ' ')
   // Summer: "סמ ק", "סמסטר ק", "סמ קיץ", or standalone "קיץ"
   if (/סמ(?:סטר)?\s*ק(?:יץ)?(?![א-ת])/i.test(t) || /(?:^|[^א-ת])קיץ(?![א-ת])/.test(t)) return 'קיץ'
+  // English BGU pattern: "S1"/"S2"/"S3" (preceded by space or start, followed
+  // by non-alphanumeric). Sometimes shows as "G12 S2" or "Advanced B S1" in
+  // English-track course titles. Map S1→א, S2→ב, S3→קיץ to match BGU's
+  // semester numbering (1=fall, 2=spring, 3=summer).
+  const sNum = t.match(/(?:^|[^a-z0-9])S([123])(?![a-z0-9])/i)
+  if (sNum) {
+    return sNum[1] === '1' ? 'א' : sNum[1] === '2' ? 'ב' : 'קיץ'
+  }
   // Semester ב: "סמ 2", "סמ ב", "סמסטר ב", "סמסטר ב'"
   // After the letter/digit, require a non-letter & non-digit (end, space, quote, apostrophe, gershayim)
   if (/סמ(?:סטר)?\s*(?:ב|2)(?![א-תa-z0-9])/i.test(t)) return 'ב'
@@ -148,6 +156,20 @@ function academicYearFromHebrew(text: string): number | null {
   return null
 }
 
+/** Extract an academic year from "YYYY-N" / "YYYY-NN" / "YYYY/YY" / "YYYY/YYYY"
+ *  patterns that show up in BGU titles (e.g. "יזמות חברה וסביבה 2025-6"
+ *  → AY 2025). Only accepts plausible academic years 2000-2099 to avoid
+ *  false-positives like ID numbers. */
+function academicYearFromGregorian(text: string): number | null {
+  // 2025-6 / 2025-26 / 2025/26 / 2025/2026 — first year wins.
+  const m = text.match(/(?<![\d])(20\d{2})\s*[\-/]\s*\d{1,4}(?![\d])/)
+  if (m) {
+    const y = parseInt(m[1], 10)
+    if (y >= 2000 && y <= 2099) return y
+  }
+  return null
+}
+
 // ── Public API ────────────────────────────────────────────────────────────
 
 /** Pick the best classification from all available signals.
@@ -162,7 +184,11 @@ function academicYearFromHebrew(text: string): number | null {
 export function classifyCourse(input: ClassificationInput): Classification {
   // Gather each independent signal
   const titleSem = input.title ? semesterFromText(input.title) : null
-  const titleYear = input.title ? academicYearFromHebrew(input.title) : null
+  // Year from title: Hebrew form (תשפ"ה) preferred, with Gregorian
+  // "YYYY-N" / "YYYY/YY" as fallback for titles like "יזמות חברה וסביבה 2025-6".
+  const titleYear = input.title
+    ? (academicYearFromHebrew(input.title) ?? academicYearFromGregorian(input.title))
+    : null
   const dateCls = (input.moodle_startdate && input.moodle_startdate > 0)
     ? classifyFromDate(input.moodle_startdate)
     : null

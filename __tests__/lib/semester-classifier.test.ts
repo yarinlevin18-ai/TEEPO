@@ -32,6 +32,31 @@ describe('classifyCourse', () => {
     })
     expect(result.academic_year).toBe('2025')
   })
+
+  it('parses English S1/S2/S3 semester markers from titles', () => {
+    // BGU English-track courses use "S1"/"S2"/"S3" instead of "סמ 1".
+    expect(classifyCourse({ title: 'English Advanced B G12 S1' }).semester).toBe('א')
+    expect(classifyCourse({ title: 'English Advanced B G12 S2' }).semester).toBe('ב')
+    expect(classifyCourse({ title: 'Summer Workshop S3' }).semester).toBe('קיץ')
+  })
+
+  it('does NOT misread S-prefixed words as semester markers', () => {
+    // "Systems" / "Statistics" must not match the S<digit> pattern.
+    expect(classifyCourse({ title: 'Systems Analysis' }).semester).toBeUndefined()
+    expect(classifyCourse({ title: 'Statistics for Managers' }).semester).toBeUndefined()
+  })
+
+  it('extracts academic year from Gregorian "YYYY-N" / "YYYY/YY" patterns', () => {
+    // BGU titles sometimes include the year as "2025-6" or "2025/26".
+    expect(classifyCourse({ title: 'יזמות חברה וסביבה 2025-6' }).academic_year).toBe('2025')
+    expect(classifyCourse({ title: 'Strategic Management 2024/25' }).academic_year).toBe('2024')
+    expect(classifyCourse({ title: 'AY 2026/2027 Seminar' }).academic_year).toBe('2026')
+  })
+
+  it('does NOT match implausible years (out of 2000-2099)', () => {
+    // 1985-86 looks like the pattern but is pre-2000 → reject.
+    expect(classifyCourse({ title: 'Legacy 1985-86 archive' }).academic_year).toBeUndefined()
+  })
 })
 
 describe('computeYearOfStudy', () => {
