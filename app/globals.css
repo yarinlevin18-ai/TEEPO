@@ -4400,6 +4400,55 @@ html.light .badge-danger {
   margin-top: 6px;
 }
 
+/* Onboarding nudge — shown on /summaries when degree_start_year isn't
+   set AND the tree contains a "ללא שנה" group, so the user knows why
+   their courses aren't sorted by year and how to fix it in one place. */
+.summaries-page .degree-start-nudge {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 18px;
+  margin: 0 auto 24px;
+  max-width: 760px;
+  background: var(--lp-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--lp-accent) 35%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px -2px rgba(22, 163, 74, .15);
+}
+.summaries-page .degree-start-nudge-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--lp-bg-card);
+  border-radius: 10px;
+  color: var(--lp-accent-deep);
+}
+.summaries-page .degree-start-nudge-body { flex: 1; min-width: 0; }
+.summaries-page .degree-start-nudge-body strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--lp-ink);
+  margin-bottom: 4px;
+}
+.summaries-page .degree-start-nudge-body p {
+  font-size: 13px;
+  color: var(--lp-ink-soft);
+  line-height: 1.55;
+}
+.summaries-page .degree-start-nudge-link {
+  color: var(--lp-accent-deep);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.summaries-page .degree-start-nudge-link:hover {
+  color: var(--lp-accent);
+}
+
 /* Bulk classify toolbar shown above the semester course grid */
 .summaries-page .bulk-bar {
   display: flex;
