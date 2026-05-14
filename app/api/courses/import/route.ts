@@ -234,6 +234,13 @@ export async function POST(req: NextRequest) {
         // New course. ID format mirrors the client's newId('course') so
         // the rest of the app can't tell whether it came from here or the
         // /courses page.
+        //
+        // IMPORTANT: we no longer pre-create Drive folders here. The user's
+        // mental model is "import gives me a list, I classify it, THEN
+        // folders get made" — eager creation produced a pile of folders
+        // under לא מסווגים/ that the user then had to manually clean up.
+        // /summaries now exposes a 'צור תיקיות ב-Drive' button to do this
+        // explicitly once classification is done.
         const newCourse: CourseRecord = {
           id: `course_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
           title,
@@ -248,7 +255,6 @@ export async function POST(req: NextRequest) {
         applyClassification(newCourse)
         courses.unshift(newCourse)
         added++
-        needsFolders.push(newCourse)
       } else {
         // Existing — merge metadata without overwriting user edits.
         const existing = courses[idx]
@@ -267,15 +273,17 @@ export async function POST(req: NextRequest) {
         } else {
           skipped++
         }
-        // Reprovision folders if the existing record never got them, OR if
-        // classification just changed its target path, OR if the folder id
-        // we stored no longer points at a live Drive folder (user trashed
-        // it manually, or it was hard-deleted). The actual existence check
-        // is a single GET below, batched so we don't fan out per-course
-        // sequentially during the loop.
-        const currentPath = pathForCourseRecord(courses[idx]).join('/')
-        const stalePath = existing.drive_folder_path && existing.drive_folder_path !== currentPath
-        if (!existing.drive_folder_ids || stalePath) needsFolders.push(courses[idx])
+        // ONLY case where we re-provision during import: the course already
+        // had folders at some path, and either (a) classification just moved
+        // the target path so the old folders are now orphans, or (b) the
+        // folders went missing in Drive (caught by the existence check below).
+        // Folder-less courses are left alone — the /summaries button handles
+        // initial creation now.
+        if (existing.drive_folder_ids) {
+          const currentPath = pathForCourseRecord(courses[idx]).join('/')
+          const stalePath = existing.drive_folder_path && existing.drive_folder_path !== currentPath
+          if (stalePath) needsFolders.push(courses[idx])
+        }
       }
     }
 
@@ -355,6 +363,12 @@ export async function POST(req: NextRequest) {
     }
     await uploadDB(token, dbFileId, nextDB)
 
+    // Count courses that don't have Drive folders yet — the popup uses this
+    // to tell the user how many need classification + folder creation.
+    const needFoldersCount = courses.filter(
+      (c) => !c.drive_folder_ids?.course,
+    ).length
+
     return NextResponse.json(
       {
         added,
@@ -363,8 +377,14 @@ export async function POST(req: NextRequest) {
         classified,
         total: courses.length,
         folderId,
+        // folders_created/folders_failed will normally both be 0 now — we
+        // only re-provision existing courses whose path changed or whose
+        // folder disappeared from Drive. New-course provisioning happens
+        // on /summaries after the user classifies. Kept in the response
+        // for the rare reprovision path so the popup can still surface it.
         folders_created: foldersCreated,
         folders_failed: foldersFailed,
+        need_folders: needFoldersCount,
       },
       { headers: corsHeaders() },
     )
