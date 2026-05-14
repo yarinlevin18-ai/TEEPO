@@ -32,112 +32,18 @@ import { useUniversityName } from '@/lib/use-university'
 import { FolderSection } from '@/components/summaries/CourseDrivePanel'
 import { useDriveFiles } from '@/lib/use-drive-files'
 import type { Course } from '@/types'
+import {
+  buildTree,
+  type DegreeTree,
+  type HebSemester,
+  type SemesterBucket,
+  type YearGroup,
+} from '@/lib/summaries-tree'
 
-type HebSemester = 'א' | 'ב' | 'קיץ'
-
-/** A leaf bucket — collection of courses inside a single semester (or the
- *  generic "no year_of_study" bucket). The SemesterCoursesPanel + bulk
- *  classify UI render against this shape unchanged. */
-interface SemesterBucket {
-  key: string
-  label: string
-  semester: HebSemester | null
-  courses: Course[]
-  isUnclassified: boolean
-}
-
-interface YearGroup {
-  /** 1-4 for real years, null for the "ללא שנה" group (courses that have
-   *  a semester set but no year_of_study yet — usually because the user
-   *  hasn't set their degree-start year in /settings). */
-  yearOfStudy: 1 | 2 | 3 | 4 | null
-  yearKey: string                 // 'y1' … 'y4', or 'no-year'
-  label: string                   // "שנה א'", …, "ללא שנה"
-  semesters: SemesterBucket[]
-  courseCount: number
-}
-
-interface DegreeTree {
-  years: YearGroup[]
-  /** Courses missing year_of_study live here regardless of semester. */
-  unclassified: SemesterBucket | null
-}
+// Tree-builder + tree types now live in '@/lib/summaries-tree' so they
+// can be unit-tested without rendering React. See top-of-file imports.
 
 type FolderKind = 'lessons' | 'assignments' | 'notes'
-
-const YEAR_LABEL: Record<number, string> = { 1: "שנה א'", 2: "שנה ב'", 3: "שנה ג'", 4: "שנה ד'" }
-
-/** Build the tree: courses → years (year_of_study 1-4 + a virtual 'no-year'
- *  for semester-only courses) → semesters (א/ב/קיץ + 'ללא סמסטר'). Courses
- *  with neither year_of_study NOR semester land in the top-level
- *  לא מסווגים bucket — sibling of the year row. */
-function buildTree(courses: Course[]): DegreeTree {
-  // year key is either number 1-4 or the literal 'no-year' for courses
-  // with semester but no year_of_study (very common pre-classifier).
-  type YearKey = number | 'no-year'
-  const yearMap = new Map<YearKey, Map<string, Course[]>>()
-  const unclassifiedCourses: Course[] = []
-
-  for (const c of courses) {
-    const yos = c.year_of_study
-    const sem = c.semester
-    if (!yos && !sem) { unclassifiedCourses.push(c); continue }
-    const yearKey: YearKey = yos ?? 'no-year'
-    const semKey = sem ?? 'no-sem'
-    if (!yearMap.has(yearKey)) yearMap.set(yearKey, new Map())
-    const semMap = yearMap.get(yearKey)!
-    if (!semMap.has(semKey)) semMap.set(semKey, [])
-    semMap.get(semKey)!.push(c)
-  }
-
-  const semOrder: Array<HebSemester | 'no-sem'> = ['א', 'ב', 'קיץ', 'no-sem']
-  // Sort: numeric years ascending, then 'no-year' at the end so the visible
-  // sequence reads שנה א', ב', …, ללא שנה, לא מסווגים.
-  const yearKeys = Array.from(yearMap.keys()).sort((a, b) => {
-    if (a === 'no-year') return 1
-    if (b === 'no-year') return -1
-    return (a as number) - (b as number)
-  })
-
-  const years: YearGroup[] = yearKeys.map((yKey) => {
-    const semMap = yearMap.get(yKey)!
-    const semesters: SemesterBucket[] = []
-    for (const s of semOrder) {
-      const list = semMap.get(s)
-      if (!list || list.length === 0) continue
-      semesters.push({
-        key: `${yKey === 'no-year' ? 'ny' : `y${yKey}`}-${s}`,
-        label:
-          s === 'no-sem' ? 'ללא סמסטר' :
-          s === 'קיץ'    ? 'קיץ' :
-                           `סמסטר ${s}׳`,
-        semester: s === 'no-sem' ? null : s,
-        courses: list,
-        isUnclassified: false,
-      })
-    }
-    return {
-      yearOfStudy: yKey === 'no-year' ? null : (yKey as 1|2|3|4),
-      yearKey: yKey === 'no-year' ? 'no-year' : `y${yKey}`,
-      label: yKey === 'no-year' ? 'ללא שנה' : (YEAR_LABEL[yKey as number] ?? `שנה ${yKey}`),
-      semesters,
-      courseCount: semesters.reduce((n, s) => n + s.courses.length, 0),
-    }
-  })
-
-  return {
-    years,
-    unclassified: unclassifiedCourses.length > 0
-      ? {
-          key: 'unclassified',
-          label: 'לא מסווגים',
-          semester: null,
-          courses: unclassifiedCourses,
-          isUnclassified: true,
-        }
-      : null,
-  }
-}
 
 const FOLDER_DEFS: Array<{ kind: FolderKind; label: string; hint: string; Icon: any }> = [
   { kind: 'lessons',     label: 'שיעורים',  hint: 'הרצאות, תרגולים, מצגות',        Icon: Mic },
