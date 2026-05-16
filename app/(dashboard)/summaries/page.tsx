@@ -3,19 +3,15 @@
 /**
  * /summaries (המוח) — Drive folder explorer.
  *
- * The tree mirrors the user's TEEPO/ hierarchy in their Drive and grows
- * down as the user drills in:
+ * Mockup-driven design: a degree column on top with a flat grid of
+ * semester chips (chronological). Click a chip → SemesterCoursesPanel
+ * shows the course cards below. Click a course card's folder row →
+ * drills into the Drive folder view (CourseFolderOverviewPanel /
+ * FolderContentsPanel).
  *
- *   TEEPO ─┐
- *          └─ <University> ─┐
- *                            └─ Semester chips ─┐ (one selected)
- *                                                └─ Course chips ─┐ (one selected)
- *                                                                  └─ Folder chips (lessons/assignments/notes)
- *
- * The panel below the tree shows the contents of the deepest selection:
- *   - At semester level   → list of course tiles in that semester
- *   - At course level     → 3 folder-overview tiles with live file counts
- *   - At folder level     → the real Drive file list with upload + delete
+ * Year-of-study still drives data classification under the hood (via
+ * buildTree + reclassifyCourse), but it's no longer a visible tree
+ * layer — semesters are presented flat, the way the mockup shows them.
  *
  * State invariant: selecting a level resets all deeper selections so the
  * tree never shows a node that lost its parent.
@@ -25,7 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   Folder, BookOpen, FileText, StickyNote, Mic,
-  GraduationCap, Brain, ChevronLeft, Home,
+  GraduationCap, Brain, ChevronLeft, Home, ExternalLink,
 } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
 import { useUniversityName } from '@/lib/use-university'
@@ -33,16 +29,12 @@ import { FolderSection } from '@/components/summaries/CourseDrivePanel'
 import { useDriveFiles } from '@/lib/use-drive-files'
 import { pathForCourse } from '@/lib/drive-folders'
 import type { Course } from '@/types'
+import type { HebSemester, SemesterBucket } from '@/lib/summaries-tree'
 import {
-  buildTree,
-  type DegreeTree,
-  type HebSemester,
-  type SemesterBucket,
-  type YearGroup,
-} from '@/lib/summaries-tree'
-
-// Tree-builder + tree types now live in '@/lib/summaries-tree' so they
-// can be unit-tested without rendering React. See top-of-file imports.
+  buildDegreeColumns,
+  semesterChipColor,
+  type SemesterChip,
+} from '@/lib/summaries-degree-columns'
 
 type FolderKind = 'lessons' | 'assignments' | 'notes'
 
@@ -73,84 +65,56 @@ export default function SummariesPage() {
     'התואר שלי'
 
   const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
-  const tree = useMemo(() => buildTree(courses), [courses])
+  const columns = useMemo(() => buildDegreeColumns(courses, degreeLabel), [courses, degreeLabel])
+  // Flatten chips across all degree columns for the activeChipKey lookup.
+  const allChips = useMemo<SemesterChip[]>(
+    () => columns.degrees.flatMap(d => d.chips),
+    [columns],
+  )
 
-  // Selection state — four levels deep: year → semester → course → folder.
-  // activeSemKey is either a "y<N>-<sem>" key inside the active year, OR
-  // the literal 'unclassified' for the top-level unclassified bucket. When
-  // 'unclassified', activeYearKey is irrelevant (set to null).
-  const [activeYearKey, setActiveYearKey] = useState<string | null>(null)
-  const [activeSemKey, setActiveSemKey] = useState<string | null>(null)
+  const [activeChipKey, setActiveChipKey] = useState<string | null>(null)
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null)
   const [activeFolderKind, setActiveFolderKind] = useState<FolderKind | null>(null)
 
-  // First load: auto-select the first year + its first semester so the
-  // panel below the tree isn't empty.
+  // First load: auto-pick the "current" semester chip if there is one,
+  // otherwise the first chronologically. Avoids landing on an empty panel.
   useEffect(() => {
-    if (activeYearKey || activeSemKey) return
-    if (tree.years.length > 0) {
-      const y = tree.years[0]
-      setActiveYearKey(y.yearKey)
-      if (y.semesters.length > 0) setActiveSemKey(y.semesters[0].key)
-    } else if (tree.unclassified) {
-      setActiveSemKey('unclassified')
-    }
-  }, [tree, activeYearKey, activeSemKey])
+    if (activeChipKey) return
+    const currentChip = allChips.find(c => c.isCurrent)
+    if (currentChip) { setActiveChipKey(currentChip.key); return }
+    if (allChips.length > 0) setActiveChipKey(allChips[0].key)
+  }, [allChips, activeChipKey])
 
-  const activeYear = useMemo<YearGroup | null>(
-    () => tree.years.find(y => y.yearKey === activeYearKey) ?? null,
-    [tree, activeYearKey],
+  const activeChip = useMemo<SemesterChip | null>(
+    () => allChips.find(c => c.key === activeChipKey) ?? null,
+    [allChips, activeChipKey],
   )
-  const activeBucket = useMemo<SemesterBucket | null>(() => {
-    if (activeSemKey === 'unclassified') return tree.unclassified
-    return activeYear?.semesters.find(s => s.key === activeSemKey) ?? null
-  }, [tree, activeYear, activeSemKey])
+  const activeBucket: SemesterBucket | null = activeChip?.bucket ?? null
   const activeCourse = useMemo(
     () => activeBucket?.courses.find((c) => c.id === activeCourseId) ?? null,
     [activeBucket, activeCourseId],
   )
 
-  // Selection handlers — clicking a level resets all deeper levels so the
-  // tree never displays an orphan node.
-  const pickYear = useCallback((yearKey: string) => {
-    setActiveYearKey(prev => prev === yearKey ? null : yearKey)
-    setActiveSemKey(null)
-    setActiveCourseId(null)
-    setActiveFolderKind(null)
-  }, [])
-  const pickUnclassified = useCallback(() => {
-    setActiveYearKey(null)
-    setActiveSemKey('unclassified')
-    setActiveCourseId(null)
-    setActiveFolderKind(null)
-  }, [])
-  const pickSem = useCallback((semKey: string) => {
-    setActiveSemKey(prev => prev === semKey ? null : semKey)
+  // Selection handlers — clicking a level resets deeper levels so the
+  // tree never shows an orphan node.
+  const pickChip = useCallback((key: string) => {
+    setActiveChipKey(prev => prev === key ? null : key)
     setActiveCourseId(null)
     setActiveFolderKind(null)
   }, [])
   const pickCourse = useCallback((id: string) => {
-    setActiveCourseId((prev) => (prev === id ? null : id))
+    setActiveCourseId(prev => prev === id ? null : id)
     setActiveFolderKind(null)
   }, [])
   const pickFolder = useCallback((kind: FolderKind) => {
-    setActiveFolderKind((prev) => (prev === kind ? null : kind))
+    setActiveFolderKind(prev => prev === kind ? null : kind)
   }, [])
 
   // Bulk "make folders for everything I've classified" — replaces the
-  // previous auto-heal effect that silently created folders the moment the
-  // user navigated to a bucket. User feedback was clear: import should give
-  // a list, user classifies, THEN folders are created on demand. Surfaced
-  // as an explicit button below the header.
-  //
-  // A course "needs" a folder when:
-  //   (a) it has at least one classification dimension (semester or
-  //       year_of_study), AND
-  //   (b) it either has no folder ids yet, OR its stored drive_folder_path
-  //       no longer matches what pathForCourse computes from the current
-  //       classification (folder is at an obsolete path — typical after a
-  //       reset, a bulk reclassify, or an early bug that planted folders
-  //       under לא מסווגים despite the course being classified).
+  // previous auto-heal effect that silently created folders. A course
+  // "needs" a folder when it's at least partially classified AND either
+  // has no folder ids yet, or its stored drive_folder_path no longer
+  // matches what pathForCourse computes from current classification.
   const coursesNeedingFolders = useMemo(() =>
     courses.filter(c => {
       if (!c.semester && !c.year_of_study) return false
@@ -168,11 +132,6 @@ export default function SummariesPage() {
     if (targets.length === 0) return
     setCreatingFolders({ done: 0, total: targets.length, failed: 0 })
     let failed = 0
-    // reclassifyCourse handles both cases correctly:
-    //   * no existing folder → creates at the current classification's path
-    //   * folder exists at a different path → moves it (no duplicate)
-    // Passing the course's CURRENT classification values as the patch
-    // means classification doesn't change, only the folder gets aligned.
     for (let i = 0; i < targets.length; i++) {
       const c = targets[i]
       try {
@@ -194,41 +153,51 @@ export default function SummariesPage() {
     <div className="cream-page summaries-page">
       <main className="sum-main">
 
+        {/* ===== Hero ===== */}
         <header className="sum-head">
-          <div className="sum-eyebrow">המוח</div>
+          <div className="sum-eyebrow">Google Drive</div>
           <h1 className="sum-h1">
-            הסיכומים <span className="accent">שלי</span>.
+            המוח. <span className="accent">הזיכרון השני שלי.</span>{' '}
+            <span className="brain-emoji" aria-hidden>🧠</span>
           </h1>
           <p className="sum-sub">
-            תצוגת ה-Drive האישי שלך. בחר סמסטר → קורס → תיקייה כדי לראות את הקבצים.
+            כל מקור, סילבוס, סיכום וקובץ — מסונכרן ומאורגן בתוך תיקיית
+            Google Drive האישית שלך לפי תואר, סמסטר וקורס.
           </p>
+          <a
+            href="https://drive.google.com/drive/my-drive"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="drive-link"
+          >
+            <svg className="gd-logo" viewBox="0 0 24 24" aria-hidden>
+              <path fill="#4285F4" d="M14.5 2H7l5 8h7.5z"/>
+              <path fill="#0F9D58" d="M2 17l3.5 6L10.5 14.5 7 8.5z"/>
+              <path fill="#FBBC04" d="M22 17h-7l-3.5 6h7z"/>
+            </svg>
+            פתח ב-Google Drive ←
+          </a>
         </header>
 
-        {/* Nudge: courses sit under "ללא שנה" only because the user
-            hasn't told us when they started their degree. Showing the
-            banner only when both conditions are true so we never nag a
-            properly-set-up user. */}
-        {!db?.settings?.degree_start_year &&
-          tree.years.some(y => y.yearKey === 'no-year') && (
-            <div className="degree-start-nudge" role="status">
-              <div className="degree-start-nudge-icon" aria-hidden>
-                <GraduationCap size={18} />
-              </div>
-              <div className="degree-start-nudge-body">
-                <strong>הקורסים שלך יושבים תחת "ללא שנה".</strong>
-                <p>
-                  כדי שנדע לחלק אותם לשנה א'/ב'/ג'/ד', הגדר מתי התחלת את התואר ב-
-                  <Link href="/settings" className="degree-start-nudge-link">הגדרות</Link>
-                  . אחרי שמירה — חזור לכאן ולחץ "סדר ב-Drive" על קבוצת הקורסים בכל סמסטר.
-                </p>
-              </div>
+        {/* Onboarding nudge: courses sit under "ללא שנה" because the user
+            hasn't told us when they started their degree. */}
+        {!db?.settings?.degree_start_year && courses.some(c => c.semester && !c.year_of_study) && (
+          <div className="degree-start-nudge" role="status">
+            <div className="degree-start-nudge-icon" aria-hidden>
+              <GraduationCap size={18} />
             </div>
-          )}
+            <div className="degree-start-nudge-body">
+              <strong>הקורסים שלך עוד לא משובצים לשנה.</strong>
+              <p>
+                כדי שנדע לחלק אותם לשנה א'/ב'/ג'/ד', הגדר מתי התחלת את התואר ב-
+                <Link href="/settings" className="degree-start-nudge-link">הגדרות</Link>.
+              </p>
+            </div>
+          </div>
+        )}
 
-        {/* Create folders CTA — appears once the user has classified courses
-            that don't yet have Drive folders. The import endpoint no longer
-            creates folders eagerly; this is the explicit 'I'm done classifying,
-            make me the folders' gesture. Hides itself when nothing's pending. */}
+        {/* Create-folders CTA — appears once the user has classified courses
+            that don't yet have Drive folders. */}
         {(coursesNeedingFolders.length > 0 || creatingFolders) && (
           <div className="create-folders-cta">
             <div className="create-folders-body">
@@ -254,144 +223,81 @@ export default function SummariesPage() {
           </div>
         )}
 
-        {/* ===== Tree — degree → year → semester → course → folder ===== */}
+        {/* ===== Tree (degree → semester chips) ===== */}
         <div className="tree-wrap">
+          <TreeConnectorsSvg />
+
           <div className="tree-root">
             <button
               type="button"
               className="node root"
               onClick={() => {
-                // Reset to defaults — go back to first year/semester.
-                const y = tree.years[0]
-                setActiveYearKey(y?.yearKey ?? null)
-                setActiveSemKey(y?.semesters[0]?.key ?? (tree.unclassified ? 'unclassified' : null))
+                // Reset → first/current semester chip
+                const cur = allChips.find(c => c.isCurrent) ?? allChips[0]
+                setActiveChipKey(cur?.key ?? null)
                 setActiveCourseId(null)
                 setActiveFolderKind(null)
               }}
-              title="חזור לתצוגת כל השנים"
+              title="חזור לתצוגת ברירת המחדל"
             >
               <Home className="folder-ico" />
               <span className="name">TEEPO</span>
-              <span className="count">{courses.length}</span>
+              <span className="count">
+                {columns.degrees.length} {columns.degrees.length === 1 ? 'תואר' : 'תארים'}
+              </span>
             </button>
           </div>
 
-          <div className="degree-header">
-            <div className="degree-to-sems" />
-            <div className="node degree">
-              <GraduationCap className="folder-ico" />
-              <span className="name">{degreeLabel}</span>
-              <span className="count">{tree.years.length} שנים</span>
-            </div>
-          </div>
-
-          {/* Year row — top level under the degree */}
-          {(tree.years.length > 0 || tree.unclassified) && (
-            <div className="sem-grid">
-              {tree.years.map((y) => {
-                const isActive = y.yearKey === activeYearKey
-                return (
-                  <div className={`sem-chip-wrap ${isActive ? 'active' : ''}`} key={y.yearKey}>
-                    <button
-                      type="button"
-                      className={`node sem ${isActive ? 'active' : ''}`}
-                      onClick={() => pickYear(y.yearKey)}
-                    >
-                      <Folder className="folder-ico" />
-                      <span className="name">{y.label}</span>
-                      <span className="count">{y.courseCount}</span>
-                    </button>
+          <div className={`tree-branches columns-${columns.degrees.length}`}>
+            {columns.degrees.map((degree) => (
+              <div key={degree.id} className="degree-column">
+                <div className="degree-header">
+                  <div className="node degree" aria-label={degree.name}>
+                    <GraduationCap className="folder-ico" />
+                    <span className="name">{degree.name}</span>
+                    <span className="count">
+                      {degree.chips.length} סמסטרים
+                    </span>
                   </div>
-                )
-              })}
-              {tree.unclassified && (
-                <div className={`sem-chip-wrap ${activeSemKey === 'unclassified' ? 'active' : ''}`}>
-                  <button
-                    type="button"
-                    className={`node sem ${activeSemKey === 'unclassified' ? 'active' : ''}`}
-                    onClick={pickUnclassified}
-                  >
-                    <Folder className="folder-ico" />
-                    <span className="name">לא מסווגים</span>
-                    <span className="count">{tree.unclassified.courses.length}</span>
-                  </button>
                 </div>
-              )}
-            </div>
-          )}
 
-          {/* Semester row — appears only when a (classified) year is selected */}
-          {activeYear && activeYear.semesters.length > 0 && (
-            <>
-              <div className="tree-divider-line" aria-hidden />
-              <div className="course-row">
-                {activeYear.semesters.map((s) => {
-                  const isActive = s.key === activeSemKey
-                  return (
-                    <button
-                      type="button"
-                      key={s.key}
-                      className={`node folder ${isActive ? 'active' : ''}`}
-                      onClick={() => pickSem(s.key)}
-                    >
-                      <Folder className="folder-ico" />
-                      <span className="name">{s.label}</span>
-                      <span className="count">{s.courses.length}</span>
-                    </button>
-                  )
-                })}
+                {degree.chips.length > 0 && (
+                  <div className="sem-grid">
+                    {degree.chips.map((chip) => {
+                      const isActive = chip.key === activeChipKey
+                      const color = chip.isUnclassified
+                        ? 'var(--lp-muted)'
+                        : semesterChipColor(chip.colorIdx)
+                      return (
+                        <div
+                          key={chip.key}
+                          className={`sem-chip-wrap ${isActive ? 'active' : ''}`}
+                        >
+                          <button
+                            type="button"
+                            className={`node sem ${isActive ? 'active' : ''} ${chip.isCurrent ? 'is-current' : ''}`}
+                            style={{ ['--sem-color' as any]: color }}
+                            onClick={() => pickChip(chip.key)}
+                          >
+                            <Folder className="folder-ico" />
+                            <span className="name">
+                              {chip.label}
+                              {chip.isCurrent && <span className="current-pill">נוכחי</span>}
+                            </span>
+                            <span className="count">{chip.bucket.courses.length}</span>
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-            </>
-          )}
-
-          {/* Course row — appears only when a semester (or unclassified) is picked */}
-          {activeBucket && activeBucket.courses.length > 0 && (
-            <>
-              <div className="tree-divider-line" aria-hidden />
-              <div className="course-row">
-                {activeBucket.courses.map((c, i) => {
-                  const palette = COURSE_PALETTE[i % COURSE_PALETTE.length]
-                  const isActive = c.id === activeCourseId
-                  return (
-                    <button
-                      type="button"
-                      key={c.id}
-                      className={`node course ${isActive ? 'active' : ''}`}
-                      onClick={() => pickCourse(c.id)}
-                      style={{ ['--course-color' as any]: palette.color, ['--course-soft' as any]: palette.soft }}
-                    >
-                      <BookOpen className="folder-ico" />
-                      <span className="name">{c.title}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
-
-          {/* Folder row — appears only when a course is selected */}
-          {activeCourse && (
-            <>
-              <div className="tree-divider-line" aria-hidden />
-              <div className="folder-row-tree">
-                {FOLDER_DEFS.map(({ kind, label, Icon }) => {
-                  const isActive = activeFolderKind === kind
-                  return (
-                    <button
-                      type="button"
-                      key={kind}
-                      className={`node folder ${isActive ? 'active' : ''}`}
-                      onClick={() => pickFolder(kind)}
-                    >
-                      <Icon className="folder-ico" />
-                      <span className="name">{label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
+            ))}
+          </div>
         </div>
+
+        {/* Connector line between tree and the panel below */}
+        {activeBucket && <div className="connector-line" aria-hidden />}
 
         {/* ===== Below-tree panel: contents of the deepest selection ===== */}
         {activeCourse && activeFolderKind ? (
@@ -411,20 +317,29 @@ export default function SummariesPage() {
             bucket={activeBucket}
             onPickCourse={pickCourse}
           />
-        ) : activeYear ? (
-          <div className="sum-empty">
-            <Folder />
-            <h3>בחר סמסטר ב{activeYear.label} כדי לראות את הקורסים</h3>
-          </div>
         ) : (
           <div className="sum-empty">
             <Folder />
-            <h3>בחר שנה כדי להתחיל</h3>
+            <h3>בחר סמסטר כדי להתחיל</h3>
           </div>
         )}
 
+        <p className="subtle-hint">
+          לחיצה על סמסטר → רואים את הקורסים שלו · לחיצה על קורס → פותח את
+          התיקיות שלו · לחיצה על תיקייה → רואים את הקבצים.
+        </p>
+
       </main>
     </div>
+  )
+}
+
+/** Empty SVG placeholder — keeps the CSS hook for future connector-drawing.
+ *  The mockup draws lines dynamically based on element positions; v1 ships
+ *  with the simpler CSS-only connectors. */
+function TreeConnectorsSvg() {
+  return (
+    <svg className="tree-svg" aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" />
   )
 }
 
@@ -491,19 +406,11 @@ function SemesterCoursesPanel({
       }
       setBulkStatus({ done: i + 1, total: ids.length, failed })
     }
-    // Force the batched mutations to land in Drive immediately instead of
-    // waiting on the 30s debounce — otherwise a quick reload right after
-    // bulk classifying would lose every change but leave the Drive folders
-    // (already moved by reclassifyCourse) at the new path, creating a
-    // mismatch between db.json and the actual Drive layout.
     if (typeof flushSave === 'function') {
-      try { await flushSave() } catch { /* already surfaced as bulkErr */ }
+      try { await flushSave() } catch { /* surfaced as bulkErr */ }
     }
     if (firstError) setBulkErr(firstError)
-    // Clear selection on success; the now-classified courses move out of this
-    // bucket anyway, so keeping them selected is meaningless.
     if (failed === 0) setSelectedIds(new Set())
-    // Hide progress after a short delay so success message has time to be seen.
     setTimeout(() => setBulkStatus(null), 2500)
   }
 
@@ -539,7 +446,7 @@ function SemesterCoursesPanel({
         <span className="count-pill">{bucket.courses.length} קורסים</span>
       </div>
 
-      {/* Bulk classify toolbar — sticky above the grid */}
+      {/* Bulk classify toolbar */}
       <div className="bulk-bar">
         <div className="bulk-bar-left">
           <label className="bulk-checkbox">
@@ -600,6 +507,9 @@ function SemesterCoursesPanel({
         {bucket.courses.map((c, i) => {
           const palette = COURSE_PALETTE[i % COURSE_PALETTE.length]
           const isSelected = selectedIds.has(c.id)
+          const driveUrl = (c as any).drive_folder_ids?.course
+            ? `https://drive.google.com/drive/folders/${(c as any).drive_folder_ids.course}`
+            : null
           return (
             <div
               key={c.id}
@@ -617,22 +527,59 @@ function SemesterCoursesPanel({
                   onChange={() => toggleSelect(c.id)}
                 />
               </label>
-              <button
-                type="button"
-                className="course-card-body"
-                onClick={() => onPickCourse(c.id)}
-              >
-                <div className="top">
+
+              <div className="course-card-top">
+                <button
+                  type="button"
+                  className="course-card-title-btn"
+                  onClick={() => onPickCourse(c.id)}
+                >
                   <div className="ico-wrap"><BookOpen /></div>
-                  <div>
+                  <div className="title-block">
                     <h3>{c.title}</h3>
-                    <small>{(c as any).shortname ?? ''}</small>
+                    {(c as any).shortname && <small>{(c as any).shortname}</small>}
                   </div>
-                </div>
-                <div className="folder-shortcut-row">
-                  <span>פתח →</span>
-                </div>
-              </button>
+                </button>
+                {driveUrl && (
+                  <a
+                    href={driveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="course-card-external"
+                    title="פתח ב-Google Drive"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink size={14} />
+                  </a>
+                )}
+              </div>
+
+              <div className="course-card-folders">
+                {FOLDER_DEFS.map(({ kind, label, Icon }) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    className="course-card-folder-row"
+                    onClick={() => {
+                      // Drilling into a folder from a card: select the
+                      // course first (so the FolderContentsPanel can render
+                      // it), then the folder.
+                      onPickCourse(c.id)
+                      // setTimeout so the course-pick state lands before
+                      // we set the folder kind in the parent.
+                      setTimeout(() => {
+                        const ev = new CustomEvent('teepo-pick-folder', { detail: kind })
+                        window.dispatchEvent(ev)
+                      }, 0)
+                    }}
+                    disabled={!(c as any).drive_folder_ids?.course}
+                  >
+                    <Icon className="ico" />
+                    <span className="label">{label}</span>
+                    <span className="num">›</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )
         })}
@@ -651,6 +598,18 @@ function CourseFolderOverviewPanel({
   onBack: () => void
 }) {
   const folderIds = (course as any).drive_folder_ids ?? null
+
+  // Pick up the deferred folder-pick from a course card's folder-row click
+  // (see SemesterCoursesPanel → course-card-folder-row).
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const kind = (e as CustomEvent).detail as FolderKind
+      onPickFolder(kind)
+    }
+    window.addEventListener('teepo-pick-folder', handler)
+    return () => window.removeEventListener('teepo-pick-folder', handler)
+  }, [onPickFolder])
+
   return (
     <section className="course-panel">
       <div className="course-panel-head">
@@ -672,7 +631,7 @@ function CourseFolderOverviewPanel({
       {!folderIds?.course ? (
         <div className="empty-state">
           <Folder />
-          <p>התיקיות עוד לא נוצרו ב-Drive. סווג את הקורס למעלה כדי שייווצרו אוטומטית.</p>
+          <p>התיקיות עוד לא נוצרו ב-Drive. סווג את הקורס למעלה ולחץ "צור תיקיות" כדי שייווצרו.</p>
         </div>
       ) : (
         <div className="folder-overview-grid">
@@ -718,7 +677,6 @@ function ClassifyWidget({ course }: { course: Course }) {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
-  // Re-sync local state when the user navigates between courses.
   useEffect(() => {
     setSemester(course.semester ?? '')
     setYearOfStudy(course.year_of_study ?? '')
@@ -739,11 +697,6 @@ function ClassifyWidget({ course }: { course: Course }) {
         semester: semester || undefined,
         year_of_study: (yearOfStudy || undefined) as Course['year_of_study'],
       })
-      // Force the db.json write to land now instead of waiting on the 30s
-      // debounce. The Drive folder move already happened inside
-      // reclassifyCourse; without an immediate db save we risk a reload
-      // showing stale classification data while the folder sits at the
-      // new path.
       if (typeof flushSave === 'function') {
         try { await flushSave() } catch { /* surfaced as status err below */ }
       }

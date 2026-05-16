@@ -4787,6 +4787,512 @@ html.light .badge-danger {
   animation: fadeUp .25s ease both;
 }
 
+/* ════════════════════════════════════════════════════════════════════
+   /summaries mockup redesign — overrides for the design refresh that
+   matches teepo-design/mockup_summaries.html. Layered after the
+   original .summaries-page styles so the cascade picks these up; the
+   structural rules above stay relevant for browsers without :has().
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Hero — eyebrow, h1 with hand-drawn green underline + sprig, drive link */
+.summaries-page .sum-head {
+  text-align: center;
+  margin-bottom: 32px;
+  padding: 26px 28px 30px;
+  position: relative;
+  overflow: hidden;
+}
+.summaries-page .sum-head > * { position: relative; z-index: 1; }
+.summaries-page .sum-eyebrow {
+  font-size: 12px;
+  color: var(--lp-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.summaries-page .sum-h1 {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -1.1px;
+  line-height: 1.1;
+  margin-bottom: 14px;
+  position: relative;
+  display: inline-block;
+  padding: 0 10px;
+}
+.summaries-page .sum-h1 .accent {
+  position: relative;
+  display: inline-block;
+  background: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}
+.summaries-page .sum-h1 .accent::after {
+  content: '';
+  position: absolute;
+  bottom: -8px; left: -3%; right: -3%;
+  height: 8px;
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 8' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0%25' stop-color='%2316a34a' stop-opacity='0'/%3E%3Cstop offset='15%25' stop-color='%2316a34a' stop-opacity='1'/%3E%3Cstop offset='85%25' stop-color='%2384cc16' stop-opacity='1'/%3E%3Cstop offset='100%25' stop-color='%2384cc16' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M2 4 C 60 1, 120 7, 180 3 S 280 5, 298 4' fill='none' stroke='url(%23g)' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(22,163,74,.15));
+}
+.summaries-page .sum-h1 .brain-emoji {
+  display: inline-block;
+  margin-inline-start: 6px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.08));
+}
+.summaries-page .sum-sub {
+  font-size: 15px;
+  color: var(--lp-ink-soft);
+  max-width: 540px;
+  margin: 0 auto;
+}
+.summaries-page .drive-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+  color: var(--lp-ink-soft);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 14px;
+  transition: color .15s;
+}
+.summaries-page .drive-link:hover { color: var(--lp-accent); }
+.summaries-page .drive-link .gd-logo { width: 16px; height: 16px; }
+
+/* Tree wrap — cream card with shadow, holds the root + degree column(s) */
+.summaries-page .tree-wrap {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 22px;
+  padding: 44px 32px 36px;
+  box-shadow: 0 8px 20px -4px rgba(120,70,30,.14), 0 3px 8px rgba(120,70,30,.08);
+  margin-bottom: 28px;
+  position: relative;
+}
+.summaries-page .tree-wrap .tree-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Root chip — gradient green pill at the top */
+.summaries-page .tree-root {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  padding-bottom: 32px;
+}
+.summaries-page .tree-root::before,
+.summaries-page .tree-root::after { display: none; }
+.summaries-page .node.root {
+  background: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
+  color: white;
+  border-color: transparent;
+  padding: 14px 26px;
+  box-shadow: 0 12px 28px -6px var(--lp-accent);
+  width: auto;
+  border-radius: 14px;
+}
+.summaries-page .node.root:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px -6px var(--lp-accent);
+}
+.summaries-page .node.root .name { font-size: 16px; font-weight: 700; }
+.summaries-page .node.root .folder-ico { width: 19px; height: 19px; color: white; }
+.summaries-page .node.root .count { background: rgba(255,255,255,.22); color: white; }
+
+/* Branches — one or two degree columns side-by-side */
+.summaries-page .tree-branches {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 36px;
+  position: relative;
+}
+.summaries-page .tree-branches.columns-2 {
+  grid-template-columns: 1fr 1fr;
+}
+.summaries-page .degree-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.summaries-page .degree-header {
+  margin-top: 32px;
+  position: relative;
+  z-index: 1;
+}
+.summaries-page .node.degree {
+  background: var(--lp-bg-card);
+  border: 2px solid var(--lp-line);
+  padding: 13px 22px;
+  font-size: 14px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: auto;
+}
+.summaries-page .node.degree .name { font-weight: 700; font-size: 14.5px; }
+.summaries-page .node.degree .folder-ico { width: 18px; height: 18px; color: var(--lp-accent); }
+.summaries-page .node.degree .count {
+  font-size: 10.5px;
+  padding: 2px 8px;
+  background: var(--lp-bg-elev);
+  color: var(--lp-muted);
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+/* Semester grid — flat 3-column chip layout per degree */
+.summaries-page .sem-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  position: relative;
+  padding-top: 20px;
+}
+.summaries-page .sem-grid::before,
+.summaries-page .sem-grid::after { display: none; }
+.summaries-page .sem-chip-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.summaries-page .sem-chip-wrap::before { display: none; }
+
+/* Semester chip — each gets its own --sem-color from the rotating palette */
+.summaries-page .node.sem {
+  padding: 9px 12px;
+  font-size: 12.5px;
+  background: var(--lp-bg-card);
+  border: 1.5px solid var(--lp-line);
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  width: 100%;
+  justify-content: flex-start;
+  transition: all .2s cubic-bezier(.4,0,.2,1);
+  box-shadow: 0 2px 6px rgba(120,70,30,.08), 0 1px 2px rgba(120,70,30,.05);
+  position: relative;
+  z-index: 2;
+}
+.summaries-page .node.sem:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -4px rgba(120,70,30,.14), 0 3px 8px rgba(120,70,30,.08);
+  border-color: var(--sem-color, var(--lp-accent));
+}
+.summaries-page .node.sem .folder-ico {
+  width: 14px;
+  height: 14px;
+  color: var(--sem-color, var(--lp-ink-soft));
+}
+.summaries-page .node.sem .name {
+  font-weight: 600;
+  font-size: 12.5px;
+  flex: 1;
+  text-align: right;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.summaries-page .node.sem .count {
+  font-size: 10px;
+  padding: 1px 7px;
+  background: var(--lp-bg-elev);
+  color: var(--lp-muted);
+  border-radius: 999px;
+  font-weight: 700;
+}
+.summaries-page .node.sem.active {
+  background: color-mix(in srgb, var(--sem-color, var(--lp-accent)) 12%, var(--lp-bg-card));
+  border-color: var(--sem-color, var(--lp-accent));
+  box-shadow: 0 6px 18px -4px var(--sem-color, var(--lp-accent));
+}
+.summaries-page .node.sem.active .folder-ico { color: var(--sem-color, var(--lp-accent)); }
+.summaries-page .node.sem.active .count {
+  background: var(--sem-color, var(--lp-accent));
+  color: white;
+}
+.summaries-page .node.sem .current-pill {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  background: var(--lp-accent);
+  color: white;
+  border-radius: 999px;
+  margin-inline-start: 4px;
+}
+
+/* Connector line between tree and the panel below */
+.summaries-page .connector-line {
+  height: 28px;
+  width: 2px;
+  background: var(--lp-accent);
+  border-radius: 1px;
+  margin: -8px auto 12px;
+  opacity: .8;
+}
+
+/* Course panel — wider card with bigger padding, gradient icon header */
+.summaries-page .course-panel {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 22px;
+  padding: 28px 32px 32px;
+  box-shadow: 0 8px 20px -4px rgba(120,70,30,.14), 0 3px 8px rgba(120,70,30,.08);
+  margin-bottom: 24px;
+}
+.summaries-page .course-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 26px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--lp-line-soft);
+}
+.summaries-page .course-panel-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 6px 14px -4px var(--lp-accent);
+}
+.summaries-page .course-panel-icon svg {
+  width: 22px;
+  height: 22px;
+  color: white;
+}
+.summaries-page .course-panel-head .meta { flex: 1; min-width: 0; }
+.summaries-page .course-panel-head .crumb {
+  font-size: 12px;
+  color: var(--lp-muted);
+  margin-bottom: 4px;
+}
+.summaries-page .course-panel-head h2 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.5px;
+}
+.summaries-page .course-panel-head .count-pill {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--lp-accent-soft);
+  color: var(--lp-accent-deep);
+  font-size: 12.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Course grid */
+.summaries-page .course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+/* Course card — white background, checkbox in corner, title row + folder rows */
+.summaries-page .course-grid > .course-card {
+  background: white;
+  border: 1px solid var(--lp-line-soft);
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(120,70,30,.08), 0 1px 2px rgba(120,70,30,.05);
+  transition: all .2s;
+}
+.summaries-page .course-grid > .course-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px -4px rgba(120,70,30,.14), 0 3px 8px rgba(120,70,30,.08);
+  border-color: var(--course-color, var(--lp-accent));
+}
+.summaries-page .course-card-selected {
+  border-color: var(--course-color, var(--lp-accent));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--course-color, var(--lp-accent)) 25%, transparent);
+}
+.summaries-page .course-card-pick {
+  position: absolute;
+  top: 10px;
+  inset-inline-start: 10px;
+  z-index: 3;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: white;
+  border-radius: 5px;
+  border: 1px solid var(--lp-line);
+}
+.summaries-page .course-card-pick input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--lp-accent);
+}
+
+/* Course card top row — title button + external link */
+.summaries-page .course-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.summaries-page .course-card-title-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: right;
+  padding: 0;
+}
+.summaries-page .course-card-title-btn .ico-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--course-soft, var(--lp-accent-soft));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.summaries-page .course-card-title-btn .ico-wrap svg {
+  width: 18px;
+  height: 18px;
+  color: var(--course-color, var(--lp-accent));
+}
+.summaries-page .course-card-title-btn .title-block {
+  flex: 1;
+  min-width: 0;
+}
+.summaries-page .course-card-title-btn h3 {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -.2px;
+  line-height: 1.3;
+  color: var(--lp-ink);
+  overflow-wrap: break-word;
+}
+.summaries-page .course-card-title-btn small {
+  font-size: 11.5px;
+  color: var(--lp-muted);
+}
+.summaries-page .course-card-external {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--course-color, var(--lp-accent));
+  padding: 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+  text-decoration: none;
+}
+.summaries-page .course-card-external:hover {
+  background: var(--course-soft, var(--lp-accent-soft));
+}
+
+/* Course card folder rows — bottom section, 1 column (3 rows) */
+.summaries-page .course-card-folders {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--lp-line-soft);
+}
+.summaries-page .course-card-folder-row {
+  background: var(--lp-bg-elev);
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--lp-ink-soft);
+  cursor: pointer;
+  transition: all .15s;
+  font-family: inherit;
+}
+.summaries-page .course-card-folder-row:hover:not(:disabled) {
+  background: var(--course-soft, var(--lp-accent-soft));
+  color: var(--course-color, var(--lp-accent));
+}
+.summaries-page .course-card-folder-row:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.summaries-page .course-card-folder-row .ico {
+  width: 12px;
+  height: 12px;
+  color: var(--course-color, var(--lp-accent));
+  flex-shrink: 0;
+}
+.summaries-page .course-card-folder-row .label {
+  flex: 1;
+  font-weight: 600;
+  text-align: right;
+}
+.summaries-page .course-card-folder-row .num {
+  font-size: 11px;
+  padding: 1px 6px;
+  background: white;
+  border-radius: 999px;
+  font-weight: 700;
+  color: var(--lp-muted);
+}
+
+/* Subtle hint at the bottom of the page */
+.summaries-page .subtle-hint {
+  text-align: center;
+  color: var(--lp-muted);
+  font-size: 13px;
+  margin-top: 14px;
+}
+
+/* Responsive — collapse multi-degree to single column on narrow screens */
+@media (max-width: 880px) {
+  .summaries-page .tree-branches.columns-2 {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .summaries-page .sem-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .summaries-page .sum-h1 { font-size: 30px; }
+}
+
 /* Inside the panel */
 .drive-panel { display: flex; flex-direction: column; gap: 18px; }
 .drive-panel--empty {
