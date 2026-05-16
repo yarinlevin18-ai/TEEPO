@@ -24,6 +24,8 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
 import { useWeekCalendar, type WeekCalendarSlot } from '@/lib/use-week-calendar'
+import { matchCourseForEvent } from '@/lib/event-course-match'
+import type { Course } from '@/types'
 import LCDDisplay from '@/components/ui/LCDDisplay'
 import CountryClock from '@/components/dashboard/CountryClock'
 import SlidingPuzzle from '@/components/dashboard/SlidingPuzzle'
@@ -60,15 +62,35 @@ export default function DashboardPage() {
 
   // Three card data — derived from the real DB only. Empty arrays render
   // a CTA (see EmptyHint below) instead of fake mockup rows.
+
+  // Today's schedule is sourced from Google Calendar (the same useWeekCalendar
+  // that powers the week grid above) and fuzzy-matched against the user's
+  // TEEPO courses. Each row links into /summaries with the course + the
+  // calendar event title so the user can act on that lesson immediately.
+  const calendar = useWeekCalendar()
+  const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
   const todaySchedule = useMemo(() => {
-    const events = db?.lessons?.slice(0, 4) ?? []
-    return events.map((l: any, i: number) => ({
-      time: l.scheduled_time ?? `${10 + i * 2}:00`,
-      title: l.title ?? 'שיעור',
-      meta: l.location ?? '',
-      color: ['#8b5cf6', '#d97706', '#0d9488', '#6366f1'][i % 4],
-    }))
-  }, [db])
+    const todayDow = new Date().getDay() // 0..6, matches WeekCalendarSlot.dayIndex
+    const rows = calendar.slots
+      .filter(s => s.dayIndex === todayDow)
+      .sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute))
+      .slice(0, 6)
+    const palette = ['#8b5cf6', '#d97706', '#0d9488', '#6366f1', '#e11d48', '#16a34a']
+    return rows.map((s, i) => {
+      const match = matchCourseForEvent(s.title, courses)
+      const href = match
+        ? `/summaries?course=${encodeURIComponent(match.id)}&lesson=${encodeURIComponent(s.title)}`
+        : '/summaries'
+      return {
+        time: `${pad2(s.hour)}:${pad2(s.minute)}`,
+        title: s.title,
+        meta: match ? `${match.title}${s.meta ? ' · ' + s.meta : ''}` : (s.meta || 'לא משויך לקורס'),
+        color: palette[i % palette.length],
+        href,
+        matched: !!match,
+      }
+    })
+  }, [calendar.slots, courses])
 
   const assignments = useMemo(() => {
     const real = (db?.assignments ?? []).filter((a: any) => !a.is_completed).slice(0, 4)
@@ -162,20 +184,32 @@ export default function DashboardPage() {
               </div>
               {todaySchedule.length === 0 ? (
                 <EmptyCard
-                  text="אין שיעורים מסונכרנים."
-                  ctaHref="/moodle"
-                  ctaText="חבר Moodle"
+                  text={
+                    calendar.error
+                      ? `שגיאה בקריאת היומן: ${calendar.error.slice(0, 80)}`
+                      : calendar.loading
+                        ? 'טוען את היומן…'
+                        : 'אין שיעורים היום ביומן.'
+                  }
+                  ctaHref="https://calendar.google.com"
+                  ctaText="פתח Google Calendar"
+                  external
                 />
               ) : (
                 todaySchedule.map((row, i) => (
-                  <div className="sch-row" key={i}>
+                  <Link
+                    href={row.href}
+                    key={i}
+                    className={`sch-row sch-row-link${row.matched ? '' : ' is-unmatched'}`}
+                    title={row.matched ? 'פתח במוח לבחירת פעולה' : 'אין קורס תואם — פתח את עמוד המוח'}
+                  >
                     <div className="sch-time">{row.time}</div>
                     <div className="sch-bar" style={{ background: row.color }} />
                     <div className="sch-info">
                       <strong>{row.title}</strong>
                       <small>{row.meta}</small>
                     </div>
-                  </div>
+                  </Link>
                 ))
               )}
             </div>
@@ -243,11 +277,32 @@ export default function DashboardPage() {
  * mockup-data fallback rows so a fresh account doesn't show fictional
  * courses (אלגברה / חדו"א / etc.) as if they were real.
  */
-function EmptyCard({ text, ctaHref, ctaText }: { text: string; ctaHref: string; ctaText: string }) {
+function EmptyCard({
+  text,
+  ctaHref,
+  ctaText,
+  external,
+}: {
+  text: string
+  ctaHref: string
+  ctaText: string
+  external?: boolean
+}) {
   return (
     <div className="dcard-empty">
       <p>{text}</p>
-      <Link href={ctaHref} className="dcard-empty-cta">{ctaText} →</Link>
+      {external ? (
+        <a
+          href={ctaHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="dcard-empty-cta"
+        >
+          {ctaText} →
+        </a>
+      ) : (
+        <Link href={ctaHref} className="dcard-empty-cta">{ctaText} →</Link>
+      )}
     </div>
   )
 }

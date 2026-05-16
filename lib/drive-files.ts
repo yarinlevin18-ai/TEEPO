@@ -120,6 +120,45 @@ export async function uploadFile(
 }
 
 /**
+ * Create a blank Google Doc inside `folderId`. Returns the new file's
+ * metadata — `webViewLink` is the URL to open it in Docs.
+ *
+ * Used by the dashboard "write summary" action: a single click creates a
+ * new Doc in the right course's סיכומים folder and opens it in a new
+ * tab so the user can start typing immediately.
+ *
+ * Why Google Doc and not an uploaded .docx blob: native Docs open
+ * instantly without an upload roundtrip, autosave, and can still be
+ * exported as .docx from Drive's File menu if the user needs that format.
+ */
+export async function createGoogleDoc(
+  token: string,
+  folderId: string,
+  name: string,
+): Promise<DriveFile> {
+  const metadata = {
+    name,
+    mimeType: 'application/vnd.google-apps.document',
+    parents: [folderId],
+  }
+  const fields = 'id,name,mimeType,modifiedTime,webViewLink'
+  const res = await driveFetch(
+    token,
+    `${DRIVE_API}/files?fields=${encodeURIComponent(fields)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(metadata),
+    },
+  )
+  if (!res.ok) {
+    const body = await bodyOrEmpty(res)
+    throw new Error(`Drive doc-create ${res.status}: ${body.slice(0, 200)}`)
+  }
+  return res.json()
+}
+
+/**
  * Move a file between folders (Drive supports multi-parenting via
  * addParents / removeParents query params; we always do a clean swap so a
  * file ends up in exactly one place).
