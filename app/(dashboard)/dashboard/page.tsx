@@ -185,7 +185,7 @@ export default function DashboardPage() {
                 פתח →
               </a>
             </div>
-            <CalendarWeek />
+            <CalendarWeek courses={courses} />
           </div>
 
           {/* ===== BOTTOM 3 CARDS ===== */}
@@ -328,9 +328,12 @@ function EmptyCard({
  * - Each event lands at its day-of-week column + hour row, with the
  *   bar colored deterministically by title-hash so the same lecture
  *   always renders in the same color across renders.
- * - Click opens the event directly in Google Calendar.
+ * - Click on an event whose title matches a TEEPO course opens that
+ *   course in /summaries (with the lesson context bar). Click on an
+ *   unmatched event opens it in Google Calendar — same affordance the
+ *   "היום בלוח" widget below uses.
  */
-function CalendarWeek() {
+function CalendarWeek({ courses }: { courses: Course[] }) {
   const { slots, hourRange, loading, error } = useWeekCalendar()
 
   const today = new Date()
@@ -378,15 +381,30 @@ function CalendarWeek() {
           <div key={`t-${h}`} className="cal-time">{pad2(h)}:00</div>,
           ...Array.from({ length: 7 }, (_, di) => {
             const ev = slotByCell.get(`${di}-${h}`)
+            if (!ev) return <div key={`c-${di}-${h}`} className="cal-cell" />
+            const matched = matchCourseForEvent(ev.title, courses)
+            const className = `cal-event ev-${ev.color}${matched ? ' is-matched' : ''}`
+            const titleAttr =
+              `${ev.title}${ev.meta ? ' · ' + ev.meta : ''}` +
+              (matched ? ` — לחץ לפתיחה במוח` : ' — לחץ לפתיחה ב-Google Calendar')
             return (
               <div key={`c-${di}-${h}`} className="cal-cell">
-                {ev && (
+                {matched ? (
+                  <Link
+                    href={`/summaries?course=${encodeURIComponent(matched.id)}&lesson=${encodeURIComponent(ev.title)}`}
+                    className={className}
+                    title={titleAttr}
+                  >
+                    {ev.title}
+                    {ev.meta && <small>{ev.meta}</small>}
+                  </Link>
+                ) : (
                   <a
                     href={ev.htmlLink || 'https://calendar.google.com'}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`cal-event ev-${ev.color}`}
-                    title={`${ev.title}${ev.meta ? ' · ' + ev.meta : ''}`}
+                    className={className}
+                    title={titleAttr}
                   >
                     {ev.title}
                     {ev.meta && <small>{ev.meta}</small>}
