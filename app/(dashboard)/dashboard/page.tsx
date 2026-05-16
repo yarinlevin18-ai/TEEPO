@@ -32,8 +32,21 @@ import SlidingPuzzle from '@/components/dashboard/SlidingPuzzle'
 
 const ACCENT_WORD = 'מאוזן' // each letter gets its own wave animation
 
-function firstName(user: { user_metadata?: { display_name?: string }; email?: string | null } | null): string {
-  const full = user?.user_metadata?.display_name ?? user?.email?.split('@')[0] ?? 'סטודנט'
+/** Pick the friendliest possible greeting name. Priority:
+ *   1. Drive DB `settings.display_name` — source of truth, user-editable in /settings.
+ *   2. Supabase user_metadata.display_name — legacy fallback for accounts
+ *      that filled the setting in before it was Drive-backed.
+ *   3. Email prefix — last resort so brand-new accounts still see a name.
+ *   4. "סטודנט" — final fallback. */
+function firstName(
+  user: { user_metadata?: { display_name?: string }; email?: string | null } | null,
+  driveDisplayName?: string | null,
+): string {
+  const full =
+    (driveDisplayName && driveDisplayName.trim()) ||
+    user?.user_metadata?.display_name ||
+    user?.email?.split('@')[0] ||
+    'סטודנט'
   return full.split(/\s+/)[0] || 'סטודנט'
 }
 
@@ -45,7 +58,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { db, ready } = useDB()
-  const greetName = firstName(user)
+  const greetName = firstName(user, db?.settings?.display_name)
 
   // First-run redirect: a brand-new account (DB loaded, no courses, hasn't
   // dismissed the wizard) lands on /setup instead of staring at an empty

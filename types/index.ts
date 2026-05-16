@@ -28,6 +28,11 @@ export interface UserSettings {
   /** True once the user finished or dismissed the /setup first-run wizard.
    *  When unset AND the user has zero courses, the dashboard redirects to /setup. */
   setup_seen?: boolean
+  /** Preferred display name shown in the dashboard greeting + anywhere else
+   *  we address the user. Lives in Drive (not Supabase metadata) so it's
+   *  portable across devices and survives auth re-issues. Falls back to
+   *  Supabase metadata → email prefix when unset. */
+  display_name?: string
 }
 
 /**
