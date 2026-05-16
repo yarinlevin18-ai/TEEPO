@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import {
-  Folder, BookOpen, FileText, StickyNote, Mic,
+  Folder, BookOpen, FileText, NotebookPen, Presentation, ClipboardList,
   GraduationCap, Brain, ChevronLeft, Home, ExternalLink,
 } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
@@ -41,9 +41,13 @@ import {
 type FolderKind = 'lessons' | 'assignments' | 'notes'
 
 const FOLDER_DEFS: Array<{ kind: FolderKind; label: string; hint: string; Icon: any }> = [
-  { kind: 'lessons',     label: 'שיעורים',  hint: 'הרצאות, תרגולים, מצגות',        Icon: Mic },
-  { kind: 'assignments', label: 'מטלות',    hint: 'תרגילים, פרויקטים, בחנים',      Icon: Folder },
-  { kind: 'notes',       label: 'סיכומים', hint: 'הסיכומים האישיים שלך',           Icon: StickyNote },
+  // Icons chosen to read at a glance: a presentation screen for lectures,
+  // a clipboard with line-items for assignments, and a pen-on-notebook for
+  // personal summaries. Earlier icons (Mic / Folder / StickyNote) were
+  // either ambiguous or generic.
+  { kind: 'lessons',     label: 'שיעורים',  hint: 'הרצאות, תרגולים, מצגות',        Icon: Presentation },
+  { kind: 'assignments', label: 'מטלות',    hint: 'תרגילים, פרויקטים, בחנים',      Icon: ClipboardList },
+  { kind: 'notes',       label: 'סיכומים', hint: 'הסיכומים האישיים שלך',           Icon: NotebookPen },
 ]
 
 const COURSE_PALETTE = [
