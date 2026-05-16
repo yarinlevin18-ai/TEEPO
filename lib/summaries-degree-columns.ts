@@ -41,10 +41,31 @@ export interface SemesterChip {
   isMissingYear: boolean
 }
 
+export interface YearGroupColumn {
+  /** 'y1'..'y4' for real years, 'no-year' for the synthetic, or
+   *  'unclassified' for the catch-all bucket. */
+  yearKey: string
+  /** "שנה א'", "ללא שנה", "לא מסווגים" — what the year-level node shows. */
+  yearLabel: string
+  /** Semester chips that belong to this year. Already chronologically
+   *  ordered (semester order: א → ב → קיץ → null) with palette colors
+   *  derived from the parent flat ordering. */
+  chips: SemesterChip[]
+}
+
 export interface DegreeColumn {
   id: string
-  /** Display name (e.g. 'תואר ראשון - מנע"ס'); falls back to a default. */
+  /** Display name (e.g. 'תואר ראשון - מנע"ס'); falls back to a default.
+   *  When empty/falsy the /summaries page hides the degree-level node so
+   *  the tree reads TEEPO → year → semester without a redundant
+   *  "אוניברסיטת X" pill the user already sees in the topnav. */
   name: string
+  /** Chips grouped by year-of-study (the layout the user sees in v3).
+   *  Ordered: y1, y2, y3, y4, no-year, unclassified at the very end. */
+  yearGroups: YearGroupColumn[]
+  /** Flat list of all chips in chronological order. Kept so the page's
+   *  activeChipKey lookup + the auto-select-current-chip effect still
+   *  work without needing to flatten yearGroups on every render. */
   chips: SemesterChip[]
   /** Total course count across all chips. */
   totalCourses: number
@@ -195,10 +216,47 @@ export function buildDegreeColumns(
   }
 
   const totalCourses = chips.reduce((n, c) => n + c.bucket.courses.length, 0)
+
+  // Re-bucket the now-colored flat chips list by year-of-study so the page
+  // can render TEEPO → year → semester. We use the underlying tree's year
+  // metadata (yearOfStudy 1..4, null for the synthetic 'no-year') as the
+  // grouping key — buildTree already partitions courses correctly.
+  const yearGroupsMap = new Map<string, YearGroupColumn>()
+  for (const yg of tree.years) {
+    const yk = yg.yearOfStudy === null ? 'no-year' : `y${yg.yearOfStudy}`
+    yearGroupsMap.set(yk, { yearKey: yk, yearLabel: yg.label, chips: [] })
+  }
+  for (const c of chips) {
+    if (c.isUnclassified) continue   // unclassified handled below
+    // Recover the yearKey from the bucket.key prefix (set in summaries-tree).
+    // Bucket keys look like 'y1-א' or 'ny-ב' / 'y3-קיץ'.
+    const prefix = c.bucket.key.split('-')[0]
+    const yk = prefix === 'ny' ? 'no-year' : prefix
+    const grp = yearGroupsMap.get(yk)
+    if (grp) grp.chips.push(c)
+  }
+  const yearGroups: YearGroupColumn[] = []
+  // Stable visible order: y1, y2, y3, y4, no-year
+  for (const order of ['y1', 'y2', 'y3', 'y4', 'no-year']) {
+    const g = yearGroupsMap.get(order)
+    if (g && g.chips.length > 0) yearGroups.push(g)
+  }
+  // Append the catch-all 'לא מסווגים' bucket as its own pseudo-year so it
+  // still has a slot in the tree (the user can drill into it to classify).
+  const unclassifiedChip = chips.find(c => c.isUnclassified)
+  if (unclassifiedChip) {
+    yearGroups.push({
+      yearKey: 'unclassified',
+      yearLabel: 'לא מסווגים',
+      chips: [unclassifiedChip],
+    })
+  }
+
   return {
     degrees: [{
       id: 'main',
       name: degreeName,
+      yearGroups,
       chips,
       totalCourses,
     }],
