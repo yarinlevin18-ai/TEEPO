@@ -5072,6 +5072,13 @@ html.light .badge-danger {
   font-weight: 700;
 }
 
+/* When no degree pill is rendered (user hasn't named their degree in
+ * /settings yet), the sem-grid sits closer to the TEEPO root so the
+ * tree doesn't have a yawning vertical gap. */
+.summaries-page .tree-branches.no-degree-pill .sem-grid {
+  padding-top: 8px;
+}
+
 /* Active state for the degree pill — green gradient + glow when one of
  * the degree's semesters is currently selected. Matches the mockup's
  * "this degree is the focus right now" affordance. */

@@ -61,13 +61,14 @@ const COURSE_PALETTE = [
 
 export default function SummariesPage() {
   const { db, reclassifyCourse } = useDB() as any
-  // Degree-name pill source of truth: settings.degree_name. The university
-  // name is already shown in the topnav and would be redundant in the tree;
-  // we fall back to a generic "התואר שלי" so the pill never goes blank for
-  // users who haven't filled the field in /settings.
-  const degreeLabel: string =
-    (db?.settings?.degree_name && String(db.settings.degree_name).trim()) ||
-    'התואר שלי'
+  // Degree-name pill is shown only when the user has actually named their
+  // degree in /settings. If unset we skip the pill entirely (tree goes
+  // straight from TEEPO → semester chips) so "התואר שלי" doesn't sit
+  // there as a placeholder that adds nothing.
+  const customDegreeName: string =
+    (db?.settings?.degree_name && String(db.settings.degree_name).trim()) || ''
+  const degreeLabel: string = customDegreeName || 'התואר שלי'
+  const showDegreePill = customDegreeName.length > 0
 
   const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
   const columns = useMemo(() => buildDegreeColumns(courses, degreeLabel), [courses, degreeLabel])
@@ -294,26 +295,28 @@ export default function SummariesPage() {
 
           {/* Degree columns: one per degree (multi-degree-ready — current
               data model returns one degree from buildDegreeColumns; the
-              page renders side-by-side when more are added). Each degree
-              has its own pill (using the user-set degree name) with a flat
-              3×2 grid of semester chips below. */}
-          <div className={`tree-branches columns-${columns.degrees.length}`}>
+              page renders side-by-side when more are added). The degree
+              pill is hidden when no custom degree_name is set so the tree
+              doesn't render a placeholder "התואר שלי" node. */}
+          <div className={`tree-branches columns-${columns.degrees.length} ${showDegreePill ? '' : 'no-degree-pill'}`}>
             {columns.degrees.map((degree) => {
               const degreeIsActive = degree.chips.some(c => c.key === activeChipKey)
               return (
                 <div key={degree.id} className="degree-column">
-                  <div className="degree-header">
-                    <div
-                      className={`node degree ${degreeIsActive ? 'active' : ''}`}
-                      aria-label={degree.name}
-                    >
-                      <GraduationCap className="folder-ico" />
-                      <span className="name">{degree.name}</span>
-                      <span className="count">
-                        {degree.chips.length} סמסטרים
-                      </span>
+                  {showDegreePill && (
+                    <div className="degree-header">
+                      <div
+                        className={`node degree ${degreeIsActive ? 'active' : ''}`}
+                        aria-label={degree.name}
+                      >
+                        <GraduationCap className="folder-ico" />
+                        <span className="name">{degree.name}</span>
+                        <span className="count">
+                          {degree.chips.length} סמסטרים
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {degree.chips.length > 0 && (
                     <div className="sem-grid">
