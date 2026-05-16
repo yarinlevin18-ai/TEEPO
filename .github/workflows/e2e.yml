@@ -34,17 +34,36 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
     steps:
+      - name: Skip if Supabase secrets aren't configured
+        # Without NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY, npm run build fails
+        # because the (dashboard)/* server components crash on import.
+        # Rather than email a failure every night for missing secrets the
+        # owner hasn't gotten around to setting, exit 0 with a warning.
+        # Same pattern as render-keepalive.yml / supabase-keepalive.yml.
+        id: check_secrets
+        run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::warning::Supabase secrets not configured — skipping E2E run"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.check_secrets.outputs.skip != 'true'
 
       - uses: actions/setup-node@v4
+        if: steps.check_secrets.outputs.skip != 'true'
         with:
           node-version: 20
           cache: npm
 
       - name: Install dependencies
+        if: steps.check_secrets.outputs.skip != 'true'
         run: npm ci
 
       - name: Cache Playwright browsers
+        if: steps.check_secrets.outputs.skip != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -53,12 +72,15 @@ jobs:
             playwright-${{ runner.os }}-
 
       - name: Install Playwright Chromium
+        if: steps.check_secrets.outputs.skip != 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Build Next.js
+        if: steps.check_secrets.outputs.skip != 'true'
         run: npm run build
 
       - name: Start Next.js + run Playwright
+        if: steps.check_secrets.outputs.skip != 'true'
         env:
           CI: '1'
         run: |
@@ -75,7 +97,7 @@ jobs:
           exit $STATUS
 
       - name: Upload Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.check_secrets.outputs.skip != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
