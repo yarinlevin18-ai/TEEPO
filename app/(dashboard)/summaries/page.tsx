@@ -25,7 +25,6 @@ import {
   GraduationCap, Brain, ChevronLeft, Home, ExternalLink,
 } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
-import { useUniversityName } from '@/lib/use-university'
 import { FolderSection } from '@/components/summaries/CourseDrivePanel'
 import BulkOrganizeLessonsCTA from '@/components/summaries/BulkOrganizeLessonsCTA'
 import LessonActionBar from '@/components/summaries/LessonActionBar'
@@ -58,13 +57,12 @@ const COURSE_PALETTE = [
 
 export default function SummariesPage() {
   const { db, reclassifyCourse } = useDB() as any
-  const universityName = useUniversityName()
-  // Prefer the user's named degree (e.g. "תואר ראשון - מנע״ס") over the
-  // generic university label. Falls back to university → 'התואר שלי' so
-  // the tree never renders a blank node for users who haven't filled it in.
+  // Degree-name pill source of truth: settings.degree_name. The university
+  // name is already shown in the topnav and would be redundant in the tree;
+  // we fall back to a generic "התואר שלי" so the pill never goes blank for
+  // users who haven't filled the field in /settings.
   const degreeLabel: string =
     (db?.settings?.degree_name && String(db.settings.degree_name).trim()) ||
-    universityName ||
     'התואר שלי'
 
   const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
@@ -290,59 +288,62 @@ export default function SummariesPage() {
             </button>
           </div>
 
-          {/* Year branches: each year-of-study gets its own row, with the
-              year's semesters chipped below it. We drop the redundant
-              degree-name node (the user already sees their university in
-              the topnav and the degree name is rarely informative on its own). */}
-          <div className="tree-branches columns-1">
-            {columns.degrees.map((degree) => (
-              <div key={degree.id} className="degree-column">
-                {degree.yearGroups.map((yg) => (
-                  <div key={yg.yearKey} className="year-row">
-                    <div className="year-row-head">
-                      <div className="node year" aria-label={yg.yearLabel}>
-                        <GraduationCap className="folder-ico" />
-                        <span className="name">{yg.yearLabel}</span>
-                        <span className="count">
-                          {yg.chips.length} {yg.chips.length === 1 ? 'סמסטר' : 'סמסטרים'}
-                        </span>
-                      </div>
+          {/* Degree columns: one per degree (multi-degree-ready — current
+              data model returns one degree from buildDegreeColumns; the
+              page renders side-by-side when more are added). Each degree
+              has its own pill (using the user-set degree name) with a flat
+              3×2 grid of semester chips below. */}
+          <div className={`tree-branches columns-${columns.degrees.length}`}>
+            {columns.degrees.map((degree) => {
+              const degreeIsActive = degree.chips.some(c => c.key === activeChipKey)
+              return (
+                <div key={degree.id} className="degree-column">
+                  <div className="degree-header">
+                    <div
+                      className={`node degree ${degreeIsActive ? 'active' : ''}`}
+                      aria-label={degree.name}
+                    >
+                      <GraduationCap className="folder-ico" />
+                      <span className="name">{degree.name}</span>
+                      <span className="count">
+                        {degree.chips.length} סמסטרים
+                      </span>
                     </div>
-
-                    {yg.chips.length > 0 && (
-                      <div className="sem-grid">
-                        {yg.chips.map((chip) => {
-                          const isActive = chip.key === activeChipKey
-                          const color = chip.isUnclassified
-                            ? 'var(--lp-muted)'
-                            : semesterChipColor(chip.colorIdx)
-                          return (
-                            <div
-                              key={chip.key}
-                              className={`sem-chip-wrap ${isActive ? 'active' : ''}`}
-                            >
-                              <button
-                                type="button"
-                                className={`node sem ${isActive ? 'active' : ''} ${chip.isCurrent ? 'is-current' : ''}`}
-                                style={{ ['--sem-color' as any]: color }}
-                                onClick={() => pickChip(chip.key)}
-                              >
-                                <Folder className="folder-ico" />
-                                <span className="name">
-                                  {chip.label}
-                                  {chip.isCurrent && <span className="current-pill">נוכחי</span>}
-                                </span>
-                                <span className="count">{chip.bucket.courses.length}</span>
-                              </button>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
                   </div>
-                ))}
-              </div>
-            ))}
+
+                  {degree.chips.length > 0 && (
+                    <div className="sem-grid">
+                      {degree.chips.map((chip) => {
+                        const isActive = chip.key === activeChipKey
+                        const color = chip.isUnclassified
+                          ? 'var(--lp-muted)'
+                          : semesterChipColor(chip.colorIdx)
+                        return (
+                          <div
+                            key={chip.key}
+                            className={`sem-chip-wrap ${isActive ? 'active' : ''}`}
+                          >
+                            <button
+                              type="button"
+                              className={`node sem ${isActive ? 'active' : ''} ${chip.isCurrent ? 'is-current' : ''}`}
+                              style={{ ['--sem-color' as any]: color }}
+                              onClick={() => pickChip(chip.key)}
+                            >
+                              <Folder className="folder-ico" />
+                              <span className="name">
+                                {chip.label}
+                                {chip.isCurrent && <span className="current-pill">נוכחי</span>}
+                              </span>
+                              <span className="count">{chip.bucket.courses.length}</span>
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
 
