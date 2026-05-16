@@ -36,17 +36,20 @@ export default function SettingsPage() {
   const [profileYear, setProfileYear] = useState<number | null>(null)
 
   // Hydrate the display-name input from the Drive DB first (the new source
-  // of truth), falling back to Supabase metadata for accounts that set the
-  // name before this field was Drive-backed. Email prefix is NOT used as a
-  // seed — the input should stay blank so the user knows nothing was saved
-  // yet, otherwise they'd see "yarinlevin18" pre-filled and think it's set.
+  // of truth), falling back to Google OAuth profile name (full_name/name)
+  // and then legacy Supabase display_name. Email prefix is NOT used as a
+  // seed — the input should stay blank so the user can see they haven't
+  // saved anything yet, instead of seeing "yarinlevin18" pre-filled.
   useEffect(() => {
     if (!ready && !user) return
     const driveName = (db?.settings?.display_name as string | undefined)?.trim() || ''
-    const metaName = (user?.user_metadata?.display_name as string | undefined)
-      || (user?.user_metadata?.full_name as string | undefined)
-      || ''
-    const initial = driveName || metaName.trim()
+    const meta = (user?.user_metadata as Record<string, unknown> | undefined) ?? {}
+    const googleName =
+      (typeof meta.full_name === 'string' && meta.full_name.trim()) ||
+      (typeof meta.name === 'string' && meta.name.trim()) ||
+      (typeof meta.display_name === 'string' && meta.display_name.trim()) ||
+      ''
+    const initial = driveName || googleName
     setDisplayName(initial)
     setOriginalName(initial)
   }, [user, ready, db?.settings?.display_name])

@@ -25,6 +25,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
 import { useWeekCalendar, type WeekCalendarSlot } from '@/lib/use-week-calendar'
 import { matchCourseForEvent } from '@/lib/event-course-match'
+import { resolveFirstName } from '@/lib/display-name'
 import type { Course } from '@/types'
 import LCDDisplay from '@/components/ui/LCDDisplay'
 import CountryClock from '@/components/dashboard/CountryClock'
@@ -32,23 +33,9 @@ import SlidingPuzzle from '@/components/dashboard/SlidingPuzzle'
 
 const ACCENT_WORD = 'מאוזן' // each letter gets its own wave animation
 
-/** Pick the friendliest possible greeting name. Priority:
- *   1. Drive DB `settings.display_name` — source of truth, user-editable in /settings.
- *   2. Supabase user_metadata.display_name — legacy fallback for accounts
- *      that filled the setting in before it was Drive-backed.
- *   3. Email prefix — last resort so brand-new accounts still see a name.
- *   4. "סטודנט" — final fallback. */
-function firstName(
-  user: { user_metadata?: { display_name?: string }; email?: string | null } | null,
-  driveDisplayName?: string | null,
-): string {
-  const full =
-    (driveDisplayName && driveDisplayName.trim()) ||
-    user?.user_metadata?.display_name ||
-    user?.email?.split('@')[0] ||
-    'סטודנט'
-  return full.split(/\s+/)[0] || 'סטודנט'
-}
+// First-name greeting derived from the shared name resolver. Priority:
+// Drive setting → Google profile (full_name/name) → legacy → email prefix.
+// See lib/display-name.ts.
 
 function pad2(n: number): string {
   return n.toString().padStart(2, '0')
@@ -58,7 +45,11 @@ export default function DashboardPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { db, ready } = useDB()
-  const greetName = firstName(user, db?.settings?.display_name)
+  const greetName = resolveFirstName({
+    userMetadata: user?.user_metadata as Record<string, unknown> | undefined,
+    email: user?.email,
+    driveDisplayName: db?.settings?.display_name as string | undefined,
+  })
 
   // First-run redirect: a brand-new account (DB loaded, no courses, hasn't
   // dismissed the wizard) lands on /setup instead of staring at an empty
