@@ -116,6 +116,20 @@ async function ensureFolder(
 }
 
 /**
+ * Public wrapper around the internal ensureFolder — find-or-create a single
+ * folder named `name` directly under `parentId`. Used by the
+ * organize-by-lesson flow to provision per-lesson sub-folders inside
+ * שיעורים without touching the full hierarchy walk.
+ */
+export async function ensureSubfolder(
+  token: string,
+  name: string,
+  parentId: string,
+): Promise<string> {
+  return ensureFolder(token, name, parentId, new Map())
+}
+
+/**
  * Walk a path of folder names starting at `rootId`, creating segments along
  * the way. Returns the ID of the last folder in the path. Unlike
  * ensureCourseFolders, this does NOT also create the שיעורים/מטלות/סיכומים

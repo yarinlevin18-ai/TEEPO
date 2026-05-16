@@ -15,14 +15,17 @@
  * the existing `useCourse` action that calls `ensureCourseFolders`.
  */
 
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   Upload, Trash2, FileText, Image as ImageIcon, FileVideo, FileAudio,
   Presentation, Sheet, FileArchive, Link as LinkIcon, File as FileIcon,
-  Loader2, ExternalLink, RefreshCw,
+  Loader2, ExternalLink, RefreshCw, FolderPlus, Folder, X,
 } from 'lucide-react'
 import { useDriveFiles } from '@/lib/use-drive-files'
-import { fileKind, formatSize, type DriveFile } from '@/lib/drive-files'
+import { useAuth } from '@/lib/auth-context'
+import { fileKind, formatSize, moveFile, type DriveFile } from '@/lib/drive-files'
+import { ensureSubfolder } from '@/lib/drive-folders'
+import { groupFilesByLesson } from '@/lib/lesson-grouping'
 
 interface PanelProps {
   /** Drive folder IDs for this course — set after ensureCourseFolders ran. */
@@ -112,6 +115,13 @@ export function FolderSection({
           >
             <RefreshCw size={14} className={loading ? 'spin' : ''} />
           </button>
+          {label === 'שיעורים' && folderId && files.length > 0 && (
+            <OrganizeByLessonButton
+              files={files}
+              folderId={folderId}
+              onDone={refresh}
+            />
+          )}
           <button
             type="button"
             className="drive-upload-btn"
@@ -197,6 +207,175 @@ export function FolderSection({
         </div>
       )}
     </section>
+  )
+}
+
+/**
+ * <OrganizeByLessonButton /> — "Organize by lesson" CTA + preview modal.
+ *
+ * Only rendered inside the שיעורים folder section. Detects Week-N /
+ * שיעור-N / Lesson-N patterns in the flat file list, previews the proposed
+ * per-lesson sub-folders to the user, and (on confirm) creates the folders
+ * in Drive + moves matching files into them. Files that don't match any
+ * lesson pattern (Syllabus, Objectives, etc.) stay at the top level.
+ */
+function OrganizeByLessonButton({
+  files,
+  folderId,
+  onDone,
+}: {
+  files: DriveFile[]
+  folderId: string
+  onDone: () => void | Promise<void>
+}) {
+  const { googleToken, refreshGoogleToken } = useAuth()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+
+  const result = useMemo(() => groupFilesByLesson(files), [files])
+
+  // No detectable lessons (or only single-file lessons) — don't even show
+  // the button. The feature would be a no-op.
+  if (result.groups.length === 0) return null
+
+  const totalFiles = result.groups.reduce((n, g) => n + g.files.length, 0)
+
+  const getToken = async (): Promise<string | null> => {
+    if (googleToken) return googleToken
+    return refreshGoogleToken()
+  }
+
+  const run = async () => {
+    setBusy(true)
+    setError(null)
+    setProgress({ done: 0, total: totalFiles })
+    try {
+      const tok = await getToken()
+      if (!tok) throw new Error('לא ניתן להתחבר ל-Drive')
+      let done = 0
+      const failures: string[] = []
+      for (const g of result.groups) {
+        // Idempotent: ensureSubfolder finds an existing match before creating.
+        const subId = await ensureSubfolder(tok, g.folderName, folderId)
+        for (const f of g.files) {
+          try {
+            await moveFile(tok, f.id, subId, folderId)
+          } catch (e) {
+            console.error('[organize-by-lesson] move failed', f.name, e)
+            failures.push(f.name)
+          }
+          done++
+          setProgress({ done, total: totalFiles })
+        }
+      }
+      await onDone()
+      if (failures.length > 0) {
+        setError(`${failures.length} קבצים לא הועברו: ${failures.slice(0, 3).join(', ')}${failures.length > 3 ? '…' : ''}`)
+      } else {
+        setOpen(false)
+      }
+    } catch (e) {
+      setError((e as Error)?.message ?? 'שגיאה')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="drive-organize-btn"
+        onClick={() => setOpen(true)}
+        title="צור תיקייה לכל שיעור והעבר אליה את הקבצים המתאימים"
+      >
+        <FolderPlus size={14} /> סדר לפי שיעור
+        <span className="drive-organize-badge">{result.groups.length}</span>
+      </button>
+
+      {open && (
+        <div
+          className="drive-organize-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="סדר לפי שיעור"
+          onClick={(e) => { if (e.target === e.currentTarget && !busy) setOpen(false) }}
+        >
+          <div className="drive-organize-modal" dir="rtl">
+            <header className="drive-organize-head">
+              <h3>סדר את שיעורים לפי שבוע</h3>
+              <button
+                type="button"
+                className="drive-icon-btn"
+                onClick={() => setOpen(false)}
+                disabled={busy}
+                aria-label="סגור"
+              >
+                <X size={16} />
+              </button>
+            </header>
+
+            <p className="drive-organize-help">
+              זיהיתי {result.groups.length} שיעורים בקבצים שלך. ניצור תיקייה
+              לכל אחד מהם ב-Drive ונעביר את הקבצים אליה. הפעולה הפיכה —
+              תמיד אפשר להחזיר קבצים בעזרת Drive עצמו.
+            </p>
+
+            <div className="drive-organize-groups">
+              {result.groups.map(g => (
+                <div className="drive-organize-group" key={g.key}>
+                  <div className="drive-organize-group-head">
+                    <Folder size={14} />
+                    <strong>{g.folderName}</strong>
+                    <span className="drive-organize-count">{g.files.length} קבצים</span>
+                  </div>
+                  <ul>
+                    {g.files.map(f => (
+                      <li key={f.id}>{f.name}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+
+            {result.unmatched.length > 0 && (
+              <p className="drive-organize-unmatched">
+                {result.unmatched.length} קבצים נוספים יישארו במקומם — לא
+                זוהו כשייכים לשיעור מסוים.
+              </p>
+            )}
+
+            {error && <div className="drive-organize-error">{error}</div>}
+
+            {progress && busy && (
+              <div className="drive-organize-progress">
+                מעביר… {progress.done}/{progress.total}
+              </div>
+            )}
+
+            <footer className="drive-organize-foot">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                disabled={busy}
+              >
+                ביטול
+              </button>
+              <button
+                type="button"
+                className="primary"
+                onClick={run}
+                disabled={busy}
+              >
+                {busy ? 'מסדר…' : `סדר ${result.groups.length} שיעורים`}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 

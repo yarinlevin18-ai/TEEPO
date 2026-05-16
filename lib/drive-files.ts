@@ -120,6 +120,35 @@ export async function uploadFile(
 }
 
 /**
+ * Move a file between folders (Drive supports multi-parenting via
+ * addParents / removeParents query params; we always do a clean swap so a
+ * file ends up in exactly one place).
+ *
+ * Used by the "organize by lesson" feature in /summaries to move loose
+ * Week-N files into per-lesson sub-folders without re-uploading.
+ */
+export async function moveFile(
+  token: string,
+  fileId: string,
+  newParentId: string,
+  oldParentId: string,
+): Promise<void> {
+  const url =
+    `${DRIVE_API}/files/${fileId}` +
+    `?addParents=${encodeURIComponent(newParentId)}` +
+    `&removeParents=${encodeURIComponent(oldParentId)}`
+  const res = await driveFetch(token, url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  })
+  if (!res.ok) {
+    const body = await bodyOrEmpty(res)
+    throw new Error(`Drive move ${res.status}: ${body.slice(0, 200)}`)
+  }
+}
+
+/**
  * Move a file to Drive's trash. We don't permanently delete — the user can
  * still recover from the Drive UI for ~30 days, which matches Google's
  * native expectation and gives us a safety net.
