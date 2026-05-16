@@ -26,6 +26,7 @@ import Logo from '@/components/Logo'
 import { useAuth } from '@/lib/auth-context'
 import { useUniversityName, useUniversityCode } from '@/lib/use-university'
 import { useDB } from '@/lib/db-context'
+import { resolveDisplayName, resolveInitials } from '@/lib/display-name'
 
 const PRIMARY = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'בית' },
@@ -71,11 +72,15 @@ export default function TopNav({ mobileOpen = false, onMobileToggle }: Props) {
   const isActive = (href: string) =>
     pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
 
-  const initials = (() => {
-    const name = (user?.user_metadata?.display_name as string) || user?.email || ''
-    return name.split(/[\s@]/).filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase() || '').join('') || 'U'
-  })()
-  const displayName = ((user?.user_metadata?.display_name as string) || user?.email || '').split('@')[0]
+  // Shared name resolution — same priority as the dashboard greeting so the
+  // top-nav pill and the "שלום X" line always agree.
+  const nameSources = {
+    userMetadata: user?.user_metadata as Record<string, unknown> | undefined,
+    email: user?.email,
+    driveDisplayName: db?.settings?.display_name as string | undefined,
+  }
+  const initials = resolveInitials(nameSources)
+  const displayName = resolveDisplayName(nameSources)
   const universityShort = universityCode === 'tau' ? 'TAU' : universityCode === 'bgu' ? 'BGU' : ''
   // Moodle connection state isn't part of DriveDB yet — settings carries
   // it under an unstructured slot until /moodle gets its v2 wiring.
