@@ -26,6 +26,7 @@ import {
 import { useDB } from '@/lib/db-context'
 import { useUniversityName } from '@/lib/use-university'
 import { FolderSection } from '@/components/summaries/CourseDrivePanel'
+import BulkOrganizeLessonsCTA from '@/components/summaries/BulkOrganizeLessonsCTA'
 import { useDriveFiles } from '@/lib/use-drive-files'
 import { pathForCourse } from '@/lib/drive-folders'
 import type { Course } from '@/types'
@@ -222,6 +223,10 @@ export default function SummariesPage() {
             </button>
           </div>
         )}
+
+        {/* Bulk "organize שיעורים into per-lesson sub-folders across every
+            course" — sister of the per-course button inside FolderSection. */}
+        <BulkOrganizeLessonsCTA courses={courses} />
 
         {/* ===== Tree (degree → semester chips) ===== */}
         <div className="tree-wrap">
