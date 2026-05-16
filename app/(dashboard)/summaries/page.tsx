@@ -708,12 +708,15 @@ function CourseFolderOverviewPanel({
         />
       )}
 
-      <ClassifyWidget course={course} />
+      {/* ClassifyWidget intentionally hidden here — courses surfaced inside
+       *  a semester panel are already classified, and showing the inline
+       *  שנה/סמסטר picker on every course was visual noise. Mis-classified
+       *  courses can be fixed from the "לא מסווגים" bucket bulk-bar. */}
 
       {!folderIds?.course ? (
         <div className="empty-state">
           <Folder />
-          <p>התיקיות עוד לא נוצרו ב-Drive. סווג את הקורס למעלה ולחץ "צור תיקיות" כדי שייווצרו.</p>
+          <p>התיקיות עוד לא נוצרו ב-Drive. חזרו ל"לא מסווגים" כדי לסווג את הקורס, ואז ייווצרו תיקיות אוטומטית.</p>
         </div>
       ) : (
         <div className="folder-overview-grid">
