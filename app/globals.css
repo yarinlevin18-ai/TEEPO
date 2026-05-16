@@ -2801,6 +2801,15 @@ html.light .badge-danger {
   transform: scale(1.03);
   z-index: 2;
 }
+/* Events that match a TEEPO course get a subtle accent ring so the user
+ * knows clicking opens the course in /summaries (vs. a stranger event
+ * which opens Google Calendar). */
+.dashboard-v2 .cal-event.is-matched {
+  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, .25);
+}
+.dashboard-v2 .cal-event.is-matched:hover {
+  box-shadow: inset 0 0 0 1.5px rgba(22, 163, 74, .55);
+}
 .dashboard-v2 .cal-error {
   padding: 8px 14px;
   margin: 0 14px 8px;
