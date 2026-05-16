@@ -487,6 +487,18 @@ function SemesterCoursesPanel({
   const allSelected = selectedIds.size === bucket.courses.length
   const someSelected = selectedIds.size > 0
 
+  // Only surface the bulk-classify toolbar when there's actually something
+  // to classify. For a fully-classified semester bucket (every course has
+  // year_of_study + semester set) it's just visual noise — the user can
+  // still re-classify individual courses via ClassifyWidget inside the
+  // course panel. Show it for: truly unclassified, "ללא שנה" / "ללא
+  // סמסטר" synthetics, or any bucket where at least one course is missing
+  // year_of_study OR semester.
+  const needsClassify =
+    bucket.isUnclassified ||
+    bucket.semester === null ||
+    bucket.courses.some(c => !c.year_of_study || !c.semester)
+
   return (
     <section className="course-panel">
       <div className="course-panel-head">
@@ -498,7 +510,9 @@ function SemesterCoursesPanel({
         <span className="count-pill">{bucket.courses.length} קורסים</span>
       </div>
 
-      {/* Bulk classify toolbar */}
+      {/* Bulk classify toolbar — only when there's still classification work to do. */}
+      {needsClassify && (
+      <>
       <div className="bulk-bar">
         <div className="bulk-bar-left">
           <label className="bulk-checkbox">
@@ -553,6 +567,8 @@ function SemesterCoursesPanel({
           {bulkStatus.total - bulkStatus.failed} קורסים סודרו ב-Drive
           {bulkStatus.failed > 0 ? ` · ${bulkStatus.failed} נכשלו` : ''}
         </div>
+      )}
+      </>
       )}
 
       <div className="course-grid">
