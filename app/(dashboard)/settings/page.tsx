@@ -35,13 +35,21 @@ export default function SettingsPage() {
   const [trackName, setTrackName] = useState<string | null>(null)
   const [profileYear, setProfileYear] = useState<number | null>(null)
 
+  // Hydrate the display-name input from the Drive DB first (the new source
+  // of truth), falling back to Supabase metadata for accounts that set the
+  // name before this field was Drive-backed. Email prefix is NOT used as a
+  // seed — the input should stay blank so the user knows nothing was saved
+  // yet, otherwise they'd see "yarinlevin18" pre-filled and think it's set.
   useEffect(() => {
-    if (user) {
-      const name = user.user_metadata?.display_name || user.user_metadata?.full_name || ''
-      setDisplayName(name)
-      setOriginalName(name)
-    }
-  }, [user])
+    if (!ready && !user) return
+    const driveName = (db?.settings?.display_name as string | undefined)?.trim() || ''
+    const metaName = (user?.user_metadata?.display_name as string | undefined)
+      || (user?.user_metadata?.full_name as string | undefined)
+      || ''
+    const initial = driveName || metaName.trim()
+    setDisplayName(initial)
+    setOriginalName(initial)
+  }, [user, ready, db?.settings?.display_name])
 
   // Hydrate degree-start fields from Drive DB once it's ready
   useEffect(() => {
@@ -159,14 +167,20 @@ export default function SettingsPage() {
     setError('')
     setSaved(false)
 
+    const next = displayName.trim()
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: { display_name: displayName.trim() }
-      })
-
-      if (updateError) throw updateError
-
-      setOriginalName(displayName.trim())
+      // Drive DB is the source of truth — write there first + flush so the
+      // dashboard picks up the new name on the next render. The Supabase
+      // metadata write is best-effort for legacy consumers; failures don't
+      // fail the save.
+      await updateSettings({ display_name: next })
+      await flushSave()
+      try {
+        await supabase.auth.updateUser({ data: { display_name: next } })
+      } catch (e) {
+        console.warn('[settings] supabase metadata mirror failed', e)
+      }
+      setOriginalName(next)
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (e: any) {
