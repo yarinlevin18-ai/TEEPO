@@ -3589,6 +3589,23 @@ html.light .badge-danger {
 .dashboard-v2 .sch-info strong { font-size: 13.5px; font-weight: 600; display: block; color: var(--lp-ink); }
 .dashboard-v2 .sch-info small  { font-size: 11.5px; color: var(--lp-muted); }
 
+/* Clickable schedule row variant — used when the row resolves to a real
+ * course; click navigates to /summaries with the course pre-selected. */
+.dashboard-v2 .sch-row-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+.dashboard-v2 .sch-row-link:hover {
+  background: var(--lp-bg-hover);
+}
+.dashboard-v2 .sch-row-link.is-unmatched {
+  opacity: .75;
+}
+.dashboard-v2 .sch-row-link.is-unmatched:hover {
+  opacity: 1;
+}
+
 /* Course/assignment rows */
 .dashboard-v2 .course {
   padding: 14px 22px;
@@ -4187,6 +4204,96 @@ html.light .badge-danger {
   font-weight: 700;
   flex-shrink: 0;
 }
+
+/* ── Lesson action bar — shown above the folder grid when arriving via
+ *     a dashboard "היום בלוח" deep-link. ─────────────────────────────── */
+.summaries-page .lesson-action-bar {
+  margin: 0 0 14px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(22, 163, 74, .10), rgba(132, 204, 22, .12));
+  border: 1px solid rgba(22, 163, 74, .25);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.summaries-page .lesson-action-bar-head { display: flex; flex-direction: column; gap: 2px; }
+.summaries-page .lesson-action-bar-eyebrow {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--lp-accent-deep, #166534);
+}
+.summaries-page .lesson-action-bar-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--lp-ink, #1f2937);
+}
+.summaries-page .lesson-action-bar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.summaries-page .lesson-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  background: white;
+  color: var(--lp-ink, #1f2937);
+  border: 1px solid rgba(0, 0, 0, .12);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s, background .15s;
+  font-family: inherit;
+}
+.summaries-page .lesson-action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #fafafa;
+}
+.summaries-page .lesson-action-btn:disabled { opacity: .55; cursor: not-allowed; }
+.summaries-page .lesson-action-btn.primary {
+  background: var(--lp-gradient, linear-gradient(135deg, #16a34a, #84cc16));
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 3px 10px -2px rgba(22, 163, 74, .35);
+}
+.summaries-page .lesson-action-btn.primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 6px 14px -2px rgba(22, 163, 74, .5);
+}
+.summaries-page .lesson-action-bar-error {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(220, 38, 38, .08);
+  color: #b91c1c;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.summaries-page .lesson-action-bar-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(22, 163, 74, .10);
+  color: var(--lp-accent-deep, #166534);
+  font-size: 12.5px;
+}
+.summaries-page .lesson-action-bar-success strong { font-weight: 800; margin-right: 4px; }
+.summaries-page .lesson-action-bar-success a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: auto;
+  color: var(--lp-accent-deep, #166534);
+  font-weight: 700;
+  text-decoration: none;
+}
+.summaries-page .lesson-action-bar-success a:hover { text-decoration: underline; }
 
 .summaries-page .course-grid {
   display: grid;
