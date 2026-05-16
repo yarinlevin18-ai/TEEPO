@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import {
   Folder, BookOpen, FileText, StickyNote, Mic,
   GraduationCap, Brain, ChevronLeft, Home, ExternalLink,
@@ -27,6 +28,7 @@ import { useDB } from '@/lib/db-context'
 import { useUniversityName } from '@/lib/use-university'
 import { FolderSection } from '@/components/summaries/CourseDrivePanel'
 import BulkOrganizeLessonsCTA from '@/components/summaries/BulkOrganizeLessonsCTA'
+import LessonActionBar from '@/components/summaries/LessonActionBar'
 import { useDriveFiles } from '@/lib/use-drive-files'
 import { pathForCourse } from '@/lib/drive-folders'
 import type { Course } from '@/types'
@@ -85,6 +87,41 @@ export default function SummariesPage() {
     if (currentChip) { setActiveChipKey(currentChip.key); return }
     if (allChips.length > 0) setActiveChipKey(allChips[0].key)
   }, [allChips, activeChipKey])
+
+  // Deep-link from dashboard ("היום בלוח" row click): /summaries?course=ID&lesson=Title
+  // Find the chip that contains the course, select chip + course so the
+  // CourseFolderOverviewPanel renders with the LessonActionBar.
+  // Once consumed the params are stripped from the URL so a refresh
+  // doesn't re-trigger the modal-like state.
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const courseQuery = searchParams.get('course')
+  const lessonQuery = searchParams.get('lesson')
+  useEffect(() => {
+    if (!courseQuery) return
+    if (courses.length === 0) return  // wait for DB to hydrate
+    const targetChip = allChips.find(chip =>
+      chip.bucket.courses.some(c => c.id === courseQuery),
+    )
+    if (!targetChip) return
+    setActiveChipKey(targetChip.key)
+    setActiveCourseId(courseQuery)
+    setActiveFolderKind(null)
+    // Strip the params so back/forward + refresh don't keep re-triggering.
+    const next = new URLSearchParams(searchParams.toString())
+    next.delete('course')
+    next.delete('lesson')
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseQuery, allChips, courses.length])
+  // Keep the lesson title across the param-strip above so LessonActionBar
+  // still has something to display after we cleaned the URL.
+  const [deepLinkLesson, setDeepLinkLesson] = useState<string | null>(null)
+  useEffect(() => {
+    if (lessonQuery) setDeepLinkLesson(lessonQuery)
+  }, [lessonQuery])
 
   const activeChip = useMemo<SemesterChip | null>(
     () => allChips.find(c => c.key === activeChipKey) ?? null,
@@ -315,7 +352,9 @@ export default function SummariesPage() {
           <CourseFolderOverviewPanel
             course={activeCourse}
             onPickFolder={pickFolder}
-            onBack={() => setActiveCourseId(null)}
+            onBack={() => { setActiveCourseId(null); setDeepLinkLesson(null) }}
+            lessonFromCalendar={deepLinkLesson}
+            onDismissLesson={() => setDeepLinkLesson(null)}
           />
         ) : activeBucket ? (
           <SemesterCoursesPanel
@@ -597,10 +636,16 @@ function CourseFolderOverviewPanel({
   course,
   onPickFolder,
   onBack,
+  lessonFromCalendar,
+  onDismissLesson,
 }: {
   course: Course
   onPickFolder: (k: FolderKind) => void
   onBack: () => void
+  /** Calendar event title that brought us here via a /summaries?lesson= deep
+   *  link. When set, renders LessonActionBar above the folder grid. */
+  lessonFromCalendar?: string | null
+  onDismissLesson?: () => void
 }) {
   const folderIds = (course as any).drive_folder_ids ?? null
 
@@ -630,6 +675,13 @@ function CourseFolderOverviewPanel({
           פתח קורס →
         </Link>
       </div>
+
+      {lessonFromCalendar && (
+        <LessonActionBar
+          course={course}
+          lessonTitle={lessonFromCalendar}
+        />
+      )}
 
       <ClassifyWidget course={course} />
 
