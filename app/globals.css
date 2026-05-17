@@ -5574,15 +5574,30 @@ html.light .badge-danger {
   border-radius: 999px;
   font-weight: 700;
 }
+/* Active chip: solid green gradient + white text, ignoring the palette
+ * color entirely. Earlier we tinted active with the chip's palette
+ * (--sem-color), which made it hard to tell the difference between
+ * "this chip is selected" and "this chip has palette color #N" —
+ * especially confusing in dual-degree mode where two chips with the
+ * same palette color sit side by side. */
 .summaries-page .node.sem.active {
-  background: color-mix(in srgb, var(--sem-color, var(--lp-accent)) 12%, var(--lp-bg-card));
-  border-color: var(--sem-color, var(--lp-accent));
-  box-shadow: 0 6px 18px -4px var(--sem-color, var(--lp-accent));
-}
-.summaries-page .node.sem.active .folder-ico { color: var(--sem-color, var(--lp-accent)); }
-.summaries-page .node.sem.active .count {
-  background: var(--sem-color, var(--lp-accent));
+  background: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
+  border-color: transparent;
   color: white;
+  box-shadow: 0 8px 22px -6px rgba(22, 163, 74, .55);
+  transform: translateY(-1px);
+}
+.summaries-page .node.sem.active .name { color: white; }
+.summaries-page .node.sem.active .folder-ico { color: white; }
+.summaries-page .node.sem.active .count {
+  background: rgba(255, 255, 255, .22);
+  color: white;
+}
+/* Keep the "(נוכחי)" current-semester pill visible on the green active
+ * background — bumping its opacity so it doesn't blend in. */
+.summaries-page .node.sem.active .current-pill {
+  background: rgba(255, 255, 255, .9);
+  color: var(--lp-accent-deep, #14532d);
 }
 .summaries-page .node.sem .current-pill {
   font-size: 9.5px;
