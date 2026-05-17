@@ -2804,7 +2804,11 @@ html.light .badge-danger {
 .dashboard-v2 .cal-cell:hover { background: var(--lp-bg-elev); }
 .dashboard-v2 .cal-event {
   position: absolute;
-  inset: 3px;
+  /* Horizontal inset only — top + height are set inline per-event so the
+   * block spans its real duration (minute-precise). See CAL_ROW_PX in
+   * dashboard/page.tsx. */
+  left: 3px;
+  right: 3px;
   border-radius: 8px;
   padding: 4px 10px;
   font-size: 12px;
@@ -2812,7 +2816,7 @@ html.light .badge-danger {
   overflow: hidden;
   border: 0;
   border-right: 2px solid;
-  background: rgba(255,255,255,.5);
+  background: rgba(255,255,255,.85);
   backdrop-filter: blur(6px);
   display: flex;
   flex-direction: column;
@@ -2821,6 +2825,8 @@ html.light .badge-danger {
   line-height: 1.2;
   text-decoration: none;
   transition: transform .15s ease;
+  /* Events span past their starting cell — let them sit above the gridlines. */
+  z-index: 1;
 }
 .dashboard-v2 .cal-event:hover {
   transform: scale(1.03);
