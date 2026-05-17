@@ -5414,6 +5414,46 @@ html.light .badge-danger {
   color: white;
 }
 
+/* ── Year sub-branch inside a degree column ─────────────────────────── */
+.summaries-page .year-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-top: 22px;
+}
+.summaries-page .year-row:first-of-type { margin-top: 14px; }
+.summaries-page .year-row-head { margin-bottom: 4px; position: relative; z-index: 1; }
+.summaries-page .node.year {
+  background: var(--lp-bg-card);
+  border: 1.5px solid var(--lp-line);
+  padding: 7px 14px;
+  font-size: 12.5px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  box-shadow: 0 2px 6px rgba(120,70,30,.08);
+}
+.summaries-page .node.year .name { font-weight: 700; font-size: 12.5px; }
+.summaries-page .node.year .folder-ico { width: 14px; height: 14px; color: var(--lp-accent); }
+.summaries-page .node.year .count {
+  font-size: 10px;
+  padding: 1px 7px;
+  background: var(--lp-bg-elev);
+  color: var(--lp-muted);
+  border-radius: 999px;
+  font-weight: 700;
+}
+/* Sem-grid nested under a year row uses 2 cols so each year's "semester
+ * א + semester ב" pair reads naturally and stays narrow inside the
+ * (already half-width) degree column. */
+.summaries-page .year-row .sem-grid {
+  grid-template-columns: repeat(2, 1fr);
+  padding-top: 8px;
+}
+
 /* Semester grid — flat 3-column chip layout per degree */
 .summaries-page .sem-grid {
   display: grid;
