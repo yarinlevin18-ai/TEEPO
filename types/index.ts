@@ -102,6 +102,14 @@ export interface Course {
   /** Opaque snapshot from the university Portal scraper. Schema is per-university;
    *  the frontend treats it as read-only and just surfaces specific keys. */
   portal_metadata?: Record<string, unknown>
+
+  /** ISO-8601 timestamp of the last successful Moodle sync for this course.
+   *  Used by POST /api/sync/all as the diff cutoff — only scraper hits
+   *  newer than this are surfaced as "new" in the results modal.
+   *  Mirrored to the supabase courses table via migrate_005.sql so the
+   *  value works both directions when the storage primary eventually
+   *  shifts back to the table. */
+  last_synced_at?: string
 }
 
 export interface LessonFile {

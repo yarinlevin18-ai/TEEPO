@@ -23,6 +23,7 @@ import {
   GraduationCap, Building2, Settings, Menu, X, LogOut,
 } from 'lucide-react'
 import Logo from '@/components/Logo'
+import SyncAllButton from '@/components/sync/SyncAllButton'
 import { useAuth } from '@/lib/auth-context'
 import { useUniversityName, useUniversityCode } from '@/lib/use-university'
 import { useDB } from '@/lib/db-context'
@@ -121,6 +122,10 @@ export default function TopNav({ mobileOpen = false, onMobileToggle }: Props) {
           <span>{moodleConnected ? 'Moodle מסונכרן' : 'Moodle לא מחובר'}</span>
         </div>
 
+        <div className="tn-desktop">
+          <SyncAllButton variant="mini" />
+        </div>
+
         {user && (
           <div className="user-pill tn-desktop" title={displayName}>
             <div className="info">
@@ -164,6 +169,7 @@ export default function TopNav({ mobileOpen = false, onMobileToggle }: Props) {
                 <span className={`pulse ${moodleConnected ? 'on' : 'off'}`} aria-hidden />
                 <span>{moodleConnected ? 'Moodle מסונכרן' : 'Moodle לא מחובר'}</span>
               </div>
+              <SyncAllButton variant="mini" />
               <button className="tn-signout" onClick={() => signOut()}>
                 <LogOut size={15} /> יציאה
               </button>
