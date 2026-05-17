@@ -1914,6 +1914,40 @@ html.light .badge-danger {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   DARK-MODE OVERRIDES for .cream-page pages.
+   Triggered when the user picks "כהה" in /settings → theme-context
+   adds .dark to <html>. We just re-define the --lp-* tokens so every
+   descendant that reads them (cards, borders, ink, etc.) flips
+   automatically — and dim the warm radial color-washes so the cream
+   atmosphere doesn't bleed through. The accent green stays untouched
+   so brand color reads identically across themes.
+   ════════════════════════════════════════════════════════════════════ */
+html.dark .cream-page {
+  --lp-bg:          #0f1117;
+  --lp-bg-card:     #1a1f2e;
+  --lp-bg-card-2:   #232938;
+  --lp-bg-elev:     #2a3145;
+  --lp-bg-hover:    #232938;
+  --lp-ink:         #e5e7eb;
+  --lp-ink-soft:    #c2c8d3;
+  --lp-muted:       #8b95a8;
+  --lp-faint:       #6b7488;
+  --lp-line:        #2d3548;
+  --lp-line-soft:   #232938;
+  --lp-accent-soft: rgba(22, 163, 74, .18);
+  --lp-accent-deep: #4ade80;
+  /* Stronger, neutral-grey shadows (warm brown reads wrong on dark). */
+  --lp-shadow-sm: 0 2px 6px rgba(0, 0, 0, .35), 0 1px 2px rgba(0, 0, 0, .25);
+  --lp-shadow:    0 8px 20px -4px rgba(0, 0, 0, .50), 0 3px 8px rgba(0, 0, 0, .35);
+  --lp-shadow-lg: 0 24px 50px -10px rgba(0, 0, 0, .65), 0 8px 20px rgba(0, 0, 0, .45);
+  /* Cooler, more subtle noise pattern + tame the warm matte grain. */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+/* Dim the warm radial color washes way down — at full strength on dark
+ * they look like blown-out lens flares. ::before is the drift layer. */
+html.dark .cream-page::before { opacity: .35; }
+
+/* ════════════════════════════════════════════════════════════════════
    Shared <Logo /> component — book SVG + locked wordmark image.
    Source: teepo-design/brand_kit.css. Three size variants.
    ════════════════════════════════════════════════════════════════════ */
@@ -9241,5 +9275,168 @@ html.light .badge-danger {
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
 }
 .sync-not-connected-actions a { text-decoration: none; }
+
+/* ════════════════════════════════════════════════════════════════════
+   DARK-MODE TARGETED OVERRIDES
+   The .cream-page token block earlier flips most descendants because
+   they read via var(--lp-*). These rules patch the components that
+   used hardcoded cream/white hex values (mostly older pages: topnav,
+   /tasks v2 cards + modal, /summaries empty-state cards, summary-page
+   modals) so dark mode reads cohesively across the whole site.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Topnav (lives OUTSIDE .cream-page — has its own hardcoded cream bg) */
+html.dark .topnav-v2 {
+  background: rgba(15, 17, 23, .85) !important;
+  border-bottom-color: #2d3548 !important;
+}
+html.dark .topnav-v2 .tn-link { color: #8b95a8; }
+html.dark .topnav-v2 .tn-link:hover { background: #232938; color: #e5e7eb; }
+html.dark .topnav-v2 .tn-link .count { background: #2a3145; color: #8b95a8; }
+html.dark .topnav-v2 .tn-divider { background: #2d3548; }
+html.dark .topnav-v2 .moodle-pill {
+  background: #1a1f2e !important;
+  border-color: #2d3548 !important;
+  color: #c2c8d3 !important;
+}
+html.dark .topnav-v2 .user-pill {
+  background: #1a1f2e !important;
+  border-color: #2d3548 !important;
+}
+html.dark .topnav-v2 .user-pill .info strong { color: #e5e7eb; }
+html.dark .topnav-v2 .user-pill .info small  { color: #8b95a8; }
+html.dark .topnav-v2 .tn-burger { color: #c2c8d3; }
+html.dark .topnav-v2 .tn-burger:hover { background: #232938; color: #e5e7eb; }
+html.dark .tn-drawer { background: #0f1117; color: #e5e7eb; }
+html.dark .tn-drawer-divider { background: #2d3548; }
+html.dark .tn-backdrop { background: rgba(0, 0, 0, .6); }
+
+/* /tasks v2 — many hardcoded #fdf6e3 / #efe0bc / #fffaf0 values */
+html.dark .tasks-v2 .t-tabs,
+html.dark .tasks-v2 .t-card {
+  background: #1a1f2e !important;
+  border-color: #2d3548 !important;
+}
+html.dark .tasks-v2 .t-tab { color: #8b95a8; }
+html.dark .tasks-v2 .t-tab:hover { color: #e5e7eb; }
+html.dark .tasks-v2 .t-tab-count { background: #2a3145; color: #8b95a8; }
+html.dark .tasks-v2 .t-card-title { color: #e5e7eb; }
+html.dark .tasks-v2 .t-card-meta .t-meta-item.due { color: #c2c8d3; }
+html.dark .tasks-v2 .t-card-meta .t-meta-item.solo { color: #c2c8d3; }
+html.dark .tasks-v2 .t-pill {
+  background: rgba(26, 31, 46, .55);
+  border-color: rgba(45, 53, 72, .55);
+  color: #c2c8d3;
+}
+html.dark .tasks-v2 .t-pill .num { color: #e5e7eb; }
+html.dark .tasks-v2 .t-sec-count {
+  background: rgba(26, 31, 46, .6);
+  border-color: #2d3548;
+  color: #8b95a8;
+}
+html.dark .tasks-v2 .t-sec-label { color: #e5e7eb; }
+html.dark .tasks-v2 .t-priority.low { background: #2a3145; color: #8b95a8; }
+html.dark .tasks-v2 .t-drive-btn {
+  border-color: #2d3548;
+  color: #c2c8d3;
+}
+html.dark .tasks-v2 .t-empty {
+  background: rgba(26, 31, 46, .4);
+  border-color: #2d3548;
+  color: #8b95a8;
+}
+html.dark .tasks-v2 .t-modal,
+html.dark .tasks-v2 .t-modal-foot {
+  background: #1a1f2e !important;
+  color: #e5e7eb;
+}
+html.dark .tasks-v2 .t-modal-head {
+  background: linear-gradient(180deg, #1a1f2e, #232938) !important;
+  border-bottom-color: #2d3548;
+}
+html.dark .tasks-v2 .t-modal-close { color: #c2c8d3; }
+html.dark .tasks-v2 .t-modal-close:hover:not(:disabled) { background: rgba(255, 255, 255, .05); }
+html.dark .tasks-v2 .t-field > span { color: #c2c8d3; }
+html.dark .tasks-v2 .t-field input,
+html.dark .tasks-v2 .t-field select {
+  background: #0f1117;
+  border-color: #2d3548;
+  color: #e5e7eb;
+}
+html.dark .tasks-v2 .t-modal-foot button {
+  background: #232938;
+  border-color: #2d3548;
+  color: #e5e7eb;
+}
+html.dark .tasks-v2 .t-modal-foot button:hover:not(:disabled) { background: #2a3145; }
+
+/* /summaries — modal overlays + organize-lessons modal (hardcoded #fffaf0) */
+html.dark .summaries-page .drive-organize-modal,
+html.dark .drive-organize-modal,
+html.dark .summaries-page .drive-organize-foot,
+html.dark .drive-organize-foot {
+  background: #1a1f2e !important;
+  color: #e5e7eb;
+}
+html.dark .drive-organize-head {
+  background: linear-gradient(180deg, #1a1f2e, #232938) !important;
+  border-bottom-color: #2d3548;
+}
+html.dark .drive-organize-help { color: #c2c8d3; }
+html.dark .drive-organize-group {
+  background: #232938 !important;
+  border-color: #2d3548 !important;
+}
+html.dark .drive-organize-group-head strong { color: #e5e7eb; }
+html.dark .drive-organize-count {
+  background: #2a3145;
+  color: #c2c8d3;
+}
+html.dark .drive-organize-group li {
+  background: rgba(139, 92, 246, .08) !important;
+  color: #c2c8d3;
+}
+html.dark .drive-organize-foot button {
+  background: #232938;
+  border-color: #2d3548;
+  color: #e5e7eb;
+}
+html.dark .drive-organize-foot button:hover:not(:disabled) { background: #2a3145; }
+html.dark .drive-organize-unmatched { color: #8b95a8; }
+html.dark .drive-organize-progress { color: #c2c8d3; }
+
+/* Modal backdrops: ensure they're dark-friendly */
+html.dark .drive-organize-overlay { background: rgba(0, 0, 0, .65); }
+html.dark .tasks-v2 .t-modal-overlay { background: rgba(0, 0, 0, .6); }
+
+/* Dashboard widgets — most use var(--lp-*) already but a few got
+ * hardcoded hex during recent additions (quick-add input). */
+html.dark .dashboard-v2 .quick-add-task input {
+  background: #0f1117;
+  color: #e5e7eb;
+  border-color: #2d3548;
+}
+html.dark .dashboard-v2 .quick-add-task { border-top-color: #2d3548; }
+html.dark .dashboard-v2 .quick-add-task input::placeholder { color: #6b7488; }
+
+/* Per-course degree picker dropdown (cream styling hardcoded) */
+html.dark .summaries-page .course-card-degree-select {
+  background-color: #232938 !important;
+  border-color: #2d3548;
+  color: #e5e7eb;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%238b95a8' d='M5 6L0 0h10z'/></svg>");
+}
+
+/* Lesson action bar — uses light green; dim it for dark */
+html.dark .summaries-page .lesson-action-bar {
+  background: linear-gradient(135deg, rgba(22, 163, 74, .14), rgba(132, 204, 22, .10)) !important;
+  border-color: rgba(22, 163, 74, .35) !important;
+}
+html.dark .summaries-page .lesson-action-btn {
+  background: #232938;
+  color: #e5e7eb;
+  border-color: #2d3548;
+}
+html.dark .summaries-page .lesson-action-btn:hover:not(:disabled) { background: #2a3145; }
 
 
