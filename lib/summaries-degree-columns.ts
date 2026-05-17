@@ -185,6 +185,13 @@ function buildSingleDegreeColumn(
   const tree = buildTree(courses)
   const current = currentAcademicSlot(now)
 
+  // Prefix all chip + bucket keys with the degree id so they're unique
+  // across degrees. Without this, both degrees' "סמסטר א' תשפ״ו" chips
+  // share the same key (e.g. 'y1-א'), `allChips.find(key)` resolves to
+  // whichever appears first in iteration order, and clicking a chip in
+  // degree B silently activates the chip with the same name in degree A.
+  const scopedKey = (k: string) => `${degree.id}::${k}`
+
   // Flatten every (year, semester) bucket from the tree into chips. Each
   // course ends up in exactly one chip — buildTree already handled the
   // partition logic + the 'unclassified' / 'no-year' / 'no-sem' synthetics.
@@ -198,7 +205,7 @@ function buildSingleDegreeColumn(
       const isMissingYear = yos === null && acadNum === null
 
       chips.push({
-        key: bucket.key,
+        key: scopedKey(bucket.key),
         label: chipLabel({
           semester: bucket.semester,
           academicYear: acadNum,
@@ -238,7 +245,7 @@ function buildSingleDegreeColumn(
   // palette) so it doesn't visually compete with real semesters.
   if (tree.unclassified) {
     chips.push({
-      key: tree.unclassified.key,
+      key: scopedKey(tree.unclassified.key),
       label: 'לא מסווגים',
       academicYear: null,
       semester: null,
