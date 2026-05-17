@@ -3739,6 +3739,69 @@ html.light .badge-danger {
   background: var(--lp-accent, #16a34a);
   color: white;
 }
+/* Compact variant — used in the משימות card when there's a quick-add
+ * row below; the standard padded empty-state would push the input too
+ * far down the card. */
+.dashboard-v2 .dcard-empty-compact {
+  padding: 14px 22px 6px;
+}
+.dashboard-v2 .dcard-empty-compact p {
+  font-size: 12.5px;
+}
+
+/* Inline quick-add task input — bottom row of the משימות widget */
+.dashboard-v2 .quick-add-task {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--lp-line-soft);
+  margin-top: 4px;
+}
+.dashboard-v2 .quick-add-task input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--lp-line);
+  background: white;
+  color: var(--lp-ink);
+  font-family: inherit;
+  font-size: 13px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.dashboard-v2 .quick-add-task input::placeholder {
+  color: var(--lp-muted);
+}
+.dashboard-v2 .quick-add-task input:focus {
+  outline: none;
+  border-color: var(--lp-accent);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, .15);
+}
+.dashboard-v2 .quick-add-task input:disabled { opacity: .6; }
+.dashboard-v2 .quick-add-task button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 0;
+  background: var(--lp-gradient, linear-gradient(135deg, #16a34a, #84cc16));
+  color: white;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 3px 8px -2px rgba(22, 163, 74, .35);
+  transition: transform .15s, box-shadow .15s, opacity .15s;
+}
+.dashboard-v2 .quick-add-task button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px -2px rgba(22, 163, 74, .5);
+}
+.dashboard-v2 .quick-add-task button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
 
 /* 2-column intermediate so the jump isn't 3 → 1. The drawer kicks in at
    1100px, but cards stay readable in 2 columns down to ~700px. */
