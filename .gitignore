@@ -15,6 +15,11 @@ build/
 .env.test.local
 .env.production.local
 
+# Private keys (Chrome extension signing keys, OAuth keys, etc.)
+*.pem
+*.key
+*-private.json
+
 # Python
 __pycache__/
 *.py[cod]
