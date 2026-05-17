@@ -318,14 +318,18 @@ export default function SummariesPage() {
             </button>
           </div>
 
-          {/* Degree columns: one per degree (multi-degree-ready — current
-              data model returns one degree from buildDegreeColumns; the
-              page renders side-by-side when more are added). The degree
-              pill is hidden when no custom degree_name is set so the tree
-              doesn't render a placeholder "התואר שלי" node. */}
+          {/* Degree columns side by side (one per degree). Inside each
+              column the tree continues: degree → year → semester chips.
+              Year branches collapse when the column only has a single
+              year so single-degree single-year users don't get an extra
+              "שנה א'" pill for nothing. */}
           <div className={`tree-branches columns-${columns.degrees.length} ${showDegreePill ? '' : 'no-degree-pill'}`}>
             {columns.degrees.map((degree) => {
               const degreeIsActive = degree.chips.some(c => c.key === activeChipKey)
+              // Render flat (no year nodes) when there's only one year group
+              // in this degree column — the extra node adds noise without
+              // information.
+              const flatten = degree.yearGroups.length <= 1
               return (
                 <div key={degree.id} className="degree-column">
                   {showDegreePill && (
@@ -343,35 +347,47 @@ export default function SummariesPage() {
                     </div>
                   )}
 
-                  {degree.chips.length > 0 && (
-                    <div className="sem-grid">
-                      {degree.chips.map((chip) => {
-                        const isActive = chip.key === activeChipKey
-                        const color = chip.isUnclassified
-                          ? 'var(--lp-muted)'
-                          : semesterChipColor(chip.colorIdx)
-                        return (
-                          <div
+                  {flatten ? (
+                    degree.chips.length > 0 && (
+                      <div className="sem-grid">
+                        {degree.chips.map((chip) => (
+                          <SemChip
                             key={chip.key}
-                            className={`sem-chip-wrap ${isActive ? 'active' : ''}`}
-                          >
-                            <button
-                              type="button"
-                              className={`node sem ${isActive ? 'active' : ''} ${chip.isCurrent ? 'is-current' : ''}`}
-                              style={{ ['--sem-color' as any]: color }}
-                              onClick={() => pickChip(chip.key)}
-                            >
-                              <Folder className="folder-ico" />
-                              <span className="name">
-                                {chip.label}
-                                {chip.isCurrent && <span className="current-pill">נוכחי</span>}
-                              </span>
-                              <span className="count">{chip.bucket.courses.length}</span>
-                            </button>
+                            chip={chip}
+                            isActive={chip.key === activeChipKey}
+                            onPick={pickChip}
+                          />
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    // Multi-year column → render one .year-row per year,
+                    // each with its own semester sub-grid.
+                    degree.yearGroups.map((yg) => (
+                      <div key={yg.yearKey} className="year-row">
+                        <div className="year-row-head">
+                          <div className="node year" aria-label={yg.yearLabel}>
+                            <GraduationCap className="folder-ico" />
+                            <span className="name">{yg.yearLabel}</span>
+                            <span className="count">
+                              {yg.chips.length} {yg.chips.length === 1 ? 'סמסטר' : 'סמסטרים'}
+                            </span>
                           </div>
-                        )
-                      })}
-                    </div>
+                        </div>
+                        {yg.chips.length > 0 && (
+                          <div className="sem-grid">
+                            {yg.chips.map((chip) => (
+                              <SemChip
+                                key={chip.key}
+                                chip={chip}
+                                isActive={chip.key === activeChipKey}
+                                onPick={pickChip}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))
                   )}
                 </div>
               )
@@ -422,6 +438,39 @@ export default function SummariesPage() {
 /** Empty SVG placeholder — keeps the CSS hook for future connector-drawing.
  *  The mockup draws lines dynamically based on element positions; v1 ships
  *  with the simpler CSS-only connectors. */
+/** Single semester chip rendered inside any sem-grid. Extracted so the
+ *  flat-degree and per-year layouts share the exact same chip markup. */
+function SemChip({
+  chip,
+  isActive,
+  onPick,
+}: {
+  chip: SemesterChip
+  isActive: boolean
+  onPick: (key: string) => void
+}) {
+  const color = chip.isUnclassified
+    ? 'var(--lp-muted)'
+    : semesterChipColor(chip.colorIdx)
+  return (
+    <div className={`sem-chip-wrap ${isActive ? 'active' : ''}`}>
+      <button
+        type="button"
+        className={`node sem ${isActive ? 'active' : ''} ${chip.isCurrent ? 'is-current' : ''}`}
+        style={{ ['--sem-color' as any]: color }}
+        onClick={() => onPick(chip.key)}
+      >
+        <Folder className="folder-ico" />
+        <span className="name">
+          {chip.label}
+          {chip.isCurrent && <span className="current-pill">נוכחי</span>}
+        </span>
+        <span className="count">{chip.bucket.courses.length}</span>
+      </button>
+    </div>
+  )
+}
+
 function TreeConnectorsSvg() {
   return (
     <svg className="tree-svg" aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" />
