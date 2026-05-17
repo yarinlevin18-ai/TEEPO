@@ -479,6 +479,24 @@ function TreeConnectorsSvg() {
 
 // ── Below-tree panels ──────────────────────────────────────────────────
 
+/** Snapshot of a course's classification fields, captured right BEFORE
+ *  a bulk-classify so the user can hit "בטל" and roll the change back. */
+interface BulkUndoSnapshot {
+  ts: number
+  /** Localized verb for the undo banner: "סווגו 4 קורסים — בטל". */
+  count: number
+  snapshots: Array<{
+    courseId: string
+    prev: {
+      year_of_study?: Course['year_of_study']
+      semester?: Course['semester']
+      degree_id?: string
+    }
+  }>
+}
+
+const UNDO_WINDOW_MS = 30_000
+
 function SemesterCoursesPanel({
   bucket,
   onPickCourse,
@@ -495,14 +513,30 @@ function SemesterCoursesPanel({
   const [bulkDegreeId, setBulkDegreeId] = useState<string>('')
   const [bulkStatus, setBulkStatus] = useState<{ done: number; total: number; failed: number } | null>(null)
   const [bulkErr, setBulkErr] = useState<string | null>(null)
+  // Most-recent bulk action snapshot — drives the "בטל" undo banner.
+  // Auto-clears after UNDO_WINDOW_MS so the banner doesn't linger forever.
+  const [lastBulk, setLastBulk] = useState<BulkUndoSnapshot | null>(null)
+  const [undoing, setUndoing] = useState<{ done: number; total: number } | null>(null)
 
   // Clear selection when the bucket changes (user navigated away and back).
+  // We do NOT clear lastBulk here on purpose — the undo banner should stay
+  // visible even if the user navigates between chips while still inside
+  // the undo window.
   useEffect(() => {
     setSelectedIds(new Set())
     setBulkStatus(null)
     setBulkErr(null)
     setBulkDegreeId('')
   }, [bucket.key])
+
+  // Auto-expire the undo snapshot after the window passes.
+  useEffect(() => {
+    if (!lastBulk) return
+    const remaining = lastBulk.ts + UNDO_WINDOW_MS - Date.now()
+    if (remaining <= 0) { setLastBulk(null); return }
+    const id = setTimeout(() => setLastBulk(null), remaining)
+    return () => clearTimeout(id)
+  }, [lastBulk])
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -527,6 +561,23 @@ function SemesterCoursesPanel({
   const applyBulk = async () => {
     if (!canApply || typeof reclassifyCourse !== 'function') return
     const ids = Array.from(selectedIds)
+    // Capture each course's CURRENT classification BEFORE we touch them, so
+    // the undo banner can restore the exact prior state per-course (each
+    // course may have had different starting year/semester/degree).
+    const snapshots = ids
+      .map((id) => {
+        const c = bucket.courses.find((x) => x.id === id)
+        if (!c) return null
+        return {
+          courseId: id,
+          prev: {
+            year_of_study: c.year_of_study,
+            semester: c.semester,
+            degree_id: (c as any).degree_id,
+          },
+        }
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null)
     setBulkErr(null)
     setBulkStatus({ done: 0, total: ids.length, failed: 0 })
     let failed = 0
@@ -549,8 +600,39 @@ function SemesterCoursesPanel({
       try { await flushSave() } catch { /* surfaced as bulkErr */ }
     }
     if (firstError) setBulkErr(firstError)
-    if (failed === 0) setSelectedIds(new Set())
+    if (failed === 0) {
+      setSelectedIds(new Set())
+      // Only offer undo when EVERYTHING succeeded — undoing partial state
+      // would require knowing which ones actually changed, more trouble
+      // than it's worth for the rare partial-failure case.
+      setLastBulk({ ts: Date.now(), count: snapshots.length, snapshots })
+    }
     setTimeout(() => setBulkStatus(null), 2500)
+  }
+
+  const undoLastBulk = async () => {
+    if (!lastBulk || typeof reclassifyCourse !== 'function') return
+    setUndoing({ done: 0, total: lastBulk.snapshots.length })
+    let failed = 0
+    for (let i = 0; i < lastBulk.snapshots.length; i++) {
+      const s = lastBulk.snapshots[i]
+      try {
+        // Pass the previous values verbatim (undefined included) so
+        // reclassifyCourse restores the exact prior shape — including
+        // clearing fields back to undefined when needed.
+        await reclassifyCourse(s.courseId, s.prev)
+      } catch (e) {
+        failed++
+        console.warn('[bulk-undo] failed for', s.courseId, e)
+      }
+      setUndoing({ done: i + 1, total: lastBulk.snapshots.length })
+    }
+    if (typeof flushSave === 'function') {
+      try { await flushSave() } catch { /* best-effort */ }
+    }
+    setUndoing(null)
+    setLastBulk(null)
+    if (failed > 0) setBulkErr(`לא הצלחנו לבטל ${failed} סיווגים`)
   }
 
   if (bucket.courses.length === 0) {
@@ -672,6 +754,41 @@ function SemesterCoursesPanel({
         </div>
       )}
       </>
+      )}
+
+      {/* Undo banner — surfaces immediately after a successful bulk action.
+       *  Stays visible (across chip switches too) until the user clicks
+       *  בטל, dismisses, or the 30s window expires. Lives OUTSIDE the
+       *  needsClassify gate so it's reachable even when the toolbar
+       *  itself has hidden (e.g. user fixed everything and now wants to
+       *  revert). */}
+      {lastBulk && (
+        <div className="bulk-undo" role="status">
+          <span>
+            {undoing
+              ? `מבטל… ${undoing.done}/${undoing.total}`
+              : `${lastBulk.count} ${lastBulk.count === 1 ? 'קורס סווג' : 'קורסים סווגו'}`}
+          </span>
+          <div className="bulk-undo-actions">
+            <button
+              type="button"
+              className="bulk-undo-btn"
+              onClick={undoLastBulk}
+              disabled={undoing !== null}
+            >
+              בטל
+            </button>
+            <button
+              type="button"
+              className="bulk-undo-dismiss"
+              onClick={() => setLastBulk(null)}
+              disabled={undoing !== null}
+              aria-label="הסתר"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="course-grid">
