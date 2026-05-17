@@ -656,19 +656,17 @@ function SemesterCoursesPanel({
   const allSelected = selectedIds.size === bucket.courses.length
   const someSelected = selectedIds.size > 0
 
-  // Only surface the bulk-classify toolbar when there's actually something
-  // to classify. For a fully-classified semester bucket (every course has
-  // year_of_study + semester set) it's just visual noise — the user can
-  // still re-classify individual courses via ClassifyWidget inside the
-  // course panel. Show it for: truly unclassified, "ללא שנה" / "ללא
-  // סמסטר" synthetics, any bucket where at least one course is missing
-  // year_of_study OR semester, or — for dual-degree users — any course
-  // that hasn't been assigned to a degree yet.
+  // Only surface the bulk-classify toolbar when there's actually
+  // year/semester work to do. We previously also forced it open whenever
+  // a dual-degree user had an unassigned course in the bucket — but
+  // courses ARE visible in their semester bucket regardless of degree
+  // (unassigned ones default to the first degree column), so showing the
+  // toolbar then made the user think they weren't classified at all.
+  // Dual-degree assignment moves to per-course UI in a follow-up.
   const needsClassify =
     bucket.isUnclassified ||
     bucket.semester === null ||
-    bucket.courses.some(c => !c.year_of_study || !c.semester) ||
-    (degrees.length > 1 && bucket.courses.some(c => !c.degree_id))
+    bucket.courses.some(c => !c.year_of_study || !c.semester)
 
   return (
     <section className="course-panel">
