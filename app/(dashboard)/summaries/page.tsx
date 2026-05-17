@@ -37,6 +37,7 @@ import {
   semesterChipColor,
   type SemesterChip,
 } from '@/lib/summaries-degree-columns'
+import { resolveDegrees } from '@/lib/degrees'
 
 type FolderKind = 'lessons' | 'assignments' | 'notes'
 
@@ -61,17 +62,18 @@ const COURSE_PALETTE = [
 
 export default function SummariesPage() {
   const { db, reclassifyCourse } = useDB() as any
-  // Degree-name pill is shown only when the user has actually named their
-  // degree in /settings. If unset we skip the pill entirely (tree goes
-  // straight from TEEPO → semester chips) so "התואר שלי" doesn't sit
-  // there as a placeholder that adds nothing.
-  const customDegreeName: string =
-    (db?.settings?.degree_name && String(db.settings.degree_name).trim()) || ''
-  const degreeLabel: string = customDegreeName || 'התואר שלי'
-  const showDegreePill = customDegreeName.length > 0
+  // Degree list — supports dual-degree (תואר דו-חוגי). resolveDegrees
+  // hydrates from settings.degrees[] first, then falls back to the legacy
+  // settings.degree_name single-string field for users who haven't been
+  // migrated yet. Always returns ≥1 degree.
+  const degrees = useMemo(() => resolveDegrees(db?.settings ?? null), [db?.settings])
+  // Show the degree-row only when there are 2+ degrees OR the single one
+  // has a real name. A nameless single degree skips the pill entirely so
+  // the tree reads TEEPO → semester chips without a placeholder.
+  const showDegreePill = degrees.length > 1 || (degrees[0]?.name?.trim()?.length ?? 0) > 0
 
   const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
-  const columns = useMemo(() => buildDegreeColumns(courses, degreeLabel), [courses, degreeLabel])
+  const columns = useMemo(() => buildDegreeColumns(courses, degrees), [courses, degrees])
   // Flatten chips across all degree columns for the activeChipKey lookup.
   const allChips = useMemo<SemesterChip[]>(
     () => columns.degrees.flatMap(d => d.chips),
@@ -435,10 +437,13 @@ function SemesterCoursesPanel({
   bucket: SemesterBucket
   onPickCourse: (id: string) => void
 }) {
-  const { reclassifyCourse, flushSave } = useDB() as any
+  const { db, reclassifyCourse, flushSave } = useDB() as any
+  // Degree list for the bulk-classify dropdown (only rendered when 2+).
+  const degrees = useMemo(() => resolveDegrees(db?.settings ?? null).filter(d => d.name.length > 0), [db?.settings])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkYear, setBulkYear] = useState<number | ''>('')
   const [bulkSem, setBulkSem] = useState<HebSemester | ''>('')
+  const [bulkDegreeId, setBulkDegreeId] = useState<string>('')
   const [bulkStatus, setBulkStatus] = useState<{ done: number; total: number; failed: number } | null>(null)
   const [bulkErr, setBulkErr] = useState<string | null>(null)
 
@@ -447,6 +452,7 @@ function SemesterCoursesPanel({
     setSelectedIds(new Set())
     setBulkStatus(null)
     setBulkErr(null)
+    setBulkDegreeId('')
   }, [bucket.key])
 
   const toggleSelect = useCallback((id: string) => {
@@ -466,7 +472,7 @@ function SemesterCoursesPanel({
 
   const canApply =
     selectedIds.size > 0 &&
-    (bulkYear !== '' || bulkSem !== '') &&
+    (bulkYear !== '' || bulkSem !== '' || bulkDegreeId !== '') &&
     bulkStatus === null
 
   const applyBulk = async () => {
@@ -481,6 +487,7 @@ function SemesterCoursesPanel({
         await reclassifyCourse(ids[i], {
           year_of_study: (bulkYear || undefined) as Course['year_of_study'],
           semester: (bulkSem || undefined) as Course['semester'],
+          degree_id: bulkDegreeId || undefined,
         })
       } catch (e: any) {
         failed++
@@ -523,12 +530,14 @@ function SemesterCoursesPanel({
   // year_of_study + semester set) it's just visual noise — the user can
   // still re-classify individual courses via ClassifyWidget inside the
   // course panel. Show it for: truly unclassified, "ללא שנה" / "ללא
-  // סמסטר" synthetics, or any bucket where at least one course is missing
-  // year_of_study OR semester.
+  // סמסטר" synthetics, any bucket where at least one course is missing
+  // year_of_study OR semester, or — for dual-degree users — any course
+  // that hasn't been assigned to a degree yet.
   const needsClassify =
     bucket.isUnclassified ||
     bucket.semester === null ||
-    bucket.courses.some(c => !c.year_of_study || !c.semester)
+    bucket.courses.some(c => !c.year_of_study || !c.semester) ||
+    (degrees.length > 1 && bucket.courses.some(c => !c.degree_id))
 
   return (
     <section className="course-panel">
@@ -560,6 +569,20 @@ function SemesterCoursesPanel({
           </span>
         </div>
         <div className="bulk-bar-right">
+          {degrees.length > 1 && (
+            <select
+              className="bulk-select"
+              value={bulkDegreeId}
+              onChange={(e) => setBulkDegreeId(e.target.value)}
+              disabled={!someSelected || bulkStatus !== null}
+              aria-label="תואר"
+            >
+              <option value="">תואר —</option>
+              {degrees.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          )}
           <select
             className="bulk-select"
             value={bulkYear}
