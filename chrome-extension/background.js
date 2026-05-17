@@ -329,6 +329,80 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return true
 })
 
+// ── External message router ──────────────────────────────────────────────
+//
+// Accepts messages from the TEEPO web app (origins listed under
+// `externally_connectable` in manifest.json). The bridge lets the
+// /assignments "סנכרן" results modal hand off the actual file-upload
+// work to the extension after the backend identifies new files on Moodle.
+//
+// Contract (one message per file — keeps progress reporting simple on
+// the page side and aborts cleanly if a single file 403s):
+//
+//   { type: 'TEEPO_PING' }
+//     → { ok: true, version: '<manifest.version>' }
+//
+//   { type: 'TEEPO_SYNC_FILE',
+//     file: { url, filename, mimeType? },
+//     courseId, kind = 'assignments' | 'lessons' | 'notes' }
+//     → { ok: true, file: { id, name } }  |  { ok: false, error: '...' }
+//
+// The extension uses the active Chrome cookies for the Moodle download
+// (its service worker shares the user's cookie jar for host_permissions
+// origins) and the *website's* Google token for the Drive upload — same
+// double-token dance the popup flow already does.
+chrome.runtime.onMessageExternal.addListener((msg, _sender, sendResponse) => {
+  ;(async () => {
+    try {
+      switch (msg?.type) {
+        case 'TEEPO_PING': {
+          sendResponse({
+            ok: true,
+            version: chrome.runtime.getManifest().version,
+            extensionId: chrome.runtime.id,
+          })
+          break
+        }
+        case 'TEEPO_SYNC_FILE': {
+          if (!msg.file?.url || !msg.file?.filename) {
+            sendResponse({ ok: false, error: 'missing file.url or file.filename' })
+            return
+          }
+          if (!msg.courseId) {
+            sendResponse({ ok: false, error: 'missing courseId' })
+            return
+          }
+          const kind = msg.kind || 'assignments'
+          let folderId
+          try {
+            folderId = await resolveFolder({ courseId: msg.courseId, kind })
+          } catch (e) {
+            sendResponse({ ok: false, error: `folder_resolve_failed: ${e?.message || e}` })
+            return
+          }
+          try {
+            const file = await uploadFile({
+              folderId,
+              sourceUrl: msg.file.url,
+              filename: msg.file.filename,
+              mimeType: msg.file.mimeType,
+            })
+            sendResponse({ ok: true, file })
+          } catch (e) {
+            sendResponse({ ok: false, error: `upload_failed: ${e?.message || e}` })
+          }
+          break
+        }
+        default:
+          sendResponse({ ok: false, error: 'unknown_type' })
+      }
+    } catch (e) {
+      sendResponse({ ok: false, error: String(e?.message || e) })
+    }
+  })()
+  return true
+})
+
 // Lifecycle log so install/update is visible in chrome://extensions logs.
 chrome.runtime.onInstalled.addListener((info) => {
   console.info('[TEEPO] installed/updated:', info.reason)
