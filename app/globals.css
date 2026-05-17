@@ -9439,4 +9439,100 @@ html.dark .summaries-page .lesson-action-btn {
 }
 html.dark .summaries-page .lesson-action-btn:hover:not(:disabled) { background: #2a3145; }
 
+/* ════════════════════════════════════════════════════════════════════
+   DARK-MODE PATCH PASS 2 — audit findings
+   Covers: sliding puzzle, CountryClock input, calendar event pills,
+   the sync modal (used on dashboard/tasks/assignments), and the
+   courses error banner.
+   ════════════════════════════════════════════════════════════════════ */
 
+/* /dashboard — Sliding-puzzle widget (cream tiles → unreadable on dark) */
+html.dark .puzzle-mini {
+  background: rgba(35, 41, 56, .55) !important;
+  border-color: #2d3548 !important;
+}
+html.dark .puzzle-mini:hover {
+  background: rgba(35, 41, 56, .85) !important;
+  border-color: #2d3548 !important;
+}
+html.dark .puzzle-mini .pm-head,
+html.dark .puzzle-mini .pm-foot { border-color: #2d3548 !important; }
+html.dark .puzzle-mini .pm-label { color: #e5e7eb !important; }
+html.dark .puzzle-mini .slide-tile {
+  background: #232938 !important;
+  border-color: #2d3548 !important;
+  color: #e5e7eb !important;
+}
+html.dark .puzzle-mini .slide-tile:hover:not(.empty):not(:disabled) {
+  background: #2a3145 !important;
+}
+html.dark .puzzle-mini .slide-tile.empty { background: rgba(255, 255, 255, .04) !important; }
+html.dark .puzzle-mini .pm-info { color: #c2c8d3 !important; }
+html.dark .puzzle-mini .pm-info strong { color: #e5e7eb !important; }
+html.dark .puzzle-mini .pm-info small { color: #8b95a8 !important; }
+html.dark .puzzle-mini .pm-shuffle {
+  border-color: #2d3548 !important;
+  color: #c2c8d3 !important;
+}
+
+/* /dashboard — CountryClock guess input */
+html.dark .country-guess input {
+  background: #232938 !important;
+  border-color: #2d3548 !important;
+  color: #e5e7eb !important;
+}
+html.dark .country-guess input::placeholder { color: #6b7488 !important; }
+html.dark .country-guess.correct input {
+  background: rgba(22, 163, 74, .15) !important;
+  color: #4ade80 !important;
+}
+
+/* /dashboard — calendar event pills (white background → blown-out on dark) */
+html.dark .dashboard-v2 .cal-event {
+  background: rgba(35, 41, 56, .85) !important;
+  color: #e5e7eb !important;
+}
+html.dark .dashboard-v2 .cal-event small {
+  color: #c2c8d3 !important;
+  opacity: .8 !important;
+}
+html.dark .dashboard-v2 .ev-amber  { background: linear-gradient(90deg, rgba(217, 119, 6, .25), rgba(35, 41, 56, .85)) !important; }
+html.dark .dashboard-v2 .ev-blue   { background: linear-gradient(90deg, rgba(99, 102, 241, .25), rgba(35, 41, 56, .85)) !important; }
+html.dark .dashboard-v2 .ev-green  { background: linear-gradient(90deg, rgba(13, 148, 136, .25), rgba(35, 41, 56, .85)) !important; }
+html.dark .dashboard-v2 .ev-rose   { background: linear-gradient(90deg, rgba(225, 29, 72, .25), rgba(35, 41, 56, .85)) !important; }
+html.dark .dashboard-v2 .ev-purple { background: linear-gradient(90deg, rgba(139, 92, 246, .25), rgba(35, 41, 56, .85)) !important; }
+
+/* Sync modal (dashboard/tasks/assignments) — reads from the LEGACY root
+ * tokens (--bg-card / --ink / --muted) which are :root-only and never
+ * flipped by .dark. Cheapest fix: re-define those tokens inside the
+ * modal's own scope so the cascade flips just this surface. */
+html.dark .sync-modal,
+html.dark .sync-modal-overlay {
+  --bg-card: #1a1f2e;
+  --bg-card-2: #232938;
+  --bg-hover: #2a3145;
+  --bg-elev: #232938;
+  --ink: #e5e7eb;
+  --ink-soft: #c2c8d3;
+  --muted: #8b95a8;
+  --line: #2d3548;
+  --line-soft: #232938;
+}
+html.dark .sync-modal {
+  color: #e5e7eb;
+  box-shadow: 0 24px 50px -10px rgba(0, 0, 0, .65), 0 8px 20px rgba(0, 0, 0, .45) !important;
+}
+html.dark .sync-modal-overlay { background: rgba(0, 0, 0, .6) !important; }
+html.dark .sync-ni-icon,
+html.dark .sync-bridge-icon { background: #232938 !important; }
+html.dark .sync-bridge-bar { background: rgba(255, 255, 255, .08) !important; }
+
+/* /courses — amber error banner reads loud on dark; tone the surface
+ * down while keeping warm amber text for the alert affordance. */
+html.dark .courses-error-banner {
+  background: rgba(154, 52, 18, .18) !important;
+  border-color: rgba(254, 215, 170, .35) !important;
+}
+html.dark .courses-error-body h2 { color: #fed7aa !important; }
+html.dark .courses-error-body p,
+html.dark .courses-error-body small { color: #fdba74 !important; }
