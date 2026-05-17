@@ -1,11 +1,21 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+/**
+ * /notes — global "all my notes" list.
+ *
+ * Reads from the Drive DB (db.notes + db.courses) via useDB(). Previously
+ * this page called api.courses.list() + api.notes.list(courseId) which hit
+ * legacy Supabase tables that are no longer populated post-migration —
+ * the page permanently showed "עדיין אין סיכומים" no matter how many
+ * notes the user wrote. Same shape of bug as the now-deleted פרופיל
+ * אקדמי card on /settings.
+ */
+
+import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { FileText, Search, BookOpen, Calendar } from 'lucide-react'
 import Link from 'next/link'
-import { api } from '@/lib/api-client'
-import { useAuth } from '@/lib/auth-context'
+import { useDB } from '@/lib/db-context'
 import GlowCard from '@/components/ui/GlowCard'
 import type { Course, CourseNote } from '@/types'
 import { format } from 'date-fns'
@@ -20,51 +30,28 @@ interface NoteWithCourse extends CourseNote {
 }
 
 export default function NotesPage() {
-  const { user } = useAuth()
-  const [allNotes, setAllNotes] = useState<NoteWithCourse[]>([])
-  const [courses, setCourses] = useState<Course[]>([])
-  const [loading, setLoading] = useState(true)
+  const { db, ready } = useDB()
+  const loading = !ready
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCourse, setSelectedCourse] = useState<string>('all')
 
-  useEffect(() => {
-    if (!user) return
-
-    const load = async () => {
-      try {
-        const coursesList = await api.courses.list()
-        setCourses(coursesList)
-
-        const notesPerCourse = await Promise.all(
-          coursesList.map(async (course: Course) => {
-            try {
-              const notes = await api.notes.list(course.id)
-              return notes.map((note: CourseNote) => ({
-                ...note,
-                courseName: course.title,
-              }))
-            } catch {
-              return []
-            }
-          })
-        )
-
-        const merged = notesPerCourse
-          .flat()
-          .sort((a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          )
-
-        setAllNotes(merged)
-      } catch (e) {
-        console.error('Failed to load notes:', e)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    load()
-  }, [user])
+  // Hydrate notes with the parent course's display name + sort newest-first.
+  // The note's course_id may dangle if the user removed a course but kept
+  // its notes — we surface those with a "(קורס נמחק)" label so they're
+  // still discoverable.
+  const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
+  const allNotes = useMemo<NoteWithCourse[]>(() => {
+    const courseById = new Map(courses.map(c => [c.id, c]))
+    const raw = (db?.notes ?? []) as CourseNote[]
+    return raw
+      .map(n => ({
+        ...n,
+        courseName: courseById.get(n.course_id)?.title ?? '(קורס נמחק)',
+      }))
+      .sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+  }, [db?.notes, courses])
 
   // Courses that actually have notes (for filter chips)
   const coursesWithNotes = useMemo(() => {
