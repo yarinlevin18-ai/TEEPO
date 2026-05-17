@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, User, GraduationCap, Save, Check, AlertCircle, ArrowRight, CalendarDays, Database, Building2, Sun, Moon, Trash2, Plus } from 'lucide-react'
+import { Settings, User, Save, Check, AlertCircle, CalendarDays, Database, Building2, Sun, Moon, Trash2, Plus } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 import { useDB } from '@/lib/db-context'
@@ -34,9 +34,9 @@ export default function SettingsPage() {
   const [universitySaved, setUniversitySaved] = useState(false)
   const [themeSaved, setThemeSaved] = useState(false)
 
-  // Track info
-  const [trackName, setTrackName] = useState<string | null>(null)
-  const [profileYear, setProfileYear] = useState<number | null>(null)
+  // (Removed: legacy Supabase track/profile state — see PR comment above
+  // about the now-deleted "פרופיל אקדמי" card.)
+
 
   // Hydrate the display-name input from the Drive DB first (the new source
   // of truth), falling back to Google OAuth profile name (full_name/name)
@@ -149,35 +149,6 @@ export default function SettingsPage() {
       setError(e.message || 'שמירה נכשלה')
     }
   }
-
-  // Load academic profile info
-  useEffect(() => {
-    async function loadProfile() {
-      if (!user) return
-      try {
-        const { data } = await supabase
-          .from('student_profile')
-          .select('track_id, current_year')
-          .eq('user_id', user.id)
-          .single()
-
-        if (data) {
-          setProfileYear(data.current_year)
-          if (data.track_id) {
-            const { data: track } = await supabase
-              .from('bgu_tracks')
-              .select('name')
-              .eq('id', data.track_id)
-              .single()
-            if (track) setTrackName(track.name)
-          }
-        }
-      } catch {
-        // No profile yet
-      }
-    }
-    loadProfile()
-  }, [user])
 
   const hasChanges = displayName.trim() !== originalName
 
@@ -333,67 +304,12 @@ export default function SettingsPage() {
         </GlowCard>
         </motion.div>
 
-        {/* Academic Profile Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-        <GlowCard glowColor="rgba(99,102,241,0.10)">
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <GraduationCap size={18} style={{ color: '#818cf8' }} />
-            <h2 className="font-semibold text-white">פרופיל אקדמי</h2>
-          </div>
-
-          {trackName ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-ink-muted">מסלול לימודים</span>
-                <span className="text-sm text-white font-medium">{trackName}</span>
-              </div>
-              {profileYear && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-ink-muted">שנה נוכחית</span>
-                  <span className="text-sm text-white font-medium">שנה {profileYear}</span>
-                </div>
-              )}
-              <div
-                className="mt-3 pt-3"
-                style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
-              >
-                <Link href="/credits">
-                  <motion.button
-                    whileHover={{ x: -3 }}
-                    className="flex items-center gap-2 text-sm font-medium transition-colors"
-                    style={{ color: '#818cf8' }}
-                  >
-                    <ArrowRight size={16} />
-                    <span>עבור למעקב נקודות זכות</span>
-                  </motion.button>
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-4">
-              <p className="text-sm text-ink-muted mb-3">
-                עדיין לא הגדרת פרופיל אקדמי
-              </p>
-              <Link href="/credits">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold btn-gradient"
-                >
-                  <GraduationCap size={16} />
-                  <span>הגדר עכשיו</span>
-                </motion.button>
-              </Link>
-            </div>
-          )}
-        </div>
-        </GlowCard>
-        </motion.div>
+        {/* "פרופיל אקדמי" card removed — it read from the legacy
+            Supabase student_profile table and never lit up after the
+            Drive-DB migration, so it permanently showed "עדיין לא
+            הגדרת" no matter what the user did. The same information
+            (degree name + year of study) lives in the "תחילת התואר"
+            card below and is now Drive-backed. */}
 
         {/* University (v2.1) — drives catalog, scrapers, branding */}
         <motion.div
