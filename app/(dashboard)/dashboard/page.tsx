@@ -337,10 +337,18 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
   for (let h = hourRange.min; h <= hourRange.max; h++) hours.push(h)
 
   // Index events by `${dayIndex}-${hour}` so each cell can look up its event in O(1).
+  // We anchor the event at its START hour cell; the absolute-positioned event
+  // element then extends downward by its duration (see CAL_ROW_PX math below).
   const slotByCell = new Map<string, WeekCalendarSlot>()
   for (const s of slots) {
     slotByCell.set(`${s.dayIndex}-${s.hour}`, s)
   }
+
+  // Each hour row is 42px tall (matches .cal-cell height in globals.css).
+  // Used to translate event minute-offset + duration into top/height pixels
+  // so the event block actually spans its real time range instead of being
+  // clipped to a 1-hour cell.
+  const CAL_ROW_PX = 42
 
   return (
     <>
@@ -378,6 +386,14 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
             const titleAttr =
               `${ev.title}${ev.meta ? ' · ' + ev.meta : ''}` +
               (matched ? ` — לחץ לפתיחה במוח` : ' — לחץ לפתיחה ב-Google Calendar')
+            // Compute pixel-precise top/height so the event spans its full
+            // duration. Top accounts for the minute offset within the starting
+            // hour, height covers the full duration (clamped to a minimum of
+            // 22px so very short events stay readable). 3px inset top/bottom
+            // matches the original cal-event styling.
+            const topPx = Math.round((ev.minute / 60) * CAL_ROW_PX) + 3
+            const heightPx = Math.max(22, Math.round((ev.durationMins / 60) * CAL_ROW_PX) - 6)
+            const eventStyle = { top: `${topPx}px`, height: `${heightPx}px` }
             return (
               <div key={`c-${di}-${h}`} className="cal-cell">
                 {matched ? (
@@ -385,6 +401,7 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
                     href={`/summaries?course=${encodeURIComponent(matched.id)}&lesson=${encodeURIComponent(ev.title)}`}
                     className={className}
                     title={titleAttr}
+                    style={eventStyle}
                   >
                     {ev.title}
                     {ev.meta && <small>{ev.meta}</small>}
@@ -396,6 +413,7 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
                     rel="noopener noreferrer"
                     className={className}
                     title={titleAttr}
+                    style={eventStyle}
                   >
                     {ev.title}
                     {ev.meta && <small>{ev.meta}</small>}
