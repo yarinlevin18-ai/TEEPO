@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, User, GraduationCap, Save, Check, AlertCircle, ArrowRight, CalendarDays, Database, Building2, Sun, Moon, Trash2 } from 'lucide-react'
+import { Settings, User, GraduationCap, Save, Check, AlertCircle, ArrowRight, CalendarDays, Database, Building2, Sun, Moon, Trash2, Plus } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 import { useDB } from '@/lib/db-context'
@@ -109,14 +109,20 @@ export default function SettingsPage() {
     // change lands in Drive immediately (not 30s later inside the debounce
     // window — a reload in that window would discard it).
     const patch: Partial<UserSettings> = { takes_summer: takesSummer }
-    // Persist the degrees list (filtering blank rows). Also mirror the
-    // first degree's name into the legacy degree_name field so older
-    // consumers + the Drive folder hierarchy keep working.
-    const cleanedDegrees = degreesList
-      .map(d => ({ id: d.id, name: d.name.trim() }))
-      .filter(d => d.name.length > 0)
+    // Persist all degree rows EVEN IF they're empty. Previously we filtered
+    // empty rows on save, which made the "+ הוסף עוד תואר" button look
+    // broken: users clicked it, expected to see a second column on
+    // /summaries, but the empty row was silently dropped on save. Now empty
+    // rows persist and the user can fill them in later. The /summaries
+    // page already filters names <1 char so cosmetic-only.
+    const cleanedDegrees = degreesList.map(d => ({ id: d.id, name: d.name.trim() }))
+    // Drop fully-empty trailing rows so the user doesn't accumulate orphan
+    // ids forever — but keep at least one row even if blank.
+    while (cleanedDegrees.length > 1 && cleanedDegrees[cleanedDegrees.length - 1].name === '') {
+      cleanedDegrees.pop()
+    }
     patch.degrees = cleanedDegrees
-    patch.degree_name = cleanedDegrees[0]?.name || undefined
+    patch.degree_name = cleanedDegrees.find(d => d.name)?.name || undefined
     if (degreeYear.trim()) {
       const y = parseInt(degreeYear, 10)
       if (!y || y < 2000 || y > 2100) {
@@ -522,7 +528,7 @@ export default function SettingsPage() {
 
           <div className="mb-4">
             <label className="block text-sm text-ink-muted mb-1.5">
-              {degreesList.length > 1 ? 'התארים שלי' : 'שם התואר'}
+              {degreesList.length > 1 ? 'התארים שלי (דו-חוגי)' : 'שם התואר'}
             </label>
             <div className="flex flex-col gap-2">
               {degreesList.map((d, i) => (
@@ -536,6 +542,7 @@ export default function SettingsPage() {
                     }}
                     placeholder={i === 0 ? 'מדעי המחשב' : 'מנהל עסקים'}
                     maxLength={80}
+                    autoFocus={i > 0 && d.name === ''}
                     className="input-dark flex-1"
                     dir="rtl"
                   />
@@ -570,17 +577,29 @@ export default function SettingsPage() {
             {degreesList.length < 3 && (
               <button
                 type="button"
-                onClick={() => setDegreesList(prev => [...prev, { id: newDegreeId(), name: '' }])}
-                className="mt-2 text-xs font-semibold"
-                style={{ color: 'var(--lp-accent-deep, #14532d)' }}
+                onClick={() => setDegreesList(prev => [
+                  ...(prev.length === 0 ? [{ id: newDegreeId(), name: '' }] : prev),
+                  { id: newDegreeId(), name: '' },
+                ])}
+                className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:translate-y-[-1px]"
+                style={{
+                  background: 'rgba(22,163,74,0.12)',
+                  color: 'var(--lp-accent-deep, #14532d)',
+                  border: '1px dashed rgba(22,163,74,0.4)',
+                }}
               >
-                + הוסף עוד תואר (דו-חוגי)
+                <Plus size={13} />
+                {degreesList.length === 0
+                  ? 'הוסף תואר'
+                  : degreesList.length === 1
+                    ? 'הוסף תואר שני (דו-חוגי)'
+                    : 'הוסף תואר נוסף'}
               </button>
             )}
-            <p className="text-xs text-ink-subtle mt-1.5">
+            <p className="text-xs text-ink-subtle mt-2">
               {degreesList.length > 1
-                ? 'בעמוד המוח כל תואר יקבל עמודה משלו עם הסמסטרים שלו.'
-                : 'מופיע בעץ של המוח כקצה השני (אחרי TEEPO). הוסף תואר שני אם אתה לומד דו-חוגי.'}
+                ? 'בעמוד המוח כל תואר יקבל עמודה משלו עם הסמסטרים שלו. צריך לתת לכל תואר שם בשביל שיופיע.'
+                : 'מופיע בעץ של המוח אחרי TEEPO. אם אתה לומד דו-חוגי — לחץ "הוסף תואר שני" ותן שם לכל אחד מהם.'}
             </p>
           </div>
 
