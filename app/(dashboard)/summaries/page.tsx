@@ -22,7 +22,7 @@ import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import {
   Folder, BookOpen, FileText, NotebookPen, Presentation, ClipboardList,
-  GraduationCap, Brain, ChevronLeft, Home, ExternalLink,
+  GraduationCap, Brain, ChevronLeft, Home, ExternalLink, Sparkles, ArrowLeft,
 } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
 import { FolderSection } from '@/components/summaries/CourseDrivePanel'
@@ -76,6 +76,13 @@ export default function SummariesPage() {
   const allChips = useMemo<SemesterChip[]>(
     () => columns.degrees.flatMap(d => d.chips),
     [columns],
+  )
+
+  // Count of courses still living under TEEPO/לא מסווגים/ — same predicate
+  // as /courses/classify uses. Drives the bulk-classify banner below.
+  const unclassifiedCount = useMemo(
+    () => courses.filter((c) => !c.year_of_study && !c.semester).length,
+    [courses],
   )
 
   const [activeChipKey, setActiveChipKey] = useState<string | null>(null)
@@ -219,6 +226,22 @@ export default function SummariesPage() {
             פתח ב-Google Drive ←
           </a>
         </header>
+
+        {/* Bulk-classify banner — appears first because unclassified courses
+            are the most urgent thing to fix; nothing else can be classified
+            into year/semester folders until this is resolved. */}
+        {unclassifiedCount > 0 && (
+          <Link href="/courses/classify" className="classify-banner" prefetch={false}>
+            <div className="classify-banner-icon"><Sparkles size={18} /></div>
+            <div className="classify-banner-text">
+              <strong>יש לך {unclassifiedCount} קורסים לא מסווגים</strong>
+              <span>סווג שנה + סמסטר בבת אחת והקבצים יסתדרו אוטומטית בתיקיות הנכונות.</span>
+            </div>
+            <div className="classify-banner-cta">
+              סווג עכשיו <ArrowLeft size={16} />
+            </div>
+          </Link>
+        )}
 
         {/* Onboarding nudge: courses sit under "ללא שנה" because the user
             hasn't told us when they started their degree. */}
