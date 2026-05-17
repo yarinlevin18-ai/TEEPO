@@ -8530,3 +8530,113 @@ html.light .badge-danger {
 .sync-empty h3 { margin: 0 0 8px; font-family: 'Heebo', sans-serif; font-weight: 800; color: var(--ink, #2d1810); }
 .sync-empty p { margin: 0; color: var(--muted, #8a7261); font-size: 13.5px; }
 
+/* Extension bridge CTA — sits above sync-modal-body on results state */
+.sync-bridge {
+  display: flex; align-items: center; gap: 12px;
+  margin: 0 24px 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft, #ead8b3);
+  background: var(--bg-card-2, #fbeed1);
+}
+.sync-bridge-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: #fff; color: var(--accent-deep, #14532d);
+  border: 1px solid var(--line-soft, #ead8b3);
+  flex-shrink: 0;
+}
+.sync-bridge-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sync-bridge-text strong { font-size: 14px; font-weight: 700; color: var(--ink, #2d1810); }
+.sync-bridge-text span { font-size: 12px; color: var(--muted, #8a7261); line-height: 1.5; }
+
+.sync-bridge-ready {
+  background: linear-gradient(135deg, rgba(132, 204, 22, .08), rgba(22, 163, 74, .04));
+  border-color: rgba(22, 163, 74, .25);
+}
+.sync-bridge-ready .sync-bridge-icon {
+  background: var(--gradient-warm, linear-gradient(135deg, #16a34a, #84cc16));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 3px 8px -2px rgba(22, 163, 74, .35);
+}
+
+.sync-bridge-missing {
+  background: rgba(245, 158, 11, .07);
+  border-color: rgba(245, 158, 11, .2);
+}
+.sync-bridge-missing .sync-bridge-icon { color: #92400e; }
+
+.sync-bridge-checking {
+  justify-content: center;
+  color: var(--muted, #8a7261);
+  font-size: 12.5px;
+  padding: 10px;
+  border: 1px dashed var(--line, #e0cda8);
+  background: transparent;
+}
+
+.sync-bridge-running { flex-direction: column; align-items: stretch; gap: 8px; }
+.sync-bridge-running .sync-bridge-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13.5px; color: var(--ink-soft, #5c3f2f);
+}
+.sync-bridge-row strong { color: var(--ink, #2d1810); font-weight: 800; }
+.sync-bridge-failed {
+  margin-inline-start: auto;
+  font-size: 12px; font-weight: 700; color: #9f1239;
+  padding: 2px 7px; background: rgba(225, 29, 72, .1);
+  border-radius: 99px;
+}
+.sync-bridge-bar {
+  height: 6px; border-radius: 99px; overflow: hidden;
+  background: rgba(255, 255, 255, .55);
+}
+.sync-bridge-bar-fill {
+  height: 100%;
+  background: var(--gradient-warm, linear-gradient(135deg, #16a34a, #84cc16));
+  border-radius: 99px;
+  transition: width .25s ease;
+}
+
+.sync-bridge-done {
+  background: rgba(22, 163, 74, .07);
+  border-color: rgba(22, 163, 74, .25);
+}
+.sync-bridge-done .sync-bridge-icon { background: rgba(22, 163, 74, .15); color: #15803d; border-color: transparent; }
+.sync-bridge-done.has-errors {
+  background: rgba(245, 158, 11, .07);
+  border-color: rgba(245, 158, 11, .25);
+}
+.sync-bridge-done.has-errors .sync-bridge-icon {
+  background: rgba(245, 158, 11, .18); color: #92400e;
+}
+
+/* Not-connected state — Moodle session missing on the backend */
+.sync-not-connected {
+  padding: 40px 24px;
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.sync-not-connected-ico {
+  color: #d97706;
+  background: rgba(217, 119, 6, .1);
+  padding: 10px; border-radius: 14px;
+  margin-bottom: 6px;
+}
+.sync-not-connected h3 {
+  margin: 0 0 4px;
+  font-family: 'Heebo', sans-serif; font-weight: 800;
+  color: var(--ink, #2d1810);
+  font-size: 18px;
+}
+.sync-not-connected p {
+  margin: 0 0 18px;
+  color: var(--muted, #8a7261); font-size: 14px;
+  max-width: 440px; line-height: 1.6;
+}
+.sync-not-connected-actions {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
+}
+.sync-not-connected-actions a { text-decoration: none; }
+

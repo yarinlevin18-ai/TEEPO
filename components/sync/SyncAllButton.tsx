@@ -55,6 +55,7 @@ export default function SyncAllButton({ variant = 'mini', label, className = '' 
   const [progress, setProgress] = useState<SyncProgress | null>(null)
   const [results, setResults] = useState<SyncResultsPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notConnectedReason, setNotConnectedReason] = useState<string | null>(null)
 
   const close = useCallback(() => {
     if (stage === 'progress') return // don't allow close mid-flight
@@ -62,6 +63,7 @@ export default function SyncAllButton({ variant = 'mini', label, className = '' 
     setProgress(null)
     setResults(null)
     setError(null)
+    setNotConnectedReason(null)
   }, [stage])
 
   const run = useCallback(async () => {
@@ -113,6 +115,13 @@ export default function SyncAllButton({ variant = 'mini', label, className = '' 
         throw new Error(detail.slice(0, 200) || `HTTP ${res.status}`)
       }
       const data = (await res.json()) as SyncResultsPayload
+      // Short-circuit when the backend tells us Moodle isn't connected —
+      // show the "connect" CTA instead of confusing empty results.
+      if (data.moodle_connected === false) {
+        setNotConnectedReason(data.moodle_error ?? null)
+        setStage('not_connected')
+        return
+      }
       setResults(data)
       setStage('results')
 
@@ -175,6 +184,7 @@ export default function SyncAllButton({ variant = 'mini', label, className = '' 
         progress={progress}
         results={results}
         error={error}
+        notConnectedReason={notConnectedReason}
         onRetry={run}
         onClose={close}
       />

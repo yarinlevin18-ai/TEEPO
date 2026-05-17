@@ -83,5 +83,14 @@
       "resources": ["popup.html", "icons/*"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+
+  "externally_connectable": {
+    "matches": [
+      "https://bgu-study-organizer.vercel.app/*",
+      "https://teepo.app/*",
+      "https://*.vercel.app/*",
+      "http://localhost:3000/*"
+    ]
+  }
 }

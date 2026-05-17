@@ -189,3 +189,48 @@ class TestSyncAll:
         assert res.status_code == 200
         body = res.get_json()
         assert body["results"][0]["new_assignments"] == []
+
+    def test_short_circuits_when_moodle_not_connected(self, client, mocker, supabase_mock):
+        """When BOTH global scrapers return the 'לא מחובר' error pattern,
+        the route short-circuits with moodle_connected=false so the modal
+        can show a 'connect Moodle' CTA instead of silent empty results."""
+        mocker.patch("routes.sync.scrape_all_assignments", return_value={
+            "status": "error", "message": "לא מחובר ל-Moodle.", "assignments": [],
+        })
+        mocker.patch("routes.sync.scrape_grades", return_value={
+            "status": "error", "message": "לא מחובר", "grades": [],
+        })
+        # If we reach materials, the test should fail — the short-circuit
+        # must skip that work entirely.
+        mat_mock = mocker.patch("routes.sync.scrape_course_materials")
+
+        res = client.post("/api/sync/all", json={
+            "courses": [
+                {"course_id": "u1", "moodle_id": "1", "title": "X", "source_url": "https://m/1"},
+                {"course_id": "u2", "moodle_id": "2", "title": "Y", "source_url": "https://m/2"},
+            ],
+        })
+        assert res.status_code == 200
+        body = res.get_json()
+        assert body["moodle_connected"] is False
+        assert "לא מחובר" in (body["moodle_error"] or "")
+        assert body["results"] == []
+        assert mat_mock.call_count == 0  # short-circuit avoided the per-course loop
+
+    def test_one_scraper_failing_is_not_treated_as_not_connected(self, client, mocker, supabase_mock):
+        """If only one of the two global scrapers reports 'not connected',
+        treat it as a transient and continue — could be a real account that
+        just has stale grades cookies but valid Moodle ones."""
+        mocker.patch("routes.sync.scrape_all_assignments", return_value={"assignments": []})
+        mocker.patch("routes.sync.scrape_grades", return_value={
+            "status": "error", "message": "לא מחובר",
+        })
+        mocker.patch("routes.sync.scrape_course_materials", return_value={"materials": []})
+
+        res = client.post("/api/sync/all", json={
+            "courses": [{"course_id": "u", "moodle_id": "1", "title": "X"}],
+        })
+        body = res.get_json()
+        # Did NOT short-circuit
+        assert body["moodle_connected"] is True
+        assert body["courses_scanned"] == 1

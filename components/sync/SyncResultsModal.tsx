@@ -15,13 +15,20 @@
  * Matches `mockups/assignments.html` `#syncModal`.
  */
 
-import { useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import {
   X, FileText, Code, BarChart2, CheckCircle2, ExternalLink,
-  RotateCw, AlertCircle, Loader2,
+  RotateCw, AlertCircle, Loader2, Link2Off, Download, Puzzle, ArrowDownToLine,
 } from 'lucide-react'
+import {
+  probeExtension,
+  syncFileViaExtension,
+  EXTENSION_INSTALL_URL,
+  type ExtensionPresence,
+} from '@/lib/extension-bridge'
 
-export type SyncStage = 'idle' | 'progress' | 'results' | 'error'
+export type SyncStage = 'idle' | 'progress' | 'results' | 'error' | 'not_connected'
 
 export interface SyncProgress {
   current: number
@@ -55,6 +62,10 @@ export interface SyncCourseResult {
 export interface SyncResultsPayload {
   courses_scanned: number
   synced_at: string
+  /** False when the user hasn't connected Moodle — drives the "connect" CTA. */
+  moodle_connected?: boolean
+  /** Human-readable reason when moodle_connected is false. */
+  moodle_error?: string | null
   results: SyncCourseResult[]
   totals: {
     new_assignments: number
@@ -68,12 +79,22 @@ interface Props {
   progress: SyncProgress | null
   results: SyncResultsPayload | null
   error: string | null
+  /** Human-readable reason when stage === 'not_connected'. */
+  notConnectedReason?: string | null
   onRetry: () => void
   onClose: () => void
 }
 
+type DriveTransferStatus = 'idle' | 'running' | 'done'
+interface FileTransferState {
+  total: number
+  done: number
+  failed: number
+  status: DriveTransferStatus
+}
+
 export default function SyncResultsModal({
-  stage, progress, results, error, onRetry, onClose,
+  stage, progress, results, error, notConnectedReason, onRetry, onClose,
 }: Props) {
   // Lock body scroll while open + escape-to-close
   useEffect(() => {
@@ -89,6 +110,78 @@ export default function SyncResultsModal({
       document.removeEventListener('keydown', onKey)
     }
   }, [stage, onClose])
+
+  // Extension presence — re-probed each time the modal lands on the
+  // results state. We don't probe at component-mount because the extension
+  // service worker has cold-start latency and we'd risk false-negatives
+  // before the user could actually want it.
+  const [extension, setExtension] = useState<ExtensionPresence | null>(null)
+  useEffect(() => {
+    if (stage !== 'results') return
+    let cancelled = false
+    probeExtension().then((p) => { if (!cancelled) setExtension(p) })
+    return () => { cancelled = true }
+  }, [stage])
+
+  // Files the extension can move. Only courses with a `course_id` are
+  // included — without it we can't ask the extension to resolve a Drive
+  // folder.
+  const transferableFiles = useMemo(() => {
+    if (!results) return [] as Array<{
+      courseId: string
+      courseName: string
+      file: { url: string; filename: string; mimeType?: string }
+    }>
+    const out: Array<{
+      courseId: string
+      courseName: string
+      file: { url: string; filename: string; mimeType?: string }
+    }> = []
+    for (const c of results.results) {
+      if (!c.course_id) continue
+      for (const f of c.new_files) {
+        if (!f.url || !f.title) continue
+        out.push({
+          courseId: c.course_id,
+          courseName: c.course_name,
+          file: {
+            url: f.url,
+            filename: f.title,
+            mimeType: (f as { mimeType?: string }).mimeType,
+          },
+        })
+      }
+    }
+    return out
+  }, [results])
+
+  const [transfer, setTransfer] = useState<FileTransferState>({ total: 0, done: 0, failed: 0, status: 'idle' })
+
+  // Reset transfer state whenever the modal re-opens with fresh results.
+  useEffect(() => {
+    if (stage === 'results') setTransfer({ total: 0, done: 0, failed: 0, status: 'idle' })
+  }, [stage, results])
+
+  const sendFilesToDrive = useCallback(async () => {
+    if (!extension?.available || transferableFiles.length === 0) return
+    setTransfer({ total: transferableFiles.length, done: 0, failed: 0, status: 'running' })
+    // Sequential — Drive throttles parallel writes to the same parent
+    // folder, and the per-file progress reads cleaner. Per-file failures
+    // are isolated so a single bad URL doesn't sink the batch.
+    let done = 0
+    let failed = 0
+    for (const entry of transferableFiles) {
+      const r = await syncFileViaExtension({
+        file: entry.file,
+        courseId: entry.courseId,
+        kind: 'lessons',
+      })
+      if (r.ok) done++
+      else failed++
+      setTransfer({ total: transferableFiles.length, done, failed, status: 'running' })
+    }
+    setTransfer({ total: transferableFiles.length, done, failed, status: 'done' })
+  }, [extension?.available, transferableFiles])
 
   if (stage === 'idle') return null
 
@@ -111,21 +204,24 @@ export default function SyncResultsModal({
             <div className="sync-modal-head-icon">
               {stage === 'error' ? <AlertCircle size={20} /> :
                 stage === 'progress' ? <Loader2 size={20} className="sync-icon-spin" /> :
-                  <CheckCircle2 size={20} />}
+                  stage === 'not_connected' ? <Link2Off size={20} /> :
+                    <CheckCircle2 size={20} />}
             </div>
             <div>
               <h2 id="sync-modal-title">
                 {stage === 'progress' ? 'סורק את Moodle…'
                   : stage === 'error' ? 'הסנכרון נכשל'
-                    : isEmptyResults ? 'הכל מסונכרן'
-                      : 'סנכרון הושלם'}
+                    : stage === 'not_connected' ? 'Moodle לא מחובר'
+                      : isEmptyResults ? 'הכל מסונכרן'
+                        : 'סנכרון הושלם'}
               </h2>
               <div className="sub">
                 {stage === 'progress' ? 'מחפש מטלות, חומרים וציונים חדשים'
                   : stage === 'error' ? 'נסה שוב או בדוק את החיבור ל-Moodle'
-                    : results
-                      ? `סרקנו ${results.courses_scanned} קורסים · נמצאו ${totalNew} פריטים חדשים`
-                      : ''}
+                    : stage === 'not_connected' ? 'צריך להתחבר ל-Moodle כדי לסרוק את הקורסים'
+                      : results
+                        ? `סרקנו ${results.courses_scanned} קורסים · נמצאו ${totalNew} פריטים חדשים`
+                        : ''}
               </div>
             </div>
           </div>
@@ -172,6 +268,26 @@ export default function SyncResultsModal({
           </div>
         )}
 
+        {/* NOT CONNECTED — Moodle cookies missing on the backend */}
+        {stage === 'not_connected' && (
+          <div className="sync-not-connected">
+            <Link2Off size={48} className="sync-not-connected-ico" />
+            <h3>צריך לחבר את Moodle</h3>
+            <p>
+              {notConnectedReason || 'הסשן של Moodle בשרת לא קיים או פג. גש להגדרות החיבור והתחבר מחדש כדי שנוכל לסרוק את הקורסים שלך.'}
+            </p>
+            <div className="sync-not-connected-actions">
+              <Link href="/moodle" className="asn-btn asn-btn-primary" onClick={onClose}>
+                התחבר ל-Moodle
+                <ExternalLink size={14} />
+              </Link>
+              <button type="button" className="asn-btn asn-btn-ghost" onClick={onRetry}>
+                <RotateCw size={14} /> בדוק שוב
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* RESULTS */}
         {stage === 'results' && results && !isEmptyResults && (
           <>
@@ -189,6 +305,13 @@ export default function SyncResultsModal({
                 <div className="sync-sum-label">ציונים חדשים</div>
               </div>
             </div>
+
+            <ExtensionBridgeCTA
+              extension={extension}
+              transferableCount={transferableFiles.length}
+              transfer={transfer}
+              onSend={sendFilesToDrive}
+            />
 
             <div className="sync-modal-body">
               {results.results.map((course) => {
@@ -327,4 +450,118 @@ function formatBytes(bytes: number): string {
   if (!bytes || bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ExtensionBridgeCTA — the "send X files to Drive" panel that hands off
+// the file-transfer work to the Chrome extension after the backend has
+// identified what's new. Three visual states:
+//   - extension available + files to send → green CTA button
+//   - extension available + transfer running → progress strip
+//   - extension available + transfer done → result summary
+//   - extension NOT available → muted "install the extension" prompt
+//   - no transferable files → entire block is hidden
+// ─────────────────────────────────────────────────────────────────────────
+
+function ExtensionBridgeCTA({
+  extension, transferableCount, transfer, onSend,
+}: {
+  extension: ExtensionPresence | null
+  transferableCount: number
+  transfer: { total: number; done: number; failed: number; status: 'idle' | 'running' | 'done' }
+  onSend: () => void
+}) {
+  // Hide if backend didn't surface any movable files at all
+  if (transferableCount === 0) return null
+
+  // Probe still pending — render a slim placeholder so the layout doesn't
+  // jump when the result lands.
+  if (extension === null) {
+    return (
+      <div className="sync-bridge sync-bridge-checking">
+        <Loader2 size={14} className="sync-icon-spin" />
+        <span>בודק אם התוסף של TEEPO מותקן…</span>
+      </div>
+    )
+  }
+
+  // Extension not installed / not Chrome — show install/help link.
+  if (!extension.available) {
+    return (
+      <div className="sync-bridge sync-bridge-missing">
+        <div className="sync-bridge-icon"><Puzzle size={18} /></div>
+        <div className="sync-bridge-text">
+          <strong>נמצאו {transferableCount} קבצים חדשים ב-Moodle</strong>
+          <span>התוסף של TEEPO ב-Chrome מעביר אותם ישירות ל-Drive. התקן אותו כדי להעביר בלחיצה אחת.</span>
+        </div>
+        <a
+          href={EXTENSION_INSTALL_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="asn-btn asn-btn-ghost"
+        >
+          התקן את התוסף
+          <ExternalLink size={13} />
+        </a>
+      </div>
+    )
+  }
+
+  // Running transfer — progress bar
+  if (transfer.status === 'running') {
+    const pct = transfer.total > 0 ? (transfer.done + transfer.failed) / transfer.total * 100 : 0
+    return (
+      <div className="sync-bridge sync-bridge-running">
+        <div className="sync-bridge-row">
+          <Loader2 size={16} className="sync-icon-spin" />
+          <span>מעביר ל-Drive · <strong>{transfer.done + transfer.failed}</strong> מתוך {transfer.total}</span>
+          {transfer.failed > 0 && <span className="sync-bridge-failed">{transfer.failed} נכשלו</span>}
+        </div>
+        <div className="sync-bridge-bar">
+          <div className="sync-bridge-bar-fill" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    )
+  }
+
+  // Done — result summary
+  if (transfer.status === 'done') {
+    return (
+      <div className={`sync-bridge sync-bridge-done${transfer.failed > 0 ? ' has-errors' : ''}`}>
+        <div className="sync-bridge-icon">
+          {transfer.failed === 0 ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+        </div>
+        <div className="sync-bridge-text">
+          <strong>
+            הועברו {transfer.done} מתוך {transfer.total} ל-Drive
+            {transfer.failed > 0 ? ` · ${transfer.failed} נכשלו` : ''}
+          </strong>
+          <span>
+            {transfer.failed > 0
+              ? 'הקבצים שנכשלו עדיין נגישים דרך הקישורים למטה — אפשר להעלות ידנית או לנסות שוב.'
+              : 'הקבצים נשמרו תחת תיקיית הקורס המתאימה ב-TEEPO/Drive.'}
+          </span>
+        </div>
+        {transfer.failed > 0 && (
+          <button type="button" className="asn-btn asn-btn-ghost" onClick={onSend}>
+            <RotateCw size={13} /> נסה שוב
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  // Idle — green CTA to start the transfer
+  return (
+    <div className="sync-bridge sync-bridge-ready">
+      <div className="sync-bridge-icon"><Download size={18} /></div>
+      <div className="sync-bridge-text">
+        <strong>שלח {transferableCount} קבצים ל-Drive</strong>
+        <span>התוסף יוריד מ-Moodle ויעלה ישירות ל-TEEPO/Drive בשם הקורס.</span>
+      </div>
+      <button type="button" className="asn-btn asn-btn-primary" onClick={onSend}>
+        <ArrowDownToLine size={14} /> שלח עכשיו
+      </button>
+    </div>
+  )
 }

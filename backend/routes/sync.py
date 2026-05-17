@@ -26,6 +26,8 @@ Response shape:
     {
         "courses_scanned": int,
         "synced_at": ISO-8601 timestamp (the cutoff written),
+        "moodle_connected": bool,                   # false → user needs to connect
+        "moodle_error": str | None,                 # human-readable when not connected
         "results": [
             {
                 "course_id": str | None,            # frontend's course id
@@ -48,6 +50,11 @@ Response shape:
 Per-course errors do NOT fail the whole batch — they're returned in the
 per-course `error` field. The user sees "3 courses ok, 1 failed" rather
 than losing the run.
+
+When the user hasn't connected Moodle at all, the scrapers all return
+`{"status": "error", "message": "לא מחובר..."}`. We detect that pattern
+and short-circuit with `moodle_connected: false` so the frontend can
+show a "connect Moodle" CTA instead of a confusing empty results modal.
 """
 from __future__ import annotations
 
@@ -81,6 +88,23 @@ def _parse_iso(ts: str | None) -> datetime | None:
         return datetime.fromisoformat(ts.replace("Z", "+00:00"))
     except (ValueError, AttributeError):
         return None
+
+
+# Sentinel substrings that signal "no Moodle session cookies" coming
+# back from the scraper. The scraper currently localises these messages,
+# so we match on the Hebrew + an English-fallback substring.
+_NOT_CONNECTED_HINTS = ("לא מחובר", "not_connected", "session expired")
+
+
+def _is_not_connected(resp: dict | None) -> bool:
+    """True when a scraper response signals 'no Moodle cookies'.
+    Scrapers return `{"status": "error", "message": "..."}` in that case."""
+    if not resp:
+        return False
+    if resp.get("status") != "error":
+        return False
+    msg = (resp.get("message") or "").lower()
+    return any(hint.lower() in msg for hint in _NOT_CONNECTED_HINTS)
 
 
 def _is_new(item: dict, cutoff: datetime | None, *date_keys: str) -> bool:
@@ -136,16 +160,32 @@ def sync_all():
         logger.warning(f"{_LOG} scrape_all_assignments failed: {e}")
         assignments_response = {"status": "error", "assignments": []}
 
-    assignments_by_course: dict[str, list[dict]] = {}
-    for a in assignments_response.get("assignments") or []:
-        cid = str(a.get("course_moodle_id") or "")
-        assignments_by_course.setdefault(cid, []).append(a)
-
     try:
         grades_response = scrape_grades()
     except Exception as e:  # noqa: BLE001
         logger.warning(f"{_LOG} scrape_grades failed: {e}")
         grades_response = {"status": "error", "grades": []}
+
+    # If BOTH global scrapers report "not connected" we treat this as a
+    # session-cookies problem and short-circuit. Single-scraper failure
+    # could just be a transient Moodle hiccup, so we don't escalate then.
+    not_connected = _is_not_connected(assignments_response) and _is_not_connected(grades_response)
+    if not_connected:
+        logger.info(f"{_LOG} Moodle not connected — short-circuiting")
+        return jsonify({
+            "courses_scanned": 0,
+            "synced_at": now_iso,
+            "moodle_connected": False,
+            "moodle_error": assignments_response.get("message") or grades_response.get("message")
+                            or "לא מחובר ל-Moodle. גש ל-/moodle והתחבר.",
+            "results": [],
+            "totals": {"new_assignments": 0, "new_files": 0, "new_grades": 0},
+        })
+
+    assignments_by_course: dict[str, list[dict]] = {}
+    for a in assignments_response.get("assignments") or []:
+        cid = str(a.get("course_moodle_id") or "")
+        assignments_by_course.setdefault(cid, []).append(a)
 
     grades_by_course: dict[str, list[dict]] = {}
     for g in grades_response.get("grades") or []:
@@ -234,6 +274,8 @@ def sync_all():
     return jsonify({
         "courses_scanned": len(incoming),
         "synced_at": now_iso,
+        "moodle_connected": True,
+        "moodle_error": None,
         "results": results,
         "totals": {
             "new_assignments": total_a,
