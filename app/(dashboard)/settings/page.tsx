@@ -10,7 +10,8 @@ import { useTheme } from '@/lib/theme-context'
 import Link from 'next/link'
 import GlowCard from '@/components/ui/GlowCard'
 import BackupRestore from '@/components/settings/BackupRestore'
-import type { UniversityCode, UserSettings } from '@/types'
+import type { Degree, UniversityCode, UserSettings } from '@/types'
+import { resolveDegrees, newDegreeId } from '@/lib/degrees'
 
 export default function SettingsPage() {
   const { user } = useAuth()
@@ -22,7 +23,9 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   // Degree-start state (local; persisted to Drive settings on change)
-  const [degreeName, setDegreeName] = useState<string>('')
+  // Degrees list — supports dual-degree (תואר דו-חוגי). Each entry has a
+  // stable id (for course.degree_id refs) and a user-typed name.
+  const [degreesList, setDegreesList] = useState<Degree[]>([])
   const [degreeYear, setDegreeYear] = useState<string>('')
   const [degreeMonth, setDegreeMonth] = useState<string>('10')
   const [takesSummer, setTakesSummer] = useState<boolean>(false)
@@ -54,11 +57,13 @@ export default function SettingsPage() {
     setOriginalName(initial)
   }, [user, ready, db?.settings?.display_name])
 
-  // Hydrate degree-start fields from Drive DB once it's ready
+  // Hydrate degree-start fields from Drive DB once it's ready.
+  // Degrees list: prefer the new degrees[] array; if missing, migrate from
+  // the legacy single-string degree_name (resolveDegrees handles both).
   useEffect(() => {
     if (!ready) return
     const s = db.settings || {}
-    if (s.degree_name) setDegreeName(String(s.degree_name))
+    setDegreesList(resolveDegrees(s).filter(d => d.name.length > 0))
     if (s.degree_start_year) setDegreeYear(String(s.degree_start_year))
     if (s.degree_start_month) setDegreeMonth(String(s.degree_start_month))
     setTakesSummer(!!s.takes_summer)
@@ -104,8 +109,14 @@ export default function SettingsPage() {
     // change lands in Drive immediately (not 30s later inside the debounce
     // window — a reload in that window would discard it).
     const patch: Partial<UserSettings> = { takes_summer: takesSummer }
-    const trimmedName = degreeName.trim()
-    if (trimmedName) patch.degree_name = trimmedName
+    // Persist the degrees list (filtering blank rows). Also mirror the
+    // first degree's name into the legacy degree_name field so older
+    // consumers + the Drive folder hierarchy keep working.
+    const cleanedDegrees = degreesList
+      .map(d => ({ id: d.id, name: d.name.trim() }))
+      .filter(d => d.name.length > 0)
+    patch.degrees = cleanedDegrees
+    patch.degree_name = cleanedDegrees[0]?.name || undefined
     if (degreeYear.trim()) {
       const y = parseInt(degreeYear, 10)
       if (!y || y < 2000 || y > 2100) {
@@ -510,18 +521,66 @@ export default function SettingsPage() {
           </p>
 
           <div className="mb-4">
-            <label className="block text-sm text-ink-muted mb-1.5">שם התואר</label>
-            <input
-              type="text"
-              value={degreeName}
-              onChange={(e) => setDegreeName(e.target.value)}
-              placeholder='תואר ראשון - מנע"ס'
-              maxLength={80}
-              className="input-dark"
-              dir="rtl"
-            />
+            <label className="block text-sm text-ink-muted mb-1.5">
+              {degreesList.length > 1 ? 'התארים שלי' : 'שם התואר'}
+            </label>
+            <div className="flex flex-col gap-2">
+              {degreesList.map((d, i) => (
+                <div key={d.id} className="flex gap-2 items-stretch">
+                  <input
+                    type="text"
+                    value={d.name}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setDegreesList(prev => prev.map((x, j) => j === i ? { ...x, name: v } : x))
+                    }}
+                    placeholder={i === 0 ? 'מדעי המחשב' : 'מנהל עסקים'}
+                    maxLength={80}
+                    className="input-dark flex-1"
+                    dir="rtl"
+                  />
+                  {degreesList.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setDegreesList(prev => prev.filter((_, j) => j !== i))}
+                      className="px-3 rounded-lg text-xs font-medium"
+                      style={{ background: 'rgba(225,29,72,0.12)', color: '#e11d48' }}
+                      title="מחק תואר"
+                    >
+                      הסר
+                    </button>
+                  )}
+                </div>
+              ))}
+              {degreesList.length === 0 && (
+                <input
+                  type="text"
+                  value=""
+                  onChange={(e) => {
+                    if (!e.target.value) return
+                    setDegreesList([{ id: newDegreeId(), name: e.target.value }])
+                  }}
+                  placeholder='תואר ראשון - מדעי המחשב'
+                  maxLength={80}
+                  className="input-dark"
+                  dir="rtl"
+                />
+              )}
+            </div>
+            {degreesList.length < 3 && (
+              <button
+                type="button"
+                onClick={() => setDegreesList(prev => [...prev, { id: newDegreeId(), name: '' }])}
+                className="mt-2 text-xs font-semibold"
+                style={{ color: 'var(--lp-accent-deep, #14532d)' }}
+              >
+                + הוסף עוד תואר (דו-חוגי)
+              </button>
+            )}
             <p className="text-xs text-ink-subtle mt-1.5">
-              מופיע בעץ של המוח כקצה השני (אחרי TEEPO). אם ריק, יוצג שם האוניברסיטה.
+              {degreesList.length > 1
+                ? 'בעמוד המוח כל תואר יקבל עמודה משלו עם הסמסטרים שלו.'
+                : 'מופיע בעץ של המוח כקצה השני (אחרי TEEPO). הוסף תואר שני אם אתה לומד דו-חוגי.'}
             </p>
           </div>
 

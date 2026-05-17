@@ -88,7 +88,15 @@ interface DBContextType {
    *  folder, this falls back to a fresh provision. Marks classified_manually. */
   reclassifyCourse: (
     courseId: string,
-    patch: { semester?: Course['semester']; year_of_study?: Course['year_of_study']; academic_year?: string },
+    patch: {
+      semester?: Course['semester']
+      year_of_study?: Course['year_of_study']
+      academic_year?: string
+      /** Dual-degree (תואר דו-חוגי) assignment. Optional — when set, the
+       *  Drive folder path stays under the same TEEPO root but the
+       *  /summaries page splits this course into the matching degree column. */
+      degree_id?: string
+    },
   ) => Promise<void>
   /** Force any pending debounced save to flush to Drive RIGHT NOW.
    *  Useful after explicit save actions ("save" buttons) so the user
@@ -624,7 +632,12 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
 
   const reclassifyCourse = useCallback(async (
     courseId: string,
-    patch: { semester?: Course['semester']; year_of_study?: Course['year_of_study']; academic_year?: string },
+    patch: {
+      semester?: Course['semester']
+      year_of_study?: Course['year_of_study']
+      academic_year?: string
+      degree_id?: string
+    },
   ) => {
     if (!handle) throw new Error('מסד הנתונים טרם נטען.')
     const existing = db.courses.find(c => c.id === courseId)

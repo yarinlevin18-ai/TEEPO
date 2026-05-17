@@ -11,7 +11,7 @@
  * keep both and pick the right view per consumer.
  */
 
-import type { Course } from '@/types'
+import type { Course, Degree } from '@/types'
 import { buildTree, type HebSemester, type SemesterBucket } from './summaries-tree'
 
 /** One slot in the degree column's semester grid. */
@@ -134,19 +134,54 @@ function chipLabel(opts: {
 }
 
 /**
- * Build the degree-column view for the /summaries mockup layout.
+ * Build the multi-degree column view for /summaries.
  *
- * @param courses     all the user's courses (from db.courses)
- * @param degreeName  human-readable degree label (from settings.degree_name,
- *                    falling back to universityName). The mockup design
- *                    branches on multi-degree but we only have one for now;
- *                    multi-degree extension is a follow-up.
+ * Splits the user's courses by `course.degree_id` (with unassigned ones
+ * folded into the first degree as a sensible default) and runs the same
+ * chip-building pipeline per degree. The mockup shows two columns side
+ * by side for dual-degree users (דו-חוגי); single-degree users get one
+ * centered column.
+ *
+ * @param courses  all the user's courses (from db.courses)
+ * @param degrees  the user's degrees (from resolveDegrees(settings)) —
+ *                 always at least one element per that helper's contract
  */
 export function buildDegreeColumns(
   courses: Course[],
-  degreeName: string,
+  degrees: Degree[],
   now: Date = new Date(),
 ): { degrees: DegreeColumn[]; total: number } {
+  if (degrees.length === 0) {
+    // Defensive — callers should use resolveDegrees() which guarantees ≥1.
+    return { degrees: [], total: 0 }
+  }
+  // Group courses by degree_id. Unassigned (or referencing a deleted
+  // degree) fall into the first degree so they remain visible to the user.
+  const validDegreeIds = new Set(degrees.map(d => d.id))
+  const fallbackId = degrees[0].id
+  const coursesByDegree = new Map<string, Course[]>()
+  for (const d of degrees) coursesByDegree.set(d.id, [])
+  for (const c of courses) {
+    const did = c.degree_id && validDegreeIds.has(c.degree_id) ? c.degree_id : fallbackId
+    coursesByDegree.get(did)!.push(c)
+  }
+
+  const columns: DegreeColumn[] = []
+  let total = 0
+  for (const d of degrees) {
+    const col = buildSingleDegreeColumn(d, coursesByDegree.get(d.id) ?? [], now)
+    columns.push(col)
+    total += col.totalCourses
+  }
+  return { degrees: columns, total }
+}
+
+/** Build the chips + yearGroups for a single degree's course list. */
+function buildSingleDegreeColumn(
+  degree: Degree,
+  courses: Course[],
+  now: Date,
+): DegreeColumn {
   const tree = buildTree(courses)
   const current = currentAcademicSlot(now)
 
@@ -253,14 +288,11 @@ export function buildDegreeColumns(
   }
 
   return {
-    degrees: [{
-      id: 'main',
-      name: degreeName,
-      yearGroups,
-      chips,
-      totalCourses,
-    }],
-    total: totalCourses,
+    id: degree.id,
+    name: degree.name,
+    yearGroups,
+    chips,
+    totalCourses,
   }
 }
 
