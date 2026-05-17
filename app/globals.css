@@ -2552,36 +2552,30 @@ html.light .badge-danger {
 }
 .dashboard-v2 .dash-h1 {
   font-family: 'Heebo', sans-serif;
-  font-size: clamp(44px, 5.5vw, 64px);
+  /* Tighter clamp + nowrap so the full greeting fits on a single line
+   * even on smaller laptop widths. Was clamp(44px, 5.5vw, 64px) which
+   * wrapped "ירין," to a second row. */
+  font-size: clamp(32px, 4vw, 50px);
   font-weight: 900;
-  letter-spacing: -2.5px;
-  line-height: 1;
+  letter-spacing: -2px;
+  line-height: 1.1;
   color: var(--lp-ink);
   margin: 0;
+  white-space: nowrap;
   animation: fadeUp .8s ease .35s both;
 }
+/* The whole accent word is rendered as a single static span with the
+ * green→lime gradient + the wavy underline below. No per-letter wave
+ * animation — too jittery for a rotating word that swaps every 30 min. */
 .dashboard-v2 .dash-h1 .accent {
   position: relative;
   display: inline-block;
   font-weight: 900;
-}
-/* Each letter has its OWN gradient — background-clip:text doesn't pass
-   through inline-block children, so the wave needs per-letter spans. */
-.dashboard-v2 .dash-h1 .accent .letter {
-  display: inline-block;
   background: var(--lp-gradient);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
-  animation: letterWave 2.4s ease-in-out infinite;
-  transform-origin: 50% 100%;
-}
-@keyframes letterWave {
-  0%, 60%, 100% { transform: translateY(0) rotate(0); }
-  15%           { transform: translateY(-8px) rotate(-3deg); }
-  30%           { transform: translateY(0)    rotate(2deg); }
-  45%           { transform: translateY(-3px) rotate(-1deg); }
 }
 .dashboard-v2 .dash-h1 .accent::before {
   content: '';

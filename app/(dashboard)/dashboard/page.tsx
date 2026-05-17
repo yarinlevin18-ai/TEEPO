@@ -19,7 +19,7 @@
  */
 
 import Link from 'next/link'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
@@ -31,7 +31,24 @@ import LCDDisplay from '@/components/ui/LCDDisplay'
 import CountryClock from '@/components/dashboard/CountryClock'
 import SlidingPuzzle from '@/components/dashboard/SlidingPuzzle'
 
-const ACCENT_WORD = 'מאוזן' // each letter gets its own wave animation
+// Accent word at the end of the greeting cycles through this list every
+// 30 minutes (a slow, deterministic rotation — same word for all clients
+// within the same half-hour slot). The user can refresh and see the same
+// word, then come back after lunch and find a new one. Every entry must
+// be a single-word positive descriptor that ends the sentence cleanly
+// ("השבוע שלך <word>.").
+const ACCENT_WORDS = [
+  'מאוזן',
+  'ממוקד',
+  'מסודר',
+  'פרודוקטיבי',
+  'מאתגר',
+  'נמרץ',
+  'מתקדם',
+  'מלא',
+] as const
+
+const ACCENT_SLOT_MS = 30 * 60 * 1000  // 30 minutes
 
 // First-name greeting derived from the shared name resolver. Priority:
 // Drive setting → Google profile (full_name/name) → legacy → email prefix.
@@ -39,6 +56,22 @@ const ACCENT_WORD = 'מאוזן' // each letter gets its own wave animation
 
 function pad2(n: number): string {
   return n.toString().padStart(2, '0')
+}
+
+/** Hook: which accent word to render right now. Same word for every
+ *  client during the same 30-minute slot (slot = floor(now / 30min) mod
+ *  WORDS.length). Re-checks every minute so we catch the transition. */
+function useRotatingAccent(): string {
+  const pick = () => ACCENT_WORDS[
+    Math.floor(Date.now() / ACCENT_SLOT_MS) % ACCENT_WORDS.length
+  ]
+  const [word, setWord] = useState<string>(pick)
+  useEffect(() => {
+    const tick = () => setWord(pick())
+    const id = setInterval(tick, 60_000)
+    return () => clearInterval(id)
+  }, [])
+  return word
 }
 
 export default function DashboardPage() {
@@ -50,6 +83,7 @@ export default function DashboardPage() {
     email: user?.email,
     driveDisplayName: db?.settings?.display_name as string | undefined,
   })
+  const accentWord = useRotatingAccent()
 
   // First-run redirect: a brand-new account (DB loaded, no courses, hasn't
   // dismissed the wizard) lands on /setup instead of staring at an empty
@@ -130,13 +164,12 @@ export default function DashboardPage() {
                 <LCDDisplay kind="time" />
                 <CountryClock />
               </div>
+              {/* One line, no wave. The accent word inside .accent gets the
+               *  green underline (CSS ::after) but is otherwise static — and
+               *  cycles every 30 minutes via useRotatingAccent above. */}
               <h1 className="dash-h1">
                 שלום {greetName}, השבוע שלך{' '}
-                <span className="accent">
-                  {Array.from(ACCENT_WORD).map((ch, i) => (
-                    <span className="letter" key={i} style={{ animationDelay: `${i * 0.12}s` }}>{ch}</span>
-                  ))}
-                </span>
+                <span className="accent">{accentWord}</span>
                 .
               </h1>
             </div>
