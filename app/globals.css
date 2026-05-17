@@ -206,9 +206,11 @@ body {
   animation: strike 0.3s ease-out forwards;
 }
 
-/* Force native dropdowns into dark color scheme so <option> isn't white-on-white */
-select { color-scheme: dark; }
-select option {
+/* Native dropdowns adopt the page color-scheme. Site default is cream/light
+   so dropdowns render with light chrome; html.dark below opts back into dark. */
+select { color-scheme: light; }
+html.dark select { color-scheme: dark; }
+html.dark select option {
   background-color: #0f1117;
   color: #f1f5f9;
 }
@@ -230,11 +232,22 @@ html.dark body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: #161b27; }
-::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #4a5568; }
+/* ── Scrollbar ──
+   Cream defaults (matches the locked light design); html.dark overrides
+   back to dark below. Firefox uses scrollbar-color (inherited from <html>),
+   WebKit uses ::-webkit-scrollbar pseudo-elements. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #e0cda8 #f5ead2; /* thumb track */
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f5ead2; }
+::-webkit-scrollbar-thumb { background: #e0cda8; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #c9b58a; }
+html.dark { scrollbar-color: #2d3748 #161b27; }
+html.dark ::-webkit-scrollbar-track { background: #161b27; }
+html.dark ::-webkit-scrollbar-thumb { background: #2d3748; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #4a5568; }
 
 /* ── Glass card — claymorphism treatment site-wide ──
    Solid dark gradient + dual inner shadows (highlight + depth)
@@ -1481,13 +1494,6 @@ html.light body {
   color: var(--ink);
 }
 
-html.light ::-webkit-scrollbar-track { background: #dde0ec; }
-html.light ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #b8bdd0, #a8aec5);
-  border-radius: 99px;
-}
-html.light ::-webkit-scrollbar-thumb:hover { background: #8d93a8; }
-
 /* Glass cards: warm off-white with lavender rim + gradient border feel */
 html.light .glass {
   background: linear-gradient(180deg, rgba(253,253,255,0.82) 0%, rgba(246,247,253,0.76) 100%);
@@ -1593,6 +1599,11 @@ html.light .modal-header,
 html.light .modal-footer {
   border-color: rgba(15,17,23,0.07);
 }
+/* Modal.tsx hardcodes `text-white` on the title (designed for the dark panel).
+   On html.light the panel flips to #fff, so the title becomes invisible —
+   force the heading to dark ink to restore contrast. */
+html.light .modal-header h2 { color: #1a1d28; }
+html.light .modal-header p  { color: #475569; }
 html.light .modal-close-btn {
   background: rgba(15,17,23,0.04);
   border: 1px solid rgba(15,17,23,0.08);
@@ -2166,7 +2177,10 @@ html.light .badge-danger {
 }
 .tn-drawer .tn-signout:hover { background: #e0cda8; color: #2d1810; }
 
-@media (max-width: 980px) {
+/* Drawer kicks in at 1100px to match the `.tn-desktop { display: none !important }`
+   rule further down in this file. Without alignment, the 981–1100px range left
+   the desktop nav hidden while the burger stayed hidden — i.e. no nav at all. */
+@media (max-width: 1100px) {
   .topnav-v2 .tn-desktop { display: none; }
   .topnav-v2 .tn-burger { display: inline-flex; }
   .topnav-v2 { padding: 12px 18px; }
@@ -2719,6 +2733,17 @@ html.light .badge-danger {
   color: var(--lp-accent);
   text-decoration: none;
   font-weight: 500;
+}
+/* Horizontal-scroll wrapper for the week calendar. Below ~700px the 7-day
+   grid can't fit (50px time col + 7 days × ~70px). Wrapping both grids in
+   one overflow-x container keeps headers and cells aligned while scrolling. */
+.dashboard-v2 .cal-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.dashboard-v2 .cal-scroll .cal-grid,
+.dashboard-v2 .cal-scroll .cal-body {
+  min-width: 540px;
 }
 .dashboard-v2 .cal-grid {
   display: grid;
@@ -3711,7 +3736,12 @@ html.light .badge-danger {
   color: white;
 }
 
-@media (max-width: 980px) {
+/* 2-column intermediate so the jump isn't 3 → 1. The drawer kicks in at
+   1100px, but cards stay readable in 2 columns down to ~700px. */
+@media (max-width: 1100px) {
+  .dashboard-v2 .bottom-row-v2 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 700px) {
   .dashboard-v2 .bottom-row-v2 { grid-template-columns: 1fr; }
   .dashboard-v2 .dash-main { padding: 32px 20px 60px; }
 }
@@ -7138,65 +7168,6 @@ html.light .badge-danger {
   font-weight: 700;
   font-size: 11px;
   flex-shrink: 0;
-}
-
-/* Mobile / drawer */
-.tn-mobile-only { display: none; }
-@media (max-width: 1100px) {
-  .tn-desktop { display: none !important; }
-  .tn-mobile-only { display: inline-flex; }
-  .topnav { padding: 10px 16px; }
-}
-.tn-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(45, 24, 16, 0.45);
-  backdrop-filter: blur(2px);
-  z-index: 40;
-}
-.tn-drawer {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  inset-inline-start: 0;
-  width: 280px;
-  background: var(--bg-card);
-  border-inline-end: 1px solid var(--line);
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
-  gap: 12px;
-  box-shadow: 0 24px 60px rgba(45, 24, 16, 0.18);
-}
-.tn-drawer-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--line-soft);
-}
-.tn-drawer-section {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.tn-drawer-section .tn-link {
-  width: 100%;
-  justify-content: flex-start;
-}
-.tn-drawer-divider {
-  height: 1px;
-  background: var(--line-soft);
-  margin: 4px 0;
-}
-.tn-drawer-foot {
-  margin-top: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line-soft);
 }
 
 /* ══════════════════════════════════════════
