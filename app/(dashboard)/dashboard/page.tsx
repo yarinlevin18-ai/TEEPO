@@ -344,11 +344,11 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
     slotByCell.set(`${s.dayIndex}-${s.hour}`, s)
   }
 
-  // Each hour row is 42px tall (matches .cal-cell height in globals.css).
+  // Each hour row is 56px tall (matches .cal-cell height in globals.css).
   // Used to translate event minute-offset + duration into top/height pixels
   // so the event block actually spans its real time range instead of being
-  // clipped to a 1-hour cell.
-  const CAL_ROW_PX = 42
+  // clipped to a 1-hour cell. Must stay in sync with the CSS rule.
+  const CAL_ROW_PX = 56
 
   return (
     <>

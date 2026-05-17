@@ -2793,13 +2793,17 @@ html.light .badge-danger {
   text-align: left;
   border-right: 1px solid var(--lp-line-soft);
   border-bottom: 1px solid var(--lp-line-soft);
-  height: 42px;
+  height: 56px;
+  box-sizing: border-box;
 }
 .dashboard-v2 .cal-cell {
   border-right: 1px solid var(--lp-line-soft);
   border-bottom: 1px solid var(--lp-line-soft);
   position: relative;
-  height: 42px;
+  height: 56px;
+  box-sizing: border-box;
+  /* Keep events visible when they extend past this cell's bottom edge. */
+  overflow: visible;
 }
 .dashboard-v2 .cal-cell:hover { background: var(--lp-bg-elev); }
 .dashboard-v2 .cal-event {
