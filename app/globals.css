@@ -5921,6 +5921,51 @@ html.light .badge-danger {
   background: var(--course-soft, var(--lp-accent-soft));
 }
 
+/* Per-course degree picker (dual-degree users only). Slot sits between
+ * the title row and the folder rows. Rendered as a small chip with a
+ * native select inside so click-to-open behavior is OS-standard. */
+.summaries-page .course-card-degree {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px 0;
+}
+.summaries-page .course-card-degree-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--lp-muted, #8a7261);
+  letter-spacing: .02em;
+}
+.summaries-page .course-card-degree-select {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: var(--lp-bg-elev);
+  border: 1px solid var(--lp-line);
+  color: var(--lp-ink, #2d1810);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%238a7261' d='M5 6L0 0h10z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: 8px center;
+  padding-left: 22px;
+}
+.summaries-page .course-card-degree-select:hover {
+  border-color: var(--course-color, var(--lp-accent));
+  background-color: var(--course-soft, var(--lp-bg-elev));
+}
+.summaries-page .course-card-degree-select:focus {
+  outline: none;
+  border-color: var(--lp-accent);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, .15);
+}
+
 /* Course card folder rows — bottom section, 1 column (3 rows) */
 .summaries-page .course-card-folders {
   display: grid;
