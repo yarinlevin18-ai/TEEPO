@@ -27,6 +27,7 @@ import { useWeekCalendar, type WeekCalendarSlot } from '@/lib/use-week-calendar'
 import { matchCourseForEvent } from '@/lib/event-course-match'
 import { resolveFirstName } from '@/lib/display-name'
 import type { Course } from '@/types'
+import { Plus } from 'lucide-react'
 import LCDDisplay from '@/components/ui/LCDDisplay'
 import CountryClock from '@/components/dashboard/CountryClock'
 import SlidingPuzzle from '@/components/dashboard/SlidingPuzzle'
@@ -77,7 +78,7 @@ function useRotatingAccent(): string {
 export default function DashboardPage() {
   const router = useRouter()
   const { user } = useAuth()
-  const { db, ready } = useDB()
+  const { db, ready, createTask, flushSave } = useDB()
   const greetName = resolveFirstName({
     userMetadata: user?.user_metadata as Record<string, unknown> | undefined,
     email: user?.email,
@@ -279,14 +280,12 @@ export default function DashboardPage() {
             <div className="dcard">
               <div className="dcard-head">
                 <h3>משימות <span className="badge-num">{todos.length} פעילות</span></h3>
-                <Link href="/todos">הוספה +</Link>
+                <Link href="/todos">פתח הכל →</Link>
               </div>
               {todos.length === 0 ? (
-                <EmptyCard
-                  text="אין משימות פתוחות."
-                  ctaHref="/todos"
-                  ctaText="הוסף משימה"
-                />
+                <div className="dcard-empty dcard-empty-compact">
+                  <p>אין משימות פתוחות.</p>
+                </div>
               ) : (
                 todos.map((t, i) => (
                   <div className="task" key={i}>
@@ -299,6 +298,20 @@ export default function DashboardPage() {
                   </div>
                 ))
               )}
+              <QuickAddTask
+                onAdd={async (title) => {
+                  try {
+                    await createTask({
+                      title,
+                      scheduled_date: new Date().toISOString().slice(0, 10),
+                      category: 'study',
+                    })
+                    await flushSave()
+                  } catch (e) {
+                    console.warn('[quick-add-task] failed', e)
+                  }
+                }}
+              />
             </div>
           </div>
 
@@ -314,6 +327,51 @@ export default function DashboardPage() {
  * mockup-data fallback rows so a fresh account doesn't show fictional
  * courses (אלגברה / חדו"א / etc.) as if they were real.
  */
+/** Inline single-row task adder at the bottom of the משימות widget.
+ *  Type a title → Enter or click + → creates a StudyTask for today.
+ *  Esc clears. Optimistic UX (clear input immediately on submit). */
+function QuickAddTask({ onAdd }: { onAdd: (title: string) => Promise<void> }) {
+  const [value, setValue] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async () => {
+    const t = value.trim()
+    if (!t || busy) return
+    setBusy(true)
+    setValue('') // optimistic clear so the user can type the next one
+    try {
+      await onAdd(t)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form
+      className="quick-add-task"
+      onSubmit={(e) => { e.preventDefault(); void submit() }}
+    >
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Escape') setValue('') }}
+        placeholder="הוסף משימה ולחץ Enter…"
+        maxLength={200}
+        dir="rtl"
+        disabled={busy}
+      />
+      <button
+        type="submit"
+        aria-label="הוסף משימה"
+        disabled={!value.trim() || busy}
+      >
+        <Plus size={14} />
+      </button>
+    </form>
+  )
+}
+
 function EmptyCard({
   text,
   ctaHref,
