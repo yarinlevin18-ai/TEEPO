@@ -5,6 +5,16 @@
 /** Universities supported in v2.1. More are roadmapped for Phase 3. */
 export type UniversityCode = 'bgu' | 'tau'
 
+/** One degree-track in a dual-degree (תואר דו-חוגי) or single-degree
+ *  program. Each course can be tagged with `degree_id` so the /summaries
+ *  tree splits them into per-degree columns. */
+export interface Degree {
+  /** Stable id (used by Course.degree_id). Generated client-side. */
+  id: string
+  /** User-typed display name (e.g. "מדעי המחשב" / "מנהל עסקים"). */
+  name: string
+}
+
 /** Per-user app settings stored inside the Drive DB */
 export interface UserSettings {
   /** Which university's catalog + scrapers to use. Set during onboarding. */
@@ -15,10 +25,13 @@ export interface UserSettings {
   degree_start_year?: number
   /** Month (1-12) the user started — normally 10 (October). Used to align year-of-study boundaries. */
   degree_start_month?: number
-  /** Human-readable name of the degree (e.g. "תואר ראשון - מנע״ס"). Shown
-   *  as the second node in the /summaries tree, between TEEPO and the
-   *  semester chips. Falls back to the university name when unset. */
+  /** Legacy single-degree name. Kept for backwards compatibility; new code
+   *  uses `degrees[]` (which is hydrated from this field on first load
+   *  when the array isn't set yet). */
   degree_name?: string
+  /** Dual-degree (or single) tracks. When the user has 2+ degrees, the
+   *  /summaries tree shows one column per degree. */
+  degrees?: Degree[]
   /** True if the user does summer semesters (shows קיץ slots even if empty) */
   takes_summer?: boolean
   /** Loose moodle-connection mirror for the TopNav pill. Authoritative state
@@ -72,6 +85,10 @@ export interface Course {
   academic_year?: string
   /** Year of study relative to the user's degree (1=א, 2=ב, 3=ג, 4=ד). Computed from academic_year + degree start. */
   year_of_study?: 1 | 2 | 3 | 4
+  /** Which degree-track this course belongs to (for dual-degree users).
+   *  References UserSettings.degrees[].id. Unassigned → the course goes
+   *  to the first/default degree column in /summaries. */
+  degree_id?: string
   /** Raw Moodle metadata kept so we can re-classify on demand */
   moodle_startdate?: number   // UNIX timestamp seconds
   moodle_enddate?: number     // UNIX timestamp seconds
