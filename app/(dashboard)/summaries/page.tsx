@@ -796,6 +796,15 @@ function SemesterCoursesPanel({
           const driveUrl = (c as any).drive_folder_ids?.course
             ? `https://drive.google.com/drive/folders/${(c as any).drive_folder_ids.course}`
             : null
+          // For dual-degree users, surface the course's degree assignment
+          // as a small pill+dropdown so they can re-route a course from
+          // degree A to degree B without going through bulk-classify.
+          // Default fallback (degrees[0]) is highlighted as the assumed
+          // value when degree_id isn't explicitly set.
+          const currentDegreeId =
+            ((c as any).degree_id && degrees.some(d => d.id === (c as any).degree_id))
+              ? (c as any).degree_id
+              : degrees[0]?.id
           return (
             <div
               key={c.id}
@@ -839,6 +848,30 @@ function SemesterCoursesPanel({
                   </a>
                 )}
               </div>
+
+              {degrees.length > 1 && (
+                <div className="course-card-degree" onClick={(e) => e.stopPropagation()}>
+                  <span className="course-card-degree-label">תואר</span>
+                  <select
+                    className="course-card-degree-select"
+                    value={currentDegreeId ?? ''}
+                    onChange={async (e) => {
+                      const newId = e.target.value
+                      try {
+                        await reclassifyCourse(c.id, { degree_id: newId })
+                        if (typeof flushSave === 'function') await flushSave()
+                      } catch (err) {
+                        console.warn('[degree-picker] failed', err)
+                      }
+                    }}
+                    aria-label="שנה את התואר של הקורס"
+                  >
+                    {degrees.map(d => (
+                      <option key={d.id} value={d.id}>{d.name || '(ללא שם)'}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="course-card-folders">
                 {FOLDER_DEFS.map(({ kind, label, Icon }) => (
