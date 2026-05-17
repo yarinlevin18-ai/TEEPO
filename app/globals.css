@@ -5520,14 +5520,142 @@ html.light .badge-danger {
   position: relative;
   padding-top: 20px;
 }
-.summaries-page .sem-grid::before,
-.summaries-page .sem-grid::after { display: none; }
 .summaries-page .sem-chip-wrap {
   position: relative;
   display: flex;
   justify-content: center;
 }
-.summaries-page .sem-chip-wrap::before { display: none; }
+
+/* ── Tree connector lines (TEEPO → degree → year → semester) ────────────
+ *
+ * Pure CSS, no SVG. Each level draws:
+ *   1. A vertical line DOWN from the parent toward its children
+ *   2. For multi-child levels, a horizontal line spanning the children
+ *      with a vertical drop into each one
+ *
+ * Cases handled:
+ *   - 1 degree, no pill           → TEEPO straight into sem-grid
+ *   - 1 degree with pill          → TEEPO → pill → (year-rows or sem-grid)
+ *   - 2 degrees                   → TEEPO → horizontal → each degree pill
+ *   - Multi-year inside a degree  → degree pill → vertical → year row(s)
+ *   - Year row                    → year pill → vertical → sem-grid chips
+ * ────────────────────────────────────────────────────────────────────── */
+
+/* (1) TEEPO root: vertical drop toward the level below. */
+.summaries-page .tree-root {
+  position: relative;
+  padding-bottom: 32px;
+}
+.summaries-page .tree-root::after {
+  content: '';
+  display: block;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  height: 32px;
+  background: var(--lp-line);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+/* (2) Multi-degree: horizontal connector across degree column tops +
+ *      vertical drop from the horizontal into each column. */
+.summaries-page .tree-branches.columns-2 { position: relative; }
+.summaries-page .tree-branches.columns-2::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: var(--lp-line);
+  z-index: 0;
+}
+.summaries-page .tree-branches.columns-2 .degree-column { position: relative; }
+.summaries-page .tree-branches.columns-2 .degree-column::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 32px; /* drop down to the .degree-header (which has margin-top: 32px) */
+  background: var(--lp-line);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+/* (3) Degree pill: vertical drop toward its children (year-row OR sem-grid). */
+.summaries-page .degree-header {
+  position: relative;
+  padding-bottom: 22px;
+}
+.summaries-page .degree-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  height: 22px;
+  background: var(--lp-line);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+/* (4) Year-row: vertical drop from the year pill to its sem-grid. */
+.summaries-page .year-row-head {
+  padding-bottom: 14px;
+}
+.summaries-page .year-row-head::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  height: 14px;
+  background: var(--lp-line);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+/* (5) sem-grid: horizontal line across the chips + vertical drops to each.
+ *      Already partially defined earlier — we just need to make sure the
+ *      ::before pseudo is re-shown (an earlier hide rule was killing it). */
+.summaries-page .sem-grid {
+  position: relative;
+}
+.summaries-page .sem-grid::before {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 2px;
+  background: var(--lp-line);
+  z-index: 0;
+}
+/* Single-chip grid: no horizontal needed (would be a dot otherwise). */
+.summaries-page .sem-grid:has(> .sem-chip-wrap:only-child)::before { display: none; }
+/* 2-col year-row grid uses a narrower horizontal span (chip centers
+ * are closer to the column center). */
+.summaries-page .year-row .sem-grid::before { left: 25%; right: 25%; }
+/* Vertical drop from sem-grid horizontal down to each chip. */
+.summaries-page .sem-chip-wrap::before {
+  content: '';
+  display: block;
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  width: 2px;
+  height: 20px;
+  background: var(--lp-line);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+/* Highlight the chip's own drop line when selected so the eye can trace
+ * the path TEEPO → degree → year → chip at a glance. */
+.summaries-page .sem-chip-wrap.active::before { background: var(--lp-accent); }
 
 /* Semester chip — each gets its own --sem-color from the rotating palette */
 .summaries-page .node.sem {
