@@ -4,6 +4,8 @@
   "version": "2.0.0",
   "description": "מסנכרן קבצים מ-Moodle ומהפורטל ישירות ל-Google Drive שלך, מסודר לפי הקורסים שלך ב-TEEPO.",
 
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmxKmPMTczPLhs3qFunkfUnCftA6aTNmhfppgSzdXoe6c6NvL3BS7vAVUDsfP9mrDEzKFIqjg+Kbtp6Zjd4FYEx0wE3WLPsj4uwzDsWBnq47xgNpxcuKwAQHTyFksF/UNAb11XKMZrIv2paGvrddQvTTMmuh7gcAbRhJ/6alqK3eiQGfWFLjGqg/+gaYeT2N5dbjhMxrq/jyElR3yE93cqNiAACxsJqTnkV6hfDHhJnwwSwNkZusGNATqot+DdzdjVnJ4BwZJdb34SDXuq4XB5rRg6+f2GZHw/p4/Uxo8PxDLteoNsdGQyq8nL86J+8Ojz3ZqJtxtrRqOX9b4iGis8wIDAQAB",
+
   "permissions": [
     "storage",
     "scripting",

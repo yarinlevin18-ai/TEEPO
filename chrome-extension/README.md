@@ -40,46 +40,48 @@ ID in your Drive" via [`/api/drive/folder-for-course`](../app/api/drive/folder-f
 
 ---
 
-## Install for development (5 min)
+## Extension ID is stable
 
-### 1. Create a Google OAuth client
+The `"key"` field in `manifest.json` is the public half of an RSA-2048
+keypair generated for this project. Chrome derives the extension ID
+deterministically from that key, so **every install of this unpacked
+extension gets the same ID**:
 
-The extension uses Chrome's `chrome.identity` API, which needs **its own**
-OAuth client. **It MUST be the same Google OAuth project as the TEEPO
-web app** — otherwise Drive treats them as separate apps and the
-extension can't see folders the web app created.
-
-1. Go to **[Google Cloud Console → APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials)**.
-2. Make sure you're in the **same project** as the TEEPO web app.
-3. **Create Credentials → OAuth client ID → Application type: Chrome Extension**.
-4. **Application ID**: paste the extension's ID. You'll get it after
-   step 3 below — come back and update.
-5. Click **Create**. Copy the Client ID
-   (looks like `123456789-abc...apps.googleusercontent.com`).
-
-### 2. Patch the manifest
-
-Open `chrome-extension/manifest.json` and replace:
-
-```json
-"oauth2": {
-  "client_id": "REPLACE_WITH_YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com",
-  ...
-}
+```
+jdhpdacenamdkdjleojfjimaeggkokal
 ```
 
-with your real client ID.
+The private key (`teepo-extension-key.pem`) is **not in git** — it's only
+needed to publish to the Chrome Web Store. If you ever need it, ask Yarin.
 
-### 3. Load the unpacked extension
+This means the Google Cloud OAuth client only has to be configured once
+ever, and any new contributor's local install will work without re-jiggering
+the OAuth Application ID.
+
+## Install for development (3 min)
+
+### 1. One-time: configure the Google OAuth client (already done)
+
+The OAuth client for the extension is already created in Google Cloud
+(project `lifeos-494812`, client ID `157877045941-lnm2cna90npvefkmcmem9up5ml516d8d`)
+and its **Application ID** is set to `jdhpdacenamdkdjleojfjimaeggkokal`.
+The same OAuth project hosts the TEEPO web app, so the `drive.file` scope
+gives both halves access to the same Drive folder set.
+
+If you ever rotate the keypair (and so the extension ID changes), update the
+Application ID on the OAuth client at
+[Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials).
+
+### 2. Load the unpacked extension
 
 1. Open **`chrome://extensions`**.
 2. Toggle **Developer mode** (top-right).
 3. **Load unpacked** → select the `chrome-extension/` directory.
-4. Note the **Extension ID** that appears (32-character hex string).
-5. Go back to Google Cloud Console (step 1) and paste the Extension ID
-   into the OAuth client's **Application ID** field. Save.
+4. The Extension ID should appear as `jdhpdacenamdkdjleojfjimaeggkokal`
+   (if it doesn't, something is wrong with the `"key"` field in the
+   manifest — check it wasn't truncated).
 
-### 4. Point the extension at the right backend
+### 3. Point the extension at the right backend
 
 By default the extension talks to `http://localhost:3000`. For any
 other URL — Vercel preview, staging, prod — set `teepoBase` in
@@ -100,7 +102,7 @@ chrome.storage.local.set({ teepoBase: 'https://teepo.app' })
 The extension's `host_permissions` already covers `*.vercel.app/*` and
 `teepo.app/*` so no extra approval prompt is needed.
 
-### 5. Make sure the web app provisioned your folders
+### 4. Make sure the web app provisioned your folders
 
 Before the extension can upload, your Drive needs the
 `TEEPO/{...}/{course}/{lessons,assignments,notes}/` folders to exist.
