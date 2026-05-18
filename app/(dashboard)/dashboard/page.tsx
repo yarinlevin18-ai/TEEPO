@@ -439,9 +439,15 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
   // Index events by `${dayIndex}-${hour}` so each cell can look up its event in O(1).
   // We anchor the event at its START hour cell; the absolute-positioned event
   // element then extends downward by its duration (see CAL_ROW_PX math below).
-  const slotByCell = new Map<string, WeekCalendarSlot>()
+  // Note: when MULTIPLE events start in the same cell (same day + hour), we
+  // keep all of them in an array and let the renderer side-by-side them
+  // via the layout map below.
+  const slotsByCell = new Map<string, WeekCalendarSlot[]>()
   for (const s of slots) {
-    slotByCell.set(`${s.dayIndex}-${s.hour}`, s)
+    const k = `${s.dayIndex}-${s.hour}`
+    const arr = slotsByCell.get(k) ?? []
+    arr.push(s)
+    slotsByCell.set(k, arr)
   }
 
   // Each hour row is 56px tall (matches .cal-cell height in globals.css).
@@ -449,6 +455,63 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
   // so the event block actually spans its real time range instead of being
   // clipped to a 1-hour cell. Must stay in sync with the CSS rule.
   const CAL_ROW_PX = 56
+
+  // Compute side-by-side columns for overlapping events. Two events overlap
+  // when they share any minute on the same day. Previous version stacked
+  // them on top of each other (later in DOM order won z-index) — the user
+  // could only see the topmost one and thought the others were "hidden".
+  //
+  // Layout map: slot.title+dayIndex+startMins → { col, of } where `col` is
+  // the column index inside the overlap group and `of` is the group size.
+  // The event renderer translates these into width + offset percentages.
+  const layoutByEvent = new Map<string, { col: number; of: number }>()
+  function evKey(s: WeekCalendarSlot): string {
+    return `${s.dayIndex}-${s.hour * 60 + s.minute}-${s.title}`
+  }
+  // Process per-day, sorted by start time so earlier events claim col 0 first.
+  for (let di = 0; di < 7; di++) {
+    const dayEvents = slots
+      .filter(s => s.dayIndex === di)
+      .sort((a, b) => (a.hour * 60 + a.minute) - (b.hour * 60 + b.minute))
+    // Greedy interval-coloring: each event picks the lowest-index column
+    // whose last-event-end is ≤ this event's start. Then the group size for
+    // each event is the max columns used among events that overlap with it.
+    const colEnd: number[] = []   // colEnd[i] = end minute of last event in col i
+    const eventCol: number[] = [] // per dayEvents index → assigned col
+    for (const ev of dayEvents) {
+      const start = ev.hour * 60 + ev.minute
+      const end = start + ev.durationMins
+      let placed = false
+      for (let i = 0; i < colEnd.length; i++) {
+        if (colEnd[i] <= start) {
+          colEnd[i] = end
+          eventCol.push(i)
+          placed = true
+          break
+        }
+      }
+      if (!placed) {
+        eventCol.push(colEnd.length)
+        colEnd.push(end)
+      }
+    }
+    // For each event, group size = max(col+1) among events that overlap it.
+    for (let i = 0; i < dayEvents.length; i++) {
+      const ev = dayEvents[i]
+      const start = ev.hour * 60 + ev.minute
+      const end = start + ev.durationMins
+      let groupMax = eventCol[i] + 1
+      for (let j = 0; j < dayEvents.length; j++) {
+        if (i === j) continue
+        const other = dayEvents[j]
+        const oStart = other.hour * 60 + other.minute
+        const oEnd = oStart + other.durationMins
+        const overlaps = oStart < end && oEnd > start
+        if (overlaps) groupMax = Math.max(groupMax, eventCol[j] + 1)
+      }
+      layoutByEvent.set(evKey(ev), { col: eventCol[i], of: groupMax })
+    }
+  }
 
   return (
     <>
@@ -497,66 +560,90 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
                 <span className="cal-now-dot" />
               </div>
             ) : null
-            const ev = slotByCell.get(`${di}-${h}`)
-            if (!ev) return (
+            const cellEvents = slotsByCell.get(`${di}-${h}`) ?? []
+            if (cellEvents.length === 0) return (
               <div key={`c-${di}-${h}`} className="cal-cell">
                 {nowIndicator}
               </div>
             )
-            const matched = matchCourseForEvent(ev.title, courses)
-            const className = `cal-event ev-${ev.color}${matched ? ' is-matched' : ''}`
-            const titleAttr =
-              `${ev.title}${ev.meta ? ' · ' + ev.meta : ''}` +
-              (matched ? ` — לחץ לפתיחה במוח` : ' — לחץ לפתיחה ב-Google Calendar')
-            // Compute pixel-precise top/height so the event spans its full
-            // duration. Top accounts for the minute offset within the starting
-            // hour, height covers the full duration (clamped to a minimum of
-            // 22px so very short events stay readable). 3px inset top/bottom
-            // matches the original cal-event styling.
-            const topPx = Math.round((ev.minute / 60) * CAL_ROW_PX) + 3
-            const heightPx = Math.max(22, Math.round((ev.durationMins / 60) * CAL_ROW_PX) - 6)
-            const eventStyle = { top: `${topPx}px`, height: `${heightPx}px` }
-            // Time label: HH:MM at the start, optionally HH:MM–HH:MM when
-            // the event is tall enough (>= 1h) so the range reads cleanly.
-            const startStr = `${pad2(ev.hour)}:${pad2(ev.minute)}`
-            const endTotal = ev.hour * 60 + ev.minute + ev.durationMins
-            const endStr = `${pad2(Math.floor(endTotal / 60) % 24)}:${pad2(endTotal % 60)}`
-            const showRange = ev.durationMins >= 60
-            const timeLabel = showRange ? `${startStr}–${endStr}` : startStr
-            // Sub-30min event has barely room for the title — drop the time
-            // label to avoid a cluttered single line.
-            const showTime = ev.durationMins >= 30
-            const eventContent = (
-              <>
-                {showTime && <span className="cal-event-time">{timeLabel}</span>}
-                <span className="cal-event-title">{ev.title}</span>
-                {ev.meta && <small>{ev.meta}</small>}
-              </>
-            )
             return (
               <div key={`c-${di}-${h}`} className="cal-cell">
                 {nowIndicator}
-                {matched ? (
-                  <Link
-                    href={`/summaries?course=${encodeURIComponent(matched.id)}&lesson=${encodeURIComponent(ev.title)}`}
-                    className={className}
-                    title={`${timeLabel} · ${titleAttr}`}
-                    style={eventStyle}
-                  >
-                    {eventContent}
-                  </Link>
-                ) : (
-                  <a
-                    href={ev.htmlLink || 'https://calendar.google.com'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={className}
-                    title={`${timeLabel} · ${titleAttr}`}
-                    style={eventStyle}
-                  >
-                    {eventContent}
-                  </a>
-                )}
+                {cellEvents.map((ev, evIdx) => {
+                  const matched = matchCourseForEvent(ev.title, courses)
+                  const className = `cal-event ev-${ev.color}${matched ? ' is-matched' : ''}`
+                  const titleAttr =
+                    `${ev.title}${ev.meta ? ' · ' + ev.meta : ''}` +
+                    (matched ? ` — לחץ לפתיחה במוח` : ' — לחץ לפתיחה ב-Google Calendar')
+                  // Pixel-precise top/height so the event spans its full
+                  // duration. Top accounts for the minute offset within the
+                  // starting hour, height covers the full duration (clamped
+                  // to ≥22px so very short events stay readable).
+                  const topPx = Math.round((ev.minute / 60) * CAL_ROW_PX) + 3
+                  const heightPx = Math.max(22, Math.round((ev.durationMins / 60) * CAL_ROW_PX) - 6)
+                  // Side-by-side layout for overlapping events: split the
+                  // cell width into `of` equal columns, position this event
+                  // in column `col`. Single-event groups render full width
+                  // (left/right 3px from the inherited rule).
+                  const layout = layoutByEvent.get(evKey(ev)) ?? { col: 0, of: 1 }
+                  // 3px each side keeps the existing visual gutter when
+                  // it's a single event; for multi-col we use percentages
+                  // so columns share the cell cleanly.
+                  let horizStyle: React.CSSProperties
+                  if (layout.of <= 1) {
+                    horizStyle = { left: '3px', right: '3px' }
+                  } else {
+                    // 2px gap between columns, fractional widths inside.
+                    const widthPct = 100 / layout.of
+                    horizStyle = {
+                      left: `calc(${widthPct * layout.col}% + 2px)`,
+                      width: `calc(${widthPct}% - 4px)`,
+                      right: 'auto',
+                    }
+                  }
+                  const eventStyle: React.CSSProperties = {
+                    top: `${topPx}px`,
+                    height: `${heightPx}px`,
+                    ...horizStyle,
+                  }
+                  const startStr = `${pad2(ev.hour)}:${pad2(ev.minute)}`
+                  const endTotal = ev.hour * 60 + ev.minute + ev.durationMins
+                  const endStr = `${pad2(Math.floor(endTotal / 60) % 24)}:${pad2(endTotal % 60)}`
+                  const showRange = ev.durationMins >= 60 && layout.of === 1
+                  const timeLabel = showRange ? `${startStr}–${endStr}` : startStr
+                  const showTime = ev.durationMins >= 30
+                  const eventContent = (
+                    <>
+                      {showTime && <span className="cal-event-time">{timeLabel}</span>}
+                      <span className="cal-event-title">{ev.title}</span>
+                      {ev.meta && <small>{ev.meta}</small>}
+                    </>
+                  )
+                  const evReactKey = `e-${di}-${h}-${evIdx}`
+                  return matched ? (
+                    <Link
+                      key={evReactKey}
+                      href={`/summaries?course=${encodeURIComponent(matched.id)}&lesson=${encodeURIComponent(ev.title)}`}
+                      className={className}
+                      title={`${timeLabel} · ${titleAttr}`}
+                      style={eventStyle}
+                    >
+                      {eventContent}
+                    </Link>
+                  ) : (
+                    <a
+                      key={evReactKey}
+                      href={ev.htmlLink || 'https://calendar.google.com'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={className}
+                      title={`${timeLabel} · ${titleAttr}`}
+                      style={eventStyle}
+                    >
+                      {eventContent}
+                    </a>
+                  )
+                })}
               </div>
             )
           }),
