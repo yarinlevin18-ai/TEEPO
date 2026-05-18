@@ -81,10 +81,16 @@ export default function AnalogClock({
       <circle cx="50" cy="50" r="48" fill={ringColor} />
       <g clipPath="url(#clockFaceClip)">
         <rect x="0" y="0" width="100" height="100" fill={faceColor} />
-        {faceContent}
+        {/* Wash the flag down so the hands read clearly on top. Without
+            this the saturated reds/greens swallow the dark hour hand on
+            a 42 px display. */}
+        {faceContent && <g opacity={0.45}>{faceContent}</g>}
+        {/* Center disk so the pivot + hand bases sit on a clean white
+            puck — keeps the hour hand legible even on a busy flag. */}
+        <circle cx="50" cy="50" r="22" fill={faceColor} opacity={0.55} />
       </g>
-      {/* 12 hour ticks with subtle halo so they stay visible on any face */}
-      <g stroke={tickColor} strokeLinecap="round" style={{ filter: 'drop-shadow(0 0 1.2px rgba(255,255,255,.85))' }}>
+      {/* 12 hour ticks with a stronger halo so they survive any flag */}
+      <g stroke={tickColor} strokeLinecap="round" style={{ filter: 'drop-shadow(0 0 1.4px rgba(255,255,255,.95))' }}>
         <line x1="50"    y1="6"     x2="50"    y2="14"    strokeWidth="3" />
         <line x1="73"    y1="12.16" x2="71"    y2="15.62" strokeWidth="1.5" />
         <line x1="87.84" y1="27"    x2="84.38" y2="29"    strokeWidth="1.5" />
@@ -98,18 +104,22 @@ export default function AnalogClock({
         <line x1="12.16" y1="27"    x2="15.62" y2="29"    strokeWidth="1.5" />
         <line x1="27"    y1="12.16" x2="29"    y2="15.62" strokeWidth="1.5" />
       </g>
-      {/* Hands */}
-      <line x1="50" y1="50" x2="50" y2="30" stroke="#2d1810" strokeWidth="3.8" strokeLinecap="round"
-            transform={`rotate(${hourRot} 50 50)`}
-            style={{ transition: 'transform .3s cubic-bezier(.65,0,.35,1)' }} />
-      <line x1="50" y1="50" x2="50" y2="18" stroke="#3a4a3d" strokeWidth="2.6" strokeLinecap="round"
-            transform={`rotate(${minRot} 50 50)`}
-            style={{ transition: 'transform .3s cubic-bezier(.65,0,.35,1)' }} />
-      <line x1="50" y1="50" x2="50" y2="12" stroke="#d97706" strokeWidth="1.3" strokeLinecap="round"
-            transform={`rotate(${secRot} 50 50)`}
-            style={{ transition: 'transform .1s linear' }} />
-      <circle cx="50" cy="50" r="4" fill="#2d1810" />
-      <circle cx="50" cy="50" r="1.5" fill="#d97706" />
+      {/* Hands — grouped with a white halo so they stay crisp against
+          any face color. Without this the dark hour hand vanishes on
+          dark-blue flags (UK, Argentina) and on the red Italian stripe. */}
+      <g style={{ filter: 'drop-shadow(0 0 1.6px rgba(255,255,255,.9))' }}>
+        <line x1="50" y1="50" x2="50" y2="30" stroke="#2d1810" strokeWidth="3.8" strokeLinecap="round"
+              transform={`rotate(${hourRot} 50 50)`}
+              style={{ transition: 'transform .3s cubic-bezier(.65,0,.35,1)' }} />
+        <line x1="50" y1="50" x2="50" y2="18" stroke="#3a4a3d" strokeWidth="2.6" strokeLinecap="round"
+              transform={`rotate(${minRot} 50 50)`}
+              style={{ transition: 'transform .3s cubic-bezier(.65,0,.35,1)' }} />
+        <line x1="50" y1="50" x2="50" y2="12" stroke="#d97706" strokeWidth="1.3" strokeLinecap="round"
+              transform={`rotate(${secRot} 50 50)`}
+              style={{ transition: 'transform .1s linear' }} />
+        <circle cx="50" cy="50" r="4" fill="#2d1810" />
+        <circle cx="50" cy="50" r="1.5" fill="#d97706" />
+      </g>
     </svg>
   )
 }
