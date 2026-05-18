@@ -418,10 +418,19 @@ function EmptyCard({
 function CalendarWeek({ courses }: { courses: Course[] }) {
   const { slots, hourRange, loading, error } = useWeekCalendar()
 
-  const today = new Date()
-  const dow = today.getDay()
-  const weekStart = new Date(today)
-  weekStart.setDate(today.getDate() - dow)
+  // "Now" tick — drives the red current-time line. Re-renders every
+  // 60s so the indicator inches down the grid in real time without
+  // waiting for the next data refresh.
+  const [now, setNow] = useState<Date>(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const dow = now.getDay()
+  const nowHour = now.getHours()
+  const nowMinute = now.getMinutes()
+  const weekStart = new Date(now)
+  weekStart.setDate(now.getDate() - dow)
 
   const DAYS = ['א\'', 'ב\'', 'ג\'', 'ד\'', 'ה\'', 'ו\'', 'ש\'']
   const hours: number[] = []
@@ -470,8 +479,30 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
         {hours.flatMap(h => [
           <div key={`t-${h}`} className="cal-time">{pad2(h)}:00</div>,
           ...Array.from({ length: 7 }, (_, di) => {
+            // "Now" indicator — a thin red line at the current minute,
+            // shown only inside today's column at the current hour's cell.
+            // Sits above events (z-index in CSS) so it's visible even when
+            // an event spans this row.
+            const isNowCell =
+              di === dow &&
+              h === nowHour &&
+              h >= hourRange.min &&
+              h <= hourRange.max
+            const nowIndicator = isNowCell ? (
+              <div
+                className="cal-now"
+                style={{ top: `${(nowMinute / 60) * CAL_ROW_PX}px` }}
+                aria-label={`עכשיו ${pad2(nowHour)}:${pad2(nowMinute)}`}
+              >
+                <span className="cal-now-dot" />
+              </div>
+            ) : null
             const ev = slotByCell.get(`${di}-${h}`)
-            if (!ev) return <div key={`c-${di}-${h}`} className="cal-cell" />
+            if (!ev) return (
+              <div key={`c-${di}-${h}`} className="cal-cell">
+                {nowIndicator}
+              </div>
+            )
             const matched = matchCourseForEvent(ev.title, courses)
             const className = `cal-event ev-${ev.color}${matched ? ' is-matched' : ''}`
             const titleAttr =
@@ -504,6 +535,7 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
             )
             return (
               <div key={`c-${di}-${h}`} className="cal-cell">
+                {nowIndicator}
                 {matched ? (
                   <Link
                     href={`/summaries?course=${encodeURIComponent(matched.id)}&lesson=${encodeURIComponent(ev.title)}`}
