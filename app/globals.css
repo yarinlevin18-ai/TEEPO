@@ -9560,3 +9560,327 @@ html.dark .courses-error-banner {
 html.dark .courses-error-body h2 { color: #fed7aa !important; }
 html.dark .courses-error-body p,
 html.dark .courses-error-body small { color: #fdba74 !important; }
+
+/* ════════════════════════════════════════════════════════════════════
+   <DriveOrganize /> — 4-level course folder tree on /courses.
+   Source: teepo-design/mockup_drive_organize.html. Connectors are
+   painted as SVG paths (elbow curves) by useSvgTreeConnectors; the
+   CSS below shapes the boxes + spacing the SVG draws into.
+   ════════════════════════════════════════════════════════════════════ */
+.drive-organize {
+  padding: 32px 32px 80px;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Info banner — cream card, "פרק וסדר" gradient CTA on the left
+ * (replaces the old purple/violet header per CLAUDE_CODE_HANDOFF §10). */
+.do-banner {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 18px;
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  box-shadow: 0 2px 6px rgba(120, 70, 30, .08), 0 1px 2px rgba(120, 70, 30, .05);
+  animation: fadeUp .45s ease both;
+}
+.do-banner-text { flex: 1; min-width: 0; text-align: right; }
+.do-banner-title {
+  font-family: 'Heebo', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--lp-ink);
+  letter-spacing: -.4px;
+  margin-bottom: 4px;
+}
+.do-banner-desc {
+  font-size: 13px;
+  color: var(--lp-ink-soft);
+  line-height: 1.5;
+}
+.do-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.do-banner-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
+  color: white;
+  border: none;
+  padding: 12px 22px;
+  border-radius: 11px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 6px 18px -4px var(--lp-accent);
+  transition: transform .15s, box-shadow .15s;
+}
+.do-banner-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px -6px var(--lp-accent);
+}
+.do-banner-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--lp-line);
+  color: var(--lp-ink-soft);
+  padding: 11px 14px;
+  border-radius: 11px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .15s, border-color .15s, color .15s, transform .15s;
+}
+.do-banner-secondary:hover {
+  background: var(--lp-bg-elev);
+  color: var(--lp-ink);
+  border-color: var(--lp-ink-soft);
+  transform: translateY(-1px);
+}
+
+/* Classify banner — shown only when there are unclassified courses.
+ * Sage-green tint so it reads as "actionable" rather than alarming. */
+.do-classify-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: rgba(22, 163, 74, .07);
+  border: 1px solid rgba(22, 163, 74, .25);
+  border-radius: 14px;
+  color: var(--lp-ink);
+  text-decoration: none;
+  transition: background .15s, transform .15s;
+}
+.do-classify-banner:hover {
+  background: rgba(22, 163, 74, .12);
+  transform: translateY(-1px);
+}
+.do-classify-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.do-classify-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.do-classify-text strong { font-size: 14px; font-weight: 700; }
+.do-classify-text span { font-size: 12.5px; color: var(--lp-ink-soft); }
+.do-classify-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  background: white;
+  color: var(--lp-accent-deep);
+  border: 1px solid var(--lp-accent);
+  font-weight: 700;
+  font-size: 12.5px;
+  flex-shrink: 0;
+}
+
+/* Tree card — wrap for the SVG overlay + node grid */
+.do-tree-card {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 22px;
+  padding: 48px 32px 40px;
+  box-shadow: 0 8px 20px -4px rgba(120, 70, 30, .14), 0 3px 8px rgba(120, 70, 30, .08);
+  position: relative;
+}
+.do-tree-card .tree-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: visible;
+}
+.do-tree-card .tree-svg path,
+.do-tree-card .tree-svg line {
+  fill: none;
+  stroke: var(--lp-accent);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 2px rgba(22, 163, 74, .15));
+}
+.do-tree-card .tree-svg circle.junction {
+  fill: var(--lp-accent);
+  stroke: none;
+}
+
+/* Tree node layout — root at top, degree columns side by side, each
+ * column with year+semester groups stacked vertically. */
+.do-tree-card .tree-root {
+  display: flex;
+  justify-content: center;
+  padding-bottom: 48px;
+  position: relative;
+  z-index: 2;
+}
+.do-tree-card .tree-branches {
+  display: grid;
+  gap: 48px;
+  position: relative;
+  z-index: 2;
+}
+.do-tree-card .tree-branches[data-columns="1"] { grid-template-columns: 1fr; }
+.do-tree-card .tree-branches[data-columns="2"] { grid-template-columns: 1fr 1fr; }
+.do-tree-card .degree-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 48px;
+  padding-top: 48px;
+}
+.do-tree-card .year-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+  width: 100%;
+}
+.do-tree-card .year-header { position: relative; z-index: 2; }
+.do-tree-card .semester-row {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  max-width: 340px;
+  padding-top: 36px;
+  position: relative;
+}
+.do-tree-card .semester-row[data-chips="1"] { grid-template-columns: 1fr; }
+.do-tree-card .semester-row[data-chips="2"] { grid-template-columns: 1fr 1fr; }
+.do-tree-card .semester-row[data-chips="3"] { grid-template-columns: 1fr 1fr 1fr; }
+
+/* Node base — every box in the tree shares this skeleton */
+.do-tree-card .node {
+  background: var(--lp-bg-card);
+  border: 1.5px solid var(--lp-line);
+  border-radius: 11px;
+  padding: 11px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  transition: all .2s cubic-bezier(.4, 0, .2, 1);
+  box-shadow: 0 2px 6px rgba(120, 70, 30, .08), 0 1px 2px rgba(120, 70, 30, .05);
+  white-space: nowrap;
+  font-family: inherit;
+  color: var(--lp-ink);
+  text-align: right;
+  justify-content: flex-start;
+  position: relative;
+  z-index: 2;
+  text-decoration: none;
+}
+.do-tree-card .node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -4px rgba(120, 70, 30, .14), 0 3px 8px rgba(120, 70, 30, .08);
+  border-color: var(--lp-accent);
+}
+.do-tree-card .node .ico { width: 16px; height: 16px; flex-shrink: 0; color: var(--lp-ink-soft); }
+.do-tree-card .node .name { font-weight: 600; font-size: 13px; flex: 1; }
+.do-tree-card .node .count {
+  font-size: 10.5px;
+  padding: 2px 9px;
+  background: var(--lp-bg-elev);
+  color: var(--lp-muted);
+  border-radius: 999px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Root variant — sage-green gradient pill at the top */
+.do-tree-card .node.root {
+  background: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
+  color: white;
+  border-color: transparent;
+  padding: 14px 26px;
+  box-shadow: 0 12px 28px -6px var(--lp-accent);
+}
+.do-tree-card .node.root .name { font-size: 16px; font-weight: 700; }
+.do-tree-card .node.root .ico { width: 19px; height: 19px; color: white; }
+.do-tree-card .node.root .count { background: rgba(255, 255, 255, .22); color: white; }
+
+/* Degree variant — bigger, bolder than year/semester */
+.do-tree-card .node.degree { padding: 13px 22px; font-size: 14px; }
+.do-tree-card .node.degree .name { font-weight: 700; font-size: 14.5px; }
+.do-tree-card .node.degree .ico { width: 18px; height: 18px; color: var(--lp-accent); }
+
+/* Year variant — slightly warmer card, smaller text */
+.do-tree-card .node.year {
+  padding: 10px 18px;
+  background: var(--lp-bg-card-2, var(--lp-bg-elev));
+}
+.do-tree-card .node.year .name { font-weight: 700; font-size: 13px; }
+.do-tree-card .node.year .ico { width: 15px; height: 15px; color: var(--lp-accent); }
+
+/* Semester variant — fills its grid cell, centers name */
+.do-tree-card .node.sem {
+  padding: 9px 12px;
+  font-size: 12.5px;
+  width: 100%;
+  justify-content: center;
+}
+.do-tree-card .node.sem .name { font-size: 12.5px; font-weight: 600; text-align: center; }
+.do-tree-card .node.sem .ico { width: 14px; height: 14px; }
+.do-tree-card .node.sem .count { font-size: 10px; padding: 1px 7px; }
+
+/* Stagger nodes in on first paint (matches the mockup's animation timing) */
+@keyframes doNodeIn {
+  from { opacity: 0; transform: translateY(15px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.do-tree-card .tree-root .node,
+.do-tree-card .degree-header .node,
+.do-tree-card .year-header .node,
+.do-tree-card .semester-row .node,
+.do-banner {
+  animation: doNodeIn .45s ease both;
+}
+.do-banner { animation-delay: .05s; }
+.do-tree-card .tree-root .node { animation-delay: .15s; }
+.do-tree-card .degree-column:nth-child(1) .degree-header .node { animation-delay: .25s; }
+.do-tree-card .degree-column:nth-child(2) .degree-header .node { animation-delay: .32s; }
+.do-tree-card .year-group:nth-child(2) .year-header .node { animation-delay: .4s; }
+.do-tree-card .year-group:nth-child(3) .year-header .node { animation-delay: .48s; }
+.do-tree-card .year-group:nth-child(4) .year-header .node { animation-delay: .56s; }
+.do-tree-card .semester-row .node:nth-child(1) { animation-delay: .55s; }
+.do-tree-card .semester-row .node:nth-child(2) { animation-delay: .6s; }
+.do-tree-card .semester-row .node:nth-child(3) { animation-delay: .65s; }
+
+/* Responsive — collapse dual-degree to single column on narrow screens */
+@media (max-width: 880px) {
+  .do-tree-card .tree-branches[data-columns="2"] { grid-template-columns: 1fr; gap: 36px; }
+  .do-banner { flex-direction: column; align-items: stretch; gap: 14px; text-align: right; }
+  .do-banner-actions { justify-content: flex-end; flex-wrap: wrap; }
+}
