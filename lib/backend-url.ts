@@ -15,7 +15,7 @@
  */
 
 const DEAD_URL = 'https://bgu-study-backend.onrender.com'
-const LIVE_URL = 'https://bgu-study-backend-yr3r.onrender.com'
+const LIVE_URL = 'https://bgu-study-backend-y73r.onrender.com'
 
 /** Resolve the runtime backend URL for the Flask service. */
 export function backendUrl(): string {
