@@ -584,7 +584,7 @@ function DetailContent({
           </div>
         </div>
         <div className="asn-detail-actions">
-          <button type="button" className="asn-icon-btn" title="עוד">
+          <button type="button" className="asn-icon-btn" title="עוד" aria-label="פעולות נוספות">
             <MoreHorizontal size={16} />
           </button>
         </div>
