@@ -33,15 +33,26 @@ const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
  *  "Failed to fetch". We do a separate /health ping FIRST with a 90s
  *  timeout to absorb the cold-start; the real sync call then runs
  *  against a warm server. */
-async function wakeBackend(): Promise<void> {
+/** Returns 'awake' on 2xx, 'suspended' when Render returns no-server
+ *  (every endpoint 404s with x-render-routing: no-server header — the
+ *  service is suspended/missing, not just cold-starting), or 'unreachable'
+ *  on any network failure. */
+async function wakeBackend(): Promise<'awake' | 'suspended' | 'unreachable'> {
   try {
-    await fetch(`${BACKEND}/health`, {
+    const res = await fetch(`${BACKEND}/health`, {
       method: 'GET',
       signal: AbortSignal.timeout(90_000),
     })
+    if (res.ok) return 'awake'
+    // Render's routing layer returns this header when there's no app
+    // container behind it (service suspended on free tier inactivity,
+    // failed deploy, or service deleted). All endpoints will 404.
+    if (res.headers.get('x-render-routing') === 'no-server') return 'suspended'
+    // Other 404/5xx — backend reachable, /health endpoint just missing.
+    // Treat as awake and let the main fetch decide.
+    return 'awake'
   } catch {
-    // Best-effort — if /health is unreachable the main fetch below
-    // will fail with a clearer message we can surface to the user.
+    return 'unreachable'
   }
 }
 
@@ -115,10 +126,26 @@ export default function SyncAllButton({ variant = 'mini', label, className = '' 
     setProgress({ current: 0, total: payload.length, label: 'מעיר את השרת…' })
 
     // Wake the Render free-tier backend first — first request after
-    // ~15min idle takes ~60s as the container boots. Without this the
-    // main fetch dies with "Failed to fetch" and the user thinks
-    // something is broken.
-    await wakeBackend()
+    // ~15min idle takes ~60s as the container boots. Short-circuit on
+    // 'suspended' so the user sees a useful error instead of waiting
+    // 2 minutes for a guaranteed-fail sync.
+    const wake = await wakeBackend()
+    if (wake === 'suspended') {
+      setError(
+        'שרת הסנכרון לא רץ ב-Render כרגע (suspended / לא פרוס). ' +
+        'התחבר ל-Render dashboard כדי לראות למה השירות נפל ולהפעיל אותו מחדש.',
+      )
+      setStage('error')
+      return
+    }
+    if (wake === 'unreachable') {
+      setError(
+        'אין חיבור לשרת. בדוק שיש חיבור לאינטרנט, ושכתובת ה-backend ב-Vercel ' +
+        'מצביעה על שירות פעיל ב-Render.',
+      )
+      setStage('error')
+      return
+    }
     setProgress({ current: 0, total: payload.length, label: payload[0]?.title ?? 'מתחיל…' })
 
     // Cheap progress animation — the backend call is a single round-trip,
