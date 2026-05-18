@@ -4212,30 +4212,18 @@ html.dark .cream-page::before { opacity: .35; }
   position: relative;
   padding-bottom: 32px;
 }
-.summaries-page .tree-root::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 2px;
-  height: 32px;
-  background: var(--lp-line);
-  animation: lineInY .4s ease-out .15s both;
-}
 .summaries-page .degree-header {
   display: flex;
   justify-content: center;
   position: relative;
 }
-.summaries-page .degree-to-sems {
-  position: absolute;
-  bottom: -32px;
-  left: 50%;
-  width: 2px;
-  height: 32px;
-  background: var(--lp-line);
-  animation: lineInY .4s ease-out .4s both;
-}
+/* CSS pseudo-element connector rules (tree-root::after, degree-to-sems
+ * + their sibling rules) were replaced by the SVG overlay painted by
+ * useSvgTreeConnectors — see app/(dashboard)/summaries/page.tsx +
+ * lib/use-svg-tree-connectors.ts.
+ *
+ * lineInY is kept here because .connector-line (the tree→panel
+ * vertical divider) still uses it for its scaleY draw-in flourish. */
 @keyframes lineInY { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 
 /* Generic node */
@@ -4302,33 +4290,13 @@ html.dark .cream-page::before { opacity: .35; }
   margin-top: 12px;
   position: relative;
 }
-.summaries-page .sem-grid::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 12%;
-  right: 12%;
-  height: 2px;
-  background: var(--lp-line);
-  animation: lineInX2 .4s ease-out .45s both;
-}
-@keyframes lineInX2 { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* .sem-grid::before / .sem-chip-wrap::before connector pseudo-elements
+ * (first iteration) lived here. Replaced by the SVG overlay. */
 .summaries-page .sem-chip-wrap {
   position: relative;
   display: flex;
   justify-content: center;
 }
-.summaries-page .sem-chip-wrap::before {
-  content: '';
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  width: 2px;
-  height: 20px;
-  background: var(--lp-line);
-  animation: lineInY .3s ease-out .5s both;
-}
-.summaries-page .sem-chip-wrap.active::before { background: var(--lp-accent); }
 
 .summaries-page .node.sem {
   padding: 9px 12px;
@@ -5542,8 +5510,6 @@ html.dark .cream-page::before { opacity: .35; }
   position: relative;
   padding-bottom: 32px;
 }
-.summaries-page .tree-root::before,
-.summaries-page .tree-root::after { display: none; }
 .summaries-page .node.root {
   background: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
   color: white;
@@ -5640,22 +5606,6 @@ html.dark .cream-page::before { opacity: .35; }
   position: relative;
 }
 .summaries-page .year-row:first-of-type { padding-top: 14px; }
-/* Continuous vertical connector through the year-row's top padding —
- * bridges the gap between the previous section's line-end (degree
- * pill drop or previous year's sem-grid bottom) and THIS year-pill's
- * top edge so the tree reads as one continuous trunk. */
-.summaries-page .year-row::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 2px;
-  height: 22px;
-  background: var(--lp-line);
-  transform: translateX(-50%);
-  z-index: 0;
-}
-.summaries-page .year-row:first-of-type::before { height: 14px; }
 .summaries-page .year-row-head { margin-bottom: 4px; position: relative; z-index: 1; }
 .summaries-page .node.year {
   background: var(--lp-bg-card);
@@ -5708,138 +5658,54 @@ html.dark .cream-page::before { opacity: .35; }
   justify-content: center;
 }
 
-/* ── Tree connector lines (TEEPO → degree → year → semester) ────────────
+/* ── Tree connectors: painted by SVG, not CSS ──────────────────────────
  *
- * Pure CSS, no SVG. Each level draws:
- *   1. A vertical line DOWN from the parent toward its children
- *   2. For multi-child levels, a horizontal line spanning the children
- *      with a vertical drop into each one
+ * The five numbered CSS-pseudo-element rules that used to live here
+ * (tree-root::after, .tree-branches.columns-2::before, .degree-column::before,
+ * .degree-header::after, .year-row-head::after, .sem-grid::before,
+ * .sem-chip-wrap::before) were replaced with an SVG overlay painted by
+ * `useSvgTreeConnectors` in app/(dashboard)/summaries/page.tsx.
  *
- * Cases handled:
- *   - 1 degree, no pill           → TEEPO straight into sem-grid
- *   - 1 degree with pill          → TEEPO → pill → (year-rows or sem-grid)
- *   - 2 degrees                   → TEEPO → horizontal → each degree pill
- *   - Multi-year inside a degree  → degree pill → vertical → year row(s)
- *   - Year row                    → year pill → vertical → sem-grid chips
+ * The CSS approach couldn't measure sibling positions and ended up
+ * misaligned across viewports / font loads / animation states; the SVG
+ * overlay uses real getBoundingClientRect() coords and a ResizeObserver
+ * to stay pixel-correct.
+ *
+ * Keep the layout padding-bottom / padding-top values on the LAYOUT
+ * rules below so the SVG has visible spacing to draw connectors into.
+ * Don't add ::before/::after lines back — they will fight the SVG.
  * ────────────────────────────────────────────────────────────────────── */
 
-/* (1) TEEPO root: vertical drop toward the level below. */
 .summaries-page .tree-root {
   position: relative;
   padding-bottom: 32px;
 }
-.summaries-page .tree-root::after {
-  content: '';
-  display: block;
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 2px;
-  height: 32px;
-  background: var(--lp-line);
-  transform: translateX(-50%);
-  z-index: 0;
-}
-
-/* (2) Multi-degree: horizontal connector across degree column tops +
- *      vertical drop from the horizontal into each column. */
 .summaries-page .tree-branches.columns-2 { position: relative; }
-.summaries-page .tree-branches.columns-2::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 25%;
-  right: 25%;
-  height: 2px;
-  background: var(--lp-line);
-  z-index: 0;
-}
 .summaries-page .tree-branches.columns-2 .degree-column { position: relative; }
-.summaries-page .tree-branches.columns-2 .degree-column::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 2px;
-  height: 32px; /* drop down to the .degree-header (which has margin-top: 32px) */
-  background: var(--lp-line);
-  transform: translateX(-50%);
-  z-index: 0;
-}
-
-/* (3) Degree pill: vertical drop toward its children (year-row OR sem-grid). */
 .summaries-page .degree-header {
   position: relative;
   padding-bottom: 22px;
 }
-.summaries-page .degree-header::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 2px;
-  height: 22px;
-  background: var(--lp-line);
-  transform: translateX(-50%);
-  z-index: 0;
-}
+.summaries-page .year-row-head { padding-bottom: 16px; }
+.summaries-page .sem-grid { position: relative; }
 
-/* (4) Year-row: vertical drop from the year pill to its sem-grid.
- *      Padding-bottom matches the bumped sem-grid padding-top so the
- *      drop line cleanly reaches the horizontal connector below. */
-.summaries-page .year-row-head {
-  padding-bottom: 16px;
+/* SVG overlay styling — the hook paints <path>/<line>/<circle.junction>
+ * into .tree-svg, and these rules give them their stroke color/width. */
+.summaries-page .tree-svg {
+  overflow: visible;
 }
-.summaries-page .year-row-head::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 2px;
-  height: 16px;
-  background: var(--lp-line);
-  transform: translateX(-50%);
-  z-index: 0;
+.summaries-page .tree-svg path,
+.summaries-page .tree-svg line {
+  fill: none;
+  stroke: var(--lp-line);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-
-/* (5) sem-grid: horizontal line across the chips + vertical drops to each.
- *      Already partially defined earlier — we just need to make sure the
- *      ::before pseudo is re-shown (an earlier hide rule was killing it). */
-.summaries-page .sem-grid {
-  position: relative;
+.summaries-page .tree-svg circle.junction {
+  fill: var(--lp-line);
+  stroke: none;
 }
-.summaries-page .sem-grid::before {
-  content: '';
-  display: block;
-  position: absolute;
-  top: 0;
-  left: 12%;
-  right: 12%;
-  height: 2px;
-  background: var(--lp-line);
-  z-index: 0;
-}
-/* Single-chip grid: no horizontal needed (would be a dot otherwise). */
-.summaries-page .sem-grid:has(> .sem-chip-wrap:only-child)::before { display: none; }
-/* 2-col year-row grid uses a narrower horizontal span (chip centers
- * are closer to the column center). */
-.summaries-page .year-row .sem-grid::before { left: 25%; right: 25%; }
-/* Vertical drop from sem-grid horizontal down to each chip. */
-.summaries-page .sem-chip-wrap::before {
-  content: '';
-  display: block;
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  width: 2px;
-  height: 20px;
-  background: var(--lp-line);
-  transform: translateX(-50%);
-  z-index: 0;
-}
-/* Highlight the chip's own drop line when selected so the eye can trace
- * the path TEEPO → degree → year → chip at a glance. */
-.summaries-page .sem-chip-wrap.active::before { background: var(--lp-accent); }
 
 /* Semester chip — each gets its own --sem-color from the rotating palette */
 .summaries-page .node.sem {

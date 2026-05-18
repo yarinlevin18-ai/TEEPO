@@ -38,6 +38,11 @@ import {
   type SemesterChip,
 } from '@/lib/summaries-degree-columns'
 import { resolveDegrees } from '@/lib/degrees'
+import {
+  useSvgTreeConnectors,
+  type ConnectorHelpers,
+  type ConnectorPoint,
+} from '@/lib/use-svg-tree-connectors'
 
 type FolderKind = 'lessons' | 'assignments' | 'notes'
 
@@ -90,6 +95,20 @@ export default function SummariesPage() {
   const [activeChipKey, setActiveChipKey] = useState<string | null>(null)
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null)
   const [activeFolderKind, setActiveFolderKind] = useState<FolderKind | null>(null)
+
+  // Refs for the SVG tree overlay. The hook fires after layout, measures
+  // node positions inside `treeWrapRef`, and paints connector paths
+  // into `treeSvgRef`. Re-runs whenever the tree shape (`columns` /
+  // `showDegreePill`) changes, plus on resize / font-load / animation
+  // settle (see lib/use-svg-tree-connectors.ts).
+  const treeWrapRef = useRef<HTMLDivElement | null>(null)
+  const treeSvgRef = useRef<SVGSVGElement | null>(null)
+  useSvgTreeConnectors(
+    treeWrapRef,
+    treeSvgRef,
+    drawSummariesTree,
+    [columns, showDegreePill],
+  )
 
   // First load: auto-pick the "current" semester chip if there is one,
   // otherwise the first chronologically. Avoids landing on an empty panel.
@@ -293,9 +312,18 @@ export default function SummariesPage() {
             course" — sister of the per-course button inside FolderSection. */}
         <BulkOrganizeLessonsCTA courses={courses} />
 
-        {/* ===== Tree (degree → semester chips) ===== */}
-        <div className="tree-wrap">
-          <TreeConnectorsSvg />
+        {/* ===== Tree (degree → semester chips) =====
+            Connectors are painted into <svg.tree-svg> by the
+            useSvgTreeConnectors hook above, after layout. Don't add CSS
+            ::before/::after lines back — they can't measure sibling
+            positions and end up misaligned across viewports. */}
+        <div className="tree-wrap" ref={treeWrapRef}>
+          <svg
+            ref={treeSvgRef}
+            className="tree-svg"
+            aria-hidden
+            xmlns="http://www.w3.org/2000/svg"
+          />
 
           <div className="tree-root">
             <button
@@ -435,9 +463,116 @@ export default function SummariesPage() {
   )
 }
 
-/** Empty SVG placeholder — keeps the CSS hook for future connector-drawing.
- *  The mockup draws lines dynamically based on element positions; v1 ships
- *  with the simpler CSS-only connectors. */
+/**
+ * Paint the summaries tree connectors. Called by `useSvgTreeConnectors`
+ * inside SummariesPage after every layout change. Direct port of the
+ * algorithm at the bottom of `teepo-design/mockup_summaries.html` —
+ * straight lines plus horizontal joiner bars (no curved elbows; those
+ * belong to the drive-organize variant in PR #4).
+ *
+ * Three branching cases, picked at runtime based on what's in the DOM:
+ *   (a) No degree pill (single nameless degree)
+ *       → root → joiner bar → sem chips directly
+ *   (b) Degree pill, flat (single year of study)
+ *       → root → joiner → degree pills → sem chips
+ *   (c) Degree pill, multi-year
+ *       → root → joiner → degree pills → year-pill → sem chips
+ *
+ * Each parent with >1 children fans out via a horizontal joiner bar,
+ * matching the mockup. A single child gets a straight line (no joiner).
+ */
+function drawSummariesTree(h: ConnectorHelpers): void {
+  const root = h.wrap.querySelector('.tree-root .node')
+  if (!root) return
+  const rb = h.center(root, 'bottom')
+
+  const degrees = Array.from(
+    h.wrap.querySelectorAll('.degree-header .node.degree'),
+  ) as HTMLElement[]
+
+  // Case (a): no degree pill — root connects straight to all sem chips.
+  if (degrees.length === 0) {
+    const chips = Array.from(
+      h.wrap.querySelectorAll('.sem-chip-wrap .node.sem'),
+    ) as HTMLElement[]
+    fanOut(h, rb, chips.map(c => h.center(c, 'top')))
+    return
+  }
+
+  // Cases (b) and (c): root → degree pills.
+  fanOut(h, rb, degrees.map(d => h.center(d, 'top')))
+
+  // Then for each degree column: degree → (year-row | flat sem-grid).
+  h.wrap.querySelectorAll('.degree-column').forEach((col) => {
+    const deg = col.querySelector('.degree-header .node')
+    if (!deg) return
+    const db = h.center(deg, 'bottom')
+
+    // `:scope >` constrains the year-rows to the current degree-column,
+    // so a degree with year rows doesn't accidentally grab another
+    // column's children.
+    const yearRows = Array.from(col.querySelectorAll(':scope > .year-row')) as HTMLElement[]
+    if (yearRows.length === 0) {
+      // Flat: degree → sem chips directly.
+      const chips = Array.from(
+        col.querySelectorAll('.sem-chip-wrap .node.sem'),
+      ) as HTMLElement[]
+      fanOut(h, db, chips.map(c => h.center(c, 'top')))
+      return
+    }
+
+    // Multi-year: degree → year-pills (one per year row), then each
+    // year-pill → its sem chips.
+    const yearPills = yearRows
+      .map(yr => yr.querySelector('.year-row-head .node.year'))
+      .filter((n): n is HTMLElement => n != null)
+    fanOut(h, db, yearPills.map(p => h.center(p, 'top')))
+
+    yearRows.forEach((yr) => {
+      const yearPill = yr.querySelector('.year-row-head .node.year')
+      if (!yearPill) return
+      const yb = h.center(yearPill, 'bottom')
+      const chips = Array.from(
+        yr.querySelectorAll('.sem-chip-wrap .node.sem'),
+      ) as HTMLElement[]
+      fanOut(h, yb, chips.map(c => h.center(c, 'top')))
+    })
+  })
+}
+
+/**
+ * Connect a single parent point to N children using a horizontal joiner
+ * bar. With 1 child, degenerates to a straight line. With ≥2, paints:
+ *   - parent → joiner Y (vertical drop)
+ *   - joiner bar across child X span (horizontal)
+ *   - junction dot at the parent's X on the joiner
+ *   - vertical drop from joiner to each child's top
+ */
+function fanOut(
+  h: ConnectorHelpers,
+  parent: ConnectorPoint,
+  childTops: ConnectorPoint[],
+): void {
+  if (childTops.length === 0) return
+  if (childTops.length === 1) {
+    h.line(parent.x, parent.y, childTops[0].x, childTops[0].y)
+    return
+  }
+  const minChildY = Math.min(...childTops.map(c => c.y))
+  const joinerY = (parent.y + minChildY) / 2
+  // Parent → joiner
+  h.line(parent.x, parent.y, parent.x, joinerY)
+  // Horizontal joiner bar
+  const xs = childTops.map(c => c.x)
+  h.line(Math.min(...xs), joinerY, Math.max(...xs), joinerY)
+  // Junction dot where parent's vertical meets the bar
+  h.dot(parent.x, joinerY)
+  // Joiner → each child
+  childTops.forEach((c) => {
+    h.line(c.x, joinerY, c.x, c.y)
+  })
+}
+
 /** Single semester chip rendered inside any sem-grid. Extracted so the
  *  flat-degree and per-year layouts share the exact same chip markup. */
 function SemChip({
@@ -471,11 +606,6 @@ function SemChip({
   )
 }
 
-function TreeConnectorsSvg() {
-  return (
-    <svg className="tree-svg" aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" />
-  )
-}
 
 // ── Below-tree panels ──────────────────────────────────────────────────
 
