@@ -13,6 +13,12 @@
  *
  * This is intentionally a server component — no client hooks needed; the
  * video element auto-plays via the native HTML attribute.
+ *
+ * v3 audit (PR #168) — verified against mockup_loading.html. Structure
+ * + animations match the mockup exactly. One intentional swap: we render
+ * the wordmark as an <img> (teepo-wordmark.svg) instead of the mockup's
+ * Fredoka 42px text. Using the SVG keeps the brand mark consistent with
+ * TopNav / Logo / landing — all of which use the same wordmark asset.
  */
 export default function Loading() {
   return (
