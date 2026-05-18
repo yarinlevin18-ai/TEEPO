@@ -5615,9 +5615,30 @@ html.dark .cream-page::before { opacity: .35; }
   flex-direction: column;
   align-items: center;
   width: 100%;
-  margin-top: 22px;
+  /* Use padding-top instead of margin-top so the ::before connector
+   * line below has space to bridge between the previous section's
+   * line-end and this year-row's pill — keeping the vertical
+   * connector continuous through the whole degree column. */
+  padding-top: 22px;
+  position: relative;
 }
-.summaries-page .year-row:first-of-type { margin-top: 14px; }
+.summaries-page .year-row:first-of-type { padding-top: 14px; }
+/* Continuous vertical connector through the year-row's top padding —
+ * bridges the gap between the previous section's line-end (degree
+ * pill drop or previous year's sem-grid bottom) and THIS year-pill's
+ * top edge so the tree reads as one continuous trunk. */
+.summaries-page .year-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 22px;
+  background: var(--lp-line);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+.summaries-page .year-row:first-of-type::before { height: 14px; }
 .summaries-page .year-row-head { margin-bottom: 4px; position: relative; z-index: 1; }
 .summaries-page .node.year {
   background: var(--lp-bg-card);
@@ -5641,12 +5662,18 @@ html.dark .cream-page::before { opacity: .35; }
   border-radius: 999px;
   font-weight: 700;
 }
-/* Sem-grid nested under a year row uses 2 cols so each year's "semester
- * א + semester ב" pair reads naturally and stays narrow inside the
- * (already half-width) degree column. */
+/* Sem-grid nested under a year row: 2 cols so each year's
+ * "semester א + semester ב" pair reads naturally and stays narrow
+ * inside the (already half-width) degree column. Padding-top brings
+ * the horizontal connector into clear visual space below the year
+ * pill instead of crowding against its bottom edge. */
 .summaries-page .year-row .sem-grid {
   grid-template-columns: repeat(2, 1fr);
-  padding-top: 8px;
+  padding-top: 16px;
+  /* Constrain chip width so 2-col chips don't look stretched in the
+   * already-narrow degree column (50% of total page width). */
+  max-width: min(420px, 100%);
+  margin: 0 auto;
 }
 
 /* Semester grid — flat 3-column chip layout per degree */
@@ -5740,9 +5767,11 @@ html.dark .cream-page::before { opacity: .35; }
   z-index: 0;
 }
 
-/* (4) Year-row: vertical drop from the year pill to its sem-grid. */
+/* (4) Year-row: vertical drop from the year pill to its sem-grid.
+ *      Padding-bottom matches the bumped sem-grid padding-top so the
+ *      drop line cleanly reaches the horizontal connector below. */
 .summaries-page .year-row-head {
-  padding-bottom: 14px;
+  padding-bottom: 16px;
 }
 .summaries-page .year-row-head::after {
   content: '';
@@ -5750,7 +5779,7 @@ html.dark .cream-page::before { opacity: .35; }
   bottom: 0;
   left: 50%;
   width: 2px;
-  height: 14px;
+  height: 16px;
   background: var(--lp-line);
   transform: translateX(-50%);
   z-index: 0;
