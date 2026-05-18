@@ -9,6 +9,29 @@ import DriveConnectionBanner from '@/components/DriveConnectionBanner'
 import WakeupBanner from '@/components/WakeupBanner'
 import OnboardingGate from '@/components/onboarding/OnboardingGate'
 
+/** Map pathname → Hebrew tab label. Falls back to '' (root layout's
+ *  fallback) for unknown routes so we don't accidentally clobber it. */
+function pageTitleFor(pathname: string): string {
+  // Sub-routes match too — /courses/123 → "קורסים", /summaries?course=x → "המוח"
+  if (pathname.startsWith('/dashboard'))      return 'בית'
+  if (pathname.startsWith('/summaries'))      return 'המוח'
+  if (pathname.startsWith('/tasks'))          return 'מטלות'
+  if (pathname.startsWith('/todos'))          return 'משימות'
+  if (pathname.startsWith('/assignments'))    return 'מטלות ועבודות'
+  if (pathname.startsWith('/notes'))          return 'סיכומים'
+  if (pathname.startsWith('/courses'))        return 'הקורסים שלי'
+  if (pathname.startsWith('/credits'))        return 'מעקב נק״ז'
+  if (pathname.startsWith('/university'))     return 'על האוניברסיטה'
+  if (pathname.startsWith('/settings'))       return 'הגדרות'
+  if (pathname.startsWith('/moodle'))         return 'Moodle'
+  if (pathname.startsWith('/setup'))          return 'התחלה'
+  if (pathname.startsWith('/academic'))       return 'אקדמי'
+  if (pathname.startsWith('/ai-tools'))       return 'כלי AI'
+  if (pathname.startsWith('/diagnostics'))    return 'אבחון'
+  if (pathname.startsWith('/study-buddy'))    return 'חבר ללמידה'
+  return ''
+}
+
 /**
  * Dashboard shell — TEEPO locked design.
  *
@@ -35,6 +58,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Close mobile drawer on route change
   useEffect(() => {
     setMobileOpen(false)
+  }, [pathname])
+
+  // Per-route browser-tab title. Root layout sets a static fallback
+  // ("TEEPO — הסמסטר שלך, מאורגן") that every dashboard route used to
+  // share — so the browser tab gave no hint of where you were. Mapping
+  // pathname → label here is cheaper than adding a metadata-exporting
+  // server layout to every route folder.
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const label = pageTitleFor(pathname)
+    document.title = label ? `${label} — TEEPO` : 'TEEPO — הסמסטר שלך, מאורגן'
   }, [pathname])
 
   if (loading) {
