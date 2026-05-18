@@ -29,7 +29,7 @@ import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, CheckCircle2, Circle, BookOpen, Sparkles, MessageSquare,
-  ChevronLeft, ChevronRight, Lightbulb, X, FileText,
+  ChevronLeft, ChevronRight, X, FileText,
   User, ExternalLink, Plus, Link as LinkIcon, Mail, Users,
 } from 'lucide-react'
 import { useDB, useCourse, useLessons } from '@/lib/db-context'
@@ -37,6 +37,7 @@ import NotebookPaper, { type NotebookPrefs } from '@/components/course/NotebookP
 import LessonNotebookChat from '@/components/course/LessonNotebookChat'
 import LessonRecorder from '@/components/course/LessonRecorder'
 import { TasksMini, AssignmentsMini } from '@/components/course/CourseTabs'
+import { FolderSection } from '@/components/summaries/CourseDrivePanel'
 import {
   runNotebookAi,
   promptContinue, promptSummarize, promptExpand, promptFix, promptToList,
@@ -88,23 +89,22 @@ export default function CoursePage() {
   // ── AI panel state: silent by default, user opens when needed ────
   const [aiOpen, setAiOpen] = useState(false)
 
-  // ── Whisper (margin hint) — stub, shows up on long idle ─────────
-  const [whisperShown, setWhisperShown] = useState(false)
-  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const triggerIdle = () => {
-    if (idleTimer.current) clearTimeout(idleTimer.current)
-    idleTimer.current = setTimeout(() => setWhisperShown(true), 45_000)
-  }
-  useEffect(() => { triggerIdle(); return () => { if (idleTimer.current) clearTimeout(idleTimer.current) } }, [activeId])
+  // Earlier versions had two AI stubs here — an idle "whisper" and an
+  // end-of-chapter "coach" button — both rendered placeholder Hebrew
+  // strings instead of calling the AI. Removed because they showed up
+  // every visit and eroded trust. The real per-chapter AI surface lives
+  // in <LessonNotebookChat /> + the in-editor `/` slash menu.
 
-  // ── End-of-chapter coach stub ────────────────────────────
-  const [coachMsg, setCoachMsg] = useState<string | null>(null)
-  const runCoach = () => {
-    setCoachMsg(
-      'זה סטאב של מאמן סוף פרק. בגרסה האמיתית, ה-AI יעבור על הסיכום ' +
-      'שלך, יציין שני דברים טובים וישאל על משהו אחד שחסר — בלי לשכתב לך.',
-    )
-  }
+  // Lightweight transient notice — replaces the old `coachMsg` slot for
+  // legitimate use cases like "summary inserted" or "create-lesson
+  // failed". Auto-dismisses after 4s; not AI-related.
+  const [notice, setNotice] = useState<string | null>(null)
+  useEffect(() => {
+    if (!notice) return
+    const id = setTimeout(() => setNotice(null), 4000)
+    return () => clearTimeout(id)
+  }, [notice])
+
 
   // ── Save state + editor stats (shown in the NotebookPaper footer) ──
   const [saveState, setSaveState] = useState<'saving' | 'saved' | null>(null)
@@ -122,7 +122,6 @@ export default function CoursePage() {
       // Hide "saved" after a moment so the footer returns to empty.
       savedTimer.current = setTimeout(() => setSaveState(null), 1600)
     }, 400)
-    triggerIdle()
   }
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current) }, [])
 
@@ -144,7 +143,7 @@ export default function CoursePage() {
     // If the user was looking at a different chapter, jump to the one we
     // just updated so they see the inserted summary.
     if (activeLesson?.id !== targetLessonId) setActiveId(targetLessonId)
-    setCoachMsg(`הסיכום של ההקלטה נוסף לפרק "${target.title}".`)
+    setNotice(`הסיכום של ההקלטה נוסף לפרק "${target.title}".`)
   }
 
   // ── AI actions — wire the inline editor affordances to the notebook
@@ -186,7 +185,7 @@ export default function CoursePage() {
       const created = await dbCreateLesson(courseId, { title: 'פרק 1' })
       setActiveId(created.id)
     } catch {
-      setCoachMsg('שגיאה ביצירת פרק. נסה שוב.')
+      setNotice('שגיאה ביצירת פרק. נסה שוב.')
     } finally {
       setCreating(false)
     }
@@ -221,10 +220,15 @@ export default function CoursePage() {
         </button>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl md:text-2xl font-bold truncate">{course.title}</h1>
-          <div className="text-xs text-ink-muted mt-0.5">
-            {course.academic_year && `שנת ${course.academic_year} · `}
-            {course.semester && `סמסטר ${course.semester} · `}
-            {completedCount} מתוך {lessons.length} פרקים הושלמו
+          <div className="text-xs text-ink-muted mt-0.5 flex items-center gap-2 flex-wrap">
+            {course.shortname && (
+              <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-white/5 border border-white/8" dir="ltr">
+                {course.shortname}
+              </span>
+            )}
+            {course.academic_year && <span>שנת {course.academic_year}</span>}
+            {course.semester && <span>· סמסטר {course.semester}</span>}
+            <span>· {completedCount} מתוך {lessons.length} פרקים הושלמו</span>
           </div>
         </div>
       </div>
@@ -332,9 +336,29 @@ export default function CoursePage() {
             </div>
           )}
 
-          {/* Chapter actions strip */}
+          {/* Transient notice (insert-summary success, create-lesson error, etc.) */}
+          <AnimatePresence>
+            {notice && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className="mt-3 glass rounded-xl p-3 text-xs flex items-start gap-2 border border-emerald-500/20"
+              >
+                <CheckCircle2 size={14} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">{notice}</div>
+                <button onClick={() => setNotice(null)} className="text-ink-muted hover:text-ink">
+                  <X size={13} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Chapter actions strip — just the "mark done" toggle now that
+              the coach stub is gone. Real AI lives in the side chat
+              panel + the in-editor `/` slash menu. */}
           {activeLesson && (
-            <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
               <button
                 onClick={toggleDone}
                 className={`px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors ${
@@ -346,56 +370,8 @@ export default function CoursePage() {
                 {activeLesson.is_completed ? <CheckCircle2 size={13} /> : <Circle size={13} />}
                 {activeLesson.is_completed ? 'פרק הושלם' : 'סמן פרק כהושלם'}
               </button>
-              <button
-                onClick={runCoach}
-                className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 bg-violet-500/15 text-violet-300 border border-violet-500/20 hover:bg-violet-500/25"
-                title="קבל משוב קצר על מה שכתבת"
-              >
-                <Sparkles size={13} /> קבל משוב על הפרק
-              </button>
             </div>
           )}
-
-          {/* Coach message (stub) */}
-          <AnimatePresence>
-            {coachMsg && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                className="mt-3 glass rounded-xl p-3 text-xs flex items-start gap-2 border border-violet-500/20"
-              >
-                <Sparkles size={14} className="text-violet-400 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">{coachMsg}</div>
-                <button onClick={() => setCoachMsg(null)} className="text-ink-muted hover:text-ink">
-                  <X size={13} />
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Margin whisper (stub — shows after idle) */}
-          <AnimatePresence>
-            {whisperShown && activeLesson && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="absolute -left-3 top-24 w-52 p-3 rounded-xl text-[11px] glass border border-amber-400/20 hidden xl:block"
-                style={{ background: 'rgba(251, 191, 36, 0.05)' }}
-              >
-                <div className="flex items-start gap-1.5">
-                  <Lightbulb size={12} className="text-amber-400 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 text-amber-200/90">
-                    (סטאב לחישה) נראה שעצרת לרגע — תרצה שאסביר משהו?
-                  </div>
-                  <button onClick={() => setWhisperShown(false)} className="text-ink-muted hover:text-ink">
-                    <X size={11} />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
         {/* AI panel (silent until opened) */}
@@ -472,15 +448,49 @@ export default function CoursePage() {
           </span>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <MoodleCard icon={FileText} title="קבצים רשמיים" hint="PDF מהקורס">
-            <StubList items={[
-              'הרצאה 1 — מבוא',
-              'הרצאה 2 — בסיסי',
-              'תרגול שבוע 1',
-            ]} emptyText="אין עדיין קבצים." />
-          </MoodleCard>
+        {/* Compact metadata banner — description + Moodle date range +
+            category. Only renders when there's at least one populated
+            field so brand-new manual courses don't get an empty box. */}
+        {(course.description || course.moodle_startdate || course.moodle_enddate || course.category_name) && (
+          <div className="mb-4 rounded-xl bg-white/[0.02] border border-white/8 p-4 space-y-2">
+            {course.description && (
+              <p className="text-xs text-ink-soft leading-relaxed">{course.description}</p>
+            )}
+            <div className="flex flex-wrap gap-3 text-[11px] text-ink-muted">
+              {course.category_name && (
+                <span className="inline-flex items-center gap-1">
+                  <BookOpen size={10} />
+                  {course.category_name}
+                </span>
+              )}
+              {(course.moodle_startdate || course.moodle_enddate) && (
+                <span className="inline-flex items-center gap-1" dir="ltr">
+                  {course.moodle_startdate && new Date(course.moodle_startdate * 1000).toLocaleDateString('he-IL')}
+                  {course.moodle_startdate && course.moodle_enddate && ' – '}
+                  {course.moodle_enddate && new Date(course.moodle_enddate * 1000).toLocaleDateString('he-IL')}
+                </span>
+              )}
+              {course.source_url && (
+                <a
+                  href={course.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300"
+                >
+                  <ExternalLink size={10} /> פתח ב-Moodle
+                </a>
+              )}
+            </div>
+          </div>
+        )}
 
+        {/* Drive folder shelf — live listing of the course's שיעורים,
+            מטלות, סיכומים folders. Replaces the old fake-data stub list.
+            Falls back to a "create folders on /summaries" hint when the
+            course hasn't been provisioned in Drive yet. */}
+        <CourseDriveShelf course={course} />
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 mt-4">
           <MoodleCard icon={FileText} title="סילבוס" hint="מסמך הקורס הרשמי">
             {course.syllabus_url ? (
               <a
@@ -593,19 +603,39 @@ function summaryToHtml(text: string, dateLabel: string): string {
   return html
 }
 
-function StubList({ items, emptyText }: { items: string[]; emptyText: string }) {
-  if (items.length === 0) {
-    return <div className="text-[11px] text-ink-muted">{emptyText}</div>
+/**
+ * Drive folder shelf — surfaces the course's שיעורים / מטלות / סיכומים
+ * directly on the course page. Replaces the fake hardcoded "קבצים
+ * רשמיים" list with a live FolderSection per folder (same component
+ * used on /summaries — upload, refresh, delete already work).
+ *
+ * When the course has no drive_folder_ids yet (never been provisioned),
+ * we show a one-line hint pointing the user to /summaries where the
+ * "צור תיקיות" flow lives.
+ */
+function CourseDriveShelf({ course }: { course: import('@/types').Course }) {
+  const ids = course.drive_folder_ids
+  if (!ids?.course) {
+    return (
+      <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5 text-center">
+        <p className="text-xs text-ink-muted leading-relaxed mb-2">
+          תיקיות הקורס עדיין לא נוצרו ב-Drive.
+        </p>
+        <a
+          href="/summaries"
+          className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300"
+        >
+          לחץ ליצירת התיקיות בעמוד המוח <ArrowRight size={12} />
+        </a>
+      </div>
+    )
   }
   return (
-    <ul className="space-y-1">
-      {items.map((t, i) => (
-        <li key={i} className="text-[11px] text-ink-muted flex items-start gap-1.5">
-          <span className="text-indigo-400 mt-0.5">·</span>
-          <span className="flex-1">{t}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="grid gap-3 md:grid-cols-3">
+      <FolderSection label="שיעורים"  hint="הרצאות, תרגולים, מצגות"     folderId={ids.lessons ?? null} />
+      <FolderSection label="מטלות"    hint="תרגילים, פרויקטים, בחנים"   folderId={ids.assignments ?? null} />
+      <FolderSection label="סיכומים" hint="הסיכומים האישיים שלך"         folderId={ids.notes ?? null} />
+    </div>
   )
 }
 
