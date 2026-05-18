@@ -27,3 +27,9 @@ services:
         value: claude-sonnet-4-6
       - key: RENDER
         value: "true"
+      # Suppress Flask's debug mode + dev reloader on Render. Was
+      # defaulting to "development" because we never set it, which
+      # turned on the debug reloader and broke Render's process tracking
+      # (container kept being marked unhealthy / no-server).
+      - key: FLASK_ENV
+        value: production
