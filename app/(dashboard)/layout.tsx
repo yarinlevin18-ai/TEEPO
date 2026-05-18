@@ -68,7 +68,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (typeof document === 'undefined') return
     const label = pageTitleFor(pathname)
-    document.title = label ? `${label} — TEEPO` : 'TEEPO — הסמסטר שלך, מאורגן'
+    // Brand-first format: "teepo — <page>". Matches the in-page wordmark
+    // (lowercase 'teepo') and puts the brand where the tab favicon sits.
+    document.title = label ? `teepo — ${label}` : 'teepo — הסמסטר שלך, מאורגן'
   }, [pathname])
 
   if (loading) {

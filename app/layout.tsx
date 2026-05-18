@@ -5,11 +5,17 @@ import { ThemeProvider } from '@/lib/theme-context'
 import ErrorBoundary from '@/components/ErrorBoundary'
 
 export const metadata: Metadata = {
-  title: 'TEEPO — הסמסטר שלך, מאורגן',
+  title: 'teepo — הסמסטר שלך, מאורגן',
   description: 'פלטפורמת לימודים חכמה לסטודנטים. הסמסטר שלך — במקום אחד.',
   manifest: '/manifest.json',
   icons: {
-    icon: '/brand/teepo-256px.png',
+    // SVG book favicon (matches the in-page <Logo /> book glyph). Browsers
+    // that prefer raster fall back to the wordmark PNG. Apple touch icon
+    // stays on the 512 wordmark for larger home-screen tiles.
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/brand/teepo-256px.png', type: 'image/png' },
+    ],
     apple: '/brand/teepo-512px.png',
   },
 }
