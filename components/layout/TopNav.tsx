@@ -17,7 +17,7 @@
  */
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, CheckSquare, ListChecks, Brain,
   GraduationCap, Building2, Settings, Menu, X, LogOut,
@@ -86,9 +86,15 @@ export default function TopNav({ mobileOpen = false, onMobileToggle }: Props) {
   const initials = resolveInitials(nameSources)
   const displayName = resolveDisplayName(nameSources)
   const universityShort = universityCode === 'tau' ? 'TAU' : universityCode === 'bgu' ? 'BGU' : ''
-  // Moodle connection state isn't part of DriveDB yet — settings carries
-  // it under an unstructured slot until /moodle gets its v2 wiring.
+  // Live-mirrored by useMoodleStatus (mounted in (dashboard)/layout.tsx) —
+  // updates every 90s while the tab is visible so the pill reflects the
+  // real backend session, not a stale "connected once a week ago" cache.
   const moodleConnected = Boolean((db?.settings as any)?.moodle_connected)
+  // Last automatic background sync — bumped by useAutoSync. Drives the
+  // tiny "מסונכרן · לפני N דק׳" freshness label below the pill so users
+  // can tell whether the data they're looking at is fresh.
+  const lastAutoSyncAt = (db?.settings as any)?.last_auto_sync_at as string | undefined
+  const freshness = useRelativeTime(lastAutoSyncAt)
 
   function NavLink({ href, icon: Icon, label, count }: any) {
     const active = isActive(href)
@@ -120,9 +126,18 @@ export default function TopNav({ mobileOpen = false, onMobileToggle }: Props) {
 
         <div className="tn-spacer" />
 
-        <div className="moodle-pill tn-desktop" title={moodleConnected ? 'Moodle מסונכרן' : 'Moodle לא מחובר'}>
+        <div
+          className="moodle-pill tn-desktop"
+          title={moodleConnected
+            ? `Moodle מחובר${freshness ? ` · עודכן ${freshness}` : ''}`
+            : 'Moodle לא מחובר — לחץ "מסנכרן" או היכנס ל-/moodle כדי לחדש את החיבור'}
+        >
           <span className={`pulse ${moodleConnected ? 'on' : 'off'}`} aria-hidden />
-          <span>{moodleConnected ? 'Moodle מסונכרן' : 'Moodle לא מחובר'}</span>
+          <span>
+            {moodleConnected
+              ? (freshness ? `מסונכרן · ${freshness}` : 'Moodle מסונכרן')
+              : 'Moodle לא מחובר'}
+          </span>
         </div>
 
         <div className="tn-desktop">
@@ -170,7 +185,11 @@ export default function TopNav({ mobileOpen = false, onMobileToggle }: Props) {
             <div className="tn-drawer-foot">
               <div className="moodle-pill">
                 <span className={`pulse ${moodleConnected ? 'on' : 'off'}`} aria-hidden />
-                <span>{moodleConnected ? 'Moodle מסונכרן' : 'Moodle לא מחובר'}</span>
+                <span>
+                  {moodleConnected
+                    ? (freshness ? `מסונכרן · ${freshness}` : 'Moodle מסונכרן')
+                    : 'Moodle לא מחובר'}
+                </span>
               </div>
               <SyncAllButton variant="mini" />
               <button className="tn-signout" onClick={() => signOut()}>
@@ -182,4 +201,44 @@ export default function TopNav({ mobileOpen = false, onMobileToggle }: Props) {
       )}
     </>
   )
+}
+
+/**
+ * Render a "מסונכרן · לפני N דק׳" style label that auto-refreshes
+ * itself every minute. Returns null when there's nothing to show
+ * (no timestamp, or unparseable) so the caller can conditionally
+ * render the static label instead.
+ *
+ * Re-renders are cheap (one state + one interval). Pauses the timer
+ * once the gap is >24h since the minute-granularity update no longer
+ * adds information (we round to days at that point).
+ */
+function useRelativeTime(iso: string | undefined): string | null {
+  const [tick, setTick] = useState(0)
+
+  useEffect(() => {
+    if (!iso) return
+    // 60s update granularity matches our string output (minutes, hours,
+    // days). A timer that ticks every 5s would just thrash for no UI gain.
+    const id = setInterval(() => setTick((t) => t + 1), 60_000)
+    return () => clearInterval(id)
+  }, [iso])
+
+  if (!iso) return null
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return null
+
+  // `tick` is intentionally read but unused — it just forces this fn to
+  // re-evaluate every minute via the parent component's re-render.
+  void tick
+
+  const diffSec = Math.max(0, Math.round((Date.now() - then) / 1000))
+  if (diffSec < 30) return 'כרגע'
+  if (diffSec < 90) return 'לפני דקה'
+  const diffMin = Math.round(diffSec / 60)
+  if (diffMin < 60) return `לפני ${diffMin} דק׳`
+  const diffH = Math.round(diffMin / 60)
+  if (diffH < 24) return `לפני ${diffH} שע׳`
+  const diffD = Math.round(diffH / 24)
+  return `לפני ${diffD} ימים`
 }

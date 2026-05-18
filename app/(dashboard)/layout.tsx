@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
-import { DBProvider } from '@/lib/db-context'
+import { DBProvider, useDB } from '@/lib/db-context'
 import TopNav from '@/components/layout/TopNav'
 import DriveConnectionBanner from '@/components/DriveConnectionBanner'
 import WakeupBanner from '@/components/WakeupBanner'
 import OnboardingGate from '@/components/onboarding/OnboardingGate'
+import { useMoodleStatus } from '@/lib/use-moodle-status'
+import { useAutoSync } from '@/lib/use-auto-sync'
 
 /** Map pathname → Hebrew tab label. Falls back to '' (root layout's
  *  fallback) for unknown routes so we don't accidentally clobber it. */
@@ -85,14 +87,52 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <DBProvider>
-      <div className="qa min-h-screen flex flex-col cream-page">
-        <TopNav mobileOpen={mobileOpen} onMobileToggle={() => setMobileOpen(o => !o)} />
-        <main className="flex-1 relative">
-          <DriveConnectionBanner />
-          <WakeupBanner />
-          <OnboardingGate>{children}</OnboardingGate>
-        </main>
-      </div>
+      <DashboardShell mobileOpen={mobileOpen} setMobileOpen={setMobileOpen}>
+        {children}
+      </DashboardShell>
     </DBProvider>
+  )
+}
+
+/**
+ * Inner shell that lives INSIDE DBProvider so it can mount the
+ * background sync hooks (which call useDB). Splitting it out keeps
+ * the outer layout free of DB concerns and lets the auth/router
+ * effects above run without waiting for Drive to hydrate.
+ */
+function DashboardShell({
+  mobileOpen,
+  setMobileOpen,
+  children,
+}: {
+  mobileOpen: boolean
+  setMobileOpen: (next: boolean | ((prev: boolean) => boolean)) => void
+  children: React.ReactNode
+}) {
+  // Mirror live backend Moodle session state into db.settings so the
+  // TopNav pill is truthful (was static-from-cache before; lied after
+  // backend sessions expired). Runs every 90s while tab is visible.
+  useMoodleStatus()
+
+  // Read the (now live) connection state from settings — passed into
+  // useAutoSync so we don't waste a Render wake when Moodle is known
+  // to be disconnected.
+  const { db } = useDB() as any
+  const moodleConnected = Boolean(db?.settings?.moodle_connected)
+
+  // Fire one silent sync 30s after the dashboard mounts, if the last
+  // automatic sync was more than 6 hours ago. Cross-tab locked via
+  // localStorage so concurrent tabs don't all hit the backend.
+  useAutoSync({ moodleConnected })
+
+  return (
+    <div className="qa min-h-screen flex flex-col cream-page">
+      <TopNav mobileOpen={mobileOpen} onMobileToggle={() => setMobileOpen(o => !o)} />
+      <main className="flex-1 relative">
+        <DriveConnectionBanner />
+        <WakeupBanner />
+        <OnboardingGate>{children}</OnboardingGate>
+      </main>
+    </div>
   )
 }
