@@ -2842,8 +2842,8 @@ html.dark .cream-page::before { opacity: .35; }
   left: 3px;
   right: 3px;
   border-radius: 8px;
-  padding: 4px 10px;
-  font-size: 12px;
+  padding: 4px 8px;
+  font-size: 11.5px;
   font-weight: 700;
   overflow: hidden;
   border: 0;
@@ -2852,17 +2852,28 @@ html.dark .cream-page::before { opacity: .35; }
   backdrop-filter: blur(6px);
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* Anchor content to the top so multi-line titles read naturally instead
+   * of centering and bleeding past short events. */
+  justify-content: flex-start;
   color: var(--lp-ink-soft);
   line-height: 1.2;
   text-decoration: none;
   transition: transform .15s ease;
   /* Events span past their starting cell — let them sit above the gridlines. */
   z-index: 1;
+  /* Hovered event grows to fit the full title even if it would otherwise
+   * be cut off — defined further down so the rule overrides the height
+   * inline style. */
 }
 .dashboard-v2 .cal-event:hover {
-  transform: scale(1.03);
-  z-index: 2;
+  z-index: 5;
+  /* Hover grows the pill to fit the full title (overrides the inline
+   * pixel height that's tuned for the time slot). The min-height
+   * preserves the original slot height so a short event doesn't
+   * collapse smaller; height: auto lets longer titles push it taller. */
+  height: auto !important;
+  min-height: 22px;
+  box-shadow: 0 8px 20px -4px rgba(0, 0, 0, .25);
 }
 
 /* Current-time indicator — thin red line at "now" inside today's column.
@@ -2907,9 +2918,15 @@ html.dark .cream-page::before { opacity: .35; }
 }
 .dashboard-v2 .cal-event-title {
   display: block;
+  /* Wrap the full title across as many lines as the event height allows
+   * instead of cutting it with an ellipsis after 1 line. Word-break
+   * lets long Hebrew/English words split mid-word if needed so a
+   * 50%-width overlapping event still shows its name. */
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
 }
 /* Events that match a TEEPO course get a subtle accent ring so the user
  * knows clicking opens the course in /summaries (vs. a stranger event
