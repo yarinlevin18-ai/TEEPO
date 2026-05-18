@@ -6,6 +6,13 @@
  * Implementation of teepo-design/mockup_login.html using locked tokens.
  * Domain restriction notice expanded per CLAUDE_CODE_PROMPT.md to mention
  * both BGU + TAU email patterns.
+ *
+ * v3 audit (PR #168) — verified against mockup_login.html. The structure
+ * (auth-card with eyebrow → h1 → sub → google-btn → bgu-restriction →
+ * next-list → footer pills) matches the mockup; the user-facing copy is
+ * intentionally extended for TAU support so we don't regress that.
+ * If you're updating, keep the dual-university copy: the mockup is a
+ * BGU-only static example, not a constraint.
  */
 
 import { useState, useEffect } from 'react'
