@@ -21,6 +21,7 @@ import type {
   UserSettings,
   StudentProfile,
   StudentCourse,
+  Announcement,
 } from '@/types'
 
 // Re-export for backward compat — existing callers import these from
@@ -70,6 +71,11 @@ export interface DriveDB {
   student_profile?: StudentProfile
   /** Courses the student has taken / is taking / plans to take, for credits tracking. */
   student_courses?: StudentCourse[]
+  /** Recent Moodle forum announcements, pulled by useAutoSync.
+   *  Capped to the most-recent 50 across all courses (older are pruned
+   *  when newer arrive) — keeps db.json size bounded. Sorted by
+   *  posted_at descending. Optional → undefined treated as []. */
+  announcements?: Announcement[]
 }
 
 export const EMPTY_DB: DriveDB = {
@@ -82,6 +88,7 @@ export const EMPTY_DB: DriveDB = {
   notes: [],
   settings: {},
   student_courses: [],
+  announcements: [],
 }
 
 // ── Migrations ────────────────────────────────────────────────

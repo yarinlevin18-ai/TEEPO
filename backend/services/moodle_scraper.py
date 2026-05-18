@@ -770,6 +770,196 @@ def scrape_course_materials(course_url: str) -> dict:
         return {"status": "error", "message": str(e)}
 
 
+# ───────────────────────────────────────────────────────────────────────────
+# Announcements scraper — pulls posts from a course's news / announcements
+# forum(s) so the dashboard can surface "what changed since last login".
+#
+# Moodle's data model:
+#   Course → Forums (multiple) → Discussions → Posts
+#
+# We only pull "news" type forums (one-way teacher→student broadcast,
+# canonical "announcements" forum) plus any forum whose name contains
+# "הודעות" / "announcements" / "news" — defensive coverage for courses
+# whose instructor renamed their announcements forum to a custom type.
+#
+# We DON'T pull general discussion forums even though they're technically
+# the same data model: their volume + signal-to-noise is wrong for the
+# dashboard. If the user wants those they can open Moodle directly.
+# ───────────────────────────────────────────────────────────────────────────
+
+# Forum types that count as "announcements" (Moodle's `forum.type` field).
+_ANNOUNCEMENT_FORUM_TYPES = ("news",)
+
+# Hebrew + English keywords that catch announcement forums whose `type`
+# is set to something other than "news" (e.g., a general forum the
+# instructor renamed to "הודעות"). Matched case-insensitively as substring.
+_ANNOUNCEMENT_NAME_HINTS = ("הודעות", "announcements", "news", "חדשות")
+
+# Per-course safety cap so an instructor with 20 forums doesn't make us
+# do 20 AJAX round-trips. Three covers any realistic course (typically
+# 1 announcements forum, sometimes 2 for he/en).
+_MAX_ANNOUNCEMENT_FORUMS_PER_COURSE = 3
+
+# Max posts to pull per forum per sync. Most courses have 1–5 new
+# announcements between syncs; 10 is comfortable headroom.
+_DEFAULT_ANNOUNCEMENT_LIMIT = 10
+
+# Body preview length for the dashboard card. Full body is at the URL.
+_ANNOUNCEMENT_BODY_PREVIEW_CHARS = 320
+
+
+def _strip_html(html: str) -> str:
+    """Crude HTML → plain text for preview. Moodle's `message` field is
+    HTML (paragraphs, line breaks, sometimes images). We don't need
+    perfect rendering — just enough to show 1–3 sentences as a teaser."""
+    if not html:
+        return ""
+    # Convert <br> and <p> to line breaks before stripping the rest, so
+    # paragraphs don't run together as one word salad.
+    text = re.sub(r"<\s*br\s*/?>", "\n", html, flags=re.I)
+    text = re.sub(r"</\s*p\s*>", "\n", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    # Collapse whitespace (but keep paragraph breaks readable on one line).
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n\s*\n+", " · ", text).strip()
+    # Decode the most common HTML entities. Full unescape would need
+    # html.unescape but importing it just for this is overkill.
+    text = (text
+            .replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", '"')
+            .replace("&#39;", "'"))
+    return text
+
+
+def scrape_course_announcements(course_url: str,
+                                 since_ts: int = 0,
+                                 limit: int = _DEFAULT_ANNOUNCEMENT_LIMIT) -> dict:
+    """Scrape recent announcements from a course's news/announcements forum(s).
+
+    Args:
+        course_url: full Moodle course URL — we extract the course id from `?id=N`.
+        since_ts: unix-seconds cutoff; only posts with `timemodified > since_ts`
+            are returned. 0 means "give me everything (capped by limit)".
+        limit: per-forum cap on how many announcements to return.
+
+    Returns:
+        {"status": "success", "announcements": [{title, body, author, posted_at, url, forum_name}, ...]}
+        {"status": "error", "message": "..."} on auth failure
+        Per-forum scrape failures are isolated — we still return any
+        announcements collected from other forums in the course.
+    """
+    cookies = _load_cookies_from_store("moodle")
+    if not cookies:
+        return {"status": "error", "message": "לא מחובר ל-Moodle.", "announcements": []}
+
+    session = _build_session(cookies)
+    sesskey = _get_sesskey(session)
+    if not sesskey:
+        return {"status": "error", "message": "אין sesskey פעיל", "announcements": []}
+
+    # Extract course id. Course URLs look like /course/view.php?id=12345.
+    m = re.search(r"[?&]id=(\d+)", course_url)
+    if not m:
+        return {"status": "success", "announcements": []}
+    cid = int(m.group(1))
+
+    # 1. Enumerate forums in this course via AJAX. Failure = no announcements
+    #    (don't error the whole sync — most courses care less about forums
+    #    than about files/assignments).
+    forums = _moodle_ajax(
+        session, sesskey,
+        "mod_forum_get_forums_by_courses",
+        {"courseids": [cid]},
+    )
+    if not forums or not isinstance(forums, list):
+        return {"status": "success", "announcements": []}
+
+    # 2. Filter to announcement-class forums. Use type='news' as the
+    #    primary signal; fall back to name keywords for instructor-renamed
+    #    forums. Order: news first, then keyword matches.
+    announcement_forums: list[dict] = []
+    for f in forums:
+        ftype = (f.get("type") or "").lower()
+        fname = (f.get("name") or "").lower()
+        if ftype in _ANNOUNCEMENT_FORUM_TYPES:
+            announcement_forums.append(f)
+        elif any(hint in fname for hint in _ANNOUNCEMENT_NAME_HINTS):
+            announcement_forums.append(f)
+
+    if not announcement_forums:
+        return {"status": "success", "announcements": []}
+
+    # 3. For each announcement forum (capped), pull recent discussions.
+    announcements: list[dict] = []
+    for forum in announcement_forums[:_MAX_ANNOUNCEMENT_FORUMS_PER_COURSE]:
+        forum_id = forum.get("id")
+        if forum_id is None:
+            continue
+        try:
+            result = _moodle_ajax(
+                session, sesskey,
+                "mod_forum_get_forum_discussions_paginated",
+                {
+                    "forumid": int(forum_id),
+                    "sortby": "timemodified",
+                    "sortdirection": "DESC",
+                    "page": 0,
+                    "perpage": int(limit),
+                },
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"{_LOG} forum {forum_id} discussions fetch failed: {e}")
+            continue
+
+        if not result:
+            continue
+        # Moodle returns {"discussions": [...]} on success
+        discussions = result.get("discussions") if isinstance(result, dict) else None
+        if not isinstance(discussions, list):
+            continue
+
+        for d in discussions:
+            # Pick the freshest timestamp Moodle provides — `timemodified`
+            # bumps on any reply too, but for announcement-class forums
+            # students don't usually reply so it tracks "when last edited".
+            raw_ts = d.get("timemodified") or d.get("created") or 0
+            try:
+                modified = int(raw_ts)
+            except (TypeError, ValueError):
+                modified = 0
+            if since_ts and modified <= since_ts:
+                # Older than the cutoff — skip. Discussions are sorted
+                # DESC so we could `break` here for a tiny speedup, but
+                # leave the linear scan in case Moodle's sort silently
+                # changes some day.
+                continue
+
+            body_text = _strip_html(d.get("message") or "")
+            if len(body_text) > _ANNOUNCEMENT_BODY_PREVIEW_CHARS:
+                body_text = body_text[:_ANNOUNCEMENT_BODY_PREVIEW_CHARS].rstrip() + "…"
+
+            # discussion id is the URL parameter for /mod/forum/discuss.php
+            discussion_id = d.get("discussion") or d.get("id")
+            url = (
+                f"{MOODLE_URL}/mod/forum/discuss.php?d={discussion_id}"
+                if discussion_id else course_url
+            )
+
+            announcements.append({
+                "title": (d.get("name") or d.get("subject") or "הודעה").strip(),
+                "body": body_text,
+                "author": (d.get("userfullname") or "").strip(),
+                "posted_at": modified,  # unix seconds; frontend formats
+                "url": url,
+                "forum_name": (forum.get("name") or "הודעות").strip(),
+            })
+
+    return {"status": "success", "announcements": announcements}
+
+
 # --- v2.1 course metadata enrichment ----------------------------------------
 
 # All per-university classification values are loaded from the active

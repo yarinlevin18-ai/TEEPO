@@ -28,7 +28,8 @@
 import { useEffect, useRef } from 'react'
 import { useDB } from './db-context'
 import { runSync } from './run-sync'
-import type { Course } from '@/types'
+import { mergeAnnouncements } from './announcements-merge'
+import type { Announcement, Course } from '@/types'
 
 /** Auto-sync if `last_auto_sync_at` is older than this. Lecture loads
  *  + Moodle scrapes are non-trivial so we don't want to hammer the
@@ -131,12 +132,24 @@ export function useAutoSync({ moodleConnected, enabled = true }: UseAutoSyncOpti
         const result = await runSync({ courses })
         switch (result.kind) {
           case 'ok': {
-            // Mirror per-course cutoff (same as the button) + bump the
-            // auto-sync timestamp so we won't refire for another 6h.
+            // Mirror per-course cutoff (same as the button) + merge new
+            // announcements into the persistent list + bump the auto-sync
+            // timestamp so we won't refire for another 6h.
             const syncedAt = result.results.synced_at
             const syncedIds = new Set(
               result.results.results.map((r) => r.course_id).filter(Boolean),
             )
+
+            // Pre-compute the merged announcements list using the pure
+            // helper so the mutate() closure stays small and we can log
+            // the new count for visibility.
+            const existingAnns = (db?.announcements ?? []) as Announcement[]
+            const mergedAnns = mergeAnnouncements({
+              existing: existingAnns,
+              syncResults: result.results.results,
+              syncedAt,
+            })
+
             if (mutate) {
               try {
                 await mutate((d: any) => ({
@@ -144,6 +157,9 @@ export function useAutoSync({ moodleConnected, enabled = true }: UseAutoSyncOpti
                   courses: (d.courses ?? []).map((c: any) =>
                     syncedIds.has(c.id) ? { ...c, last_synced_at: syncedAt } : c,
                   ),
+                  // Persist the merged announcements list. mergeAnnouncements
+                  // already capped + sorted + preserved acknowledged_at.
+                  announcements: mergedAnns.merged,
                 }))
               } catch {
                 /* non-fatal */
@@ -156,7 +172,8 @@ export function useAutoSync({ moodleConnected, enabled = true }: UseAutoSyncOpti
             console.info(
               `[auto-sync] ok — ${result.results.totals.new_assignments} new assignments, ` +
               `${result.results.totals.new_files} new files, ` +
-              `${result.results.totals.new_grades} new grades`,
+              `${result.results.totals.new_grades} new grades, ` +
+              `${mergedAnns.newCount} new announcements`,
             )
             break
           }
