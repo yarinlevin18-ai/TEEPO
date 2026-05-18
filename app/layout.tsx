@@ -1,8 +1,52 @@
 import type { Metadata } from 'next'
+import { Assistant, Heebo, Frank_Ruhl_Libre, VT323, Fredoka } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/lib/auth-context'
 import { ThemeProvider } from '@/lib/theme-context'
 import ErrorBoundary from '@/components/ErrorBoundary'
+
+// v2 locked design typography (teepo-design/CLAUDE_CODE_HANDOFF.md):
+//   Assistant — body/UI; Heebo — hero headlines (900);
+//   Frank Ruhl Libre — elegant italic accents (puzzle titles, eyebrows);
+//   VT323 — LCD clock + timers; Fredoka — legacy wordmark fallback.
+//
+// Each font exposes a CSS variable so globals.css can keep using
+// `var(--font-heebo)` etc. without changes.
+const assistant = Assistant({
+  subsets: ['hebrew', 'latin'],
+  weight: ['300', '400', '500', '600', '700', '800'],
+  variable: '--font-assistant',
+  display: 'swap',
+  fallback: ['system-ui', 'sans-serif'],
+})
+const heebo = Heebo({
+  subsets: ['hebrew', 'latin'],
+  weight: ['400', '700', '800', '900'],
+  variable: '--font-heebo',
+  display: 'swap',
+  fallback: ['system-ui', 'sans-serif'],
+})
+const frankRuhl = Frank_Ruhl_Libre({
+  subsets: ['hebrew', 'latin'],
+  weight: ['500', '700', '900'],
+  variable: '--font-serif',
+  display: 'swap',
+  fallback: ['Georgia', 'serif'],
+})
+const vt323 = VT323({
+  subsets: ['latin'],
+  weight: ['400'],
+  variable: '--font-vt323',
+  display: 'swap',
+  fallback: ['Share Tech Mono', 'monospace'],
+})
+const fredoka = Fredoka({
+  subsets: ['hebrew', 'latin'],
+  weight: ['500', '600', '700'],
+  variable: '--font-fredoka',
+  display: 'swap',
+  fallback: ['system-ui', 'sans-serif'],
+})
 
 export const metadata: Metadata = {
   title: 'teepo — הסמסטר שלך, מאורגן',
@@ -21,20 +65,9 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const fontVars = [assistant.variable, heebo.variable, frankRuhl.variable, vt323.variable, fredoka.variable].join(' ')
   return (
-    <html lang="he" dir="rtl">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* v2 locked design typography (teepo-design/CLAUDE_CODE_HANDOFF.md):
-            Assistant — body/UI; Heebo — hero headlines (900);
-            Frank Ruhl Libre — elegant italic accents (puzzle titles, eyebrows);
-            VT323 — LCD clock + timers; Fredoka — legacy wordmark fallback. */}
-        <link
-          href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&family=Heebo:wght@400;700;800;900&family=Fredoka:wght@500;600;700&family=Frank+Ruhl+Libre:wght@500;700;900&family=VT323&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="he" dir="rtl" className={fontVars}>
       <body>
         <ErrorBoundary>
           <ThemeProvider>
