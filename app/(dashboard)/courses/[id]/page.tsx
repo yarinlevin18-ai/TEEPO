@@ -123,21 +123,21 @@ export default function CoursePage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-[1100px] mx-auto" style={{ direction: 'rtl' }}>
+    <div className="p-6 md:p-10 max-w-[1600px] mx-auto" style={{ direction: 'rtl' }}>
       {/* ── Header ───────────────────────────────────── */}
-      <div className="flex items-center gap-3 mb-5">
+      <div className="flex items-center gap-4 mb-8">
         <button
           onClick={() => router.push('/courses')}
-          className="p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-white/5"
+          className="p-3 rounded-xl text-ink-muted hover:text-ink hover:bg-white/5"
           title="חזרה לרשימת הקורסים"
         >
-          <ArrowRight size={18} />
+          <ArrowRight size={22} />
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl md:text-2xl font-bold truncate">{course.title}</h1>
-          <div className="text-xs text-ink-muted mt-0.5 flex items-center gap-2 flex-wrap">
+          <h1 className="text-2xl md:text-4xl font-bold truncate leading-tight">{course.title}</h1>
+          <div className="text-sm text-ink-muted mt-2 flex items-center gap-3 flex-wrap">
             {course.shortname && (
-              <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-white/5 border border-white/8" dir="ltr">
+              <span className="font-mono text-xs px-2 py-1 rounded-md bg-white/5 border border-white/8" dir="ltr">
                 {course.shortname}
               </span>
             )}
@@ -150,12 +150,12 @@ export default function CoursePage() {
           <button
             onClick={syncFromMoodle}
             disabled={syncing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-indigo-500/15 text-indigo-300 border border-indigo-400/20 hover:bg-indigo-500/25 disabled:opacity-50 flex-shrink-0"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-400/20 hover:bg-indigo-500/25 disabled:opacity-50 flex-shrink-0"
             title="משוך נתונים מעודכנים על הקורס מ-Moodle"
           >
             {syncing
-              ? <Loader2 size={13} className="animate-spin" />
-              : <RefreshCw size={13} />}
+              ? <Loader2 size={16} className="animate-spin" />
+              : <RefreshCw size={16} />}
             {syncing ? 'מסנכרן…' : 'סנכרן מ-Moodle'}
           </button>
         )}
@@ -168,25 +168,25 @@ export default function CoursePage() {
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className="mb-4 glass rounded-xl p-3 text-xs flex items-start gap-2 border border-emerald-500/20"
+            className="mb-6 glass rounded-2xl p-4 text-sm flex items-start gap-3 border border-emerald-500/20"
           >
-            <CheckCircle2 size={14} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+            <CheckCircle2 size={18} className="text-emerald-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">{notice}</div>
             <button onClick={() => setNotice(null)} className="text-ink-muted hover:text-ink">
-              <X size={13} />
+              <X size={16} />
             </button>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ── על הקורס: metadata + Drive shelf + Moodle cards ─── */}
-      <div className="glass rounded-2xl p-5 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold flex items-center gap-2">
-            <BookOpen size={14} className="text-indigo-400" />
+      <div className="glass rounded-3xl p-7 md:p-9 mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg md:text-xl font-bold flex items-center gap-2.5">
+            <BookOpen size={20} className="text-indigo-400" />
             על הקורס
           </h2>
-          <span className="text-[10px] text-ink-muted">
+          <span className="text-xs text-ink-muted">
             {course.source === 'bgu' ? 'נשאב מ-Moodle' : 'הזנה ידנית'}
           </span>
         </div>
@@ -194,19 +194,19 @@ export default function CoursePage() {
         {/* Metadata banner — only renders when at least one Moodle field
             populated, so manual courses don't get an empty box. */}
         {(course.description || course.moodle_startdate || course.moodle_enddate || course.category_name) && (
-          <div className="mb-4 rounded-xl bg-white/[0.02] border border-white/8 p-4 space-y-2">
+          <div className="mb-6 rounded-2xl bg-white/[0.02] border border-white/8 p-5 space-y-3">
             {course.description && (
-              <p className="text-xs text-ink-soft leading-relaxed">{course.description}</p>
+              <p className="text-sm text-ink-soft leading-relaxed">{course.description}</p>
             )}
-            <div className="flex flex-wrap gap-3 text-[11px] text-ink-muted">
+            <div className="flex flex-wrap gap-4 text-xs text-ink-muted">
               {course.category_name && (
-                <span className="inline-flex items-center gap-1">
-                  <BookOpen size={10} />
+                <span className="inline-flex items-center gap-1.5">
+                  <BookOpen size={12} />
                   {course.category_name}
                 </span>
               )}
               {(course.moodle_startdate || course.moodle_enddate) && (
-                <span className="inline-flex items-center gap-1" dir="ltr">
+                <span className="inline-flex items-center gap-1.5" dir="ltr">
                   {course.moodle_startdate && new Date(course.moodle_startdate * 1000).toLocaleDateString('he-IL')}
                   {course.moodle_startdate && course.moodle_enddate && ' – '}
                   {course.moodle_enddate && new Date(course.moodle_enddate * 1000).toLocaleDateString('he-IL')}
@@ -217,9 +217,9 @@ export default function CoursePage() {
                   href={course.source_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300"
+                  className="inline-flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300"
                 >
-                  <ExternalLink size={10} /> פתח ב-Moodle
+                  <ExternalLink size={12} /> פתח ב-Moodle
                 </a>
               )}
             </div>
@@ -239,21 +239,21 @@ export default function CoursePage() {
         {/* Drive folder shelf */}
         <CourseDriveShelf course={course} />
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 mt-4">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 mt-6">
           <MoodleCard icon={FileText} title="סילבוס" hint="מסמך הקורס הרשמי">
             {course.syllabus_url ? (
               <a
                 href={course.syllabus_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                className="inline-flex items-center gap-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
                 dir="ltr"
               >
-                <ExternalLink size={11} />
-                <span className="truncate max-w-[180px]">פתח סילבוס</span>
+                <ExternalLink size={14} />
+                <span className="truncate max-w-[220px]">פתח סילבוס</span>
               </a>
             ) : (
-              <p className="text-xs text-ink-subtle">אין עדיין סילבוס.</p>
+              <p className="text-sm text-ink-subtle">אין עדיין סילבוס.</p>
             )}
           </MoodleCard>
 
@@ -266,40 +266,40 @@ export default function CoursePage() {
 
           <MoodleCard icon={LinkIcon} title="קישורים" hint="מקורות מהקורס">
             {course.course_links && course.course_links.length > 0 ? (
-              <ul className="space-y-1.5">
+              <ul className="space-y-2">
                 {course.course_links.map((link, i) => (
                   <li key={i}>
                     <a
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                      className="inline-flex items-center gap-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
                     >
-                      <ExternalLink size={10} className="flex-shrink-0" />
+                      <ExternalLink size={13} className="flex-shrink-0" />
                       <span className="truncate">{link.label}</span>
                     </a>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-xs text-ink-subtle">אין קישורים.</p>
+              <p className="text-sm text-ink-subtle">אין קישורים.</p>
             )}
           </MoodleCard>
         </div>
       </div>
 
       {/* ── משימות ומטלות ───────────────────────────── */}
-      <div className="glass rounded-2xl p-5 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold flex items-center gap-2">
-            <CheckCircle2 size={14} className="text-emerald-400" />
+      <div className="glass rounded-3xl p-7 md:p-9 mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg md:text-xl font-bold flex items-center gap-2.5">
+            <CheckCircle2 size={20} className="text-emerald-400" />
             משימות ומטלות
           </h2>
-          <span className="text-[10px] text-ink-muted">
+          <span className="text-xs text-ink-muted">
             מסתנכרן עם /tasks ועם כרטיס הקורס
           </span>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2">
           <TasksMini courseId={courseId} />
           <AssignmentsMini courseId={courseId} />
         </div>
@@ -365,12 +365,12 @@ function CourseLessonsActions({
   }
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2">
+    <div className="mb-6 flex flex-wrap items-center gap-3">
       <button
         type="button"
         onClick={organize}
         disabled={!canOrganize}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-violet-500/15 text-violet-300 border border-violet-400/20 hover:bg-violet-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-violet-500/15 text-violet-300 border border-violet-400/20 hover:bg-violet-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
         title={
           groups.length === 0
             ? 'אין קבצי שיעור עם תאריכים מזוהים (Week N / שיעור N) — העלה קבצים תחילה'
@@ -378,11 +378,11 @@ function CourseLessonsActions({
         }
       >
         {busy
-          ? <Loader2 size={13} className="animate-spin" />
-          : <ListTree size={13} />}
+          ? <Loader2 size={16} className="animate-spin" />
+          : <ListTree size={16} />}
         {busy ? 'מסדר…' : groups.length > 0 ? `ארגן לפי שיעור (${groups.length})` : 'ארגן לפי שיעור'}
       </button>
-      <span className="text-[10px] text-ink-muted">
+      <span className="text-xs text-ink-muted">
         קבצים בתיקיית שיעורים בעלי שם "Week N" / "שיעור N" יקובצו לתת-תיקיות.
       </span>
     </div>
@@ -398,21 +398,21 @@ function CourseDriveShelf({ course }: { course: import('@/types').Course }) {
   const ids = course.drive_folder_ids
   if (!ids?.course) {
     return (
-      <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5 text-center">
-        <p className="text-xs text-ink-muted leading-relaxed mb-2">
+      <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-8 text-center">
+        <p className="text-sm text-ink-muted leading-relaxed mb-3">
           תיקיות הקורס עדיין לא נוצרו ב-Drive.
         </p>
         <a
           href="/summaries"
-          className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-400 hover:text-indigo-300"
         >
-          לחץ ליצירת התיקיות בעמוד המוח <ArrowRight size={12} />
+          לחץ ליצירת התיקיות בעמוד המוח <ArrowRight size={14} />
         </a>
       </div>
     )
   }
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className="grid gap-5 md:grid-cols-3">
       <FolderSection label="שיעורים"  hint="הרצאות, תרגולים, מצגות"     folderId={ids.lessons ?? null} />
       <FolderSection label="מטלות"    hint="תרגילים, פרויקטים, בחנים"   folderId={ids.assignments ?? null} />
       <FolderSection label="סיכומים" hint="הסיכומים האישיים שלך"         folderId={ids.notes ?? null} />
@@ -426,14 +426,14 @@ function MoodleCard({
   icon: any; title: string; hint: string; children: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="w-7 h-7 rounded-lg bg-indigo-500/15 flex items-center justify-center">
-          <Icon size={13} className="text-indigo-400" />
+    <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-11 h-11 rounded-xl bg-indigo-500/15 flex items-center justify-center">
+          <Icon size={18} className="text-indigo-400" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-semibold">{title}</div>
-          <div className="text-[10px] text-ink-muted">{hint}</div>
+          <div className="text-sm font-bold">{title}</div>
+          <div className="text-xs text-ink-muted mt-0.5">{hint}</div>
         </div>
       </div>
       {children}
@@ -455,48 +455,48 @@ function LecturerInfo({
   const hasTAs = !!(tas && tas.length > 0)
 
   if (!hasLecturer && !hasTAs) {
-    return <p className="text-xs text-ink-subtle">אין עדיין פרטים.</p>
+    return <p className="text-sm text-ink-subtle">אין עדיין פרטים.</p>
   }
 
   return (
-    <div className="text-xs space-y-2.5 text-ink-muted">
+    <div className="text-sm space-y-3 text-ink-muted">
       {hasLecturer && (
         <a
           href={`mailto:${email}`}
-          className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 transition-colors"
+          className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300 transition-colors"
           dir="ltr"
         >
-          <Mail size={11} className="flex-shrink-0" />
+          <Mail size={14} className="flex-shrink-0" />
           <span className="truncate">{email}</span>
         </a>
       )}
       {hasTAs && (
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5 text-[11px] text-ink-subtle uppercase tracking-wide">
-            <Users size={11} />
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-xs text-ink-subtle uppercase tracking-wide">
+            <Users size={12} />
             <span>מתרגלים</span>
           </div>
-          <ul className="space-y-1">
+          <ul className="space-y-1.5">
             {tas!.map((ta, i) => (
-              <li key={i} className="space-y-0.5">
-                <div className="text-ink leading-tight">
+              <li key={i} className="space-y-1">
+                <div className="text-ink text-sm leading-tight">
                   {ta.name}
                   {ta.role && (
-                    <span className="text-ink-subtle text-[11px] mr-1">· {ta.role}</span>
+                    <span className="text-ink-subtle text-xs mr-2">· {ta.role}</span>
                   )}
                 </div>
                 {ta.email && (
                   <a
                     href={`mailto:${ta.email}`}
-                    className="inline-flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
+                    className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
                     dir="ltr"
                   >
-                    <Mail size={10} />
-                    <span className="truncate max-w-[160px]">{ta.email}</span>
+                    <Mail size={12} />
+                    <span className="truncate max-w-[200px]">{ta.email}</span>
                   </a>
                 )}
                 {ta.office_hours && (
-                  <div className="text-[11px] text-ink-subtle">{ta.office_hours}</div>
+                  <div className="text-xs text-ink-subtle">{ta.office_hours}</div>
                 )}
               </li>
             ))}
