@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, Search, Plus, Trash2, Check,
-  ChevronRight, ChevronLeft, BookOpen, Target,
+  ChevronRight, ChevronLeft, Target,
   TrendingUp, Award, Sparkles, X, Loader2,
   AlertTriangle, Pencil,
 } from 'lucide-react'
@@ -12,7 +12,6 @@ import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
 import { computeCreditSummary } from '@/lib/catalog'
-import GlowCard from '@/components/ui/GlowCard'
 import Modal from '@/components/ui/Modal'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import GradesList from '@/components/credits/GradesList'
@@ -94,16 +93,20 @@ export default function CreditsPage() {
 
   if (!ready || dbLoading || trackLoading) {
     return (
-      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 animate-fade-in" dir="rtl">
-        <div className="h-8 w-48 shimmer rounded-lg" />
-        <div className="h-4 w-64 shimmer rounded-lg" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-24 shimmer rounded-2xl" />
-          ))}
+      <div className="cream-page credits-v2">
+        <div className="credits-v2-main animate-fade-in" dir="rtl">
+          <div className="credits-v2-skeleton">
+            <div className="shimmer h-8 w-48 rounded-lg" />
+            <div className="shimmer h-4 w-64 rounded-lg" />
+          </div>
+          <div className="credits-v2-stat-grid">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="shimmer h-24 rounded-2xl" />
+            ))}
+          </div>
+          <div className="shimmer h-48 rounded-2xl" />
+          <div className="shimmer h-64 rounded-2xl" />
         </div>
-        <div className="h-48 shimmer rounded-2xl" />
-        <div className="h-64 shimmer rounded-2xl" />
       </div>
     )
   }
@@ -111,9 +114,13 @@ export default function CreditsPage() {
   if (needsOnboarding) {
     return (
       <div dir="rtl">
-        <div className="max-w-2xl mx-auto px-4 pt-4">
-          <ErrorAlert message={error} onDismiss={() => setError(null)} />
-        </div>
+        {error && (
+          <div className="cream-page credits-v2">
+            <div className="credits-v2-wizard-error">
+              <ErrorAlert message={error} onDismiss={() => setError(null)} />
+            </div>
+          </div>
+        )}
         <OnboardingWizard onComplete={() => setError(null)} />
       </div>
     )
@@ -202,34 +209,33 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
   const currentYearOptions = new Date().getFullYear()
 
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4" dir="rtl">
+    <div className="cream-page credits-v2">
+      <div className="credits-v2-wizard" dir="rtl">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <GlowCard>
-          <div className="p-8">
+        <section className="credits-v2-card credits-v2-wizard-card">
+          <div className="credits-v2-wizard-body">
             {/* Header */}
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mb-4">
-                <GraduationCap className="w-8 h-8 text-white" />
+            <div className="credits-v2-wizard-head">
+              <div className="credits-v2-wizard-icon">
+                <GraduationCap size={32} />
               </div>
-              <h1 className="text-2xl font-bold text-ink mb-2">
+              <h1 className="credits-v2-wizard-title">
                 בוא נתחיל!
               </h1>
-              <p className="text-ink-muted">
+              <p className="credits-v2-wizard-sub">
                 ספר לנו מה אתה לומד כדי שנחשב את הנק"ז שלך
               </p>
             </div>
 
             {/* Step indicator */}
-            <div className="flex items-center justify-center gap-2 mb-8">
+            <div className="credits-v2-steps">
               {[1, 2].map(s => (
                 <div
                   key={s}
-                  className={`w-3 h-3 rounded-full transition-all ${
-                    s === step ? 'bg-indigo-500 w-8' : s < step ? 'bg-emerald-500' : 'bg-slate-700'
-                  }`}
+                  className={`credits-v2-step${s === step ? ' active' : ''}${s < step ? ' done' : ''}`}
                 />
               ))}
             </div>
@@ -242,26 +248,22 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -50 }}
                 >
-                  <h2 className="text-lg font-semibold text-ink mb-4">
+                  <h2 className="credits-v2-wizard-h2">
                     מה אתה לומד?
                   </h2>
 
                   {dualTracks.length > 0 && (
                     <>
-                      <p className="text-sm text-ink-muted mb-3">תוכניות דו-מחלקתיות (שילובים)</p>
-                      <div className="space-y-2 mb-6">
+                      <p className="credits-v2-wizard-label">תוכניות דו-מחלקתיות (שילובים)</p>
+                      <div className="credits-v2-track-list">
                         {dualTracks.map(t => (
                           <button
                             key={t.id}
                             onClick={() => setSelectedTrack(t.id)}
-                            className={`w-full text-right p-4 rounded-xl border transition-all ${
-                              selectedTrack === t.id
-                                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                                : 'border-white/10 bg-white/5 text-ink-muted hover:border-white/20'
-                            }`}
+                            className={`credits-v2-track${selectedTrack === t.id ? ' active' : ''}`}
                           >
-                            <div className="font-medium">{t.name}</div>
-                            <div className="text-sm text-ink-subtle mt-1">
+                            <div className="credits-v2-track-name">{t.name}</div>
+                            <div className="credits-v2-track-meta">
                               {t.total_credits} נק"ז | {t.type === 'dual' ? 'דו-מחלקתי' : 'חד-מחלקתי'}
                             </div>
                           </button>
@@ -272,20 +274,16 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
 
                   {singleTracks.length > 0 && (
                     <>
-                      <p className="text-sm text-ink-muted mb-3">מסלולים חד-מחלקתיים</p>
-                      <div className="space-y-2 mb-6">
+                      <p className="credits-v2-wizard-label">מסלולים חד-מחלקתיים</p>
+                      <div className="credits-v2-track-list">
                         {singleTracks.map(t => (
                           <button
                             key={t.id}
                             onClick={() => setSelectedTrack(t.id)}
-                            className={`w-full text-right p-4 rounded-xl border transition-all ${
-                              selectedTrack === t.id
-                                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                                : 'border-white/10 bg-white/5 text-ink-muted hover:border-white/20'
-                            }`}
+                            className={`credits-v2-track${selectedTrack === t.id ? ' active' : ''}`}
                           >
-                            <div className="font-medium">{t.name}</div>
-                            <div className="text-sm text-ink-subtle mt-1">
+                            <div className="credits-v2-track-name">{t.name}</div>
+                            <div className="credits-v2-track-meta">
                               {t.total_credits} נק"ז
                             </div>
                           </button>
@@ -295,32 +293,26 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   )}
 
                   {tracksLoading && tracks.length === 0 && !tracksError && (
-                    <div className="text-center py-8 text-ink-subtle">
-                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                      טוען מסלולים...
-                      <p className="text-xs text-slate-600 mt-2">
+                    <div className="credits-v2-loading">
+                      <Loader2 size={24} className="spin" />
+                      <p>טוען מסלולים...</p>
+                      <small>
                         השרת האחורי עלול להיות ישן (Render free-tier) — זה עלול לקחת עד 30 שניות בפעם הראשונה
-                      </p>
+                      </small>
                     </div>
                   )}
 
                   {tracksError && (
-                    <div
-                      className="rounded-xl p-4 mb-4 flex items-start gap-3"
-                      style={{
-                        background: 'rgba(239,68,68,0.08)',
-                        border: '1px solid rgba(239,68,68,0.25)',
-                      }}
-                    >
-                      <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-red-300 mb-1">
+                    <div className="credits-v2-error">
+                      <AlertTriangle size={20} />
+                      <div className="credits-v2-error-body">
+                        <p className="title">
                           לא הצלחנו לטעון את המסלולים
                         </p>
-                        <p className="text-xs text-red-400/80 mb-3">{tracksError}</p>
+                        <p className="msg">{tracksError}</p>
                         <button
                           onClick={loadTracks}
-                          className="text-xs px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors"
+                          className="credits-v2-error-btn"
                         >
                           נסה שוב
                         </button>
@@ -329,7 +321,7 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   )}
 
                   {!tracksLoading && !tracksError && tracks.length === 0 && (
-                    <div className="text-center py-8 text-ink-subtle text-sm">
+                    <div className="credits-v2-empty">
                       אין מסלולים זמינים כרגע
                     </div>
                   )}
@@ -337,10 +329,10 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   <button
                     disabled={!selectedTrack}
                     onClick={() => setStep(2)}
-                    className="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold disabled:opacity-40 hover:shadow-lg hover:shadow-indigo-500/25 transition-all"
+                    className="credits-v2-btn primary full"
                   >
                     המשך
-                    <ChevronLeft className="inline w-4 h-4 mr-1" />
+                    <ChevronLeft size={16} />
                   </button>
                 </motion.div>
               )}
@@ -352,37 +344,32 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -50 }}
                 >
-                  <h2 className="text-lg font-semibold text-ink mb-4">
+                  <h2 className="credits-v2-wizard-h2">
                     פרטים נוספים
                   </h2>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm text-ink-muted mb-1">שנת התחלה</label>
+                  <div className="credits-v2-fields">
+                    <div className="credits-v2-field">
+                      <label>שנת התחלה</label>
                       <select
                         value={startYear}
                         onChange={e => setStartYear(Number(e.target.value))}
-                        style={{ colorScheme: 'dark' }}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-ink focus:border-indigo-500 focus:outline-none"
+                        className="credits-v2-select"
                       >
                         {Array.from({ length: 8 }, (_, i) => currentYearOptions - i).map(y => (
-                          <option key={y} value={y} className="bg-slate-900 text-ink">{y}</option>
+                          <option key={y} value={y}>{y}</option>
                         ))}
                       </select>
                     </div>
 
-                    <div>
-                      <label className="block text-sm text-ink-muted mb-1">באיזה שנה אתה עכשיו?</label>
-                      <div className="flex gap-2">
+                    <div className="credits-v2-field">
+                      <label>באיזה שנה אתה עכשיו?</label>
+                      <div className="credits-v2-year-grid">
                         {[1, 2, 3, 4].map(y => (
                           <button
                             key={y}
                             onClick={() => setCurrentYear(y)}
-                            className={`flex-1 py-3 rounded-xl border font-medium transition-all ${
-                              currentYear === y
-                                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                                : 'border-white/10 bg-white/5 text-ink-muted hover:border-white/20'
-                            }`}
+                            className={`credits-v2-year-btn${currentYear === y ? ' active' : ''}`}
                           >
                             שנה {y === 1 ? "א'" : y === 2 ? "ב'" : y === 3 ? "ג'" : "ד'"}
                           </button>
@@ -391,28 +378,29 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                     </div>
                   </div>
 
-                  <div className="flex gap-3 mt-8">
+                  <div className="credits-v2-wizard-actions">
                     <button
                       onClick={() => setStep(1)}
-                      className="flex-1 py-3 rounded-xl border border-white/10 text-ink-muted hover:bg-white/5 transition-all"
+                      className="credits-v2-btn"
                     >
-                      <ChevronRight className="inline w-4 h-4 ml-1" />
+                      <ChevronRight size={16} />
                       חזרה
                     </button>
                     <button
                       onClick={handleSave}
                       disabled={saving}
-                      className="flex-[2] py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold disabled:opacity-60 hover:shadow-lg hover:shadow-indigo-500/25 transition-all"
+                      className="credits-v2-btn primary grow"
                     >
-                      {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'סיימתי — הציגו לי את הקורסים'}
+                      {saving ? <Loader2 size={18} className="spin" /> : 'סיימתי — הציגו לי את הקורסים'}
                     </button>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-        </GlowCard>
+        </section>
       </motion.div>
+      </div>
     </div>
   )
 }
@@ -576,33 +564,30 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
   const editYearOptions = new Date().getFullYear()
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 animate-fade-in" dir="rtl">
+    <div className="cream-page credits-v2">
+      <div className="credits-v2-main animate-fade-in" dir="rtl">
       {/* Header + Edit Profile */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-ink">
-              מעקב נק&quot;ז
-            </h1>
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-sm text-ink-muted">
-                {track?.name || 'מסלול לא מוגדר'}
-              </p>
-              <button
-                onClick={openEditProfile}
-                className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-              >
-                <Pencil className="w-3 h-3" />
-                עריכת פרופיל
-              </button>
-            </div>
+      <div className="credits-v2-page-head">
+        <div className="credits-v2-page-head-info">
+          <h1 className="credits-v2-h1">
+            מעקב נק&quot;ז
+          </h1>
+          <div className="credits-v2-page-head-sub">
+            <p>{track?.name || 'מסלול לא מוגדר'}</p>
+            <button
+              onClick={openEditProfile}
+              className="credits-v2-edit-profile"
+            >
+              <Pencil size={12} />
+              עריכת פרופיל
+            </button>
           </div>
         </div>
         <button
           onClick={() => setShowSearch(!showSearch)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500 transition-all"
+          className="credits-v2-btn primary"
         >
-          <Plus className="w-4 h-4" />
+          <Plus size={16} />
           הוסף קורס
         </button>
       </div>
@@ -611,30 +596,30 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
       <ErrorAlert message={error} onDismiss={() => setError(null)} />
 
       {/* Credit Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="credits-v2-stat-grid">
         <StatCard
-          icon={<Target className="w-5 h-5" />}
+          icon={<Target size={18} />}
           label="הושלמו"
           value={`${completedCredits}`}
           sub={`מתוך ${totalRequired} נק"ז`}
           color="emerald"
         />
         <StatCard
-          icon={<TrendingUp className="w-5 h-5" />}
+          icon={<TrendingUp size={18} />}
           label="נותרו"
           value={`${credits?.remaining ?? 0}`}
           sub={'נק"ז להשלמה'}
           color="amber"
         />
         <StatCard
-          icon={<Award className="w-5 h-5" />}
+          icon={<Award size={18} />}
           label="ממוצע"
           value={credits?.average ? `${credits.average}` : '--'}
           sub="ממוצע משוקלל"
           color="indigo"
         />
         <StatCard
-          icon={<Sparkles className="w-5 h-5" />}
+          icon={<Sparkles size={18} />}
           label="מומלץ"
           value={`${credits?.recommended_per_semester ?? 0}`}
           sub={'נק"ז לסמסטר'}
@@ -652,18 +637,14 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className="rounded-xl p-4 flex items-start gap-3"
-            style={{
-              background: 'rgba(245,158,11,0.08)',
-              border: '1px solid rgba(245,158,11,0.2)',
-            }}
+            className="credits-v2-warn"
           >
-            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-amber-300">
+            <AlertTriangle size={20} />
+            <div className="credits-v2-warn-body">
+              <p className="title">
                 שים לב! אתה מאחורי הקצב המומלץ
               </p>
-              <p className="text-xs text-amber-400/80 mt-1">
+              <p className="msg">
                 לפי שנה {currentAcademicYear} היית אמור להשלים כ-{expectedCredits} נק&quot;ז,
                 אבל השלמת {completedCredits} בלבד. אתה מאחור ב-{creditsBehind} נק&quot;ז.
               </p>
@@ -673,73 +654,69 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
       </AnimatePresence>
 
       {/* Progress Bar */}
-      <GlowCard>
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-ink-muted">התקדמות לתואר</span>
-            <span className="text-sm font-medium text-indigo-400">{progressPercent.toFixed(0)}%</span>
-          </div>
-          <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${progressPercent}%` }}
-              transition={{ duration: 1, ease: 'easeOut' }}
-              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
-            />
-          </div>
-          <div className="flex justify-between mt-1 text-xs text-ink-subtle">
-            <span>{completedCredits} נק&quot;ז</span>
-            <span>{totalRequired} נק&quot;ז</span>
-          </div>
+      <section className="credits-v2-card credits-v2-progress">
+        <div className="credits-v2-progress-head">
+          <span>התקדמות לתואר</span>
+          <span className="credits-v2-progress-pct">{progressPercent.toFixed(0)}%</span>
         </div>
-      </GlowCard>
+        <div className="credits-v2-progress-bar">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${progressPercent}%` }}
+            transition={{ duration: 1, ease: 'easeOut' }}
+            className="credits-v2-progress-fill"
+          />
+        </div>
+        <div className="credits-v2-progress-foot">
+          <span>{completedCredits} נק&quot;ז</span>
+          <span>{totalRequired} נק&quot;ז</span>
+        </div>
+      </section>
 
       {/* Semester Progress Breakdown */}
       {semesterBreakdown.length > 0 && (
-        <GlowCard>
-          <div className="p-4">
-            <h2 className="text-lg font-semibold text-ink mb-4">פירוט לפי סמסטר</h2>
-            <div className="space-y-3">
-              {semesterBreakdown.map(sem => {
-                const total = sem.completed + sem.inProgress + sem.planned
-                const completedPct = total > 0 ? (sem.completed / total) * 100 : 0
-                const inProgressPct = total > 0 ? (sem.inProgress / total) * 100 : 0
-                return (
-                  <div key={sem.semester} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-ink-muted font-medium">{sem.semester}</span>
-                      <div className="flex items-center gap-3 text-xs text-ink-subtle">
-                        {sem.completed > 0 && (
-                          <span className="text-emerald-400">{sem.completed} הושלמו</span>
-                        )}
-                        {sem.inProgress > 0 && (
-                          <span className="text-indigo-400">{sem.inProgress} בתהליך</span>
-                        )}
-                        {sem.planned > 0 && (
-                          <span className="text-ink-muted">{sem.planned} מתוכנן</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden flex">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${completedPct}%` }}
-                        transition={{ duration: 0.6, ease: 'easeOut' }}
-                        className="h-full bg-emerald-500 rounded-r-full"
-                      />
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${inProgressPct}%` }}
-                        transition={{ duration: 0.6, ease: 'easeOut', delay: 0.1 }}
-                        className="h-full bg-indigo-500"
-                      />
+        <section className="credits-v2-card credits-v2-semesters">
+          <h2 className="credits-v2-card-title">פירוט לפי סמסטר</h2>
+          <div className="credits-v2-semester-list">
+            {semesterBreakdown.map(sem => {
+              const total = sem.completed + sem.inProgress + sem.planned
+              const completedPct = total > 0 ? (sem.completed / total) * 100 : 0
+              const inProgressPct = total > 0 ? (sem.inProgress / total) * 100 : 0
+              return (
+                <div key={sem.semester} className="credits-v2-semester">
+                  <div className="credits-v2-semester-head">
+                    <span className="credits-v2-semester-name">{sem.semester}</span>
+                    <div className="credits-v2-semester-tags">
+                      {sem.completed > 0 && (
+                        <span className="tag emerald">{sem.completed} הושלמו</span>
+                      )}
+                      {sem.inProgress > 0 && (
+                        <span className="tag indigo">{sem.inProgress} בתהליך</span>
+                      )}
+                      {sem.planned > 0 && (
+                        <span className="tag muted">{sem.planned} מתוכנן</span>
+                      )}
                     </div>
                   </div>
-                )
-              })}
-            </div>
+                  <div className="credits-v2-semester-bar">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${completedPct}%` }}
+                      transition={{ duration: 0.6, ease: 'easeOut' }}
+                      className="credits-v2-semester-fill emerald"
+                    />
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${inProgressPct}%` }}
+                      transition={{ duration: 0.6, ease: 'easeOut', delay: 0.1 }}
+                      className="credits-v2-semester-fill indigo"
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        </GlowCard>
+        </section>
       )}
 
       {/* Course Search */}
@@ -749,47 +726,53 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="glass rounded-xl p-4 overflow-hidden"
+            className="credits-v2-card credits-v2-search"
           >
-            <div className="flex items-center gap-2 mb-3">
-              <Search className="w-5 h-5 text-ink-subtle" />
+            <div className="credits-v2-search-head">
+              <Search size={18} />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => handleSearch(e.target.value)}
                 placeholder="חפש קורס לפי שם או מספר..."
-                className="input-dark flex-1 text-sm"
+                className="credits-v2-search-input"
                 autoFocus
               />
-              <button onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults([]) }}>
-                <X className="w-5 h-5 text-ink-subtle hover:text-ink-muted" />
+              <button
+                onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults([]) }}
+                aria-label="סגור חיפוש"
+                className="credits-v2-search-close"
+              >
+                <X size={18} />
               </button>
             </div>
-            {searching && <Loader2 className="w-5 h-5 animate-spin text-indigo-400 mx-auto" />}
+            {searching && (
+              <div className="credits-v2-search-loading">
+                <Loader2 size={18} className="spin" />
+              </div>
+            )}
             {searchResults.length > 0 && (
-              <div className="max-h-60 overflow-y-auto space-y-1">
+              <div className="credits-v2-search-results">
                 {searchResults.map(c => {
                   const alreadyAdded = myCourses.some(mc => mc.course_id === c.course_id)
                   return (
-                    <div
-                      key={c.course_id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/8 transition-all"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm text-ink truncate">{c.name}</div>
-                        <div className="text-xs text-ink-subtle">
+                    <div key={c.course_id} className="credits-v2-search-result">
+                      <div className="credits-v2-search-result-info">
+                        <div className="name">{c.name}</div>
+                        <div className="meta">
                           {c.course_id} | {c.credits} נק&quot;ז
-                          {c.type === 'mandatory' && <span className="text-indigo-400 mr-2">חובה</span>}
+                          {c.type === 'mandatory' && <span className="tag">חובה</span>}
                         </div>
                       </div>
                       {alreadyAdded ? (
-                        <Check className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                        <Check size={18} className="credits-v2-search-added" />
                       ) : (
                         <button
                           onClick={() => addCourse(c)}
-                          className="flex-shrink-0 p-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/40 transition-all"
+                          aria-label="הוסף קורס"
+                          className="credits-v2-search-add"
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus size={16} />
                         </button>
                       )}
                     </div>
@@ -798,88 +781,70 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
               </div>
             )}
             {searchQuery.length >= 2 && searchResults.length === 0 && !searching && (
-              <p className="text-center text-sm text-ink-subtle py-4">לא נמצאו קורסים</p>
+              <p className="credits-v2-search-empty">לא נמצאו קורסים</p>
             )}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* My Courses — with color-coded status badges */}
-      <GlowCard>
-        <div className="p-4">
-          <h2 className="text-lg font-semibold text-ink mb-4">הקורסים שלי</h2>
-          {myCourses.length === 0 ? (
-            <p className="text-center text-ink-subtle py-8">
-              עדיין לא נוספו קורסים. לחץ &quot;הוסף קורס&quot; למעלה
-            </p>
-          ) : (
-            <div className="space-y-1">
-              {myCourses.map(c => (
-                <div
-                  key={c.id}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-all group"
+      <section className="credits-v2-card credits-v2-courses">
+        <h2 className="credits-v2-card-title">הקורסים שלי</h2>
+        {myCourses.length === 0 ? (
+          <p className="credits-v2-courses-empty">
+            עדיין לא נוספו קורסים. לחץ &quot;הוסף קורס&quot; למעלה
+          </p>
+        ) : (
+          <div className="credits-v2-course-list">
+            {myCourses.map(c => (
+              <div key={c.id} className="credits-v2-course">
+                <button
+                  onClick={() => toggleStatus(c)}
+                  aria-label={`שנה סטטוס ל${c.course_name}`}
+                  className={`credits-v2-course-check status-${c.status}`}
                 >
-                  <button
-                    onClick={() => toggleStatus(c)}
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                      c.status === 'completed'
-                        ? 'bg-emerald-500 border-emerald-500'
-                        : c.status === 'in_progress'
-                        ? 'bg-amber-500/20 border-amber-500'
-                        : 'border-slate-600 hover:border-slate-400'
-                    }`}
-                  >
-                    {c.status === 'completed' && <Check className="w-3.5 h-3.5 text-white" />}
-                    {c.status === 'in_progress' && <div className="w-2 h-2 rounded-full bg-amber-400" />}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-sm truncate ${
-                      c.status === 'completed' ? 'text-ink-muted line-through' : 'text-ink'
-                    }`}>
-                      {c.course_name}
-                    </div>
-                    <div className="text-xs text-ink-subtle">
-                      {c.credits} נק&quot;ז
-                      {c.grade && <span className="text-emerald-400 mr-2">ציון: {c.grade}</span>}
-                    </div>
+                  {c.status === 'completed' && <Check size={14} />}
+                  {c.status === 'in_progress' && <span className="dot" />}
+                </button>
+                <div className="credits-v2-course-info">
+                  <div className={`name${c.status === 'completed' ? ' done' : ''}`}>
+                    {c.course_name}
                   </div>
-                  {/* Color-coded status badge */}
-                  <motion.button
-                    onClick={() => toggleStatus(c)}
-                    layout
-                    className={`flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                      c.status === 'completed'
-                        ? 'bg-emerald-500/15 text-emerald-300'
-                        : c.status === 'in_progress'
-                        ? 'bg-indigo-500/15 text-indigo-300'
-                        : 'bg-white/[0.08] text-ink-muted'
-                    }`}
-                    whileTap={{ scale: 0.92 }}
-                  >
-                    <AnimatePresence mode="wait">
-                      <motion.span
-                        key={c.status}
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.15 }}
-                      >
-                        {c.status === 'completed' ? 'הושלם' : c.status === 'in_progress' ? 'בתהליך' : 'מתוכנן'}
-                      </motion.span>
-                    </AnimatePresence>
-                  </motion.button>
-                  <button
-                    onClick={() => removeCourse(c.course_id)}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-ink-subtle hover:text-red-400 transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="meta">
+                    {c.credits} נק&quot;ז
+                    {c.grade && <span className="grade">ציון: {c.grade}</span>}
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </GlowCard>
+                <motion.button
+                  onClick={() => toggleStatus(c)}
+                  layout
+                  whileTap={{ scale: 0.92 }}
+                  className={`credits-v2-course-badge status-${c.status}`}
+                >
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={c.status}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      {c.status === 'completed' ? 'הושלם' : c.status === 'in_progress' ? 'בתהליך' : 'מתוכנן'}
+                    </motion.span>
+                  </AnimatePresence>
+                </motion.button>
+                <button
+                  onClick={() => removeCourse(c.course_id)}
+                  aria-label="הסר קורס"
+                  className="credits-v2-course-remove"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* ── Edit Profile Modal ──────────────────────────────────── */}
       <Modal
@@ -889,45 +854,41 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
         subtitle="עדכן את המסלול ושנת הלימודים"
         size="md"
         footer={
-          <div className="flex gap-3 justify-end">
+          <div className="credits-v2-modal-actions">
             <button
               onClick={() => setEditOpen(false)}
-              className="px-4 py-2 rounded-xl border border-white/10 text-ink-muted hover:bg-white/5 text-sm transition-all"
+              className="credits-v2-btn"
             >
               ביטול
             </button>
             <button
               onClick={saveEditProfile}
               disabled={editSaving || !editTrackId}
-              className="px-6 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-sm font-semibold disabled:opacity-40 hover:shadow-lg hover:shadow-indigo-500/25 transition-all"
+              className="credits-v2-btn primary"
             >
-              {editSaving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'שמור'}
+              {editSaving ? <Loader2 size={16} className="spin" /> : 'שמור'}
             </button>
           </div>
         }
       >
-        <div className="space-y-5">
+        <div className="credits-v2-modal-body" dir="rtl">
           {/* Track selection */}
-          <div>
-            <label className="block text-sm text-ink-muted mb-2">מסלול לימודים</label>
+          <div className="credits-v2-field">
+            <label>מסלול לימודים</label>
             {editTracks.length === 0 ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
+              <div className="credits-v2-modal-loading">
+                <Loader2 size={18} className="spin" />
               </div>
             ) : (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
+              <div className="credits-v2-modal-tracks">
                 {editTracks.map(t => (
                   <button
                     key={t.id}
                     onClick={() => setEditTrackId(t.id)}
-                    className={`w-full text-right p-3 rounded-xl border transition-all text-sm ${
-                      editTrackId === t.id
-                        ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                        : 'border-white/10 bg-white/5 text-ink-muted hover:border-white/20'
-                    }`}
+                    className={`credits-v2-track${editTrackId === t.id ? ' active' : ''}`}
                   >
-                    <span className="font-medium">{t.name}</span>
-                    <span className="text-ink-subtle mr-2">{t.total_credits} נק&quot;ז</span>
+                    <span className="credits-v2-track-name">{t.name}</span>
+                    <span className="credits-v2-track-meta">{t.total_credits} נק&quot;ז</span>
                   </button>
                 ))}
               </div>
@@ -935,33 +896,28 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
           </div>
 
           {/* Start year */}
-          <div>
-            <label className="block text-sm text-ink-muted mb-1">שנת התחלה</label>
+          <div className="credits-v2-field">
+            <label>שנת התחלה</label>
             <select
               value={editStartYear}
               onChange={e => setEditStartYear(Number(e.target.value))}
-              style={{ colorScheme: 'dark' }}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-ink focus:border-indigo-500 focus:outline-none"
+              className="credits-v2-select"
             >
               {Array.from({ length: 8 }, (_, i) => editYearOptions - i).map(y => (
-                <option key={y} value={y} className="bg-slate-900 text-ink">{y}</option>
+                <option key={y} value={y}>{y}</option>
               ))}
             </select>
           </div>
 
           {/* Current year */}
-          <div>
-            <label className="block text-sm text-ink-muted mb-1">באיזה שנה אתה עכשיו?</label>
-            <div className="flex gap-2">
+          <div className="credits-v2-field">
+            <label>באיזה שנה אתה עכשיו?</label>
+            <div className="credits-v2-year-grid">
               {[1, 2, 3, 4].map(y => (
                 <button
                   key={y}
                   onClick={() => setEditCurrentYear(y)}
-                  className={`flex-1 py-3 rounded-xl border font-medium transition-all text-sm ${
-                    editCurrentYear === y
-                      ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300'
-                      : 'border-white/10 bg-white/5 text-ink-muted hover:border-white/20'
-                  }`}
+                  className={`credits-v2-year-btn${editCurrentYear === y ? ' active' : ''}`}
                 >
                   שנה {y === 1 ? "א'" : y === 2 ? "ב'" : y === 3 ? "ג'" : "ד'"}
                 </button>
@@ -970,6 +926,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
           </div>
         </div>
       </Modal>
+      </div>
     </div>
   )
 }
@@ -977,23 +934,16 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
 // ── Helper Components ──────────────────────────────────────────
 
 function StatCard({ icon, label, value, sub, color }: {
-  icon: React.ReactNode; label: string; value: string; sub: string; color: string
+  icon: React.ReactNode; label: string; value: string; sub: string; color: 'emerald' | 'amber' | 'indigo' | 'violet'
 }) {
-  const colors: Record<string, string> = {
-    emerald: 'from-emerald-500/20 to-emerald-500/5 text-emerald-400',
-    amber: 'from-amber-500/20 to-amber-500/5 text-amber-400',
-    indigo: 'from-indigo-500/20 to-indigo-500/5 text-indigo-400',
-    violet: 'from-violet-500/20 to-violet-500/5 text-violet-400',
-  }
   return (
-    <GlowCard>
-      <div className="p-4">
-        <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${colors[color]} flex items-center justify-center mb-2`}>
-          {icon}
-        </div>
-        <div className="text-xl font-bold text-ink">{value}</div>
-        <div className="text-xs text-ink-subtle">{sub}</div>
+    <section className={`credits-v2-stat tone-${color}`}>
+      <div className="credits-v2-stat-icon">
+        {icon}
       </div>
-    </GlowCard>
+      <div className="credits-v2-stat-value">{value}</div>
+      <div className="credits-v2-stat-label">{label}</div>
+      <div className="credits-v2-stat-sub">{sub}</div>
+    </section>
   )
 }
