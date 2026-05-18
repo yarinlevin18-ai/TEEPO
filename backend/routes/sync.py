@@ -9,6 +9,9 @@ moodle_id and last_synced_at if known). The backend:
        - `scrape_all_assignments(course_ids)`
        - `scrape_course_materials(course_url)` / `ingest_course_materials`
        - `scrape_grades()`
+       - `scrape_course_announcements(course_url, since_ts)` — news/
+         announcement forum posts. Returned in `new_announcements` per
+         course + `totals.new_announcements`.
      None of these are re-implemented here — this route is glue.
 
   2. Filters scraper output to "new since last_synced_at" per course.
@@ -37,6 +40,9 @@ Response shape:
                 "new_assignments": [{...}],
                 "new_files": [{...}],
                 "new_grades": [{...}],
+                "new_announcements": [
+                    {title, body, author, posted_at: unix-sec, url, forum_name}, ...
+                ],
                 "error": str | None,                # per-course; doesn't fail the batch
             }
         ],
@@ -44,6 +50,7 @@ Response shape:
             "new_assignments": int,
             "new_files": int,
             "new_grades": int,
+            "new_announcements": int,
         }
     }
 
@@ -68,6 +75,7 @@ from routes.api import _user_id
 from services import supabase_client as db
 from services.moodle_scraper import (
     scrape_all_assignments,
+    scrape_course_announcements,
     scrape_course_materials,
     scrape_grades,
 )
@@ -179,7 +187,7 @@ def sync_all():
             "moodle_error": assignments_response.get("message") or grades_response.get("message")
                             or "לא מחובר ל-Moodle. גש ל-/moodle והתחבר.",
             "results": [],
-            "totals": {"new_assignments": 0, "new_files": 0, "new_grades": 0},
+            "totals": {"new_assignments": 0, "new_files": 0, "new_grades": 0, "new_announcements": 0},
         })
 
     assignments_by_course: dict[str, list[dict]] = {}
@@ -194,9 +202,10 @@ def sync_all():
             grades_by_course.setdefault(cid, []).append(g)
 
     # Per-course materials need an individual scrape — Moodle's
-    # core_course_get_contents takes a single courseid at a time.
+    # core_course_get_contents takes a single courseid at a time. Same
+    # is true for announcements (forum-by-forum AJAX).
     results: list[dict[str, Any]] = []
-    total_a = total_f = total_g = 0
+    total_a = total_f = total_g = total_n = 0
 
     for course in incoming:
         moodle_id = str(course.get("moodle_id") or "")
@@ -205,6 +214,9 @@ def sync_all():
         course_name = course.get("title") or course.get("course_name") or "קורס"
         course_color = course.get("color")
         cutoff = _parse_iso(course.get("last_synced_at"))
+        # Unix-seconds form of the cutoff for scrape_course_announcements
+        # (Moodle's `timemodified` is unix epoch seconds, not ISO).
+        cutoff_unix = int(cutoff.timestamp()) if cutoff else 0
 
         # Materials — best-effort per course; failures are isolated
         new_files: list[dict] = []
@@ -228,6 +240,31 @@ def sync_all():
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"{_LOG} materials for {moodle_id} failed: {e}")
                 # don't bubble — the course still gets assignments/grades
+
+        # Announcements — pulled from the course's news/announcements
+        # forum(s) via mod_forum_get_forum_discussions_paginated. Failure
+        # here doesn't surface as a per-course error: announcements are
+        # nice-to-have, the file/assignment/grade scrape is the
+        # bread-and-butter.
+        new_announcements: list[dict] = []
+        if course_url:
+            try:
+                ann_response = scrape_course_announcements(course_url, since_ts=cutoff_unix)
+                for a in (ann_response.get("announcements") or []):
+                    # Already filtered server-side by `since_ts`, but the
+                    # cutoff could be None (first sync) and we don't want
+                    # to flood the dashboard with months of old posts —
+                    # the scraper's per-forum limit (10) already bounds this.
+                    new_announcements.append({
+                        "title": a.get("title") or "הודעה",
+                        "body": a.get("body") or "",
+                        "author": a.get("author") or "",
+                        "posted_at": a.get("posted_at") or 0,  # unix seconds
+                        "url": a.get("url") or course_url,
+                        "forum_name": a.get("forum_name") or "",
+                    })
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"{_LOG} announcements for {moodle_id} failed: {e}")
 
         # Filter the AJAX-fetched assignments for this course down to new ones.
         course_assignments_all = assignments_by_course.get(moodle_id, [])
@@ -259,6 +296,7 @@ def sync_all():
         total_a += len(new_assignments)
         total_f += len(new_files)
         total_g += len(new_grades)
+        total_n += len(new_announcements)
 
         results.append({
             "course_id": course_id,
@@ -268,6 +306,7 @@ def sync_all():
             "new_assignments": new_assignments,
             "new_files": new_files,
             "new_grades": new_grades,
+            "new_announcements": new_announcements,
             "error": error,
         })
 
@@ -281,5 +320,6 @@ def sync_all():
             "new_assignments": total_a,
             "new_files": total_f,
             "new_grades": total_g,
+            "new_announcements": total_n,
         },
     })

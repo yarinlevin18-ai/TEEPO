@@ -9878,6 +9878,246 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   <AnnouncementsCard /> — dashboard widget for Moodle forum posts.
+   Source: components/dashboard/AnnouncementsCard.tsx + the persistent
+   db.announcements list populated by useAutoSync.
+
+   Placed BELOW the 2-widget grid (assignments/todos) and ABOVE the
+   weekly calendar — full-width strip so multi-line previews breathe.
+   ════════════════════════════════════════════════════════════════════ */
+.dashboard-v2 .dash-v2-announcements {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 16px;
+  box-shadow: var(--lp-shadow-sm);
+  margin-bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: fadeUp .55s ease .42s both;
+}
+.dashboard-v2 .dash-v2-announcements:hover { box-shadow: var(--lp-shadow); }
+
+.dashboard-v2 .dash-v2-announcements .ann-head {
+  padding: 14px 18px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--lp-line-soft);
+}
+.dashboard-v2 .dash-v2-announcements .ann-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--w-color, #fce7f3);
+  color: var(--w-icon-color, #be185d);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.dashboard-v2 .dash-v2-announcements .ann-title {
+  flex: 1;
+  font-family: 'Heebo', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--lp-ink);
+  letter-spacing: -.3px;
+}
+.dashboard-v2 .dash-v2-announcements .ann-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--lp-muted);
+  background: var(--lp-bg-elev);
+  border-radius: 99px;
+  padding: 2px 9px;
+}
+.dashboard-v2 .dash-v2-announcements .ann-mark-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--lp-accent-deep);
+  background: var(--lp-accent-soft);
+  border: 1px solid rgba(22, 163, 74, .3);
+  padding: 4px 10px;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: background .15s, transform .15s;
+}
+.dashboard-v2 .dash-v2-announcements .ann-mark-all:hover {
+  background: var(--lp-accent);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.dashboard-v2 .dash-v2-announcements .ann-body {
+  display: flex;
+  flex-direction: column;
+}
+.dashboard-v2 .dash-v2-announcements .ann-empty {
+  padding: 28px 22px;
+  text-align: center;
+  color: var(--lp-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.dashboard-v2 .dash-v2-announcements .ann-empty svg { color: var(--lp-faint); }
+.dashboard-v2 .dash-v2-announcements .ann-empty p {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--lp-ink-soft);
+}
+.dashboard-v2 .dash-v2-announcements .ann-empty small {
+  font-size: 12px;
+  max-width: 380px;
+  line-height: 1.5;
+}
+
+/* Each row — clickable, hover lifts the background. Unread state
+   gets a left-border accent in the course color + slightly bolder
+   title; read rows fade quietly. */
+.dashboard-v2 .dash-v2-announcements .ann-row {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--lp-line-soft);
+  cursor: pointer;
+  transition: background .15s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dashboard-v2 .dash-v2-announcements .ann-row:last-of-type { border-bottom: none; }
+.dashboard-v2 .dash-v2-announcements .ann-row:hover { background: var(--lp-bg-hover); }
+.dashboard-v2 .dash-v2-announcements .ann-row:focus-visible {
+  outline: 2px solid var(--lp-accent);
+  outline-offset: -2px;
+}
+.dashboard-v2 .dash-v2-announcements .ann-row::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  background: var(--course-color, var(--lp-line));
+  border-radius: 3px 0 0 3px;
+  opacity: .3;
+  transition: opacity .15s;
+}
+.dashboard-v2 .dash-v2-announcements .ann-row.is-unread::before { opacity: 1; }
+.dashboard-v2 .dash-v2-announcements .ann-row:not(.is-unread) {
+  opacity: .72;
+}
+
+.dashboard-v2 .dash-v2-announcements .ann-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dashboard-v2 .dash-v2-announcements .ann-course-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--course-color, var(--lp-accent));
+  font-weight: 700;
+  white-space: nowrap;
+}
+.dashboard-v2 .dash-v2-announcements .ann-course-tag .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.dashboard-v2 .dash-v2-announcements .ann-new-pill {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  background: var(--lp-accent);
+  color: white;
+  border-radius: 99px;
+  padding: 1px 7px;
+  text-transform: uppercase;
+}
+.dashboard-v2 .dash-v2-announcements .ann-time {
+  margin-inline-start: auto;
+  font-size: 11px;
+  color: var(--lp-muted);
+  font-weight: 500;
+}
+
+.dashboard-v2 .dash-v2-announcements .ann-row-title {
+  font-family: 'Heebo', sans-serif;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--lp-ink);
+  line-height: 1.3;
+  letter-spacing: -.2px;
+}
+
+.dashboard-v2 .dash-v2-announcements .ann-row-body {
+  font-size: 13px;
+  color: var(--lp-ink-soft);
+  line-height: 1.5;
+  /* Clamp to ~2 lines so the card stays scannable even with long
+     posts. The full body is one click away on Moodle. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dashboard-v2 .dash-v2-announcements .ann-row-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  color: var(--lp-muted);
+}
+.dashboard-v2 .dash-v2-announcements .ann-author {
+  font-weight: 600;
+}
+.dashboard-v2 .dash-v2-announcements .ann-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--lp-accent);
+  text-decoration: none;
+  padding: 4px 9px;
+  border-radius: 7px;
+  transition: background .15s;
+}
+.dashboard-v2 .dash-v2-announcements .ann-open:hover {
+  background: var(--lp-accent-soft);
+}
+.dashboard-v2 .dash-v2-announcements .ann-open svg { opacity: .8; }
+
+.dashboard-v2 .dash-v2-announcements .ann-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  border-top: 1px solid var(--lp-line-soft);
+  font-size: 12px;
+  color: var(--lp-muted);
+}
+.dashboard-v2 .dash-v2-announcements .ann-foot-link {
+  color: var(--lp-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+.dashboard-v2 .dash-v2-announcements .ann-foot-link:hover { text-decoration: underline; }
+
+/* ════════════════════════════════════════════════════════════════════
    Course detail v2 — app/(dashboard)/courses/[id]/page.tsx
    Source: teepo-design/mockup_course.html.
    The wrapper sets --course-color and --course-soft per course (derived
