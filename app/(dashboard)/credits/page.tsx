@@ -412,7 +412,9 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
 function CreditsDashboard({ profile, track }: { profile: any; track: Track | null }) {
   const { db, setStudentProfile, upsertStudentCourse, removeStudentCourse } = useDB()
   const university = db.settings?.university
-  const myCourses = (db.student_courses || []) as StudentCourse[]
+  // Memoize the array read so downstream useEffect/useMemo deps don't
+  // refire every render (`?? []` returns a fresh array each call).
+  const myCourses = useMemo(() => (db.student_courses || []) as StudentCourse[], [db.student_courses])
   const [credits, setCredits] = useState<CreditSummary | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<CatalogCourse[]>([])

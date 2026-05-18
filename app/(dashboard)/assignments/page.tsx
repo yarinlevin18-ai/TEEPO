@@ -125,8 +125,11 @@ type SortBy = 'deadline' | 'priority' | 'course'
 
 export default function AssignmentsPage() {
   const { db, ready, createAssignment, updateAssignment, deleteAssignment } = useDB()
-  const assignments = (db?.assignments ?? []) as Assignment[]
-  const courses = (db?.courses ?? []) as Course[]
+  // Memoize array reads from the DB context so downstream useMemo deps
+  // don't refire every render (the `?? []` fallback returns a brand-new
+  // array on each call, which thrashes the dependency-comparison check).
+  const assignments = useMemo(() => (db?.assignments ?? []) as Assignment[], [db?.assignments])
+  const courses = useMemo(() => (db?.courses ?? []) as Course[], [db?.courses])
 
   const courseById = useMemo(() => {
     const m = new Map<string, Course>()
