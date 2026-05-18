@@ -13,7 +13,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Award, Plus, Loader2, RefreshCw } from 'lucide-react'
 import { api } from '@/lib/api-client'
-import GlowCard from '@/components/ui/GlowCard'
 import GradeSourceBadge from './GradeSourceBadge'
 import ManualGradeModal from './ManualGradeModal'
 
@@ -65,119 +64,109 @@ export default function GradesList() {
   }, [reload])
 
   return (
-    <GlowCard glowColor="rgba(99,102,241,0.10)">
-      <div className="p-5">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center"
-              style={{ background: 'rgba(99,102,241,0.15)' }}
+    <section className="grades-v2-card">
+      {/* Header */}
+      <div className="grades-v2-head">
+        <div className="grades-v2-title">
+          <div className="grades-v2-title-icon">
+            <Award size={14} />
+          </div>
+          <h2>הציונים שלי</h2>
+          {average != null && (
+            <span
+              className="grades-v2-avg"
+              style={{
+                background: `${getGradeColor(average)}20`,
+                color: getGradeColor(average),
+                border: `1px solid ${getGradeColor(average)}40`,
+              }}
             >
-              <Award size={14} style={{ color: '#818cf8' }} />
-            </div>
-            <h2 className="font-semibold text-ink">הציונים שלי</h2>
-            {average != null && (
-              <span
-                className="text-[11px] font-medium px-2 py-0.5 rounded-full"
+              ממוצע {average.toFixed(1)}
+            </span>
+          )}
+        </div>
+        <div className="grades-v2-actions">
+          <button
+            onClick={reload}
+            disabled={loading}
+            className="grades-v2-refresh"
+            title="רענון"
+            aria-label="רענן רשימת ציונים"
+          >
+            <RefreshCw size={14} className={loading ? 'spin' : ''} />
+          </button>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="grades-v2-add"
+          >
+            <Plus size={12} />
+            הוסף ציון ידני
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      {loading && grades.length === 0 ? (
+        <div className="grades-v2-loading">
+          <Loader2 size={16} className="spin" />
+        </div>
+      ) : error ? (
+        <p className="grades-v2-error">{error}</p>
+      ) : grades.length === 0 ? (
+        <div className="grades-v2-empty">
+          <p className="title">אין ציונים עדיין</p>
+          <p className="sub">סנכרן את ה-Moodle או הוסף ציון ידני</p>
+        </div>
+      ) : (
+        <div className="grades-v2-list">
+          {grades.map((g, i) => (
+            <motion.div
+              key={`${g.course_name}-${g.semester || ''}-${g.component || ''}-${i}`}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: Math.min(i * 0.02, 0.4) }}
+              className="grades-v2-row"
+            >
+              {/* Grade pill */}
+              <div
+                className="grades-v2-pill"
                 style={{
-                  background: `${getGradeColor(average)}20`,
-                  color: getGradeColor(average),
-                  border: `1px solid ${getGradeColor(average)}40`,
+                  background: `${getGradeColor(g.grade)}15`,
+                  color: getGradeColor(g.grade),
+                  border: `1px solid ${getGradeColor(g.grade)}30`,
                 }}
               >
-                ממוצע {average.toFixed(1)}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={reload}
-              disabled={loading}
-              className="p-1.5 rounded-lg text-ink-subtle hover:text-ink hover:bg-white/[0.04] transition-colors disabled:opacity-50"
-              title="רענון"
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            </button>
-            <button
-              onClick={() => setModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white transition-opacity hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-            >
-              <Plus size={12} />
-              הוסף ציון ידני
-            </button>
-          </div>
+                {g.grade != null ? g.grade : g.grade_text || '—'}
+              </div>
+
+              {/* Course meta */}
+              <div className="grades-v2-info">
+                <p className="name">{g.course_name}</p>
+                <div className="meta">
+                  <GradeSourceBadge source={g.source} size="compact" />
+                  {g.component && (
+                    <span>{g.component}</span>
+                  )}
+                  {(g.semester || g.academic_year) && (
+                    <span>
+                      {[g.semester, g.academic_year].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                  {g.credits != null && (
+                    <span>{g.credits} נק״ז</span>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          ))}
         </div>
-
-        {/* Body */}
-        {loading && grades.length === 0 ? (
-          <div className="flex items-center justify-center py-8 text-ink-subtle">
-            <Loader2 size={16} className="animate-spin" />
-          </div>
-        ) : error ? (
-          <p className="text-xs text-red-400 py-4">{error}</p>
-        ) : grades.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-sm text-ink-muted">אין ציונים עדיין</p>
-            <p className="text-[11px] text-ink-subtle mt-1">
-              סנכרן את ה-Moodle או הוסף ציון ידני
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            {grades.map((g, i) => (
-              <motion.div
-                key={`${g.course_name}-${g.semester || ''}-${g.component || ''}-${i}`}
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: Math.min(i * 0.02, 0.4) }}
-                className="flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-white/[0.02]"
-                style={{ background: 'rgba(255,255,255,0.015)' }}
-              >
-                {/* Grade pill */}
-                <div
-                  className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold"
-                  style={{
-                    background: `${getGradeColor(g.grade)}15`,
-                    color: getGradeColor(g.grade),
-                    border: `1px solid ${getGradeColor(g.grade)}30`,
-                  }}
-                >
-                  {g.grade != null ? g.grade : g.grade_text || '—'}
-                </div>
-
-                {/* Course meta */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-ink truncate">{g.course_name}</p>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <GradeSourceBadge source={g.source} size="compact" />
-                    {g.component && (
-                      <span className="text-[10px] text-ink-subtle">{g.component}</span>
-                    )}
-                    {(g.semester || g.academic_year) && (
-                      <span className="text-[10px] text-ink-subtle">
-                        {[g.semester, g.academic_year].filter(Boolean).join(' · ')}
-                      </span>
-                    )}
-                    {g.credits != null && (
-                      <span className="text-[10px] text-ink-subtle">
-                        {g.credits} נק״ז
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
 
       <ManualGradeModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onSuccess={reload}
       />
-    </GlowCard>
+    </section>
   )
 }
