@@ -31,7 +31,7 @@ export default function Logo({ variant = 'default', href = '/', className = '' }
   const sizeClass = variant === 'large' ? 'brand-logo--large' : variant === 'hero' ? 'brand-logo--hero' : ''
   const cls = `brand-logo ${sizeClass} ${className}`.trim()
   return (
-    <Link href={href} className={cls} aria-label="TEEPO — דף הבית">
+    <Link href={href} className={cls} aria-label="teepo — דף הבית">
       <svg
         className="book-icon"
         viewBox="0 0 120 100"

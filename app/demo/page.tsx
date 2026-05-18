@@ -10,7 +10,7 @@
 import Link from 'next/link'
 
 export const metadata = {
-  title: 'TEEPO — תצוגה מקדימה',
+  title: 'teepo — תצוגה מקדימה',
   description: 'תצוגה מקדימה של לוח הבקרה',
   robots: { index: false, follow: false },
 }
