@@ -1,14 +1,35 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+/**
+ * /settings — account + preferences page (cream design system).
+ *
+ * Migrated from the v1 dark-theme layout (text-white / bg-white/[0.02]
+ * / <GlowCard> / input-dark) to the cream tokens used elsewhere. The
+ * data layer is unchanged — every hook, handler, and write call is
+ * the same as before. Only the visual shell + a few classNames moved.
+ *
+ * Sections (top → bottom):
+ *   1. Page head
+ *   2. פרטים אישיים — display name + email
+ *   3. האוניברסיטה שלי — picks catalog + scrapers
+ *   4. מצב תצוגה — light/dark theme switcher
+ *   5. תחילת התואר — degrees list + year/month + summer toggle
+ *   6. גיבוי ושחזור — <BackupRestore /> shared component
+ *   7. אחסון ב-Google Drive — size breakdown
+ *   8. מידע על החשבון — readonly identity fields
+ *   9. איפוס נתונים — destructive, requires typed confirmation
+ */
+
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, User, Save, Check, AlertCircle, CalendarDays, Database, Building2, Sun, Moon, Trash2, Plus } from 'lucide-react'
+import {
+  Settings, User as UserIcon, Save, Check, AlertCircle, CalendarDays,
+  Database, Building2, Sun, Moon, Trash2, Plus,
+} from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 import { useDB } from '@/lib/db-context'
 import { useTheme } from '@/lib/theme-context'
-import Link from 'next/link'
-import GlowCard from '@/components/ui/GlowCard'
 import BackupRestore from '@/components/settings/BackupRestore'
 import type { Degree, UniversityCode, UserSettings } from '@/types'
 import { resolveDegrees, newDegreeId } from '@/lib/degrees'
@@ -17,32 +38,30 @@ export default function SettingsPage() {
   const { user } = useAuth()
   const { db, ready, updateSettings, resetAccountData, flushSave } = useDB()
   const { theme, setTheme } = useTheme()
+
+  // ── Local form state ───────────────────────────────────────────────
   const [displayName, setDisplayName] = useState('')
   const [originalName, setOriginalName] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+
   // Degree-start state (local; persisted to Drive settings on change)
-  // Degrees list — supports dual-degree (תואר דו-חוגי). Each entry has a
-  // stable id (for course.degree_id refs) and a user-typed name.
   const [degreesList, setDegreesList] = useState<Degree[]>([])
   const [degreeYear, setDegreeYear] = useState<string>('')
   const [degreeMonth, setDegreeMonth] = useState<string>('10')
   const [takesSummer, setTakesSummer] = useState<boolean>(false)
   const [degreeSaved, setDegreeSaved] = useState(false)
+
   // v2.1 — university + theme persistence to Drive
   const [universitySaved, setUniversitySaved] = useState(false)
   const [themeSaved, setThemeSaved] = useState(false)
 
-  // (Removed: legacy Supabase track/profile state — see PR comment above
-  // about the now-deleted "פרופיל אקדמי" card.)
-
-
-  // Hydrate the display-name input from the Drive DB first (the new source
-  // of truth), falling back to Google OAuth profile name (full_name/name)
-  // and then legacy Supabase display_name. Email prefix is NOT used as a
-  // seed — the input should stay blank so the user can see they haven't
-  // saved anything yet, instead of seeing "yarinlevin18" pre-filled.
+  // ── Hydration effects ──────────────────────────────────────────────
+  // Hydrate the display-name input from Drive DB first, falling back to
+  // Google OAuth profile name. Email prefix is NOT used as a seed — the
+  // input should stay blank so the user can see they haven't saved
+  // anything yet, instead of seeing "yarinlevin18" pre-filled.
   useEffect(() => {
     if (!ready && !user) return
     const driveName = (db?.settings?.display_name as string | undefined)?.trim() || ''
@@ -57,9 +76,9 @@ export default function SettingsPage() {
     setOriginalName(initial)
   }, [user, ready, db?.settings?.display_name])
 
-  // Hydrate degree-start fields from Drive DB once it's ready.
-  // Degrees list: prefer the new degrees[] array; if missing, migrate from
-  // the legacy single-string degree_name (resolveDegrees handles both).
+  // Hydrate degree-start fields from Drive DB. Prefer degrees[]; if
+  // missing, migrate from the legacy single-string degree_name
+  // (resolveDegrees handles both).
   useEffect(() => {
     if (!ready) return
     const s = db.settings || {}
@@ -69,8 +88,7 @@ export default function SettingsPage() {
     setTakesSummer(!!s.takes_summer)
   }, [ready, db.settings])
 
-  // v2.1 — change which university the user belongs to. Writes to
-  // settings.university (consumed by use-university hook + scrapers + catalog).
+  // ── Save handlers ──────────────────────────────────────────────────
   const handleUniversityChange = async (code: UniversityCode | '') => {
     if (!code) return
     try {
@@ -84,10 +102,6 @@ export default function SettingsPage() {
     }
   }
 
-  // v2.1 — theme toggle. Local state (theme-context + localStorage) is the
-  // source of truth on this device; settings.theme persists the preference
-  // to Drive so future devices can default to it (db-context can pick this
-  // up on load — separate scope).
   const handleThemeChange = async (next: 'light' | 'dark') => {
     if (next === theme) return
     setTheme(next)
@@ -97,24 +111,12 @@ export default function SettingsPage() {
       setThemeSaved(true)
       setTimeout(() => setThemeSaved(false), 2000)
     } catch {
-      // Don't surface — theme already applied locally; Drive sync is best-effort.
+      // Don't surface — theme already applied locally; Drive sync best-effort.
     }
   }
 
   const handleDegreeSave = async () => {
-    // Previously this bailed out if year OR month were empty — so a user who
-    // only filled שם התואר ended up with nothing saved and a misleading
-    // 'שנה לא תקינה' error. Build the patch field-by-field instead, validate
-    // only what the user actually provided, and flush right after so the
-    // change lands in Drive immediately (not 30s later inside the debounce
-    // window — a reload in that window would discard it).
     const patch: Partial<UserSettings> = { takes_summer: takesSummer }
-    // Persist all degree rows EVEN IF they're empty. Previously we filtered
-    // empty rows on save, which made the "+ הוסף עוד תואר" button look
-    // broken: users clicked it, expected to see a second column on
-    // /summaries, but the empty row was silently dropped on save. Now empty
-    // rows persist and the user can fill them in later. The /summaries
-    // page already filters names <1 char so cosmetic-only.
     const cleanedDegrees = degreesList.map(d => ({ id: d.id, name: d.name.trim() }))
     // Drop fully-empty trailing rows so the user doesn't accumulate orphan
     // ids forever — but keep at least one row even if blank.
@@ -125,18 +127,12 @@ export default function SettingsPage() {
     patch.degree_name = cleanedDegrees.find(d => d.name)?.name || undefined
     if (degreeYear.trim()) {
       const y = parseInt(degreeYear, 10)
-      if (!y || y < 2000 || y > 2100) {
-        setError('שנה לא תקינה')
-        return
-      }
+      if (!y || y < 2000 || y > 2100) { setError('שנה לא תקינה'); return }
       patch.degree_start_year = y
     }
     if (degreeMonth.trim()) {
       const m = parseInt(degreeMonth, 10)
-      if (!m || m < 1 || m > 12) {
-        setError('חודש לא תקין')
-        return
-      }
+      if (!m || m < 1 || m > 12) { setError('חודש לא תקין'); return }
       patch.degree_start_month = m
     }
     try {
@@ -157,13 +153,11 @@ export default function SettingsPage() {
     setSaving(true)
     setError('')
     setSaved(false)
-
     const next = displayName.trim()
     try {
-      // Drive DB is the source of truth — write there first + flush so the
-      // dashboard picks up the new name on the next render. The Supabase
-      // metadata write is best-effort for legacy consumers; failures don't
-      // fail the save.
+      // Drive DB is the source of truth — write there first + flush so
+      // the dashboard picks up the new name on the next render. Supabase
+      // metadata write is best-effort for legacy consumers.
       await updateSettings({ display_name: next })
       await flushSave()
       try {
@@ -181,72 +175,46 @@ export default function SettingsPage() {
     }
   }
 
+  // ── Render ─────────────────────────────────────────────────────────
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto animate-fade-in">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-3 mb-8"
-      >
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ background: 'rgba(99,102,241,0.15)' }}
-        >
-          <Settings size={20} style={{ color: '#818cf8' }} />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-white">הגדרות</h1>
-          <p className="text-sm text-ink-muted">ניהול החשבון וההעדפות שלך</p>
-        </div>
-      </motion.div>
-
-      <div className="space-y-5">
-        {/* Profile Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
+    <div className="cream-page settings-v2">
+      <main className="settings-v2-main">
+        {/* ===== HEADER ===== */}
+        <motion.header
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
+          className="settings-v2-head"
         >
-        <GlowCard glowColor="rgba(99,102,241,0.10)">
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <User size={18} style={{ color: '#818cf8' }} />
-            <h2 className="font-semibold text-white">פרטים אישיים</h2>
+          <div className="settings-v2-head-icon">
+            <Settings size={20} />
           </div>
+          <div>
+            <h1>הגדרות</h1>
+            <p>ניהול החשבון וההעדפות שלך</p>
+          </div>
+        </motion.header>
 
-          {/* Display Name */}
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-ink-muted mb-1.5">שם תצוגה</label>
+        <div className="settings-v2-sections">
+
+          {/* ===== 1. פרטים אישיים ===== */}
+          <SectionCard delay={0.05} icon={<UserIcon size={18} />} title="פרטים אישיים">
+            <Field label="שם תצוגה" hint="השם שיוצג בדשבורד ובהודעות">
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="הזן את השם שלך"
-                className="input-dark"
+                className="settings-v2-input"
                 dir="rtl"
               />
-              <p className="text-xs text-ink-subtle mt-1">השם שיוצג בדשבורד ובהודעות</p>
-            </div>
+            </Field>
 
-            {/* Email (read only) */}
-            <div>
-              <label className="block text-sm text-ink-muted mb-1.5">אימייל</label>
-              <div
-                className="px-4 py-2.5 rounded-xl text-sm text-ink-muted"
-                style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                }}
-                dir="ltr"
-              >
+            <Field label="אימייל" hint="לא ניתן לשנות את האימייל">
+              <div className="settings-v2-readonly" dir="ltr">
                 {user?.email || '—'}
               </div>
-              <p className="text-xs text-ink-subtle mt-1">לא ניתן לשנות את האימייל</p>
-            </div>
+            </Field>
 
-            {/* Save button */}
             <AnimatePresence mode="wait">
               {hasChanges && (
                 <motion.div
@@ -259,503 +227,440 @@ export default function SettingsPage() {
                     whileTap={{ scale: 0.98 }}
                     onClick={handleSave}
                     disabled={saving}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold btn-gradient shadow-glow-sm disabled:opacity-50"
+                    className="settings-v2-btn primary"
                   >
-                    {saving ? (
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <Save size={16} />
-                    )}
+                    {saving
+                      ? <div className="settings-v2-spinner" aria-hidden />
+                      : <Save size={16} />}
                     <span>{saving ? 'שומר...' : 'שמור שינויים'}</span>
                   </motion.button>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Success / Error messages */}
-            <AnimatePresence>
-              {saved && (
-                <motion.div
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center gap-2 text-sm"
-                  style={{ color: '#10b981' }}
-                >
-                  <Check size={16} />
-                  <span>השם עודכן בהצלחה!</span>
-                </motion.div>
-              )}
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center gap-2 text-sm"
-                  style={{ color: '#ef4444' }}
-                >
-                  <AlertCircle size={16} />
-                  <span>{error}</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-        </GlowCard>
-        </motion.div>
+            <SavedMsg show={saved} text="השם עודכן בהצלחה!" />
+            <ErrorMsg show={!!error} text={error} />
+          </SectionCard>
 
-        {/* "פרופיל אקדמי" card removed — it read from the legacy
-            Supabase student_profile table and never lit up after the
-            Drive-DB migration, so it permanently showed "עדיין לא
-            הגדרת" no matter what the user did. The same information
-            (degree name + year of study) lives in the "תחילת התואר"
-            card below and is now Drive-backed. */}
-
-        {/* University (v2.1) — drives catalog, scrapers, branding */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.11 }}
-        >
-        <GlowCard glowColor="rgba(99,102,241,0.10)">
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <Building2 size={18} style={{ color: '#818cf8' }} />
-            <h2 className="font-semibold text-white">האוניברסיטה שלי</h2>
-          </div>
-          <p className="text-xs text-ink-subtle mb-5">
-            קובע איזה קטלוג קורסים נטען, מאיזה Moodle/פורטל מסונכרנים נתונים, ולאיזה מאגר ידע פונה היועץ האקדמי.
-          </p>
-
-          <div>
-            <label className="block text-sm text-ink-muted mb-1.5">אוניברסיטה</label>
-            <select
-              value={db.settings?.university || ''}
-              onChange={(e) => handleUniversityChange(e.target.value as UniversityCode | '')}
-              className="input-dark"
-              dir="rtl"
-              disabled={!ready}
-            >
-              <option value="" disabled>בחר אוניברסיטה...</option>
-              <option value="bgu">אוניברסיטת בן-גוריון בנגב</option>
-              <option value="tau">אוניברסיטת תל אביב</option>
-            </select>
-            <p className="text-[11px] text-ink-subtle mt-2">
+          {/* ===== 2. האוניברסיטה שלי ===== */}
+          <SectionCard
+            delay={0.10}
+            icon={<Building2 size={18} />}
+            title="האוניברסיטה שלי"
+            hint="קובע איזה קטלוג קורסים נטען, מאיזה Moodle/פורטל מסונכרנים נתונים, ולאיזה מאגר ידע פונה היועץ האקדמי."
+          >
+            <Field label="אוניברסיטה">
+              <select
+                value={db.settings?.university || ''}
+                onChange={(e) => handleUniversityChange(e.target.value as UniversityCode | '')}
+                className="settings-v2-input"
+                dir="rtl"
+                disabled={!ready}
+              >
+                <option value="" disabled>בחר אוניברסיטה...</option>
+                <option value="bgu">אוניברסיטת בן-גוריון בנגב</option>
+                <option value="tau">אוניברסיטת תל אביב</option>
+              </select>
+            </Field>
+            <p className="settings-v2-hint">
               אוניברסיטאות נוספות (טכניון, עברית, רייכמן ועוד) יתווספו בשלב 3.
             </p>
-          </div>
+            <SavedMsg show={universitySaved} text="נשמר — הקטלוג והסנכרון יתעדכנו בהתאם" />
+          </SectionCard>
 
-          <AnimatePresence>
-            {universitySaved && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="flex items-center gap-2 text-sm mt-4"
-                style={{ color: '#10b981' }}
-              >
-                <Check size={16} />
-                <span>נשמר — הקטלוג והסנכרון יתעדכנו בהתאם</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-        </GlowCard>
-        </motion.div>
-
-        {/* Theme (v2.1) — light / dark, persisted to settings.theme */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.115 }}
-        >
-        <GlowCard glowColor="rgba(245,158,11,0.10)">
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-2">
-            {theme === 'dark' ? (
-              <Moon size={18} style={{ color: '#fbbf24' }} />
-            ) : (
-              <Sun size={18} style={{ color: '#fbbf24' }} />
-            )}
-            <h2 className="font-semibold text-white">מצב תצוגה</h2>
-          </div>
-          <p className="text-xs text-ink-subtle mb-5">
-            כהה או בהיר. נשמר במכשיר ובחשבון, כך שמכשירים חדשים יתחילו עם ההעדפה שלך.
-          </p>
-
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => handleThemeChange('dark')}
-              className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                theme === 'dark'
-                  ? 'btn-gradient text-white shadow-glow-sm'
-                  : 'border border-white/10 text-ink-muted hover:border-white/20 hover:text-ink'
-              }`}
-            >
-              <Moon size={15} />
-              <span>כהה</span>
-            </button>
-            <button
-              onClick={() => handleThemeChange('light')}
-              className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                theme === 'light'
-                  ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20'
-                  : 'border border-white/10 text-ink-muted hover:border-white/20 hover:text-ink'
-              }`}
-            >
-              <Sun size={15} />
-              <span>בהיר</span>
-            </button>
-          </div>
-
-          <AnimatePresence>
-            {themeSaved && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="flex items-center gap-2 text-xs mt-3"
-                style={{ color: '#10b981' }}
-              >
-                <Check size={14} />
-                <span>נשמר</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-        </GlowCard>
-        </motion.div>
-
-        {/* Degree Start Date — powers year-of-study classification */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12 }}
-        >
-        <GlowCard glowColor="rgba(99,102,241,0.10)">
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <CalendarDays size={18} style={{ color: '#818cf8' }} />
-            <h2 className="font-semibold text-white">תחילת התואר</h2>
-          </div>
-          <p className="text-xs text-ink-subtle mb-5">
-            משמש לחישוב לאיזו שנה (א/ב/ג/ד) וסמסטר (א/ב/קיץ) שייך כל קורס שמושך מ-Moodle.
-          </p>
-
-          <div className="mb-4">
-            <label className="block text-sm text-ink-muted mb-1.5">
-              {degreesList.length > 1 ? 'התארים שלי (דו-חוגי)' : 'שם התואר'}
-            </label>
-            <div className="flex flex-col gap-2">
-              {degreesList.map((d, i) => (
-                <div key={d.id} className="flex gap-2 items-stretch">
-                  <input
-                    type="text"
-                    value={d.name}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setDegreesList(prev => prev.map((x, j) => j === i ? { ...x, name: v } : x))
-                    }}
-                    placeholder={i === 0 ? 'מדעי המחשב' : 'מנהל עסקים'}
-                    maxLength={80}
-                    autoFocus={i > 0 && d.name === ''}
-                    className="input-dark flex-1"
-                    dir="rtl"
-                  />
-                  {degreesList.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => setDegreesList(prev => prev.filter((_, j) => j !== i))}
-                      className="px-3 rounded-lg text-xs font-medium"
-                      style={{ background: 'rgba(225,29,72,0.12)', color: '#e11d48' }}
-                      title="מחק תואר"
-                    >
-                      הסר
-                    </button>
-                  )}
-                </div>
-              ))}
-              {degreesList.length === 0 && (
-                <input
-                  type="text"
-                  value=""
-                  onChange={(e) => {
-                    if (!e.target.value) return
-                    setDegreesList([{ id: newDegreeId(), name: e.target.value }])
-                  }}
-                  placeholder='תואר ראשון - מדעי המחשב'
-                  maxLength={80}
-                  className="input-dark"
-                  dir="rtl"
-                />
-              )}
-            </div>
-            {degreesList.length < 3 && (
+          {/* ===== 3. מצב תצוגה ===== */}
+          <SectionCard
+            delay={0.115}
+            icon={theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+            title="מצב תצוגה"
+            hint="כהה או בהיר. נשמר במכשיר ובחשבון, כך שמכשירים חדשים יתחילו עם ההעדפה שלך."
+            iconTone="amber"
+          >
+            <div className="settings-v2-theme-grid">
               <button
                 type="button"
-                onClick={() => setDegreesList(prev => [
-                  ...(prev.length === 0 ? [{ id: newDegreeId(), name: '' }] : prev),
-                  { id: newDegreeId(), name: '' },
-                ])}
-                className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:translate-y-[-1px]"
-                style={{
-                  background: 'rgba(22,163,74,0.12)',
-                  color: 'var(--lp-accent-deep, #14532d)',
-                  border: '1px dashed rgba(22,163,74,0.4)',
-                }}
+                onClick={() => handleThemeChange('dark')}
+                className={`settings-v2-theme-btn ${theme === 'dark' ? 'active' : ''}`}
               >
-                <Plus size={13} />
-                {degreesList.length === 0
-                  ? 'הוסף תואר'
-                  : degreesList.length === 1
-                    ? 'הוסף תואר שני (דו-חוגי)'
-                    : 'הוסף תואר נוסף'}
+                <Moon size={15} />
+                <span>כהה</span>
               </button>
-            )}
-            <p className="text-xs text-ink-subtle mt-2">
-              {degreesList.length > 1
-                ? 'בעמוד המוח כל תואר יקבל עמודה משלו עם הסמסטרים שלו. צריך לתת לכל תואר שם בשביל שיופיע.'
-                : 'מופיע בעץ של המוח אחרי TEEPO. אם אתה לומד דו-חוגי — לחץ "הוסף תואר שני" ותן שם לכל אחד מהם.'}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm text-ink-muted mb-1.5">חודש</label>
-              <select
-                value={degreeMonth}
-                onChange={(e) => setDegreeMonth(e.target.value)}
-                className="input-dark"
-                dir="rtl"
+              <button
+                type="button"
+                onClick={() => handleThemeChange('light')}
+                className={`settings-v2-theme-btn ${theme === 'light' ? 'active' : ''}`}
               >
-                <option value="10">אוקטובר (רגיל)</option>
-                <option value="3">מרץ</option>
-                <option value="1">ינואר</option>
-                <option value="4">אפריל</option>
-                <option value="7">יולי</option>
-                <option value="11">נובמבר</option>
-              </select>
+                <Sun size={15} />
+                <span>בהיר</span>
+              </button>
             </div>
-            <div>
-              <label className="block text-sm text-ink-muted mb-1.5">שנה</label>
-              <input
-                type="number"
-                value={degreeYear}
-                onChange={(e) => setDegreeYear(e.target.value)}
-                placeholder="2023"
-                min={2000}
-                max={2100}
-                className="input-dark"
-                dir="ltr"
-              />
-            </div>
-          </div>
+            <SavedMsg show={themeSaved} text="נשמר" small />
+          </SectionCard>
 
-          <label className="flex items-center gap-2 mt-4 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={takesSummer}
-              onChange={(e) => setTakesSummer(e.target.checked)}
-              className="w-4 h-4 accent-indigo-500"
-            />
-            <span className="text-sm text-ink-muted">
-              אני לומד גם בסמסטר קיץ (אופציונלי — מציג חריץ "קיץ" גם אם ריק)
-            </span>
-          </label>
-
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleDegreeSave}
-            className="mt-5 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold btn-gradient shadow-glow-sm"
+          {/* ===== 4. תחילת התואר ===== */}
+          <SectionCard
+            delay={0.12}
+            icon={<CalendarDays size={18} />}
+            title="תחילת התואר"
+            hint="משמש לחישוב לאיזו שנה (א/ב/ג/ד) וסמסטר (א/ב/קיץ) שייך כל קורס שמושך מ-Moodle."
           >
-            <Save size={16} />
-            <span>שמור</span>
-          </motion.button>
-
-          <AnimatePresence>
-            {degreeSaved && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="flex items-center gap-2 text-sm mt-3"
-                style={{ color: '#10b981' }}
-              >
-                <Check size={16} />
-                <span>נשמר — קורסים חדשים יסווגו אוטומטית</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-        </GlowCard>
-        </motion.div>
-
-        {/* Backup & Restore — versioned snapshots of the Drive DB */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12 }}
-        >
-          <BackupRestore />
-        </motion.div>
-
-        {/* Drive Storage — how big is the user's db.json and where is the weight? */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.13 }}
-        >
-        <GlowCard glowColor="rgba(99,102,241,0.10)">
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <Database size={18} style={{ color: '#818cf8' }} />
-            <h2 className="font-semibold text-white">אחסון ב-Google Drive</h2>
-          </div>
-          <p className="text-xs text-ink-subtle mb-5">
-            כל הנתונים שלך (קורסים, סיכומים, מחברות) שמורים בקובץ אחד ב-Drive שלך.
-            ברגע שהקובץ מתקרב ל-10MB השמירות הופכות לאיטיות — מומלץ למחוק מקורות ישנים.
-          </p>
-          {(() => {
-            // Compute sizes client-side (free) — no extra Drive calls needed.
-            const bytes = (obj: unknown) => new Blob([JSON.stringify(obj ?? [])]).size
-            const fmt = (b: number) =>
-              b < 1024 ? `${b} B`
-              : b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB`
-              : `${(b / 1024 / 1024).toFixed(2)} MB`
-            const totalDb = bytes(db)
-            const sizeCourses = bytes(db.courses)
-            const sizeLessons = bytes(db.lessons)
-            const sizeNotes = bytes(db.notes)
-            const warnLevel = totalDb > 10 * 1024 * 1024 ? 'danger'
-              : totalDb > 5 * 1024 * 1024 ? 'warn'
-              : 'ok'
-            const warnColor = warnLevel === 'danger' ? '#ef4444'
-              : warnLevel === 'warn' ? '#f59e0b'
-              : '#10b981'
-            const pct = Math.min((totalDb / (10 * 1024 * 1024)) * 100, 100)
-            const rows = [
-              { label: 'שיעורים', size: sizeLessons },
-              { label: 'סיכומים', size: sizeNotes },
-              { label: 'קורסים', size: sizeCourses },
-            ].sort((a, b) => b.size - a.size)
-            return (
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm text-ink-muted">סה״כ</span>
-                    <span className="text-sm font-medium" style={{ color: warnColor }}>
-                      {fmt(totalDb)} / 10 MB
-                    </span>
-                  </div>
-                  <div
-                    className="h-2 rounded-full overflow-hidden"
-                    style={{ background: 'rgba(255,255,255,0.06)' }}
-                  >
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${pct}%` }}
-                      transition={{ duration: 0.6 }}
-                      className="h-full rounded-full"
-                      style={{ background: warnColor }}
+            <Field label={degreesList.length > 1 ? 'התארים שלי (דו-חוגי)' : 'שם התואר'}>
+              <div className="settings-v2-degrees">
+                {degreesList.map((d, i) => (
+                  <div key={d.id} className="settings-v2-degree-row">
+                    <input
+                      type="text"
+                      value={d.name}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setDegreesList(prev => prev.map((x, j) => j === i ? { ...x, name: v } : x))
+                      }}
+                      placeholder={i === 0 ? 'מדעי המחשב' : 'מנהל עסקים'}
+                      maxLength={80}
+                      autoFocus={i > 0 && d.name === ''}
+                      className="settings-v2-input"
+                      dir="rtl"
                     />
+                    {degreesList.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setDegreesList(prev => prev.filter((_, j) => j !== i))}
+                        className="settings-v2-degree-remove"
+                        title="מחק תואר"
+                      >
+                        הסר
+                      </button>
+                    )}
                   </div>
-                  {warnLevel === 'danger' && (
-                    <p className="text-xs mt-2" style={{ color: '#ef4444' }}>
-                      הקובץ גדול מאוד — השמירות ל-Drive יהיו איטיות. מומלץ למחוק שיעורים
-                      או סיכומים ישנים שלא בשימוש.
-                    </p>
-                  )}
-                  {warnLevel === 'warn' && (
-                    <p className="text-xs mt-2" style={{ color: '#f59e0b' }}>
-                      הקובץ מתחיל להיות גדול. שים לב כמה מקורות כבדים אתה מוסיף.
-                    </p>
-                  )}
-                </div>
-                <div
-                  className="pt-3 space-y-1.5"
-                  style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
-                >
-                  {rows.map((r) => (
-                    <div key={r.label} className="flex items-center justify-between text-xs">
-                      <span className="text-ink-muted">{r.label}</span>
-                      <span className="text-ink-subtle font-mono" dir="ltr">{fmt(r.size)}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="pt-3 grid grid-cols-3 gap-3 text-center"
-                  style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
-                >
-                  <div>
-                    <div className="text-lg font-semibold text-white">{db.courses.length}</div>
-                    <div className="text-[11px] text-ink-muted">קורסים</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-semibold text-white">{db.lessons.length}</div>
-                    <div className="text-[11px] text-ink-muted">שיעורים</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-semibold text-white">{db.notes.length}</div>
-                    <div className="text-[11px] text-ink-muted">סיכומים</div>
-                  </div>
-                </div>
+                ))}
+                {degreesList.length === 0 && (
+                  <input
+                    type="text"
+                    value=""
+                    onChange={(e) => {
+                      if (!e.target.value) return
+                      setDegreesList([{ id: newDegreeId(), name: e.target.value }])
+                    }}
+                    placeholder="תואר ראשון - מדעי המחשב"
+                    maxLength={80}
+                    className="settings-v2-input"
+                    dir="rtl"
+                  />
+                )}
               </div>
-            )
-          })()}
-        </div>
-        </GlowCard>
-        </motion.div>
+              {degreesList.length < 3 && (
+                <button
+                  type="button"
+                  onClick={() => setDegreesList(prev => [
+                    ...(prev.length === 0 ? [{ id: newDegreeId(), name: '' }] : prev),
+                    { id: newDegreeId(), name: '' },
+                  ])}
+                  className="settings-v2-add-degree"
+                >
+                  <Plus size={13} />
+                  {degreesList.length === 0
+                    ? 'הוסף תואר'
+                    : degreesList.length === 1
+                      ? 'הוסף תואר שני (דו-חוגי)'
+                      : 'הוסף תואר נוסף'}
+                </button>
+              )}
+              <p className="settings-v2-hint">
+                {degreesList.length > 1
+                  ? 'בעמוד המוח כל תואר יקבל עמודה משלו עם הסמסטרים שלו. צריך לתת לכל תואר שם בשביל שיופיע.'
+                  : 'מופיע בעץ של המוח אחרי TEEPO. אם אתה לומד דו-חוגי — לחץ "הוסף תואר שני" ותן שם לכל אחד מהם.'}
+              </p>
+            </Field>
 
-        {/* Account Info */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-        >
-        <GlowCard glowColor="rgba(99,102,241,0.10)">
-        <div className="p-6">
-          <h2 className="font-semibold text-white mb-4">מידע על החשבון</h2>
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-ink-muted">מזהה משתמש</span>
-              <span className="text-xs text-ink-subtle font-mono" dir="ltr">
-                {user?.id ? `${user.id.slice(0, 8)}...` : '—'}
-              </span>
+            <div className="settings-v2-degree-grid">
+              <Field label="חודש">
+                <select
+                  value={degreeMonth}
+                  onChange={(e) => setDegreeMonth(e.target.value)}
+                  className="settings-v2-input"
+                  dir="rtl"
+                >
+                  <option value="10">אוקטובר (רגיל)</option>
+                  <option value="3">מרץ</option>
+                  <option value="1">ינואר</option>
+                  <option value="4">אפריל</option>
+                  <option value="7">יולי</option>
+                  <option value="11">נובמבר</option>
+                </select>
+              </Field>
+              <Field label="שנה">
+                <input
+                  type="number"
+                  value={degreeYear}
+                  onChange={(e) => setDegreeYear(e.target.value)}
+                  placeholder="2023"
+                  min={2000}
+                  max={2100}
+                  className="settings-v2-input"
+                  dir="ltr"
+                />
+              </Field>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-ink-muted">ספק אימות</span>
-              <span className="text-sm text-ink-muted">
+
+            <label className="settings-v2-checkbox">
+              <input
+                type="checkbox"
+                checked={takesSummer}
+                onChange={(e) => setTakesSummer(e.target.checked)}
+              />
+              <span>
+                אני לומד גם בסמסטר קיץ (אופציונלי — מציג חריץ "קיץ" גם אם ריק)
+              </span>
+            </label>
+
+            <motion.button
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleDegreeSave}
+              className="settings-v2-btn primary"
+            >
+              <Save size={16} />
+              <span>שמור</span>
+            </motion.button>
+
+            <SavedMsg show={degreeSaved} text="נשמר — קורסים חדשים יסווגו אוטומטית" />
+          </SectionCard>
+
+          {/* ===== 5. גיבוי ושחזור ===== */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.13 }}
+          >
+            <BackupRestore />
+          </motion.div>
+
+          {/* ===== 6. אחסון ב-Google Drive ===== */}
+          <SectionCard
+            delay={0.135}
+            icon={<Database size={18} />}
+            title="אחסון ב-Google Drive"
+            hint="כל הנתונים שלך (קורסים, סיכומים, מחברות) שמורים בקובץ אחד ב-Drive שלך. ברגע שהקובץ מתקרב ל-10MB השמירות הופכות לאיטיות — מומלץ למחוק מקורות ישנים."
+          >
+            <DriveStorageBlock db={db} />
+          </SectionCard>
+
+          {/* ===== 7. מידע על החשבון ===== */}
+          <SectionCard delay={0.14} icon={<UserIcon size={18} />} title="מידע על החשבון">
+            <dl className="settings-v2-info">
+              <InfoRow label="מזהה משתמש">
+                <code dir="ltr">{user?.id ? `${user.id.slice(0, 8)}...` : '—'}</code>
+              </InfoRow>
+              <InfoRow label="ספק אימות">
                 {user?.app_metadata?.provider === 'google' ? 'Google' : 'אימייל + סיסמה'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-ink-muted">נוצר בתאריך</span>
-              <span className="text-sm text-ink-muted" dir="ltr">
-                {user?.created_at
-                  ? new Date(user.created_at).toLocaleDateString('he-IL')
-                  : '—'}
-              </span>
-            </div>
-          </div>
-        </div>
-        </GlowCard>
-        </motion.div>
+              </InfoRow>
+              <InfoRow label="נוצר בתאריך">
+                <span dir="ltr">
+                  {user?.created_at
+                    ? new Date(user.created_at).toLocaleDateString('he-IL')
+                    : '—'}
+                </span>
+              </InfoRow>
+            </dl>
+          </SectionCard>
 
-        {/* Reset account data — destructive. Requires typed confirmation
-            so a misclick doesn't wipe a real semester of work. */}
+          {/* ===== 8. איפוס נתונים ===== */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <ResetSection resetAccountData={resetAccountData} ready={ready} />
+          </motion.div>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Reusable cream-styled building blocks
+// ────────────────────────────────────────────────────────────────────────
+
+function SectionCard({
+  delay = 0,
+  icon,
+  title,
+  hint,
+  iconTone = 'accent',
+  children,
+}: {
+  delay?: number
+  icon: React.ReactNode
+  title: string
+  hint?: string
+  iconTone?: 'accent' | 'amber' | 'rose'
+  children: React.ReactNode
+}) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay }}
+      className="settings-v2-card"
+    >
+      <header className="settings-v2-card-head">
+        <span className={`settings-v2-card-icon tone-${iconTone}`}>{icon}</span>
+        <h2>{title}</h2>
+      </header>
+      {hint && <p className="settings-v2-card-hint">{hint}</p>}
+      <div className="settings-v2-card-body">{children}</div>
+    </motion.section>
+  )
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="settings-v2-field">
+      <label>{label}</label>
+      {children}
+      {hint && <p className="settings-v2-field-hint">{hint}</p>}
+    </div>
+  )
+}
+
+function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="settings-v2-info-row">
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  )
+}
+
+function SavedMsg({ show, text, small = false }: { show: boolean; text: string; small?: boolean }) {
+  return (
+    <AnimatePresence>
+      {show && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
+          exit={{ opacity: 0 }}
+          className={`settings-v2-saved ${small ? 'small' : ''}`}
         >
-          <ResetSection resetAccountData={resetAccountData} ready={ready} />
+          <Check size={small ? 14 : 16} />
+          <span>{text}</span>
         </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+function ErrorMsg({ show, text }: { show: boolean; text: string }) {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          className="settings-v2-error"
+        >
+          <AlertCircle size={16} />
+          <span>{text}</span>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Drive storage block — extracted from the inline IIFE on the v1 page
+// for readability. Same computation, just cream-themed.
+// ────────────────────────────────────────────────────────────────────────
+
+function DriveStorageBlock({ db }: { db: import('@/lib/drive-db').DriveDB }) {
+  const bytes = (obj: unknown) => new Blob([JSON.stringify(obj ?? [])]).size
+  const fmt = (b: number) =>
+    b < 1024 ? `${b} B`
+    : b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB`
+    : `${(b / 1024 / 1024).toFixed(2)} MB`
+  const totalDb = bytes(db)
+  const sizeCourses = bytes(db.courses)
+  const sizeLessons = bytes(db.lessons)
+  const sizeNotes = bytes(db.notes)
+  const warnLevel: 'ok' | 'warn' | 'danger' =
+    totalDb > 10 * 1024 * 1024 ? 'danger'
+    : totalDb > 5 * 1024 * 1024 ? 'warn'
+    : 'ok'
+  const pct = Math.min((totalDb / (10 * 1024 * 1024)) * 100, 100)
+  const rows = [
+    { label: 'שיעורים', size: sizeLessons },
+    { label: 'סיכומים', size: sizeNotes },
+    { label: 'קורסים', size: sizeCourses },
+  ].sort((a, b) => b.size - a.size)
+
+  return (
+    <div className="settings-v2-storage">
+      <div className="settings-v2-storage-bar-head">
+        <span>סה״כ</span>
+        <span className={`settings-v2-storage-total tone-${warnLevel}`}>
+          {fmt(totalDb)} / 10 MB
+        </span>
+      </div>
+      <div className="settings-v2-storage-bar">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.6 }}
+          className={`settings-v2-storage-fill tone-${warnLevel}`}
+        />
+      </div>
+      {warnLevel === 'danger' && (
+        <p className="settings-v2-storage-msg danger">
+          הקובץ גדול מאוד — השמירות ל-Drive יהיו איטיות. מומלץ למחוק שיעורים
+          או סיכומים ישנים שלא בשימוש.
+        </p>
+      )}
+      {warnLevel === 'warn' && (
+        <p className="settings-v2-storage-msg warn">
+          הקובץ מתחיל להיות גדול. שים לב כמה מקורות כבדים אתה מוסיף.
+        </p>
+      )}
+
+      <ul className="settings-v2-storage-breakdown">
+        {rows.map(r => (
+          <li key={r.label}>
+            <span>{r.label}</span>
+            <span dir="ltr">{fmt(r.size)}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="settings-v2-storage-counts">
+        <div>
+          <div className="num">{db.courses.length}</div>
+          <div className="label">קורסים</div>
+        </div>
+        <div>
+          <div className="num">{db.lessons.length}</div>
+          <div className="label">שיעורים</div>
+        </div>
+        <div>
+          <div className="num">{db.notes.length}</div>
+          <div className="label">סיכומים</div>
+        </div>
       </div>
     </div>
   )
 }
 
-// ── Reset section ────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────
+// Reset section — destructive, requires typed confirmation
+// ────────────────────────────────────────────────────────────────────────
 
 function ResetSection({
   resetAccountData,
@@ -796,47 +701,32 @@ function ResetSection({
   }
 
   return (
-    <GlowCard glowColor="rgba(239,68,68,0.10)">
-      <div className="p-6">
-        <div className="flex items-center gap-2 mb-2">
-          <Trash2 size={18} style={{ color: '#ef4444' }} />
-          <h2 className="font-semibold text-white">איפוס נתונים</h2>
-        </div>
-        <p className="text-xs text-ink-subtle mb-5">
-          מוחק את כל הקורסים, השיעורים, המטלות והסיכומים מ-TEEPO/db.json,
-          וברירת המחדל גם מעביר את כל תיקיות ה-Drive שמתחת ל-TEEPO/ לסל
-          (ניתן לשחזור 30 ימים). השימושי כשרוצים להתחיל מחדש את הסריקה מ-Moodle.
-        </p>
-
+    <section className="settings-v2-card danger-card">
+      <header className="settings-v2-card-head">
+        <span className="settings-v2-card-icon tone-rose"><Trash2 size={18} /></span>
+        <h2>איפוס נתונים</h2>
+      </header>
+      <p className="settings-v2-card-hint">
+        מוחק את כל הקורסים, השיעורים, המטלות והסיכומים מ-TEEPO/db.json,
+        וברירת המחדל גם מעביר את כל תיקיות ה-Drive שמתחת ל-TEEPO/ לסל
+        (ניתן לשחזור 30 ימים). השימושי כשרוצים להתחיל מחדש את הסריקה מ-Moodle.
+      </p>
+      <div className="settings-v2-card-body">
         {!open && (
           <button
             type="button"
             onClick={() => setOpen(true)}
             disabled={!ready}
-            className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-            style={{
-              background: 'rgba(239,68,68,0.12)',
-              color: '#ef4444',
-              border: '1px solid rgba(239,68,68,0.35)',
-              opacity: ready ? 1 : 0.5,
-              cursor: ready ? 'pointer' : 'not-allowed',
-            }}
+            className="settings-v2-btn danger"
           >
             איפוס המידע שלי…
           </button>
         )}
 
         {open && (
-          <div className="space-y-4">
-            <div
-              className="p-3 rounded-lg text-xs flex items-start gap-2"
-              style={{
-                background: 'rgba(239,68,68,0.10)',
-                border: '1px solid rgba(239,68,68,0.35)',
-                color: '#fca5a5',
-              }}
-            >
-              <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div className="settings-v2-reset">
+            <div className="settings-v2-reset-warn">
+              <AlertCircle size={14} />
               <div>
                 פעולה זו מאפסת את כל המידע ב-TEEPO/db.json. אם תסמן גם
                 <strong> מחק תיקיות Drive</strong>, כל התיקיות מתחת ל-TEEPO/
@@ -845,7 +735,7 @@ function ResetSection({
               </div>
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-ink-muted cursor-pointer">
+            <label className="settings-v2-checkbox">
               <input
                 type="checkbox"
                 checked={wipeFolders}
@@ -855,37 +745,23 @@ function ResetSection({
               <span>מחק גם את תיקיות ה-Drive (תואר ראשון/, לא מסווגים/, …)</span>
             </label>
 
-            <div>
-              <label className="block text-xs text-ink-muted mb-1.5">
-                כדי לאשר, הקלד <strong>{REQUIRED_PHRASE}</strong>
-              </label>
+            <Field label={`כדי לאשר, הקלד "${REQUIRED_PHRASE}"`}>
               <input
                 type="text"
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
                 disabled={busy}
                 placeholder={REQUIRED_PHRASE}
-                className="w-full px-3 py-2 rounded-lg text-sm"
-                style={{
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  color: 'white',
-                }}
+                className="settings-v2-input"
               />
-            </div>
+            </Field>
 
-            <div className="flex items-center gap-2">
+            <div className="settings-v2-reset-actions">
               <button
                 type="button"
                 onClick={onReset}
                 disabled={!canReset}
-                className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-                style={{
-                  background: canReset ? '#ef4444' : 'rgba(239,68,68,0.20)',
-                  color: 'white',
-                  opacity: canReset ? 1 : 0.5,
-                  cursor: canReset ? 'pointer' : 'not-allowed',
-                }}
+                className="settings-v2-btn danger"
               >
                 {busy ? 'מאפס…' : 'אפס עכשיו'}
               </button>
@@ -897,37 +773,22 @@ function ResetSection({
                   setErrorMsg(null)
                 }}
                 disabled={busy}
-                className="px-4 py-2 rounded-lg text-sm"
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  color: 'rgba(255,255,255,0.8)',
-                }}
+                className="settings-v2-btn"
               >
                 ביטול
               </button>
             </div>
 
-            {errorMsg && (
-              <div className="text-xs" style={{ color: '#fca5a5' }}>
-                {errorMsg}
-              </div>
-            )}
+            {errorMsg && <ErrorMsg show text={errorMsg} />}
           </div>
         )}
 
         {result && (
-          <div
-            className="mt-4 p-3 rounded-lg text-xs"
-            style={{
-              background: 'rgba(16,185,129,0.10)',
-              border: '1px solid rgba(16,185,129,0.30)',
-              color: '#6ee7b7',
-            }}
-          >
+          <div className="settings-v2-reset-result">
             {result}
           </div>
         )}
       </div>
-    </GlowCard>
+    </section>
   )
 }
