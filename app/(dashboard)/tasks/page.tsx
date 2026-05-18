@@ -37,13 +37,16 @@ import type { Assignment, Course } from '@/types'
 // Palette: same rotation we use on /summaries chips, so the visual
 // language stays consistent across the two pages.
 // ──────────────────────────────────────────────────────────────────────
-const COURSE_PALETTE: Array<{ color: string; soft: string }> = [
-  { color: '#d97706', soft: '#fef3c7' },
-  { color: '#8b5cf6', soft: '#ede9fe' },
-  { color: '#0d9488', soft: '#ccfbf1' },
-  { color: '#e11d48', soft: '#fee2e2' },
-  { color: '#6366f1', soft: '#e0e7ff' },
-  { color: '#16a34a', soft: '#dcfce7' },
+const COURSE_PALETTE: Array<{ color: string; soft: string; emoji: string }> = [
+  // emoji per-palette mirrors mockup_tasks_v2.html (📘 / 📕 / 📗 / 📙) —
+  // shown as the section icon on the "לפי קורס" tab so adjacent course
+  // groups read as visually distinct even without the color stripe.
+  { color: '#d97706', soft: '#fef3c7', emoji: '📘' },
+  { color: '#8b5cf6', soft: '#ede9fe', emoji: '📕' },
+  { color: '#0d9488', soft: '#ccfbf1', emoji: '📗' },
+  { color: '#e11d48', soft: '#fee2e2', emoji: '📙' },
+  { color: '#6366f1', soft: '#e0e7ff', emoji: '📘' },
+  { color: '#16a34a', soft: '#dcfce7', emoji: '📗' },
 ]
 
 /** Deterministic palette index from any string (course.id or "uncategorized"). */
@@ -356,7 +359,7 @@ function CourseSection({
   return (
     <section className="t-section">
       <div className="t-sec-head">
-        <span className="t-sec-icon" style={{ color: p.color }} aria-hidden>📘</span>
+        <span className="t-sec-icon" style={{ color: p.color }} aria-hidden>{p.emoji}</span>
         <span className="t-sec-label">{course?.title ?? 'ללא קורס'}</span>
         <span className="t-sec-count">{list.length} פתוחות</span>
       </div>
