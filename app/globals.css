@@ -6616,24 +6616,32 @@ html.dark .cream-page::before { opacity: .35; }
 }
 .bulk-org-cta-btn:disabled { opacity: .6; cursor: not-allowed; }
 
-/* Status pill below the CTA banner — surfaces scan/execute results
- * (success, "nothing to organize", error). Stays visible until the
- * user dismisses it so messages aren't missed. */
+/* Status toast — floats at the BOTTOM of the viewport so the user
+ * sees the scan/execute result no matter where they scrolled to when
+ * the action completed. Earlier this lived inline under the CTA
+ * banner, which meant a user reading the tree below would miss
+ * the result (the pill appeared off-screen above the fold). */
 .bulk-org-status {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 12px 18px;
   border-radius: 12px;
-  margin-top: 8px;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   line-height: 1.5;
-  animation: bulkOrgStatusIn .25s ease both;
+  max-width: min(560px, calc(100vw - 32px));
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, .25);
+  animation: bulkOrgStatusIn .3s ease both;
 }
 @keyframes bulkOrgStatusIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translate(-50%, 16px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
 }
 .bulk-org-status > span { flex: 1; min-width: 0; }
 .bulk-org-status-success {
