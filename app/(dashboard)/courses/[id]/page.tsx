@@ -33,6 +33,7 @@ import { groupFilesByLesson } from '@/lib/lesson-grouping'
 import { ensureSubfolder } from '@/lib/drive-folders'
 import { moveFile } from '@/lib/drive-files'
 import { supabase } from '@/lib/supabase'
+import { BACKEND_URL } from '@/lib/backend-url'
 
 export default function CoursePage() {
   const params = useParams()
@@ -58,12 +59,11 @@ export default function CoursePage() {
     if (!course || syncing) return
     setSyncing(true)
     try {
-      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
       const { data: { session } } = await supabase.auth.getSession()
       const headers: Record<string, string> = session?.access_token
         ? { Authorization: `Bearer ${session.access_token}` }
         : {}
-      const res = await fetch(`${BACKEND}/api/university/courses`, {
+      const res = await fetch(`${BACKEND_URL}/api/university/courses`, {
         headers,
         signal: AbortSignal.timeout(60_000),
       })

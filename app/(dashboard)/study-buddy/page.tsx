@@ -8,8 +8,7 @@ import type { ChatMessage } from '@/types'
 import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
 import GlowCard from '@/components/ui/GlowCard'
-
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+import { BACKEND_URL as BACKEND } from '@/lib/backend-url'
 const STORAGE_KEY = 'smartdesk_conversations'
 // Render free-tier sleeps after ~15min idle. A cold start is 30-60s, so
 // retry aggressively over ~2 minutes before giving up.

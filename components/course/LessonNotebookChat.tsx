@@ -20,9 +20,8 @@ import { io, Socket } from 'socket.io-client'
 import { motion } from 'framer-motion'
 import { Send, Sparkles, Paperclip, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
+import { BACKEND_URL as BACKEND } from '@/lib/backend-url'
 import type { Lesson, ChatMessage } from '@/types'
-
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
 /**
  * Strip HTML tags for the context string we ship to the model — Claude
