@@ -9,8 +9,7 @@ import {
   searchCatalogCourses as _catalogSearch,
   computeCreditSummary as _catalogCredits,
 } from './catalog'
-
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+import { BACKEND_URL as BACKEND } from './backend-url'
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession()

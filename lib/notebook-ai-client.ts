@@ -20,9 +20,7 @@
  */
 
 import { io, Socket } from 'socket.io-client'
-
-const BACKEND =
-  process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+import { BACKEND_URL as BACKEND } from '@/lib/backend-url'
 
 /** Result of an inline AI action. Either a string to insert or an error. */
 export type AiActionResult =

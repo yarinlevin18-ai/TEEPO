@@ -18,14 +18,13 @@ import { useCallback, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
 import { supabase } from '@/lib/supabase'
+import { BACKEND_URL as BACKEND } from '@/lib/backend-url'
 import type { Course } from '@/types'
 import SyncResultsModal, {
   type SyncProgress,
   type SyncResultsPayload,
   type SyncStage,
 } from './SyncResultsModal'
-
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
 /** Backend on Render free tier sleeps after ~15min idle. The first
  *  request after that takes 30-60s to wake the container, and the

@@ -22,8 +22,7 @@ import { useDB } from '@/lib/db-context'
 import { useWeekCalendar } from '@/lib/use-week-calendar'
 import { probeTokenScopes } from '@/lib/drive-db'
 import { supabase } from '@/lib/supabase'
-
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+import { BACKEND_URL as BACKEND } from '@/lib/backend-url'
 
 async function authHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession()
