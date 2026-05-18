@@ -2865,6 +2865,31 @@ html.dark .cream-page::before { opacity: .35; }
   z-index: 2;
 }
 
+/* Current-time indicator — thin red line at "now" inside today's column.
+ * Sits in the current-hour cell with `top` set by the page from the
+ * current minute (positioned absolutely against .cal-cell's relative
+ * frame). z-index higher than events so it stays visible. */
+.dashboard-v2 .cal-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ef4444;
+  z-index: 3;
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(239, 68, 68, .55);
+}
+.dashboard-v2 .cal-now .cal-now-dot {
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, .55);
+}
+
 /* Time label at the top of the event pill — small, muted, tabular so the
  * times line up vertically when scanning the column. */
 .dashboard-v2 .cal-event-time {
