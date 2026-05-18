@@ -17,6 +17,7 @@
 import { useCallback, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
+import { supabase } from '@/lib/supabase'
 import type { Course } from '@/types'
 import SyncResultsModal, {
   type SyncProgress,
@@ -25,6 +26,31 @@ import SyncResultsModal, {
 } from './SyncResultsModal'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+
+/** Backend on Render free tier sleeps after ~15min idle. The first
+ *  request after that takes 30-60s to wake the container, and the
+ *  browser kills the connection long before — surfacing as a generic
+ *  "Failed to fetch". We do a separate /health ping FIRST with a 90s
+ *  timeout to absorb the cold-start; the real sync call then runs
+ *  against a warm server. */
+async function wakeBackend(): Promise<void> {
+  try {
+    await fetch(`${BACKEND}/health`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(90_000),
+    })
+  } catch {
+    // Best-effort — if /health is unreachable the main fetch below
+    // will fail with a clearer message we can surface to the user.
+  }
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token
+    ? { Authorization: `Bearer ${session.access_token}` }
+    : {}
+}
 
 // Deterministic palette index — must match /assignments and /summaries so the
 // course dots in the modal use the same color the user sees elsewhere.
@@ -86,6 +112,13 @@ export default function SyncAllButton({ variant = 'mini', label, className = '' 
 
     setStage('progress')
     setError(null)
+    setProgress({ current: 0, total: payload.length, label: 'מעיר את השרת…' })
+
+    // Wake the Render free-tier backend first — first request after
+    // ~15min idle takes ~60s as the container boots. Without this the
+    // main fetch dies with "Failed to fetch" and the user thinks
+    // something is broken.
+    await wakeBackend()
     setProgress({ current: 0, total: payload.length, label: payload[0]?.title ?? 'מתחיל…' })
 
     // Cheap progress animation — the backend call is a single round-trip,
@@ -104,12 +137,17 @@ export default function SyncAllButton({ variant = 'mini', label, className = '' 
     }
 
     try {
+      const headers = await authHeaders()
       const res = await fetch(`${BACKEND}/api/sync/all`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({ courses: payload }),
+        signal: AbortSignal.timeout(120_000),
       })
       if (ticker) clearInterval(ticker)
+      if (res.status === 401) {
+        throw new Error('הסשן פג. צא והתחבר מחדש כדי לסנכרן.')
+      }
       if (!res.ok) {
         const detail = await res.text().catch(() => '')
         throw new Error(detail.slice(0, 200) || `HTTP ${res.status}`)
@@ -143,7 +181,19 @@ export default function SyncAllButton({ variant = 'mini', label, className = '' 
       }
     } catch (e: any) {
       if (ticker) clearInterval(ticker)
-      setError(e?.message || 'שגיאה לא ידועה')
+      // Translate the common low-level failures into Hebrew the user
+      // can actually act on. "Failed to fetch" is the WebKit/Blink
+      // umbrella message for network errors — most often it means the
+      // Render backend timed out waking up, sometimes it means we're
+      // offline.
+      let msg = e?.message || 'שגיאה לא ידועה'
+      const lower = msg.toLowerCase()
+      if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+        msg = 'השרת לא הגיב תוך 2 דקות — נסה שוב בעוד דקה (השרת בRender מתעורר 30-60 שניות אחרי חוסר פעילות).'
+      } else if (lower.includes('failed to fetch') || lower.includes('networkerror')) {
+        msg = 'לא הצלחנו להגיע לשרת. ודא שיש חיבור לאינטרנט ונסה שוב — אם זו הריצה הראשונה היום, השרת ב-Render לוקח כדקה להתעורר.'
+      }
+      setError(msg)
       setStage('error')
     }
   }, [db?.courses, mutate])
