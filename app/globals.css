@@ -2262,207 +2262,10 @@ html.dark .cream-page::before { opacity: .35; }
   50% { opacity: .25; }
 }
 
-/* <AnalogClock /> wrapper helper — most styling lives inline on the SVG. */
-.analog-clock {
-  display: block;
-}
-.analog-clock line { transform-origin: 50px 50px; }
-
-/* ════════════════════════════════════════════════════════════════════
-   <CountryClock /> — daily flag clock + guess input.
-   Source: teepo-design/mockup_dashboard.html .country-clock-widget block.
-   ════════════════════════════════════════════════════════════════════ */
-.country-clock-widget {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-.country-guess {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-.country-guess input {
-  width: 80px;
-  font-size: 11px;
-  padding: 3px 7px;
-  border: 1px solid #e0cda8;
-  border-radius: 5px;
-  background: #fdf6e3;
-  text-align: center;
-  font-family: 'Heebo', sans-serif;
-  font-weight: 600;
-  color: #2d1810;
-  direction: rtl;
-  outline: none;
-  transition: border-color .15s, background .15s, color .15s;
-}
-.country-guess input::placeholder { color: #8a7261; font-weight: 500; }
-.country-guess input:focus { border-color: #16a34a; }
-.country-guess button {
-  width: 21px;
-  height: 21px;
-  background: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform .15s;
-}
-.country-guess button:hover { transform: scale(1.08); }
-.country-guess.correct input {
-  border-color: #16a34a;
-  background: #dcfce7;
-  color: #14532d;
-}
-.country-guess.wrong input {
-  border-color: #e11d48;
-  animation: shakeWrong .3s ease-in-out;
-}
-@keyframes shakeWrong {
-  0%, 100% { transform: translateX(0); }
-  25%      { transform: translateX(-4px); }
-  75%      { transform: translateX(4px); }
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   <SlidingPuzzle /> — 3×3 daily puzzle.
-   Source: teepo-design/mockup_dashboard.html .puzzle-mini block.
-   ════════════════════════════════════════════════════════════════════ */
-.puzzle-mini {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-  padding: 14px 16px;
-  background: rgba(253, 246, 227, .55);
-  border: 1px solid rgba(224, 205, 168, .6);
-  border-radius: 14px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  direction: ltr;
-  transition: background .15s, border-color .15s;
-  width: 240px;
-  flex-shrink: 0;
-}
-.puzzle-mini:hover {
-  background: rgba(253, 246, 227, .85);
-  border-color: #e0cda8;
-}
-.puzzle-mini .pm-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  direction: rtl;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #ead8b3;
-}
-.puzzle-mini .pm-label {
-  font-family: 'Frank Ruhl Libre', serif;
-  font-size: 14px;
-  font-weight: 700;
-  font-style: italic;
-  color: #2d1810;
-  letter-spacing: -.2px;
-}
-.puzzle-mini .pm-difficulty {
-  font-size: 10px;
-  color: #d97706;
-  letter-spacing: 1px;
-}
-.puzzle-mini .pm-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-  gap: 3px;
-  aspect-ratio: 1 / 1;
-  direction: ltr;
-}
-.puzzle-mini .slide-tile {
-  background: #fdf6e3;
-  border: 1px solid #e0cda8;
-  border-radius: 5px;
-  font-family: 'Heebo', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: #2d1810;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  user-select: none;
-  line-height: 1;
-  transition: background .15s, color .15s, border-color .15s, transform .25s ease;
-  padding: 0;
-}
-.puzzle-mini .slide-tile:hover:not(.empty):not(:disabled) {
-  background: #efe0bc;
-}
-.puzzle-mini .slide-tile.empty {
-  background: rgba(58, 74, 61, .06);
-  border-style: dashed;
-  cursor: default;
-}
-.puzzle-mini .slide-tile.solved {
-  color: #16a34a;
-  border-color: #16a34a;
-  animation: tileWin .5s ease both;
-}
-@keyframes tileWin {
-  0%   { transform: scale(.92); }
-  60%  { transform: scale(1.06); }
-  100% { transform: scale(1); }
-}
-.puzzle-mini .pm-foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  direction: rtl;
-  padding-top: 4px;
-  border-top: 1px solid #ead8b3;
-}
-.puzzle-mini .pm-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  font-family: 'Heebo', sans-serif;
-  font-size: 11px;
-  color: #5c3f2f;
-  line-height: 1.2;
-}
-.puzzle-mini .pm-info strong { color: #2d1810; font-weight: 700; font-size: 12px; }
-.puzzle-mini .pm-info small  { color: #8a7261; font-size: 10px; }
-.puzzle-mini .pm-controls { display: flex; gap: 4px; }
-.puzzle-mini .pm-shuffle {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: transparent;
-  border: 1px solid #e0cda8;
-  color: #5c3f2f;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all .15s;
-  font-size: 12px;
-}
-.puzzle-mini .pm-shuffle:hover {
-  background: linear-gradient(135deg, #16a34a 0%, #84cc16 100%);
-  color: white;
-  border-color: transparent;
-}
-.puzzle-mini .pm-shuffle svg { width: 12px; height: 12px; }
-
-@media (max-width: 780px) {
-  .puzzle-mini { width: 100%; }
-}
+/* CSS for AnalogClock / CountryClock / SlidingPuzzle (the v1 dashboard
+ * puzzle + country-guess game) used to live here. Removed in the
+ * dashboard-v2 redesign (CLAUDE_CODE_HANDOFF.md §16-20). The v2
+ * dashboard is utility-focused — no puzzles, no flag clocks. */
 
 /* ════════════════════════════════════════════════════════════════════
    Loading screen (app/loading.tsx).
@@ -2560,172 +2363,18 @@ html.dark .cream-page::before { opacity: .35; }
    Source: teepo-design/mockup_dashboard.html (.main, .hero, .calendar-card,
    .bottom-row, individual card styles).
    ════════════════════════════════════════════════════════════════════ */
-.dashboard-v2 .dash-main { padding: 48px 40px 80px; min-width: 0; }
-.dashboard-v2 .dash-wrap { max-width: 1200px; margin: 0 auto; position: relative; z-index: 10; }
-
-/* ----- Hero ----- */
-.dashboard-v2 .dash-hero {
-  margin-bottom: 44px;
-  padding: 28px 32px 32px;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 32px;
-  flex-wrap: wrap;
-  animation: fadeUp .5s ease .1s both;
-}
-.dashboard-v2 .hero-content { flex: 1; min-width: 0; }
-.dashboard-v2 .hero-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-  animation: fadeUp .7s ease .05s both;
-}
-.dashboard-v2 .dash-h1 {
-  font-family: 'Heebo', sans-serif;
-  /* Tighter clamp + nowrap so the full greeting fits on a single line
-   * even on smaller laptop widths. Was clamp(44px, 5.5vw, 64px) which
-   * wrapped "ירין," to a second row. */
-  font-size: clamp(32px, 4vw, 50px);
-  font-weight: 900;
-  letter-spacing: -2px;
-  line-height: 1.1;
-  color: var(--lp-ink);
-  margin: 0;
-  white-space: nowrap;
-  animation: fadeUp .8s ease .35s both;
-}
-/* The whole accent word is rendered as a single static span with the
- * green→lime gradient + the wavy underline below. No per-letter wave
- * animation — too jittery for a rotating word that swaps every 30 min. */
-.dashboard-v2 .dash-h1 .accent {
-  position: relative;
-  display: inline-block;
-  font-weight: 900;
-  background: var(--lp-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
-.dashboard-v2 .dash-h1 .accent::before {
-  content: '';
-  position: absolute;
-  top: -10px; left: -6%; right: -6%; bottom: -8px;
-  background: radial-gradient(ellipse at center, rgba(132,204,22,.20), transparent 65%);
-  filter: blur(10px);
-  z-index: -1;
-  animation: glowBreathe 4s ease-in-out infinite;
-}
-@keyframes glowBreathe {
-  0%, 100% { opacity: .55; }
-  50%      { opacity: 1; }
-}
-.dashboard-v2 .dash-h1 .accent::after {
-  content: '';
-  position: absolute;
-  bottom: -16px; left: -10%; right: -10%;
-  height: 12px;
-  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='12' viewBox='0 0 80 12'%3E%3Cpath d='M0 6 Q 20 0, 40 6 T 80 6' fill='none' stroke='%2316a34a' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: repeat-x;
-  background-size: 80px 12px;
-  background-position-y: center;
-  pointer-events: none;
-  opacity: .85;
-  -webkit-mask-image: linear-gradient(to left, transparent 0%, black 18%, black 82%, transparent 100%);
-  mask-image: linear-gradient(to left, transparent 0%, black 18%, black 82%, transparent 100%);
-  animation: waveFlow 9s linear infinite;
-}
-@keyframes waveFlow {
-  from { background-position-x: 0; }
-  to   { background-position-x: -80px; }
-}
-
-/* ----- Puzzle zone — instructions card + sliding puzzle widget ----- */
-.dashboard-v2 .puzzle-zone {
-  display: flex;
-  align-items: stretch;
-  gap: 12px;
-  flex-shrink: 0;
-  animation: fadeUp .6s ease .3s both;
-}
-.dashboard-v2 .puzzle-instructions {
-  width: 160px;
-  background: rgba(22, 163, 74, .07);
-  border: 1px solid rgba(22, 163, 74, .25);
-  border-radius: 14px;
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  backdrop-filter: blur(6px);
-}
-.dashboard-v2 .puzzle-instructions .pi-title {
-  font-family: 'Frank Ruhl Libre', serif;
-  font-size: 14px;
-  font-weight: 700;
-  font-style: italic;
-  color: var(--lp-accent);
-  letter-spacing: -.2px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(22, 163, 74, .2);
-}
-.dashboard-v2 .puzzle-instructions ol {
-  margin: 0;
-  padding-right: 16px;
-  font-size: 11.5px;
-  color: var(--lp-ink-soft);
-  line-height: 1.5;
-  font-weight: 500;
-}
-.dashboard-v2 .puzzle-instructions ol li { margin-bottom: 4px; }
-.dashboard-v2 .puzzle-instructions ol li strong { color: var(--lp-ink); font-weight: 700; }
-.dashboard-v2 .puzzle-instructions .pi-goal {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: auto;
-  padding-top: 6px;
-  border-top: 1px solid rgba(22, 163, 74, .2);
-  font-size: 11px;
-  color: var(--lp-ink-soft);
-}
-.dashboard-v2 .puzzle-instructions .pi-goal-mini {
-  display: grid;
-  grid-template-columns: repeat(3, 12px);
-  grid-template-rows: repeat(3, 12px);
-  gap: 1px;
-  background: rgba(58, 74, 61, .12);
-  padding: 1.5px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  direction: ltr;
-}
-.dashboard-v2 .puzzle-instructions .pi-goal-mini span {
-  background: var(--lp-bg-card);
-  border: 1px solid var(--lp-line-soft);
-  font-size: 7px;
-  font-weight: 700;
-  color: var(--lp-ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 1.5px;
-  line-height: 1;
-}
-.dashboard-v2 .puzzle-instructions .pi-goal-mini span.empty {
-  background: transparent;
-  border-color: transparent;
-}
-
+/* The v1 dashboard hero (.dash-main, .dash-wrap, .dash-hero,
+ * .hero-content, .hero-meta, .dash-h1 with glow + wave underline,
+ * .puzzle-zone, .puzzle-instructions) was removed in the dashboard-v2
+ * redesign. The new utility-focused layout lives under .dash-v2-*
+ * selectors further down in this file. */
 @media (max-width: 980px) {
-  .dashboard-v2 .dash-hero { flex-direction: column; align-items: flex-start; }
+  .dashboard-v2 .dash-v2-hero { flex-direction: column; align-items: flex-start; }
 }
 
-/* ----- Calendar card ----- */
+/* ----- Calendar wrapper card (the inner .cal-grid / .cal-event / .cal-now
+ *       rules below are preserved verbatim — same <CalendarWeek> component
+ *       still drives the week-view grid, only the wrapping card is restyled). */
 .dashboard-v2 .calendar-card-v2 {
   background: var(--lp-bg-card);
   border: 1px solid var(--lp-line);
@@ -3646,270 +3295,12 @@ html.dark .cream-page::before { opacity: .35; }
 .dashboard-v2 .ev-rose   { border-color: #e11d48; background: linear-gradient(90deg, rgba(255,217,224,.5), rgba(255,255,255,.5)); }
 .dashboard-v2 .ev-purple { border-color: #8b5cf6; background: linear-gradient(90deg, rgba(237,233,254,.5), rgba(255,255,255,.5)); }
 
-/* ----- Bottom row 3 cards ----- */
-.dashboard-v2 .bottom-row-v2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 20px;
-}
-.dashboard-v2 .dcard {
-  background: var(--lp-bg-card);
-  border: 1px solid var(--lp-line);
-  border-radius: 14px;
-  overflow: hidden;
-  transition: transform .2s ease, box-shadow .2s ease;
-  box-shadow: var(--lp-shadow-sm);
-  animation: fadeUp .55s ease .4s both;
-}
-.dashboard-v2 .dcard:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--lp-shadow-lg);
-}
-.dashboard-v2 .dcard-head {
-  padding: 18px 22px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--lp-line-soft);
-}
-.dashboard-v2 .dcard-head h3 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--lp-ink);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.dashboard-v2 .dcard-head .badge-num {
-  background: var(--lp-bg-elev);
-  color: var(--lp-muted);
-  font-size: 11px;
-  padding: 2px 9px;
-  border-radius: 999px;
-  font-weight: 600;
-}
-.dashboard-v2 .dcard-head a {
-  color: var(--lp-accent);
-  font-size: 12px;
-  text-decoration: none;
-  font-weight: 500;
-}
-.dashboard-v2 .dcard-head a:hover { color: var(--lp-accent-deep); }
-
-/* Schedule rows */
-.dashboard-v2 .sch-row {
-  padding: 14px 22px;
-  border-bottom: 1px solid var(--lp-line-soft);
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  transition: background .15s;
-}
-.dashboard-v2 .sch-row:hover { background: var(--lp-bg-hover); }
-.dashboard-v2 .sch-row:last-child { border: 0; }
-.dashboard-v2 .sch-time {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--lp-muted);
-  width: 50px;
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-}
-.dashboard-v2 .sch-bar {
-  width: 3px;
-  align-self: stretch;
-  min-height: 24px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-.dashboard-v2 .sch-info strong { font-size: 13.5px; font-weight: 600; display: block; color: var(--lp-ink); }
-.dashboard-v2 .sch-info small  { font-size: 11.5px; color: var(--lp-muted); }
-
-/* Clickable schedule row variant — used when the row resolves to a real
- * course; click navigates to /summaries with the course pre-selected. */
-.dashboard-v2 .sch-row-link {
-  text-decoration: none;
-  color: inherit;
-  cursor: pointer;
-}
-.dashboard-v2 .sch-row-link:hover {
-  background: var(--lp-bg-hover);
-}
-.dashboard-v2 .sch-row-link.is-unmatched {
-  opacity: .75;
-}
-.dashboard-v2 .sch-row-link.is-unmatched:hover {
-  opacity: 1;
-}
-
-/* Course/assignment rows */
-.dashboard-v2 .course {
-  padding: 14px 22px;
-  border-bottom: 1px solid var(--lp-line-soft);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: background .15s;
-}
-.dashboard-v2 .course:hover { background: var(--lp-bg-hover); }
-.dashboard-v2 .course:last-child { border: 0; }
-.dashboard-v2 .course-bar { width: 3px; height: 28px; border-radius: 2px; flex-shrink: 0; }
-.dashboard-v2 .course-info { flex: 1; min-width: 0; }
-.dashboard-v2 .course-info strong { font-size: 13.5px; font-weight: 600; display: block; color: var(--lp-ink); }
-.dashboard-v2 .course-info small  { font-size: 11.5px; color: var(--lp-muted); }
-.dashboard-v2 .course-tag {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 999px;
-}
-
-/* Task rows + status tags */
-.dashboard-v2 .task {
-  padding: 14px 22px;
-  border-bottom: 1px solid var(--lp-line-soft);
-  display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  transition: background .15s;
-}
-.dashboard-v2 .task:hover { background: var(--lp-bg-hover); }
-.dashboard-v2 .task:last-child { border: 0; }
-.dashboard-v2 .task .checkbox {
-  width: 17px;
-  height: 17px;
-  border: 1.5px solid var(--lp-line);
-  border-radius: 5px;
-  flex-shrink: 0;
-  margin-top: 1px;
-  transition: all .15s;
-}
-.dashboard-v2 .task .checkbox:hover { border-color: var(--lp-accent); }
-.dashboard-v2 .task-info { flex: 1; min-width: 0; }
-.dashboard-v2 .task-info strong { font-size: 13.5px; font-weight: 600; display: block; margin-bottom: 2px; color: var(--lp-ink); }
-.dashboard-v2 .task-info small  { color: var(--lp-muted); font-size: 11.5px; }
-.dashboard-v2 .task-tag {
-  font-size: 10px;
-  padding: 3px 9px;
-  border-radius: 6px;
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-}
-.dashboard-v2 .t-rose  { background: #ffd9e0; color: #9f1239; }
-.dashboard-v2 .t-amber { background: #fde68a; color: #92400e; }
-.dashboard-v2 .t-blue  { background: #e0e7ff; color: #3730a3; }
-.dashboard-v2 .t-soft  { background: var(--lp-bg-elev); color: var(--lp-ink-soft); }
-
-/* Bottom-row staggered entry */
-.dashboard-v2 .bottom-row-v2 .dcard:nth-child(1) { animation-delay: .4s; }
-.dashboard-v2 .bottom-row-v2 .dcard:nth-child(2) { animation-delay: .5s; }
-.dashboard-v2 .bottom-row-v2 .dcard:nth-child(3) { animation-delay: .6s; }
-
-/* Empty-state body inside a dashboard card — shown when the user has no
-   real data of that kind yet. Replaces the v1 mockup-data fallback. */
-.dashboard-v2 .dcard-empty {
-  padding: 28px 22px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-.dashboard-v2 .dcard-empty p {
-  font-size: 13.5px;
-  color: var(--lp-muted, #8a7261);
-  line-height: 1.55;
-}
-.dashboard-v2 .dcard-empty-cta {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--lp-accent-deep, #14532d);
-  background: var(--lp-accent-soft, #dcfce7);
-  padding: 6px 14px;
-  border-radius: 999px;
-  text-decoration: none;
-  transition: background .15s, color .15s;
-}
-.dashboard-v2 .dcard-empty-cta:hover {
-  background: var(--lp-accent, #16a34a);
-  color: white;
-}
-/* Compact variant — used in the משימות card when there's a quick-add
- * row below; the standard padded empty-state would push the input too
- * far down the card. */
-.dashboard-v2 .dcard-empty-compact {
-  padding: 14px 22px 6px;
-}
-.dashboard-v2 .dcard-empty-compact p {
-  font-size: 12.5px;
-}
-
-/* Inline quick-add task input — bottom row of the משימות widget */
-.dashboard-v2 .quick-add-task {
-  display: flex;
-  gap: 6px;
-  padding: 10px 14px 14px;
-  border-top: 1px solid var(--lp-line-soft);
-  margin-top: 4px;
-}
-.dashboard-v2 .quick-add-task input {
-  flex: 1;
-  min-width: 0;
-  padding: 7px 12px;
-  border-radius: 9px;
-  border: 1px solid var(--lp-line);
-  background: white;
-  color: var(--lp-ink);
-  font-family: inherit;
-  font-size: 13px;
-  transition: border-color .15s, box-shadow .15s;
-}
-.dashboard-v2 .quick-add-task input::placeholder {
-  color: var(--lp-muted);
-}
-.dashboard-v2 .quick-add-task input:focus {
-  outline: none;
-  border-color: var(--lp-accent);
-  box-shadow: 0 0 0 3px rgba(22, 163, 74, .15);
-}
-.dashboard-v2 .quick-add-task input:disabled { opacity: .6; }
-.dashboard-v2 .quick-add-task button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  border: 0;
-  background: var(--lp-gradient, linear-gradient(135deg, #16a34a, #84cc16));
-  color: white;
-  cursor: pointer;
-  flex-shrink: 0;
-  box-shadow: 0 3px 8px -2px rgba(22, 163, 74, .35);
-  transition: transform .15s, box-shadow .15s, opacity .15s;
-}
-.dashboard-v2 .quick-add-task button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 5px 12px -2px rgba(22, 163, 74, .5);
-}
-.dashboard-v2 .quick-add-task button:disabled {
-  opacity: .4;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-/* 2-column intermediate so the jump isn't 3 → 1. The drawer kicks in at
-   1100px, but cards stay readable in 2 columns down to ~700px. */
-@media (max-width: 1100px) {
-  .dashboard-v2 .bottom-row-v2 { grid-template-columns: 1fr 1fr; }
-}
-@media (max-width: 700px) {
-  .dashboard-v2 .bottom-row-v2 { grid-template-columns: 1fr; }
-  .dashboard-v2 .dash-main { padding: 32px 20px 60px; }
-}
+/* The v1 dashboard bottom row (.bottom-row-v2 with .dcard / .sch-row /
+ * .course / .task subcomponents + .dcard-empty empty states +
+ * .quick-add-task inline input + .t-rose/amber/blue/soft tag tints)
+ * was removed in the dashboard-v2 redesign. All three cards collapsed
+ * into the new top-of-page "השיעורים של היום" classes row + the
+ * 2-widget grid (assignments / todos) — see .dash-v2-* rules below. */
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(10px); }
@@ -9919,4 +9310,569 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   .do-tree-card .tree-branches[data-columns="2"] { grid-template-columns: 1fr; gap: 36px; }
   .do-banner { flex-direction: column; align-items: stretch; gap: 14px; text-align: right; }
   .do-banner-actions { justify-content: flex-end; flex-wrap: wrap; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Dashboard v2 — app/(dashboard)/dashboard/page.tsx
+   Source: teepo-design/mockup_dashboard_v2.html.
+   Layout: hero → today's classes → 2 widgets → weekly calendar.
+   The inner .cal-* rules (calendar grid) live earlier in this file
+   and are reused by the same <CalendarWeek> component.
+   ════════════════════════════════════════════════════════════════════ */
+
+.dashboard-v2 .dash-v2-main {
+  padding: 32px 32px 80px;
+  max-width: 1500px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+/* ----- Hero (LCD meta + headline) ----- */
+.dashboard-v2 .dash-v2-hero {
+  margin-bottom: 28px;
+  padding: 8px 8px 0;
+}
+.dashboard-v2 .dash-v2-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  animation: fadeUp .55s ease .05s both;
+}
+.dashboard-v2 .dash-v2-h1 {
+  font-family: 'Heebo', sans-serif;
+  font-size: clamp(32px, 4.2vw, 52px);
+  font-weight: 900;
+  letter-spacing: -2px;
+  line-height: 1.05;
+  color: var(--lp-ink);
+  margin: 0;
+  animation: fadeUp .65s ease .18s both;
+}
+.dashboard-v2 .dash-v2-h1 .accent {
+  display: inline-block;
+  background: var(--lp-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  font-weight: 900;
+}
+
+/* ----- Section headers ----- */
+.dashboard-v2 .dash-v2-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+.dashboard-v2 .dash-v2-section-head h2 {
+  font-family: 'Frank Ruhl Libre', serif;
+  font-size: 22px;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--lp-ink);
+  letter-spacing: -.4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.dashboard-v2 .dash-v2-section-head .badge {
+  font-family: 'Heebo', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--lp-muted);
+  background: rgba(253, 246, 227, .6);
+  border: 1px solid var(--lp-line);
+  border-radius: 99px;
+  padding: 2px 9px;
+  font-style: normal;
+  letter-spacing: 0;
+}
+
+/* ----- Today's classes row ----- */
+.dashboard-v2 .dash-v2-classes-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-bottom: 30px;
+  animation: fadeUp .55s ease .28s both;
+}
+.dashboard-v2 .dash-v2-class-card {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--lp-shadow-sm);
+  position: relative;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  transition: transform .2s, box-shadow .2s, border-color .2s;
+}
+.dashboard-v2 .dash-v2-class-card::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 4px;
+  background: var(--course-color, var(--lp-accent));
+  border-radius: 4px 0 0 4px;
+}
+.dashboard-v2 .dash-v2-class-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--lp-shadow);
+  border-color: var(--course-color, var(--lp-accent));
+}
+.dashboard-v2 .dash-v2-class-card .ctop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dashboard-v2 .dash-v2-class-card .ctime {
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  letter-spacing: 1.5px;
+  color: #a3e635;
+  background: #1a1410;
+  padding: 3px 10px 1px;
+  border-radius: 5px;
+  text-shadow: 0 0 5px rgba(132, 204, 22, .55);
+  line-height: 1;
+  direction: ltr;
+}
+.dashboard-v2 .dash-v2-class-card .ckind {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--course-color, var(--lp-accent));
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.dashboard-v2 .dash-v2-class-card .ctitle {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--lp-ink);
+  letter-spacing: -.3px;
+  line-height: 1.25;
+}
+.dashboard-v2 .dash-v2-class-card .cmeta {
+  font-size: 12.5px;
+  color: var(--lp-ink-soft);
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dashboard-v2 .dash-v2-class-card .cmeta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dashboard-v2 .dash-v2-class-card .cmeta svg {
+  width: 11px;
+  height: 11px;
+  opacity: .8;
+}
+.dashboard-v2 .dash-v2-class-card.next {
+  background: linear-gradient(135deg, var(--lp-accent-soft) 0%, rgba(220, 252, 231, .4) 100%);
+  border-color: rgba(22, 163, 74, .35);
+}
+.dashboard-v2 .dash-v2-class-card.next .ctitle,
+.dashboard-v2 .dash-v2-class-card.next .ckind {
+  color: var(--lp-accent-deep);
+}
+.dashboard-v2 .dash-v2-class-card.live {
+  background: linear-gradient(135deg, rgba(254, 226, 226, .8) 0%, rgba(254, 226, 226, .5) 100%);
+  border-color: rgba(225, 29, 72, .35);
+}
+.dashboard-v2 .dash-v2-class-card.live .ckind { color: #b91c1c; }
+.dashboard-v2 .dash-v2-class-card.live .ckind::before {
+  content: '●';
+  margin-left: 4px;
+  animation: livePulse 1.2s ease-in-out infinite;
+}
+@keyframes livePulse {
+  0%, 100% { opacity: .4; }
+  50%      { opacity: 1; }
+}
+.dashboard-v2 .dash-v2-class-card.done {
+  opacity: .6;
+}
+.dashboard-v2 .dash-v2-class-card.done .ctitle {
+  text-decoration: line-through;
+  text-decoration-color: var(--lp-muted);
+}
+
+/* ----- 2-widget grid (assignments + todos) ----- */
+.dashboard-v2 .dash-v2-widgets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 30px;
+  animation: fadeUp .55s ease .38s both;
+}
+@media (max-width: 900px) {
+  .dashboard-v2 .dash-v2-widgets { grid-template-columns: 1fr; }
+}
+.dashboard-v2 .dash-v2-widget {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 16px;
+  box-shadow: var(--lp-shadow-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: box-shadow .2s;
+}
+.dashboard-v2 .dash-v2-widget:hover { box-shadow: var(--lp-shadow); }
+.dashboard-v2 .dash-v2-widget .w-head {
+  padding: 14px 18px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--lp-line-soft);
+}
+.dashboard-v2 .dash-v2-widget .w-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--w-color, var(--lp-accent-soft));
+  color: var(--w-icon-color, var(--lp-accent));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.dashboard-v2 .dash-v2-widget .w-icon svg { width: 16px; height: 16px; }
+.dashboard-v2 .dash-v2-widget .w-title {
+  flex: 1;
+  font-family: 'Heebo', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--lp-ink);
+  letter-spacing: -.3px;
+}
+.dashboard-v2 .dash-v2-widget .w-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--lp-muted);
+  background: var(--lp-bg-elev);
+  border-radius: 99px;
+  padding: 2px 9px;
+}
+.dashboard-v2 .dash-v2-widget .w-all {
+  font-size: 12.5px;
+  color: var(--lp-accent);
+  text-decoration: none;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.dashboard-v2 .dash-v2-widget .w-all:hover { text-decoration: underline; }
+.dashboard-v2 .dash-v2-widget .w-body { flex: 1; }
+.dashboard-v2 .dash-v2-widget .w-empty {
+  text-align: center;
+  padding: 24px;
+  font-size: 13px;
+  color: var(--lp-muted);
+  font-weight: 500;
+}
+
+/* Assignment row (read-only, click to open detail) */
+.dashboard-v2 .dash-v2-widget .assn-row {
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--lp-line-soft);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+  transition: background .15s;
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+}
+.dashboard-v2 .dash-v2-widget .assn-row::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  background: var(--course-color, var(--lp-accent));
+  border-radius: 3px 0 0 3px;
+}
+.dashboard-v2 .dash-v2-widget .assn-row:last-child { border-bottom: none; }
+.dashboard-v2 .dash-v2-widget .assn-row:hover { background: var(--lp-bg-hover); }
+.dashboard-v2 .dash-v2-widget .assn-row .ar-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--course-color, var(--lp-accent));
+  font-weight: 700;
+  white-space: nowrap;
+}
+.dashboard-v2 .dash-v2-widget .assn-row .ar-tag .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.dashboard-v2 .dash-v2-widget .assn-row .ar-info { min-width: 0; }
+.dashboard-v2 .dash-v2-widget .assn-row .ar-info strong {
+  display: block;
+  font-size: 13.5px;
+  color: var(--lp-ink);
+  font-weight: 700;
+  line-height: 1.3;
+}
+.dashboard-v2 .dash-v2-widget .assn-row .ar-info small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--lp-muted);
+  margin-top: 2px;
+}
+.dashboard-v2 .dash-v2-widget .assn-row .ar-due {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.dashboard-v2 .dash-v2-widget .assn-row .ar-due.urgent { background: #fee2e2; color: #b91c1c; }
+.dashboard-v2 .dash-v2-widget .assn-row .ar-due.soon   { background: #fef3c7; color: #92400e; }
+.dashboard-v2 .dash-v2-widget .assn-row .ar-due.normal { background: var(--lp-bg-elev); color: var(--lp-muted); }
+
+/* Todo quick-add input */
+.dashboard-v2 .dash-v2-widget .todo-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 14px;
+  background: var(--lp-bg);
+  border: 1.5px dashed var(--lp-line);
+  border-radius: 10px;
+  padding: 6px 12px;
+  transition: border-color .15s, border-style .15s, box-shadow .15s;
+}
+.dashboard-v2 .dash-v2-widget .todo-add:focus-within {
+  border-style: solid;
+  border-color: var(--lp-accent);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, .1);
+}
+.dashboard-v2 .dash-v2-widget .todo-add .ta-plus {
+  width: 24px;
+  height: 24px;
+  background: var(--lp-gradient);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform .15s, opacity .15s;
+}
+.dashboard-v2 .dash-v2-widget .todo-add .ta-plus:hover:not(:disabled) { transform: scale(1.1); }
+.dashboard-v2 .dash-v2-widget .todo-add .ta-plus:disabled { opacity: .4; cursor: not-allowed; }
+.dashboard-v2 .dash-v2-widget .todo-add input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lp-ink);
+  padding: 6px 0;
+}
+.dashboard-v2 .dash-v2-widget .todo-add input::placeholder {
+  color: var(--lp-muted);
+  font-weight: 500;
+}
+
+/* Todo row (interactive: check, due chip, delete) */
+.dashboard-v2 .dash-v2-widget .todo-row {
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--lp-line-soft);
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  transition: background .15s;
+}
+.dashboard-v2 .dash-v2-widget .todo-row:last-of-type { border-bottom: none; }
+.dashboard-v2 .dash-v2-widget .todo-row:hover { background: var(--lp-bg-hover); }
+.dashboard-v2 .dash-v2-widget .todo-row .check {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--lp-line);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+  flex-shrink: 0;
+}
+.dashboard-v2 .dash-v2-widget .todo-row .check:hover {
+  border-color: var(--lp-accent);
+  transform: scale(1.08);
+}
+.dashboard-v2 .dash-v2-widget .todo-row .check svg {
+  width: 12px;
+  height: 12px;
+  color: white;
+  opacity: 0;
+  transform: scale(.5);
+  transition: all .25s cubic-bezier(.34, 1.56, .64, 1);
+}
+.dashboard-v2 .dash-v2-widget .todo-row.done .check {
+  background: var(--lp-gradient);
+  border-color: transparent;
+}
+.dashboard-v2 .dash-v2-widget .todo-row.done .check svg {
+  opacity: 1;
+  transform: scale(1);
+}
+.dashboard-v2 .dash-v2-widget .todo-row .tr-text {
+  font-size: 13.5px;
+  color: var(--lp-ink);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.dashboard-v2 .dash-v2-widget .todo-row.done .tr-text {
+  color: var(--lp-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--lp-accent);
+  text-decoration-thickness: 1.5px;
+}
+.dashboard-v2 .dash-v2-widget .todo-row .tr-due {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--lp-bg-elev);
+  color: var(--lp-muted);
+  white-space: nowrap;
+}
+.dashboard-v2 .dash-v2-widget .todo-row .tr-due.today {
+  background: var(--lp-accent-soft);
+  color: var(--lp-accent-deep);
+}
+.dashboard-v2 .dash-v2-widget .todo-row.done .tr-due { opacity: .5; }
+.dashboard-v2 .dash-v2-widget .todo-row .tr-del {
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lp-faint);
+  cursor: pointer;
+  opacity: 0;
+  border-radius: 5px;
+  transition: all .15s;
+}
+.dashboard-v2 .dash-v2-widget .todo-row:hover .tr-del { opacity: 1; }
+.dashboard-v2 .dash-v2-widget .todo-row .tr-del:hover {
+  background: #fee2e2;
+  color: var(--lp-rose);
+}
+.dashboard-v2 .dash-v2-widget .todo-row .tr-del svg { width: 13px; height: 13px; }
+
+/* ----- Today-classes empty state ----- */
+.dashboard-v2 .dash-v2-empty {
+  margin-bottom: 30px;
+  padding: 28px 22px;
+  text-align: center;
+  background: rgba(253, 246, 227, .55);
+  border: 1px dashed var(--lp-line);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  color: var(--lp-muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  animation: fadeUp .55s ease .28s both;
+}
+.dashboard-v2 .dash-v2-empty-cta {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--lp-accent-deep);
+  background: var(--lp-accent-soft);
+  padding: 6px 14px;
+  border-radius: 99px;
+  text-decoration: none;
+  transition: background .15s, color .15s;
+}
+.dashboard-v2 .dash-v2-empty-cta:hover {
+  background: var(--lp-accent);
+  color: white;
+}
+
+/* ----- Weekly calendar wrapping card ----- */
+.dashboard-v2 .dash-v2-calendar-card {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 18px;
+  padding: 18px 20px;
+  box-shadow: var(--lp-shadow);
+  margin-bottom: 32px;
+  overflow: hidden;
+  animation: fadeUp .55s ease .48s both;
+}
+.dashboard-v2 .dash-v2-calendar-card .cal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--lp-line-soft);
+  margin-bottom: 14px;
+}
+.dashboard-v2 .dash-v2-calendar-card .cal-head .gcal-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #4285f4, #34a853);
+  color: white;
+  font-weight: 800;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dashboard-v2 .dash-v2-calendar-card .cal-head h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--lp-ink);
+  flex: 1;
+}
+.dashboard-v2 .dash-v2-calendar-card .cal-head .month {
+  font-size: 12.5px;
+  color: var(--lp-muted);
+  font-weight: 600;
+}
+.dashboard-v2 .dash-v2-calendar-card .cal-head .cal-open {
+  font-size: 12.5px;
+  color: var(--lp-accent);
+  text-decoration: none;
+  font-weight: 700;
+}
+.dashboard-v2 .dash-v2-calendar-card .cal-head .cal-open:hover { text-decoration: underline; }
+
+/* ----- Responsive ----- */
+@media (max-width: 700px) {
+  .dashboard-v2 .dash-v2-main { padding: 20px 16px 60px; }
 }

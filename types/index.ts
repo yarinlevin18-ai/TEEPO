@@ -115,8 +115,18 @@ export interface Course {
   drive_folder_path?: string
 
   // ── v2.1 fields ────────────────────────────────────────────────
+  /** Lecturer's display name. Optional — when unset the course-detail
+   *  sidebar shows a "+ הוסף שם מרצה" CTA instead of inventing one from
+   *  the email prefix. Populated from Moodle scrape (when available) or
+   *  manual entry. Added in dashboard-v2-redesign. */
+  lecturer_name?: string
   /** Lecturer's email — typically pulled from Moodle/Portal, sometimes user-supplied. */
   lecturer_email?: string
+  /** Course credits (נק"ז). Optional; shown in the course-detail hero
+   *  next to semester. Falls back to the catalog `student_courses[]`
+   *  entry for the same course when unset. Added in
+   *  dashboard-v2-redesign — additive, no migration needed. */
+  credits?: number
   /** URL to the official syllabus PDF (Moodle resource or external). */
   syllabus_url?: string
   /** TAs assigned to the course. Empty array = none known yet. */

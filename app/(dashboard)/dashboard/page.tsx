@@ -1,36 +1,47 @@
 'use client'
 
 /**
- * Dashboard — v2 locked design.
+ * Dashboard — v2 utility-focused layout per
+ * teepo-design/mockup_dashboard_v2.html.
  *
- * Source: teepo-design/mockup_dashboard.html. Layout (top → bottom):
- *   1. Hero strip
- *      - left  (RTL "start"): meta row [LCD date · LCD time · CountryClock]
- *        + headline "שלום {name}, השבוע שלך מאוזן." with wave-animated
- *          accent letters and a flowing SVG underline.
- *      - right (RTL "end"): puzzle zone = instructions card + SlidingPuzzle.
- *   2. Google Calendar week card (placeholder grid — wired to real data in a
- *      follow-up).
- *   3. Three bottom cards: today schedule · academic assignments · personal todos.
+ * Structure (top → bottom):
+ *   1. Hero — LCD date pill + LCD time pill + h1 "שלום {name}, השבוע שלך {accent}."
+ *   2. השיעורים של היום — auto-fit grid of class cards with
+ *      .done / .live / .next state derived from the current time.
+ *   3. Two widgets side-by-side:
+ *        - המטלות שלי (read-only) — 3 most-urgent open assignments,
+ *          each row links to /assignments?focus=<id>.
+ *        - המשימות שלי (interactive) — quick-add + working checkbox +
+ *          delete. Wired to useDB() createTask / updateTask / deleteTask.
+ *   4. הלוז השבועי — section header + wrapper card around the
+ *      existing <CalendarWeek> grid (preserved verbatim; the iframe in
+ *      the mockup is a placeholder for whatever real calendar we ship).
  *
- * Renders real user content from useDB() when present; falls back to
- * mockup-quality placeholders for missing data so an empty account still
- * looks alive.
+ * Per the "swap visuals, keep mechanics" rule: every data source +
+ * handler below is an existing hook from db-context / use-week-calendar
+ * / auth-context — only the UI shape is new.
+ *
+ * Removed from the v1 dashboard (per CLAUDE_CODE_HANDOFF.md §16-20):
+ *   - SlidingPuzzle widget
+ *   - CountryClock guessing game
+ *   - Old 3-card bottom row ("היום בלוח" / "מטלות ועבודות" / "משימות")
+ *   - Time-aware "now" hero card
  */
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
 import { useWeekCalendar, type WeekCalendarSlot } from '@/lib/use-week-calendar'
 import { matchCourseForEvent } from '@/lib/event-course-match'
 import { resolveFirstName } from '@/lib/display-name'
-import type { Course } from '@/types'
-import { Plus } from 'lucide-react'
+import type { Course, Assignment, StudyTask } from '@/types'
+import {
+  Plus, Check, X, MapPin, Clock, User as UserIcon,
+  ClipboardCheck, ListTodo,
+} from 'lucide-react'
 import LCDDisplay from '@/components/ui/LCDDisplay'
-import CountryClock from '@/components/dashboard/CountryClock'
-import SlidingPuzzle from '@/components/dashboard/SlidingPuzzle'
 
 // Accent word at the end of the greeting cycles through this list every
 // 30 minutes (a slow, deterministic rotation — same word for all clients
@@ -50,10 +61,6 @@ const ACCENT_WORDS = [
 ] as const
 
 const ACCENT_SLOT_MS = 30 * 60 * 1000  // 30 minutes
-
-// First-name greeting derived from the shared name resolver. Priority:
-// Drive setting → Google profile (full_name/name) → legacy → email prefix.
-// See lib/display-name.ts.
 
 function pad2(n: number): string {
   return n.toString().padStart(2, '0')
@@ -75,21 +82,109 @@ function useRotatingAccent(): string {
   return word
 }
 
+/** Hook: returns the current Date, refreshed every minute. Drives the
+ *  .done / .live / .next state on the today's-classes cards (and the
+ *  red current-time line inside <CalendarWeek>). */
+function useNow(intervalMs: number = 60_000): Date {
+  const [now, setNow] = useState<Date>(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), intervalMs)
+    return () => clearInterval(id)
+  }, [intervalMs])
+  return now
+}
+
+/** Derive a small kind label for the class card eyebrow. The Google
+ *  Calendar event title is the only signal we have — heuristic match
+ *  on Hebrew keywords. Default → "הרצאה" (lecture). */
+function deriveClassKind(title: string): string {
+  const t = title.toLowerCase()
+  if (t.includes('תרגול') || t.includes('targul')) return 'תרגול'
+  if (t.includes('סמינר')) return 'סמינר'
+  if (t.includes('מעבדה')) return 'מעבדה'
+  if (t.includes('בוחן') || t.includes('מבחן')) return 'מבחן'
+  return 'הרצאה'
+}
+
+/** Map an Assignment to the .ar-due pill tone. */
+function assignmentTone(a: Assignment, daysUntil: number | null): 'urgent' | 'soon' | 'normal' {
+  if (a.priority === 'high') return 'urgent'
+  if (daysUntil !== null && daysUntil <= 1) return 'urgent'
+  if (a.priority === 'medium' || (daysUntil !== null && daysUntil <= 7)) return 'soon'
+  return 'normal'
+}
+
+/** Short Hebrew label for an assignment's due chip — "דחוף" / "השבוע" / "בעבודה". */
+function assignmentLabel(tone: 'urgent' | 'soon' | 'normal'): string {
+  if (tone === 'urgent') return 'דחוף'
+  if (tone === 'soon') return 'השבוע'
+  return 'בעבודה'
+}
+
+/** Format a deadline date (ISO) → "מחר 09:00" / "שישי" / "17 במאי". */
+const HEB_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר']
+const HEB_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
+
+function daysUntilDate(iso?: string | null): number | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  d.setHours(0, 0, 0, 0)
+  return Math.round((d.getTime() - today.getTime()) / 86_400_000)
+}
+
+function formatAssignmentDue(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const dn = daysUntilDate(iso)!
+  const hh = pad2(d.getHours())
+  const mm = pad2(d.getMinutes())
+  const hasTime = !(d.getHours() === 0 && d.getMinutes() === 0)
+  if (dn < 0) return `איחור ${Math.abs(dn)} ימים`
+  if (dn === 0) return hasTime ? `היום ${hh}:${mm}` : 'היום'
+  if (dn === 1) return hasTime ? `מחר ${hh}:${mm}` : 'מחר'
+  if (dn <= 6) {
+    const day = HEB_DAYS[d.getDay()]
+    return hasTime ? `${day} ${hh}:${mm}` : day
+  }
+  return `${d.getDate()} ב${HEB_MONTHS[d.getMonth()]}`
+}
+
+function formatTodoDue(t: StudyTask): { label: string; today: boolean } {
+  if (t.is_completed) return { label: 'הושלם', today: false }
+  if (!t.scheduled_date) return { label: '', today: false }
+  const dn = daysUntilDate(t.scheduled_date)
+  if (dn === null) return { label: '', today: false }
+  if (dn < 0) return { label: `איחור ${Math.abs(dn)} ימים`, today: false }
+  if (dn === 0) return { label: 'היום', today: true }
+  if (dn === 1) return { label: 'מחר', today: false }
+  if (dn <= 6) {
+    const d = new Date(t.scheduled_date)
+    return { label: HEB_DAYS[d.getDay()], today: false }
+  }
+  const d = new Date(t.scheduled_date)
+  return { label: `${d.getDate()} ב${HEB_MONTHS[d.getMonth()]}`, today: false }
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const { user } = useAuth()
-  const { db, ready, createTask, flushSave } = useDB()
+  const { db, ready, createTask, updateTask, deleteTask, flushSave } = useDB() as any
   const greetName = resolveFirstName({
     userMetadata: user?.user_metadata as Record<string, unknown> | undefined,
     email: user?.email,
     driveDisplayName: db?.settings?.display_name as string | undefined,
   })
   const accentWord = useRotatingAccent()
+  const now = useNow()
 
-  // First-run redirect: a brand-new account (DB loaded, no courses, hasn't
-  // dismissed the wizard) lands on /setup instead of staring at an empty
-  // dashboard. `setup_seen` is set when the user finishes or skips the
-  // wizard, so this only fires once.
+  // First-run redirect: a brand-new account (DB loaded, no courses,
+  // hasn't dismissed the wizard) lands on /setup instead of staring at
+  // an empty dashboard. `setup_seen` is set when the user finishes or
+  // skips the wizard, so this only fires once.
   useEffect(() => {
     if (!ready) return
     const noCourses = (db?.courses?.length ?? 0) === 0
@@ -99,250 +194,384 @@ export default function DashboardPage() {
     }
   }, [ready, db?.courses?.length, db?.settings?.setup_seen, router])
 
-  // Three card data — derived from the real DB only. Empty arrays render
-  // a CTA (see EmptyHint below) instead of fake mockup rows.
-
-  // Today's schedule is sourced from Google Calendar (the same useWeekCalendar
-  // that powers the week grid above) and fuzzy-matched against the user's
-  // TEEPO courses. Each row links into /summaries with the course + the
-  // calendar event title so the user can act on that lesson immediately.
   const calendar = useWeekCalendar()
   const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
-  const todaySchedule = useMemo(() => {
-    const todayDow = new Date().getDay() // 0..6, matches WeekCalendarSlot.dayIndex
-    const rows = calendar.slots
+
+  // ── Today's classes ─────────────────────────────────────────────────
+  // Same source as the legacy "היום בלוח" widget: filter to today's
+  // dayIndex, sort by hour:minute. Derive .done / .live / .next state
+  // from the current time + each slot's duration.
+  const todaysClasses = useMemo(() => {
+    const todayDow = now.getDay()
+    const nowMin = now.getHours() * 60 + now.getMinutes()
+    const palette = ['#8b5cf6', '#d97706', '#0d9488', '#6366f1', '#e11d48', '#16a34a']
+    const slots = calendar.slots
       .filter(s => s.dayIndex === todayDow)
       .sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute))
-      .slice(0, 6)
-    const palette = ['#8b5cf6', '#d97706', '#0d9488', '#6366f1', '#e11d48', '#16a34a']
-    return rows.map((s, i) => {
+
+    // First-future-slot wins the "next" badge; subsequent future slots
+    // render in the default state.
+    let nextAssigned = false
+
+    return slots.map((s, i) => {
+      const startMin = s.hour * 60 + s.minute
+      const endMin = startMin + s.durationMins
+      const isDone = endMin <= nowMin
+      const isLive = startMin <= nowMin && nowMin < endMin
+      const isNext = !isDone && !isLive && !nextAssigned
+      if (isNext) nextAssigned = true
+
       const match = matchCourseForEvent(s.title, courses)
+      const color = palette[i % palette.length]
       const href = match
         ? `/summaries?course=${encodeURIComponent(match.id)}&lesson=${encodeURIComponent(s.title)}`
-        : '/summaries'
+        : s.htmlLink || 'https://calendar.google.com'
+
       return {
-        time: `${pad2(s.hour)}:${pad2(s.minute)}`,
+        slot: s,
+        kind: deriveClassKind(s.title),
         title: s.title,
-        meta: match ? `${match.title}${s.meta ? ' · ' + s.meta : ''}` : (s.meta || 'לא משויך לקורס'),
-        color: palette[i % palette.length],
+        time: `${pad2(s.hour)}:${pad2(s.minute)}`,
+        location: s.meta || '',
+        durationMins: s.durationMins,
+        color,
+        state: isDone ? 'done' : isLive ? 'live' : isNext ? 'next' : 'default',
         href,
-        matched: !!match,
-      }
+        external: !match,
+      } as const
     })
-  }, [calendar.slots, courses])
+  }, [calendar.slots, courses, now])
 
-  const assignments = useMemo(() => {
-    const real = (db?.assignments ?? []).filter((a: any) => !a.is_completed).slice(0, 4)
-    return real.map((a: any) => ({
-      title: a.title ?? a.name ?? 'מטלה',
-      meta: a.due_date ? `דדליין ${a.due_date.slice(0, 10)}` : '',
-      tag: a.priority === 'high' ? 'דחוף' : a.priority === 'medium' ? 'השבוע' : 'בעבודה',
-      tagClass: a.priority === 'high' ? 't-rose' : a.priority === 'medium' ? 't-amber' : 't-blue',
-      color: '#d97706',
-    }))
-  }, [db])
+  // ── Assignments widget — 3 most urgent open ─────────────────────────
+  const openAssignments = useMemo(() => {
+    const list = ((db?.assignments ?? []) as Assignment[])
+      .filter(a => a.status !== 'submitted' && a.status !== 'graded')
+    // Sort by deadline asc (no-deadline last), then by priority high→low.
+    const priorityRank: Record<Assignment['priority'], number> = { high: 0, medium: 1, low: 2 }
+    return list
+      .map(a => ({
+        a,
+        days: daysUntilDate(a.deadline),
+      }))
+      .sort((x, y) => {
+        const dx = x.days ?? Number.POSITIVE_INFINITY
+        const dy = y.days ?? Number.POSITIVE_INFINITY
+        if (dx !== dy) return dx - dy
+        return priorityRank[x.a.priority] - priorityRank[y.a.priority]
+      })
+      .slice(0, 3)
+      .map(({ a, days }) => {
+        const course = a.course_id ? courses.find(c => c.id === a.course_id) ?? null : null
+        const tone = assignmentTone(a, days)
+        return {
+          a,
+          course,
+          tone,
+          dueLabel: formatAssignmentDue(a.deadline),
+          chipLabel: assignmentLabel(tone),
+        }
+      })
+  }, [db?.assignments, courses])
 
-  const todos: Array<{ title: string; meta: string; tag: string; tagClass: string }> = useMemo(() => {
-    const real = (db?.tasks ?? []).filter((t: any) => !t.is_completed).slice(0, 4)
-    return real.map((t: any) => ({
-      title: t.title,
-      meta: t.description ?? '',
-      tag: t.scheduled_date ?? '',
-      tagClass: 't-soft',
-    }))
-  }, [db])
+  // ── Todos widget — open + a few done at the bottom ──────────────────
+  const todoRows = useMemo(() => {
+    const all = (db?.tasks ?? []) as StudyTask[]
+    const open = all.filter(t => !t.is_completed)
+    const done = all.filter(t => t.is_completed)
+    // Sort open by scheduled_date asc (no-date last), done by completed_at desc.
+    open.sort((a, b) => (a.scheduled_date ?? '').localeCompare(b.scheduled_date ?? ''))
+    done.sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? ''))
+    // Show up to 6 open + 2 most-recent done so the user can quickly
+    // un-check something they did by mistake.
+    return [...open.slice(0, 6), ...done.slice(0, 2)]
+  }, [db?.tasks])
 
+  const todayOpenCount = useMemo(() => {
+    return ((db?.tasks ?? []) as StudyTask[])
+      .filter(t => !t.is_completed && daysUntilDate(t.scheduled_date) === 0)
+      .length
+  }, [db?.tasks])
+
+  // ── Todo handlers — straight pass-through to existing DB methods ────
+  const onAddTodo = useCallback(async (title: string) => {
+    if (typeof createTask !== 'function') return
+    try {
+      await createTask({
+        title,
+        category: 'study',
+        scheduled_date: new Date().toISOString().slice(0, 10),
+      })
+      if (typeof flushSave === 'function') {
+        try { await flushSave() } catch { /* non-fatal */ }
+      }
+    } catch (e) {
+      console.warn('[dash-v2] createTask failed', e)
+    }
+  }, [createTask, flushSave])
+
+  const onToggleTodo = useCallback(async (t: StudyTask) => {
+    if (typeof updateTask !== 'function') return
+    try {
+      await updateTask(t.id, {
+        is_completed: !t.is_completed,
+        completed_at: !t.is_completed ? new Date().toISOString() : undefined,
+      })
+    } catch (e) {
+      console.warn('[dash-v2] updateTask failed', e)
+    }
+  }, [updateTask])
+
+  const onDeleteTodo = useCallback(async (t: StudyTask) => {
+    if (typeof deleteTask !== 'function') return
+    try {
+      await deleteTask(t.id)
+    } catch (e) {
+      console.warn('[dash-v2] deleteTask failed', e)
+    }
+  }, [deleteTask])
+
+  // ── Render ──────────────────────────────────────────────────────────
   return (
     <div className="cream-page dashboard-v2">
-      <main className="dash-main">
-        <div className="dash-wrap">
+      <main className="dash-v2-main">
 
-          {/* ===== HERO ===== */}
-          <section className="dash-hero">
-            <div className="hero-content">
-              <div className="hero-meta">
-                <LCDDisplay kind="date" />
-                <LCDDisplay kind="time" />
-                <CountryClock />
-              </div>
-              {/* One line, no wave. The accent word inside .accent gets the
-               *  green underline (CSS ::after) but is otherwise static — and
-               *  cycles every 30 minutes via useRotatingAccent above. */}
-              <h1 className="dash-h1">
-                שלום {greetName}, השבוע שלך{' '}
-                <span className="accent">{accentWord}</span>
-                .
-              </h1>
-            </div>
+        {/* ===== HERO ===== */}
+        <section className="dash-v2-hero">
+          <div className="dash-v2-hero-meta">
+            <LCDDisplay kind="date" />
+            <LCDDisplay kind="time" />
+          </div>
+          <h1 className="dash-v2-h1">
+            שלום {greetName}, השבוע שלך{' '}
+            <span className="accent">{accentWord}</span>
+            .
+          </h1>
+        </section>
 
-            <div className="puzzle-zone">
-              <div className="puzzle-instructions">
-                <div className="pi-title">הוראות המשחק</div>
-                <ol>
-                  <li><strong>סדר</strong> את המספרים 1-8</li>
-                  <li><strong>לחץ</strong> משבצת ליד הריק</li>
-                  <li><strong>פחות</strong> מהלכים = ניצחון</li>
-                </ol>
-                <div className="pi-goal">
-                  <span>הסדר הסופי:</span>
-                  <div className="pi-goal-mini" aria-hidden>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 0].map((n, i) => (
-                      <span key={i} className={n === 0 ? 'empty' : ''}>{n !== 0 ? n : ''}</span>
-                    ))}
+        {/* ===== TODAY'S CLASSES ===== */}
+        <div className="dash-v2-section-head">
+          <h2>
+            השיעורים של היום{' '}
+            <span className="badge">
+              {todaysClasses.length === 0
+                ? 'אין שיעורים'
+                : todaysClasses.length === 1
+                  ? 'שיעור אחד'
+                  : `${todaysClasses.length} שיעורים`}
+            </span>
+          </h2>
+        </div>
+        {todaysClasses.length === 0 ? (
+          <div className="dash-v2-empty">
+            {calendar.error
+              ? `שגיאה בקריאת היומן: ${calendar.error.slice(0, 80)}`
+              : calendar.loading
+                ? 'טוען את היומן…'
+                : 'אין שיעורים היום ביומן.'}
+            <a
+              className="dash-v2-empty-cta"
+              href="https://calendar.google.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              פתח Google Calendar →
+            </a>
+          </div>
+        ) : (
+          <div className="dash-v2-classes-row">
+            {todaysClasses.map((c, i) => {
+              const eyebrow = c.state === 'done'
+                ? `${c.kind} · הסתיים`
+                : c.state === 'next'
+                  ? 'השיעור הבא'
+                  : c.kind
+              const link = c.external
+                ? (
+                  <a
+                    key={i}
+                    href={c.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`dash-v2-class-card ${c.state}`}
+                    style={{ ['--course-color' as any]: c.color }}
+                  >
+                    {classCardInner(eyebrow, c)}
+                  </a>
+                )
+                : (
+                  <Link
+                    key={i}
+                    href={c.href}
+                    className={`dash-v2-class-card ${c.state}`}
+                    style={{ ['--course-color' as any]: c.color }}
+                  >
+                    {classCardInner(eyebrow, c)}
+                  </Link>
+                )
+              return link
+            })}
+          </div>
+        )}
+
+        {/* ===== TWO WIDGETS ===== */}
+        <div className="dash-v2-widgets">
+
+          {/* Assignments — read-only, click to open detail */}
+          <section
+            className="dash-v2-widget"
+            style={{
+              ['--w-color' as any]: '#fef3c7',
+              ['--w-icon-color' as any]: '#d97706',
+            }}
+          >
+            <header className="w-head">
+              <div className="w-icon"><ClipboardCheck size={16} /></div>
+              <span className="w-title">המטלות שלי</span>
+              <span className="w-count">{openAssignments.length} פתוחות</span>
+              <Link href="/tasks" className="w-all">הכל →</Link>
+            </header>
+            <div className="w-body">
+              {openAssignments.length === 0 ? (
+                <div className="w-empty">אין מטלות פתוחות כרגע 🎉</div>
+              ) : openAssignments.map(({ a, course, tone, dueLabel, chipLabel }) => (
+                <Link
+                  key={a.id}
+                  href={`/assignments?focus=${encodeURIComponent(a.id)}`}
+                  className="assn-row"
+                  style={{ ['--course-color' as any]: courseColorFor(course?.id ?? '') }}
+                >
+                  <span className="ar-tag">
+                    <span className="dot" />
+                    {course?.title ?? 'ללא קורס'}
+                  </span>
+                  <div className="ar-info">
+                    <strong>{a.title}</strong>
+                    {dueLabel && <small>{dueLabel}</small>}
                   </div>
-                </div>
-              </div>
-              <SlidingPuzzle />
+                  <span className={`ar-due ${tone}`}>{chipLabel}</span>
+                </Link>
+              ))}
             </div>
           </section>
 
-          {/* ===== CALENDAR — week-view placeholder ===== */}
-          <div className="calendar-card-v2">
-            <div className="cal-head">
-              <div className="gcal-logo">{new Date().getDate()}</div>
-              <h3>Google Calendar</h3>
-              <span className="month">שבוע נוכחי</span>
-              <a
-                href="https://calendar.google.com"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                פתח →
-              </a>
-            </div>
-            <CalendarWeek courses={courses} />
-          </div>
-
-          {/* ===== BOTTOM 3 CARDS ===== */}
-          <div className="bottom-row-v2">
-            <div className="dcard">
-              <div className="dcard-head">
-                <h3>היום בלוח <span className="badge-num">{todaySchedule.length} שיעורים</span></h3>
-                {/* "השבוע" jumps to Google Calendar's week view (we don't
-                    have an internal calendar route — the dashboard +
-                    Drive folders cover the views we own). External link
-                    matches the same target used by other cal cards below. */}
-                <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer">השבוע →</a>
-              </div>
-              {todaySchedule.length === 0 ? (
-                <EmptyCard
-                  text={
-                    calendar.error
-                      ? `שגיאה בקריאת היומן: ${calendar.error.slice(0, 80)}`
-                      : calendar.loading
-                        ? 'טוען את היומן…'
-                        : 'אין שיעורים היום ביומן.'
-                  }
-                  ctaHref="https://calendar.google.com"
-                  ctaText="פתח Google Calendar"
-                  external
-                />
-              ) : (
-                todaySchedule.map((row, i) => (
-                  <Link
-                    href={row.href}
-                    key={i}
-                    className={`sch-row sch-row-link${row.matched ? '' : ' is-unmatched'}`}
-                    title={row.matched ? 'פתח במוח לבחירת פעולה' : 'אין קורס תואם — פתח את עמוד המוח'}
-                  >
-                    <div className="sch-time">{row.time}</div>
-                    <div className="sch-bar" style={{ background: row.color }} />
-                    <div className="sch-info">
-                      <strong>{row.title}</strong>
-                      <small>{row.meta}</small>
-                    </div>
-                  </Link>
-                ))
-              )}
-            </div>
-
-            <div className="dcard">
-              <div className="dcard-head">
-                <h3>מטלות ועבודות <span className="badge-num">{assignments.length} פעילות</span></h3>
-                <Link href="/tasks">הכל →</Link>
-              </div>
-              {assignments.length === 0 ? (
-                <EmptyCard
-                  text="אין מטלות פתוחות."
-                  ctaHref="/tasks"
-                  ctaText="הוסף מטלה"
-                />
-              ) : (
-                assignments.map((a, i) => (
-                  <div className="course" key={i}>
-                    <div className="course-bar" style={{ background: a.color }} />
-                    <div className="course-info">
-                      <strong>{a.title}</strong>
-                      <small>{a.meta}</small>
-                    </div>
-                    <div className={`course-tag ${a.tagClass}`}>{a.tag}</div>
+          {/* Todos — interactive: add, toggle, delete */}
+          <section
+            className="dash-v2-widget"
+            style={{
+              ['--w-color' as any]: '#dcfce7',
+              ['--w-icon-color' as any]: '#16a34a',
+            }}
+          >
+            <header className="w-head">
+              <div className="w-icon"><ListTodo size={16} /></div>
+              <span className="w-title">המשימות שלי</span>
+              <span className="w-count">{todayOpenCount} להיום</span>
+              <Link href="/todos" className="w-all">הכל →</Link>
+            </header>
+            <div className="w-body">
+              <TodoQuickAdd onAdd={onAddTodo} />
+              {todoRows.length === 0 ? (
+                <div className="w-empty">הוסף משימה ראשונה למעלה.</div>
+              ) : todoRows.map((t) => {
+                const due = formatTodoDue(t)
+                return (
+                  <div key={t.id} className={`todo-row ${t.is_completed ? 'done' : ''}`}>
+                    <button
+                      type="button"
+                      className="check"
+                      onClick={() => onToggleTodo(t)}
+                      aria-label={t.is_completed ? 'סמן כלא הושלם' : 'סמן כהושלם'}
+                      aria-pressed={t.is_completed}
+                    >
+                      <Check size={12} strokeWidth={3.5} />
+                    </button>
+                    <span className="tr-text">{t.title}</span>
+                    {due.label && (
+                      <span className={`tr-due ${due.today ? 'today' : ''}`}>{due.label}</span>
+                    )}
+                    <button
+                      type="button"
+                      className="tr-del"
+                      onClick={() => onDeleteTodo(t)}
+                      aria-label="מחק"
+                    >
+                      <X size={13} />
+                    </button>
                   </div>
-                ))
-              )}
+                )
+              })}
             </div>
-
-            <div className="dcard">
-              <div className="dcard-head">
-                <h3>משימות <span className="badge-num">{todos.length} פעילות</span></h3>
-                <Link href="/todos">פתח הכל →</Link>
-              </div>
-              {todos.length === 0 ? (
-                <div className="dcard-empty dcard-empty-compact">
-                  <p>אין משימות פתוחות.</p>
-                </div>
-              ) : (
-                todos.map((t, i) => (
-                  <div className="task" key={i}>
-                    <div className="checkbox" aria-hidden />
-                    <div className="task-info">
-                      <strong>{t.title}</strong>
-                      <small>{t.meta}</small>
-                    </div>
-                    <div className={`task-tag ${t.tagClass}`}>{t.tag}</div>
-                  </div>
-                ))
-              )}
-              <QuickAddTask
-                onAdd={async (title) => {
-                  try {
-                    await createTask({
-                      title,
-                      scheduled_date: new Date().toISOString().slice(0, 10),
-                      category: 'study',
-                    })
-                    await flushSave()
-                  } catch (e) {
-                    console.warn('[quick-add-task] failed', e)
-                  }
-                }}
-              />
-            </div>
-          </div>
+          </section>
 
         </div>
+
+        {/* ===== WEEKLY CALENDAR — wraps the existing CalendarWeek grid ===== */}
+        <div className="dash-v2-section-head">
+          <h2>
+            הלוז השבועי{' '}
+            <span className="badge">{calendarBadge(now)}</span>
+          </h2>
+        </div>
+        <div className="dash-v2-calendar-card">
+          <div className="cal-head">
+            <div className="gcal-logo">{new Date().getDate()}</div>
+            <h3>Google Calendar</h3>
+            <span className="month">{calendar.loading ? 'מסונכרן…' : 'מסונכרן'}</span>
+            <a
+              href="https://calendar.google.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="cal-open"
+            >
+              פתח →
+            </a>
+          </div>
+          <CalendarWeek courses={courses} />
+        </div>
+
       </main>
     </div>
   )
 }
 
-/**
- * Empty-card helper — used by the three bottom dashboard cards when the
- * user's DB has no data of that kind yet. Replaces the previous
- * mockup-data fallback rows so a fresh account doesn't show fictional
- * courses (אלגברה / חדו"א / etc.) as if they were real.
- */
-/** Inline single-row task adder at the bottom of the משימות widget.
- *  Type a title → Enter or click + → creates a StudyTask for today.
- *  Esc clears. Optimistic UX (clear input immediately on submit). */
-function QuickAddTask({ onAdd }: { onAdd: (title: string) => Promise<void> }) {
+// ──────────────────────────────────────────────────────────────────────
+// Small leaf components / helpers
+// ──────────────────────────────────────────────────────────────────────
+
+function classCardInner(
+  eyebrow: string,
+  c: { time: string; title: string; location: string; durationMins: number },
+): React.ReactNode {
+  return (
+    <>
+      <div className="ctop">
+        <span className="ckind">{eyebrow}</span>
+        <span className="ctime">{c.time}</span>
+      </div>
+      <div className="ctitle">{c.title}</div>
+      <div className="cmeta">
+        {c.location && (
+          <span><MapPin size={11} /> {c.location}</span>
+        )}
+        {c.durationMins > 0 && (
+          <span><Clock size={11} /> {c.durationMins} דק'</span>
+        )}
+      </div>
+    </>
+  )
+}
+
+/** Inline single-row task adder at the top of the todos widget. */
+function TodoQuickAdd({ onAdd }: { onAdd: (title: string) => Promise<void> }) {
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const submit = async () => {
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
     const t = value.trim()
     if (!t || busy) return
     setBusy(true)
-    setValue('') // optimistic clear so the user can type the next one
+    setValue('')  // optimistic clear
     try {
       await onAdd(t)
     } finally {
@@ -351,63 +580,54 @@ function QuickAddTask({ onAdd }: { onAdd: (title: string) => Promise<void> }) {
   }
 
   return (
-    <form
-      className="quick-add-task"
-      onSubmit={(e) => { e.preventDefault(); void submit() }}
-    >
+    <form className="todo-add" onSubmit={submit}>
+      <button
+        type="submit"
+        className="ta-plus"
+        aria-label="הוסף משימה"
+        disabled={!value.trim() || busy}
+      >
+        <Plus size={13} strokeWidth={2.8} />
+      </button>
       <input
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Escape') setValue('') }}
-        placeholder="הוסף משימה ולחץ Enter…"
+        placeholder="הוסף משימה חדשה..."
         maxLength={200}
-        dir="rtl"
         disabled={busy}
       />
-      <button
-        type="submit"
-        aria-label="הוסף משימה"
-        disabled={!value.trim() || busy}
-      >
-        <Plus size={14} />
-      </button>
     </form>
   )
 }
 
-function EmptyCard({
-  text,
-  ctaHref,
-  ctaText,
-  external,
-}: {
-  text: string
-  ctaHref: string
-  ctaText: string
-  external?: boolean
-}) {
-  return (
-    <div className="dcard-empty">
-      <p>{text}</p>
-      {external ? (
-        <a
-          href={ctaHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="dcard-empty-cta"
-        >
-          {ctaText} →
-        </a>
-      ) : (
-        <Link href={ctaHref} className="dcard-empty-cta">{ctaText} →</Link>
-      )}
-    </div>
-  )
+/** Deterministic course-color picker for assignment-widget rows.
+ *  Same palette as todaysClasses so a course renders identically in
+ *  both surfaces. */
+const ASSIGNMENT_PALETTE = ['#8b5cf6', '#d97706', '#0d9488', '#6366f1', '#e11d48', '#16a34a']
+function courseColorFor(courseId: string): string {
+  if (!courseId) return ASSIGNMENT_PALETTE[5]  // green-default for "no course"
+  let h = 0
+  for (let i = 0; i < courseId.length; i++) h = (h * 31 + courseId.charCodeAt(i)) | 0
+  return ASSIGNMENT_PALETTE[Math.abs(h) % ASSIGNMENT_PALETTE.length]
+}
+
+const HEB_MONTHS_LONG = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר']
+function calendarBadge(now: Date): string {
+  // ISO week number — start counting weeks from Jan 1.
+  const start = new Date(now.getFullYear(), 0, 1)
+  const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86_400_000) + 1
+  const week = Math.ceil((dayOfYear + start.getDay()) / 7)
+  return `${HEB_MONTHS_LONG[now.getMonth()]} ${now.getFullYear()} · שבוע ${week}`
 }
 
 /**
  * Live week-view backed by the user's primary Google Calendar.
+ *
+ * Preserved verbatim from the v1 dashboard (per "swap visuals, keep
+ * mechanics") — the only thing that changed is the wrapping card around
+ * it, not the grid itself.
  *
  * - Hour range auto-fits to the events present this week (with a ±1h
  *   buffer). Empty calendar falls back to 09–15.
@@ -416,8 +636,7 @@ function EmptyCard({
  *   always renders in the same color across renders.
  * - Click on an event whose title matches a TEEPO course opens that
  *   course in /summaries (with the lesson context bar). Click on an
- *   unmatched event opens it in Google Calendar — same affordance the
- *   "היום בלוח" widget below uses.
+ *   unmatched event opens it in Google Calendar.
  */
 function CalendarWeek({ courses }: { courses: Course[] }) {
   const { slots, hourRange, loading, error } = useWeekCalendar()
@@ -455,33 +674,19 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
   }
 
   // Each hour row is 56px tall (matches .cal-cell height in globals.css).
-  // Used to translate event minute-offset + duration into top/height pixels
-  // so the event block actually spans its real time range instead of being
-  // clipped to a 1-hour cell. Must stay in sync with the CSS rule.
   const CAL_ROW_PX = 56
 
-  // Compute side-by-side columns for overlapping events. Two events overlap
-  // when they share any minute on the same day. Previous version stacked
-  // them on top of each other (later in DOM order won z-index) — the user
-  // could only see the topmost one and thought the others were "hidden".
-  //
-  // Layout map: slot.title+dayIndex+startMins → { col, of } where `col` is
-  // the column index inside the overlap group and `of` is the group size.
-  // The event renderer translates these into width + offset percentages.
+  // Side-by-side columns for overlapping events. Greedy interval coloring.
   const layoutByEvent = new Map<string, { col: number; of: number }>()
   function evKey(s: WeekCalendarSlot): string {
     return `${s.dayIndex}-${s.hour * 60 + s.minute}-${s.title}`
   }
-  // Process per-day, sorted by start time so earlier events claim col 0 first.
   for (let di = 0; di < 7; di++) {
     const dayEvents = slots
       .filter(s => s.dayIndex === di)
       .sort((a, b) => (a.hour * 60 + a.minute) - (b.hour * 60 + b.minute))
-    // Greedy interval-coloring: each event picks the lowest-index column
-    // whose last-event-end is ≤ this event's start. Then the group size for
-    // each event is the max columns used among events that overlap with it.
-    const colEnd: number[] = []   // colEnd[i] = end minute of last event in col i
-    const eventCol: number[] = [] // per dayEvents index → assigned col
+    const colEnd: number[] = []
+    const eventCol: number[] = []
     for (const ev of dayEvents) {
       const start = ev.hour * 60 + ev.minute
       const end = start + ev.durationMins
@@ -499,7 +704,6 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
         colEnd.push(end)
       }
     }
-    // For each event, group size = max(col+1) among events that overlap it.
     for (let i = 0; i < dayEvents.length; i++) {
       const ev = dayEvents[i]
       const start = ev.hour * 60 + ev.minute
@@ -546,10 +750,6 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
         {hours.flatMap(h => [
           <div key={`t-${h}`} className="cal-time">{pad2(h)}:00</div>,
           ...Array.from({ length: 7 }, (_, di) => {
-            // "Now" indicator — a thin red line at the current minute,
-            // shown only inside today's column at the current hour's cell.
-            // Sits above events (z-index in CSS) so it's visible even when
-            // an event spans this row.
             const isNowCell =
               di === dow &&
               h === nowHour &&
@@ -579,25 +779,13 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
                   const titleAttr =
                     `${ev.title}${ev.meta ? ' · ' + ev.meta : ''}` +
                     (matched ? ` — לחץ לפתיחה במוח` : ' — לחץ לפתיחה ב-Google Calendar')
-                  // Pixel-precise top/height so the event spans its full
-                  // duration. Top accounts for the minute offset within the
-                  // starting hour, height covers the full duration (clamped
-                  // to ≥22px so very short events stay readable).
                   const topPx = Math.round((ev.minute / 60) * CAL_ROW_PX) + 3
                   const heightPx = Math.max(22, Math.round((ev.durationMins / 60) * CAL_ROW_PX) - 6)
-                  // Side-by-side layout for overlapping events: split the
-                  // cell width into `of` equal columns, position this event
-                  // in column `col`. Single-event groups render full width
-                  // (left/right 3px from the inherited rule).
                   const layout = layoutByEvent.get(evKey(ev)) ?? { col: 0, of: 1 }
-                  // 3px each side keeps the existing visual gutter when
-                  // it's a single event; for multi-col we use percentages
-                  // so columns share the cell cleanly.
                   let horizStyle: React.CSSProperties
                   if (layout.of <= 1) {
                     horizStyle = { left: '3px', right: '3px' }
                   } else {
-                    // 2px gap between columns, fractional widths inside.
                     const widthPct = 100 / layout.of
                     horizStyle = {
                       left: `calc(${widthPct * layout.col}% + 2px)`,
