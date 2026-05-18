@@ -1,22 +1,21 @@
 'use client'
 
 /**
- * /todos — personal todo list (v2 NEW page).
+ * /todos — personal todo list (v3 locked design).
  *
  * Source: teepo-design/mockup_todos.html. Layout:
- *   1. page-head with eyebrow + h1 + summary pills.
- *   2. quick-add input at top with a `+` button.
- *   3. 4 sections by urgency: היום · השבוע · בהמשך · הושלמו.
- *      Each item: animated checkbox, title + optional course tag, meta,
- *      due-date pill.
+ *   1. page-head: eyebrow + h1 ("N משימות <accent>להיום</accent>.")
+ *      + 4 summary pills (היום · השבוע · בהמשך · הושלמו היום)
+ *   2. quick-add input with a "+" button on the left, Enter-to-add hint
+ *   3. 4 sections by urgency: היום · השבוע · בהמשך · הושלמו היום.
+ *      Each section head: emoji icon + label + count chip.
+ *      Each row: animated checkbox, title + optional course tag, due pill.
  *
  * Distinct from /tasks (academic assignments). Data source is `db.tasks`
- * (StudyTask in types/index.ts) — same shape the legacy /tasks page used.
- * The legacy page keeps its kanban-by-category view; this page bins by
- * urgency and is the canonical "personal משימות" surface going forward.
+ * (StudyTask in types/index.ts).
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Plus, Check, BookOpen } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
@@ -44,7 +43,16 @@ function bucketize(task: StudyTask): Bucket {
   return 'later'
 }
 
-function formatDueLabel(task: StudyTask): string {
+function formatDueLabel(task: StudyTask, bucket: Bucket): string {
+  if (bucket === 'done') {
+    if (task.completed_at) {
+      const d = new Date(task.completed_at)
+      if (!Number.isNaN(d.getTime())) {
+        return `הושלם · ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      }
+    }
+    return 'הושלם'
+  }
   const d = daysFromNow(task)
   if (d == null) return 'ללא תאריך'
   if (d < 0) return `איחור ${Math.abs(d)} ימים`
@@ -54,11 +62,12 @@ function formatDueLabel(task: StudyTask): string {
   return new Date(task.scheduled_date!).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })
 }
 
-const BUCKETS: { key: Bucket; label: string; eyebrow: string }[] = [
-  { key: 'today', label: 'היום',   eyebrow: 'דחוף' },
-  { key: 'week',  label: 'השבוע',  eyebrow: 'בקרוב' },
-  { key: 'later', label: 'בהמשך',  eyebrow: 'בלי דדליין' },
-  { key: 'done',  label: 'הושלמו', eyebrow: 'סיכומים' },
+/** Section meta — icon + label, mirrors the mockup's 4-section structure. */
+const SECTIONS: Array<{ key: Bucket; label: string; icon: string }> = [
+  { key: 'today', label: 'להיום',       icon: '🔥' },
+  { key: 'week',  label: 'השבוע',       icon: '📅' },
+  { key: 'later', label: 'בהמשך',       icon: '💭' },
+  { key: 'done',  label: 'הושלמו היום', icon: '✅' },
 ]
 
 export default function TodosPage() {
@@ -70,19 +79,13 @@ export default function TodosPage() {
   const buckets = useMemo(() => {
     const out: Record<Bucket, StudyTask[]> = { today: [], week: [], later: [], done: [] }
     for (const t of tasks) out[bucketize(t)].push(t)
-    // Inside each bucket, sort by date ascending (done by completed_at descending).
+    // Inside each bucket, sort by date asc (done sorted by completed_at desc).
     out.today.sort((a, b) => (a.scheduled_date ?? '').localeCompare(b.scheduled_date ?? ''))
     out.week.sort((a, b) => (a.scheduled_date ?? '').localeCompare(b.scheduled_date ?? ''))
     out.later.sort((a, b) => (a.scheduled_date ?? '').localeCompare(b.scheduled_date ?? ''))
     out.done.sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? ''))
     return out
   }, [tasks])
-
-  const summary = useMemo(() => ({
-    open: buckets.today.length + buckets.week.length + buckets.later.length,
-    today: buckets.today.length,
-    done: buckets.done.length,
-  }), [buckets])
 
   const onAdd = useCallback(async () => {
     const title = draft.trim()
@@ -103,6 +106,17 @@ export default function TodosPage() {
     } catch {}
   }, [updateTask])
 
+  // H1 accent word follows the relative time of the first-due open task.
+  // "4 משימות להיום." if there are due-today items; else "השבוע" or
+  // "בהמשך" so the headline always describes the closest open work.
+  const accentWord = buckets.today.length > 0 ? 'להיום'
+    : buckets.week.length  > 0 ? 'השבוע'
+    : buckets.later.length > 0 ? 'בהמשך'
+    :                            'נקיות'
+  const openCount = buckets.today.length + buckets.week.length + buckets.later.length
+  const headlineNoun = openCount === 1 ? 'משימה' : 'משימות'
+  const headlineNumber = openCount > 0 ? openCount : 'כל ה'
+
   return (
     <div className="cream-page todos-page">
       <main className="todos-main">
@@ -110,14 +124,13 @@ export default function TodosPage() {
         <header className="todos-head">
           <div className="todos-eyebrow">המשימות שלי</div>
           <h1 className="todos-h1">
-            <span className="accent">משימות</span> אישיות.
+            {headlineNumber} {headlineNoun} <span className="accent">{accentWord}</span>.
           </h1>
           <div className="todos-summary">
-            <span className="pill today"><span className="num">{summary.open}</span> פעילות</span>
-            <span className="pill done"><span className="num">{summary.today}</span> להיום</span>
-            <span className="pill">
-              <span className="num">{summary.done}</span> הושלמו
-            </span>
+            <span className="pill today">היום · <span className="num">{buckets.today.length}</span></span>
+            <span className="pill">השבוע · <span className="num">{buckets.week.length}</span></span>
+            <span className="pill">בהמשך · <span className="num">{buckets.later.length}</span></span>
+            <span className="pill done">הושלמו היום · <span className="num">{buckets.done.length}</span></span>
           </div>
         </header>
 
@@ -125,25 +138,34 @@ export default function TodosPage() {
           className="todos-quick-add"
           onSubmit={(e) => { e.preventDefault(); onAdd() }}
         >
+          <button type="submit" className="plus-btn" aria-label="הוסף משימה">
+            <Plus size={18} />
+          </button>
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="הוסיפו משימה — Enter לשמירה"
+            placeholder='הוסף משימה חדשה... (לדוגמה: לסקור פרק 4 לפני המבחן)'
             aria-label="משימה חדשה"
           />
-          <button type="submit" aria-label="הוסף משימה">
-            <Plus size={16} />
-          </button>
+          <div className="hint">
+            <kbd>Enter</kbd> להוספה
+          </div>
         </form>
 
-        {BUCKETS.map(({ key, label, eyebrow }) => {
+        {SECTIONS.map(({ key, label, icon }) => {
           const items = buckets[key]
+          // Hide the "הושלמו" section entirely when empty — same as the
+          // mockup which only renders the completed list when there's
+          // actually something there to celebrate.
           if (key === 'done' && items.length === 0) return null
           return (
-            <section className="todo-section" key={key}>
+            <section className={`todo-section section-${key}`} key={key}>
               <div className="todo-section-head">
-                <span className="todo-section-eyebrow">{eyebrow}</span>
-                <h2>{label}<span className="todo-section-count">{items.length}</span></h2>
+                <span className="todo-section-icon" aria-hidden>{icon}</span>
+                <h2 className="todo-section-label">{label}</h2>
+                <span className="todo-section-count">
+                  {items.length} {items.length === 1 ? 'משימה' : 'משימות'}
+                </span>
               </div>
               {items.length === 0 ? (
                 <div className="todo-empty">אין משימות כאן</div>
@@ -158,7 +180,7 @@ export default function TodosPage() {
                         aria-pressed={t.is_completed}
                         aria-label={t.is_completed ? 'סמן כלא הושלם' : 'סמן כהושלם'}
                       >
-                        {t.is_completed && <Check size={12} strokeWidth={3} />}
+                        {t.is_completed && <Check size={14} strokeWidth={3.5} />}
                       </button>
                       <div className="todo-body">
                         <strong>{t.title}</strong>
@@ -173,7 +195,7 @@ export default function TodosPage() {
                           </small>
                         )}
                       </div>
-                      <span className={`todo-due ${key}`}>{formatDueLabel(t)}</span>
+                      <span className={`todo-due ${key}`}>{formatDueLabel(t, key)}</span>
                     </li>
                   ))}
                 </ul>

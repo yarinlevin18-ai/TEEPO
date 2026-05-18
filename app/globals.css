@@ -3981,32 +3981,22 @@ html.dark .cream-page::before { opacity: .35; }
   margin-bottom: 24px;
   background: var(--lp-bg-card);
   border: 1px solid var(--lp-line);
-  border-radius: 14px;
-  padding: 4px 6px 4px 4px;
+  border-radius: 16px;
+  padding: 6px 16px 6px 6px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   box-shadow: var(--lp-shadow-sm);
   transition: border-color .15s, box-shadow .15s;
 }
 .todos-quick-add:focus-within {
   border-color: var(--lp-accent);
-  box-shadow: 0 0 0 3px rgba(22, 163, 74, .12);
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, .12), var(--lp-shadow-sm);
 }
-.todos-quick-add input {
-  flex: 1;
-  padding: 12px 14px;
-  border: 0;
-  background: transparent;
-  font-family: inherit;
-  font-size: 15px;
-  color: var(--lp-ink);
-  outline: none;
-}
-.todos-quick-add input::placeholder { color: var(--lp-muted); }
-.todos-quick-add button {
-  width: 38px;
-  height: 38px;
+.todos-quick-add .plus-btn {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
   border: 0;
   border-radius: 10px;
   background: var(--lp-gradient);
@@ -4017,33 +4007,79 @@ html.dark .cream-page::before { opacity: .35; }
   justify-content: center;
   transition: transform .15s;
 }
-.todos-quick-add button:hover { transform: scale(1.06); }
+.todos-quick-add .plus-btn:hover { transform: scale(1.08); }
+.todos-quick-add input {
+  flex: 1;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--lp-ink);
+  outline: none;
+}
+.todos-quick-add input::placeholder { color: var(--lp-muted); font-weight: 400; }
+.todos-quick-add .hint {
+  font-size: 12px;
+  color: var(--lp-muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.todos-quick-add .hint kbd {
+  background: var(--lp-bg-elev);
+  border: 1px solid var(--lp-line);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: 'VT323', monospace;
+  font-size: 12px;
+  color: var(--lp-ink-soft);
+}
+/* Hide hint on narrow screens — the "+" button still tells the story. */
+@media (max-width: 540px) {
+  .todos-quick-add .hint { display: none; }
+}
 
-/* Sections */
-.todo-section { margin-bottom: 28px; animation: fadeUp .55s ease .35s both; }
+/* Sections — emoji icon + label + count chip. Animation delays
+ * staggered per section so they slide in top-to-bottom. */
+.todo-section { margin-bottom: 32px; animation: fadeUp .55s ease both; opacity: 0; }
+.todo-section.section-today { animation-delay: .35s; }
+.todo-section.section-week  { animation-delay: .45s; }
+.todo-section.section-later { animation-delay: .55s; }
+.todo-section.section-done  { animation-delay: .65s; }
 .todo-section-head {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 14px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
   padding: 0 4px;
 }
-.todo-section-eyebrow {
-  font-family: 'Frank Ruhl Libre', serif;
-  font-size: 12px;
-  font-style: italic;
-  color: var(--lp-muted);
-  letter-spacing: .3px;
+.todo-section-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  /* per-section accent — same per-bucket palette the mockup uses */
 }
+.todo-section.section-today .todo-section-icon { color: #e11d48; }
+.todo-section.section-week  .todo-section-icon { color: #d97706; }
+.todo-section.section-later .todo-section-icon { color: #6366f1; }
+.todo-section.section-done  .todo-section-icon { color: var(--lp-accent); }
+.todo-section-label,
 .todo-section h2 {
-  font-family: 'Heebo', sans-serif;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -.8px;
+  font-family: 'Frank Ruhl Libre', serif;
+  font-size: 22px;
+  font-weight: 700;
+  font-style: italic;
   color: var(--lp-ink);
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
+  letter-spacing: -.3px;
+  line-height: 1;
+  margin: 0;
 }
 .todo-section-count {
   font-size: 12px;
