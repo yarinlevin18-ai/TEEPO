@@ -12,7 +12,6 @@ from config import FLASK_SECRET_KEY, FLASK_ENV, IS_PRODUCTION, UNIVERSITY_USERNA
 from routes.api import api
 from routes.auth import auth
 from routes.university import university, _login_status
-from routes.catalog import catalog
 from routes.sync import sync
 from routes.websocket import register_socket_events
 
@@ -56,7 +55,6 @@ socketio = SocketIO(
 app.register_blueprint(api)
 app.register_blueprint(auth)
 app.register_blueprint(university)
-app.register_blueprint(catalog)
 app.register_blueprint(sync)
 
 # Register WebSocket events
