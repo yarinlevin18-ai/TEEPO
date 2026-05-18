@@ -9,7 +9,7 @@ import Link from 'next/link'
 export default function TopNav() {
   return (
     <nav className="lp-nav" aria-label="ניווט עליון">
-      <Link href="/" className="lp-nav-brand" aria-label="TEEPO — דף הבית">
+      <Link href="/" className="lp-nav-brand" aria-label="teepo — דף הבית">
         <svg
           className="lp-nav-icon"
           viewBox="0 0 120 100"

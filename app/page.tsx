@@ -23,7 +23,7 @@ import FinalCTA from '@/components/landing/FinalCTA'
 import UIFooter from '@/components/landing/UIFooter'
 
 export const metadata = {
-  title: 'TEEPO — פלטפורמת לימודים חכמה לסטודנטים',
+  title: 'teepo — פלטפורמת לימודים חכמה לסטודנטים',
   description:
     'פלטפורמה אחת ל-BGU ו-TAU. ייבוא Moodle, ציונים מהפורטל, AI על החומר שלך, ונתונים שנשארים אצלך ב-Google Drive.',
 }

@@ -35,7 +35,7 @@ export default function WakeupBanner() {
             style={{ color: '#818cf8' }}
           />
           <span className="text-xs text-ink-muted">
-            {message || 'TEEPO מתעורר...'}
+            {message || 'teepo מתעורר...'}
           </span>
           <span className="text-[10px] text-ink-subtle mr-auto">
             השרת מתעורר אחרי תקופת חוסר פעילות. עוד רגע.
