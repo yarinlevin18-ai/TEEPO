@@ -13,8 +13,7 @@ import GlowCard from '@/components/ui/GlowCard'
 import { useDB } from '@/lib/db-context'
 import { classifyCourse, computeYearOfStudy } from '@/lib/semester-classifier'
 import { useUniversityName } from '@/lib/use-university'
-
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+import { BACKEND_URL as BACKEND } from '@/lib/backend-url'
 
 type LmsInfo = {
   moodle: { enabled: boolean; url: string; host: string; my_url: string }

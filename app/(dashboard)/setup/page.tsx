@@ -27,8 +27,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
 import { useWeekCalendar } from '@/lib/use-week-calendar'
 import { supabase } from '@/lib/supabase'
-
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+import { BACKEND_URL as BACKEND } from '@/lib/backend-url'
 
 type StepStatus = 'pending' | 'checking' | 'ok' | 'error' | 'skipped'
 

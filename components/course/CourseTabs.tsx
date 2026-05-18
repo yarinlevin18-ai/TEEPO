@@ -21,11 +21,10 @@ import {
 import { io, Socket } from 'socket.io-client'
 import { useDB } from '@/lib/db-context'
 import { useAuth } from '@/lib/auth-context'
+import { BACKEND_URL as BACKEND } from '@/lib/backend-url'
 import QuickAddInput from './QuickAddInput'
 import type { Assignment, StudyTask, ChatMessage } from '@/types'
 import { format } from 'date-fns'
-
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
 // Kept for backward compatibility with callers that still import the tabs.
 export type CourseTab = 'tasks' | 'assignments' | 'notes' | 'ai'
