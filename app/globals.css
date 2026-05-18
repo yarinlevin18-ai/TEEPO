@@ -2864,6 +2864,28 @@ html.dark .cream-page::before { opacity: .35; }
   transform: scale(1.03);
   z-index: 2;
 }
+
+/* Time label at the top of the event pill — small, muted, tabular so the
+ * times line up vertically when scanning the column. */
+.dashboard-v2 .cal-event-time {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--lp-muted, #8a7261);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin-bottom: 2px;
+  letter-spacing: .02em;
+  /* LTR direction so "10:00–12:00" reads correctly inside an RTL body. */
+  direction: ltr;
+  text-align: right;
+}
+.dashboard-v2 .cal-event-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* Events that match a TEEPO course get a subtle accent ring so the user
  * knows clicking opens the course in /summaries (vs. a stranger event
  * which opens Google Calendar). */
@@ -9496,6 +9518,7 @@ html.dark .dashboard-v2 .cal-event small {
   color: #c2c8d3 !important;
   opacity: .8 !important;
 }
+html.dark .dashboard-v2 .cal-event-time { color: #8b95a8 !important; }
 html.dark .dashboard-v2 .ev-amber  { background: linear-gradient(90deg, rgba(217, 119, 6, .25), rgba(35, 41, 56, .85)) !important; }
 html.dark .dashboard-v2 .ev-blue   { background: linear-gradient(90deg, rgba(99, 102, 241, .25), rgba(35, 41, 56, .85)) !important; }
 html.dark .dashboard-v2 .ev-green  { background: linear-gradient(90deg, rgba(13, 148, 136, .25), rgba(35, 41, 56, .85)) !important; }
