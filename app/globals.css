@@ -46,10 +46,9 @@
 
   /* Backwards compatibility — legacy code still references these. Kept as
      thin aliases pointing at the new tokens so we don't have to retire
-     every reference at once. */
-  --font-heebo:  'Assistant', sans-serif;
-  --font-serif:  'Assistant', sans-serif;
-  --font-script: 'Assistant', sans-serif;
+     every reference at once. The actual font variables are injected by
+     `next/font/google` in app/layout.tsx and exposed on <html>. */
+  --font-script: var(--font-fredoka, 'Assistant', sans-serif);
   --bg1: var(--bg);
   --bg2: var(--bg-elev);
   --glow1: 22, 163, 74;
@@ -65,7 +64,7 @@
 /* Paper-texture background — applied to body so it sits behind every page.
    Matches teepo-design/CLAUDE_CODE_PROMPT.md "Paper-texture background". */
 body {
-  font-family: 'Assistant', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', system-ui, sans-serif;
   background-color: var(--bg);
   background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.18  0 0 0 0 0.10  0 0 0 0 0.06  0 0 0 0.18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 220px 220px;
