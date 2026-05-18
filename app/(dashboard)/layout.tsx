@@ -18,17 +18,13 @@ function pageTitleFor(pathname: string): string {
   if (pathname.startsWith('/tasks'))          return 'מטלות'
   if (pathname.startsWith('/todos'))          return 'משימות'
   if (pathname.startsWith('/assignments'))    return 'מטלות ועבודות'
-  if (pathname.startsWith('/notes'))          return 'סיכומים'
   if (pathname.startsWith('/courses'))        return 'הקורסים שלי'
   if (pathname.startsWith('/credits'))        return 'מעקב נק״ז'
   if (pathname.startsWith('/university'))     return 'על האוניברסיטה'
   if (pathname.startsWith('/settings'))       return 'הגדרות'
   if (pathname.startsWith('/moodle'))         return 'Moodle'
   if (pathname.startsWith('/setup'))          return 'התחלה'
-  if (pathname.startsWith('/academic'))       return 'אקדמי'
-  if (pathname.startsWith('/ai-tools'))       return 'כלי AI'
   if (pathname.startsWith('/diagnostics'))    return 'אבחון'
-  if (pathname.startsWith('/study-buddy'))    return 'חבר ללמידה'
   return ''
 }
 
