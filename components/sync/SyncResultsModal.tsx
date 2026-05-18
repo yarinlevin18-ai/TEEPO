@@ -20,6 +20,7 @@ import Link from 'next/link'
 import {
   X, FileText, Code, BarChart2, CheckCircle2, ExternalLink,
   RotateCw, AlertCircle, Loader2, Link2Off, Download, Puzzle, ArrowDownToLine,
+  Bell,
 } from 'lucide-react'
 import {
   probeExtension,
@@ -206,7 +207,8 @@ export default function SyncResultsModal({
   if (stage === 'idle') return null
 
   const totalNew = results
-    ? results.totals.new_assignments + results.totals.new_files + results.totals.new_grades
+    ? results.totals.new_assignments + results.totals.new_files + results.totals.new_grades +
+      (results.totals.new_announcements ?? 0)
     : 0
   const isEmptyResults = stage === 'results' && totalNew === 0
 
@@ -324,6 +326,15 @@ export default function SyncResultsModal({
                 <div className="sync-sum-num">{results.totals.new_grades}</div>
                 <div className="sync-sum-label">ציונים חדשים</div>
               </div>
+              {/* Optional 4th card — only render when the backend
+                  shipped announcements (older backends won't). Keeps the
+                  modal layout from looking lopsided when the field's 0. */}
+              {(results.totals.new_announcements ?? 0) > 0 && (
+                <div className="sync-sum-card">
+                  <div className="sync-sum-num">{results.totals.new_announcements}</div>
+                  <div className="sync-sum-label">הודעות חדשות</div>
+                </div>
+              )}
             </div>
 
             <ExtensionBridgeCTA
@@ -335,8 +346,10 @@ export default function SyncResultsModal({
 
             <div className="sync-modal-body">
               {results.results.map((course) => {
+                const annCount = course.new_announcements?.length ?? 0
                 const courseTotal =
-                  course.new_assignments.length + course.new_files.length + course.new_grades.length
+                  course.new_assignments.length + course.new_files.length + course.new_grades.length +
+                  annCount
                 if (courseTotal === 0 && !course.error) return null
                 return (
                   <section className="sync-course-block" key={course.moodle_id || course.course_name}>
@@ -387,6 +400,24 @@ export default function SyncResultsModal({
                         actionLabel="צפייה"
                       />
                     ))}
+                    {course.new_announcements?.map((a, i) => (
+                      <NewItemRow
+                        key={`n-${i}`}
+                        kind="announcement"
+                        title={a.title || 'הודעה חדשה'}
+                        // Body preview is already truncated server-side
+                        // (~320 chars). Author + forum context keeps the
+                        // row scannable without opening the post.
+                        sub={
+                          [
+                            a.author || null,
+                            a.forum_name || null,
+                          ].filter(Boolean).join(' · ') || 'הודעה חדשה ב-Moodle'
+                        }
+                        href={a.url}
+                        actionLabel="פתח ב-Moodle"
+                      />
+                    ))}
                   </section>
                 )
               })}
@@ -429,14 +460,16 @@ export default function SyncResultsModal({
 function NewItemRow({
   kind, title, sub, href, actionLabel,
 }: {
-  kind: 'assignment' | 'file' | 'grade'
+  kind: 'assignment' | 'file' | 'grade' | 'announcement'
   title: string
   sub: string
   href?: string
   actionLabel: string
 }) {
-  const Icon = kind === 'assignment' ? CheckCircle2 : kind === 'grade' ? BarChart2 :
-    /\.(py|js|ts|cpp|c|java|sh)$/i.test(title) ? Code : FileText
+  const Icon = kind === 'assignment' ? CheckCircle2
+    : kind === 'grade' ? BarChart2
+    : kind === 'announcement' ? Bell
+    : /\.(py|js|ts|cpp|c|java|sh)$/i.test(title) ? Code : FileText
   const Action: any = href ? 'a' : 'button'
   const actionProps = href
     ? { href, target: '_blank', rel: 'noopener noreferrer' as const }
