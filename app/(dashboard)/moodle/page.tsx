@@ -9,7 +9,6 @@ import {
   CheckCircle, Loader2, BookOpen, Calendar, ExternalLink, Puzzle,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import GlowCard from '@/components/ui/GlowCard'
 import { useDB } from '@/lib/db-context'
 import { classifyCourse, computeYearOfStudy } from '@/lib/semester-classifier'
 import { useUniversityName } from '@/lib/use-university'
@@ -289,206 +288,181 @@ export default function UniversityConnectPage() {
   const loginStatus = (site: string) => status.login_status?.[site] || 'idle'
 
   return (
-    <div className="cream-page moodle-v2 p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto space-y-8 animate-fade-in">
+    <div className="cream-page moodle-v2">
+      <div className="moodle-v2-main animate-fade-in" dir="rtl">
 
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-             style={{ background: 'linear-gradient(135deg, #16a34a, #84cc16)', boxShadow: '0 6px 14px -4px rgba(22,163,74,.45)' }}>
-          <GraduationCap size={24} className="text-white" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--lp-ink, #2d1810)' }}>חיבור Moodle</h1>
-          <p className="text-sm" style={{ color: 'var(--lp-ink-soft, #5c3f2f)' }}>התחבר ל-Moodle של {universityName}</p>
-        </div>
-      </div>
-
-      {/* How it works — branches on real backend capability:
-          - moodleConfigured: backend has MOODLE_URL set → legacy headless/extension flow can run.
-          - !moodleConfigured: backend can't scrape → push user to the Chrome extension which IS deployed and works. */}
-      <GlowCard glowColor="rgba(22,163,74,0.10)">
-      <div className="p-5 text-sm space-y-3">
-        <p className="font-semibold gradient-text mb-3">איך זה עובד?</p>
-
-        {!lmsInfo.moodle.enabled ? (
-          // Backend isn't configured for Moodle. Honest path forward.
-          <div className="space-y-3">
-            <div
-              className="p-3 rounded-xl text-xs leading-relaxed"
-              style={{
-                background: 'rgba(217, 119, 6, .08)',
-                border: '1px solid rgba(217, 119, 6, .25)',
-                color: 'var(--lp-ink-soft, #5c3f2f)',
-              }}
-            >
-              <strong style={{ color: '#9a3412' }}>השרת לא מוגדר ל-Moodle של {universityName}.</strong><br />
-              סנכרון אוטומטי מ-Moodle לא יעבוד עד שהגדרת ה-<code dir="ltr">MOODLE_URL</code> תעלה ב-Backend.
-              <br />עד אז, השתמש ב-<strong>תוסף Chrome של TEEPO</strong> — הוא קורא ישירות מדפי Moodle שאתה פותח בדפדפן.
-            </div>
-
-            <div className="space-y-2.5">
-              <div className="flex items-start gap-3">
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                      style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>1</span>
-                <p className="text-ink-muted">
-                  צור קורס ראשון ב-<Link href="/courses/extract" className="underline" style={{ color: 'var(--lp-accent-deep)' }}>/courses/extract</Link>
-                  {' '}או ידנית ב-<Link href="/courses" className="underline" style={{ color: 'var(--lp-accent-deep)' }}>/courses</Link>.
-                </p>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                      style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>2</span>
-                <p className="text-ink-muted">
-                  התקן את תוסף ה-Chrome של TEEPO לפי
-                  {' '}<a
-                    href="https://github.com/yarinlevin18-ai/TEEPO/blob/master/chrome-extension/README.md"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline"
-                    style={{ color: 'var(--lp-accent-deep)' }}
-                  >ההוראות ב-README</a> (5 דקות חד-פעמי — OAuth client + Load unpacked).
-                </p>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                      style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>3</span>
-                <p className="text-ink-muted">
-                  פתח דף קורס ב-Moodle של האוניברסיטה שלך (BGU / TAU) → לחץ אייקון TEEPO ב-toolbar.
-                </p>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                      style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>4</span>
-                <p className="text-ink-muted">
-                  בחר את הקורס מה-dropdown ולחץ <strong className="text-ink">"שלח ל-TEEPO"</strong> — הקבצים מועלים ישר ל-Drive שלך.
-                </p>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                      style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>5</span>
-                <p className="text-ink-muted">
-                  חזור ל-<Link href="/summaries" className="underline" style={{ color: 'var(--lp-accent-deep)' }}>/summaries</Link>
-                  {' '}— הקבצים יופיעו תוך 30 שניות (polling אוטומטי).
-                </p>
-              </div>
-            </div>
-
-            <div
-              className="mt-2 pt-3 flex items-center gap-2 text-xs"
-              style={{ borderTop: '1px solid var(--lp-line-soft)', color: 'var(--lp-accent-deep)' }}
-            >
-              <span>🔒</span>
-              <span>הקבצים זורמים <strong>ישירות מהדפדפן ל-Drive שלך</strong> — לא דרך השרת של TEEPO.</span>
-            </div>
+        {/* Header */}
+        <header className="moodle-v2-head">
+          <div className="moodle-v2-head-icon">
+            <GraduationCap size={24} />
           </div>
-        ) : serverMode ? (
-          // Backend IS configured + server-mode (extension Session flow).
-          <div className="space-y-2.5">
-            <div className="flex items-start gap-3">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                    style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>1</span>
-              <p className="text-ink-muted">לחץ <strong className="text-ink">"התחבר"</strong> — Moodle ייפתח בטאב חדש</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                    style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>2</span>
-              <p className="text-ink-muted">התחבר ל-Moodle <strong className="text-ink">בדפדפן שלך כרגיל</strong></p>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                    style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>3</span>
-              <p className="text-ink-muted">לחץ על <strong className="text-ink">אייקון התוסף 🎓</strong> בסרגל הדפדפן ← "שלח Session"</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
-                    style={{ background: 'var(--lp-accent-soft)', color: 'var(--lp-accent-deep)' }}>4</span>
-              <p className="text-ink-muted">חזור לכאן ← <strong className="text-ink">סנכרן הכל</strong></p>
-            </div>
-            <div className="mt-3 pt-3 flex items-center gap-2 text-xs"
-                 style={{ borderTop: '1px solid var(--lp-line-soft)', color: 'var(--lp-accent-deep)' }}>
-              <span>🔒</span>
-              <span>הסיסמה שלך לא נוגעת באפליקציה — רק ה-session cookies מועברים</span>
-            </div>
+          <div>
+            <h1>חיבור Moodle</h1>
+            <p>התחבר ל-Moodle של {universityName}</p>
           </div>
-        ) : (
-          // Backend configured + headless flow (legacy local dev mode).
-          <>
-            <p className="text-ink-muted">1. לחץ "התחבר" וייפתח טופס שם משתמש/סיסמה של {universityName}.</p>
-            <p className="text-ink-muted">2. הbackend יתחבר ל-Moodle בשמך עם headless Chrome.</p>
-            <p className="text-ink-muted">3. אחרי שמופיע ✓ ירוק, לחץ "סנכרן הכל".</p>
-            <p className="text-ink-muted">4. הקורסים, ציונים ומטלות יופיעו ב-/courses ו-/summaries.</p>
-          </>
-        )}
-      </div>
-      </GlowCard>
+        </header>
 
-      {/* Site cards */}
-      <div className="grid gap-4">
-        {lmsInfo.moodle.enabled ? (
-          <SiteCard site="moodle" name="Moodle" description="קורסים, מצגות, מטלות, הגשות"
-            url={lmsInfo.moodle.host} externalUrl={lmsInfo.moodle.my_url || lmsInfo.moodle.url}
-            connected={status.moodle} loginStatus={loginStatus('moodle')}
-            loading={!!loading['moodle']} onConnect={c => connect('moodle', c)}
-            icon={BookOpen} color="#10b981" serverMode={serverMode} />
-        ) : (
-          <GlowCard>
-            <div className="p-5 text-sm text-ink-muted">
+        {/* How it works — branches on real backend capability:
+            - moodleConfigured: backend has MOODLE_URL set → legacy headless/extension flow can run.
+            - !moodleConfigured: backend can't scrape → push user to the Chrome extension which IS deployed and works. */}
+        <section className="moodle-v2-card moodle-v2-howto">
+          <p className="moodle-v2-card-title">איך זה עובד?</p>
+
+          {!lmsInfo.moodle.enabled ? (
+            // Backend isn't configured for Moodle. Honest path forward.
+            <div className="moodle-v2-howto-body">
+              <div className="moodle-v2-banner amber">
+                <strong>השרת לא מוגדר ל-Moodle של {universityName}.</strong><br />
+                סנכרון אוטומטי מ-Moodle לא יעבוד עד שהגדרת ה-<code dir="ltr">MOODLE_URL</code> תעלה ב-Backend.
+                <br />עד אז, השתמש ב-<strong>תוסף Chrome של TEEPO</strong> — הוא קורא ישירות מדפי Moodle שאתה פותח בדפדפן.
+              </div>
+
+              <ol className="moodle-v2-steps">
+                <li>
+                  <span className="moodle-v2-step-num">1</span>
+                  <p>
+                    צור קורס ראשון ב-<Link href="/courses/extract" className="moodle-v2-link">/courses/extract</Link>
+                    {' '}או ידנית ב-<Link href="/courses" className="moodle-v2-link">/courses</Link>.
+                  </p>
+                </li>
+                <li>
+                  <span className="moodle-v2-step-num">2</span>
+                  <p>
+                    התקן את תוסף ה-Chrome של TEEPO לפי
+                    {' '}<a
+                      href="https://github.com/yarinlevin18-ai/TEEPO/blob/master/chrome-extension/README.md"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="moodle-v2-link"
+                    >ההוראות ב-README</a> (5 דקות חד-פעמי — OAuth client + Load unpacked).
+                  </p>
+                </li>
+                <li>
+                  <span className="moodle-v2-step-num">3</span>
+                  <p>
+                    פתח דף קורס ב-Moodle של האוניברסיטה שלך (BGU / TAU) → לחץ אייקון TEEPO ב-toolbar.
+                  </p>
+                </li>
+                <li>
+                  <span className="moodle-v2-step-num">4</span>
+                  <p>
+                    בחר את הקורס מה-dropdown ולחץ <strong>&quot;שלח ל-TEEPO&quot;</strong> — הקבצים מועלים ישר ל-Drive שלך.
+                  </p>
+                </li>
+                <li>
+                  <span className="moodle-v2-step-num">5</span>
+                  <p>
+                    חזור ל-<Link href="/summaries" className="moodle-v2-link">/summaries</Link>
+                    {' '}— הקבצים יופיעו תוך 30 שניות (polling אוטומטי).
+                  </p>
+                </li>
+              </ol>
+
+              <div className="moodle-v2-note">
+                <span>🔒</span>
+                <span>הקבצים זורמים <strong>ישירות מהדפדפן ל-Drive שלך</strong> — לא דרך השרת של TEEPO.</span>
+              </div>
+            </div>
+          ) : serverMode ? (
+            // Backend IS configured + server-mode (extension Session flow).
+            <div className="moodle-v2-howto-body">
+              <ol className="moodle-v2-steps">
+                <li>
+                  <span className="moodle-v2-step-num">1</span>
+                  <p>לחץ <strong>&quot;התחבר&quot;</strong> — Moodle ייפתח בטאב חדש</p>
+                </li>
+                <li>
+                  <span className="moodle-v2-step-num">2</span>
+                  <p>התחבר ל-Moodle <strong>בדפדפן שלך כרגיל</strong></p>
+                </li>
+                <li>
+                  <span className="moodle-v2-step-num">3</span>
+                  <p>לחץ על <strong>אייקון התוסף 🎓</strong> בסרגל הדפדפן ← &quot;שלח Session&quot;</p>
+                </li>
+                <li>
+                  <span className="moodle-v2-step-num">4</span>
+                  <p>חזור לכאן ← <strong>סנכרן הכל</strong></p>
+                </li>
+              </ol>
+              <div className="moodle-v2-note">
+                <span>🔒</span>
+                <span>הסיסמה שלך לא נוגעת באפליקציה — רק ה-session cookies מועברים</span>
+              </div>
+            </div>
+          ) : (
+            // Backend configured + headless flow (legacy local dev mode).
+            <ol className="moodle-v2-steps simple">
+              <li><span className="moodle-v2-step-num">1</span><p>לחץ &quot;התחבר&quot; וייפתח טופס שם משתמש/סיסמה של {universityName}.</p></li>
+              <li><span className="moodle-v2-step-num">2</span><p>הbackend יתחבר ל-Moodle בשמך עם headless Chrome.</p></li>
+              <li><span className="moodle-v2-step-num">3</span><p>אחרי שמופיע ✓ ירוק, לחץ &quot;סנכרן הכל&quot;.</p></li>
+              <li><span className="moodle-v2-step-num">4</span><p>הקורסים, ציונים ומטלות יופיעו ב-/courses ו-/summaries.</p></li>
+            </ol>
+          )}
+        </section>
+
+        {/* Site cards */}
+        <div className="moodle-v2-sites">
+          {lmsInfo.moodle.enabled ? (
+            <SiteCard site="moodle" name="Moodle" description="קורסים, מצגות, מטלות, הגשות"
+              url={lmsInfo.moodle.host} externalUrl={lmsInfo.moodle.my_url || lmsInfo.moodle.url}
+              connected={status.moodle} loginStatus={loginStatus('moodle')}
+              loading={!!loading['moodle']} onConnect={c => connect('moodle', c)}
+              icon={BookOpen} tone="emerald" serverMode={serverMode} />
+          ) : (
+            <section className="moodle-v2-card moodle-v2-disabled">
               Moodle לא מוגדר. הגדר את משתנה הסביבה <code dir="ltr">MOODLE_URL</code> ב-Backend כדי
               להפעיל את החיבור.
+            </section>
+          )}
+          {lmsInfo.portal.enabled && (
+            <SiteCard site="portal" name="פורטל הסטודנט" description="לוח שעות, רישום לקורסים, ציונים"
+              url={lmsInfo.portal.host} externalUrl={lmsInfo.portal.url}
+              connected={status.portal} loginStatus={loginStatus('portal')}
+              loading={!!loading['portal']} onConnect={c => connect('portal', c)}
+              icon={Calendar} tone="violet" serverMode={serverMode} />
+          )}
+        </div>
+
+        {/* Sync button */}
+        {(status.moodle || status.portal) && (
+          <motion.section
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="moodle-v2-card moodle-v2-sync"
+          >
+            <div className="moodle-v2-sync-head">
+              <RefreshCw size={18} />
+              <div>
+                <p className="title">סנכרן את כל הנתונים</p>
+                <p className="sub">מושך קורסים, מטלות ולוח שעות לאפליקציה</p>
+              </div>
             </div>
-          </GlowCard>
-        )}
-        {lmsInfo.portal.enabled && (
-          <SiteCard site="portal" name="פורטל הסטודנט" description="לוח שעות, רישום לקורסים, ציונים"
-            url={lmsInfo.portal.host} externalUrl={lmsInfo.portal.url}
-            connected={status.portal} loginStatus={loginStatus('portal')}
-            loading={!!loading['portal']} onConnect={c => connect('portal', c)}
-            icon={Calendar} color="#8b5cf6" serverMode={serverMode} />
+            <button
+              onClick={syncAll}
+              disabled={syncing}
+              className="moodle-v2-btn primary full"
+            >
+              {syncing ? <Loader2 size={18} className="spin" /> : <RefreshCw size={18} />}
+              {syncing ? 'מסנכרן...' : 'סנכרן הכל'}
+            </button>
+            {syncResult && (
+              <p className={`moodle-v2-sync-result${syncResult.includes('שגיאה') ? ' error' : ' success'}`}>
+                {syncResult}
+              </p>
+            )}
+          </motion.section>
         )}
       </div>
-
-      {/* Sync button */}
-      {(status.moodle || status.portal) && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <GlowCard glowColor="rgba(99,102,241,0.10)">
-          <div className="p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <RefreshCw size={18} style={{ color: '#818cf8' }} />
-            <div>
-              <p className="font-semibold text-ink">סנכרן את כל הנתונים</p>
-              <p className="text-xs text-ink-muted">מושך קורסים, מטלות ולוח שעות לאפליקציה</p>
-            </div>
-          </div>
-          <button
-            onClick={syncAll}
-            disabled={syncing}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium disabled:opacity-50 transition-all btn-gradient shadow-glow-sm"
-          >
-            {syncing ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
-            {syncing ? 'מסנכרן...' : 'סנכרן הכל'}
-          </button>
-          {syncResult && (
-            <p className={`text-sm text-center ${syncResult.includes('שגיאה') ? 'text-red-400' : 'text-emerald-400'}`}>
-              {syncResult}
-            </p>
-          )}
-          </div>
-          </GlowCard>
-        </motion.div>
-      )}
     </div>
   )
 }
 
-function SiteCard({ site, name, description, url, externalUrl, connected, loginStatus, loading,
-  onConnect, icon: Icon, color, serverMode }: {
+function SiteCard({ site, name, description, url, externalUrl, connected, loginStatus: _loginStatus, loading,
+  onConnect, icon: Icon, tone, serverMode }: {
   site: string; name: string; description: string; url: string; externalUrl: string
   connected: boolean; loginStatus: string; loading: boolean
   onConnect: (creds?: { username: string; password: string }) => void
-  icon: React.ElementType; color: string; serverMode: boolean
+  icon: React.ElementType; tone: 'emerald' | 'violet'; serverMode: boolean
 }) {
   const [step, setStep] = useState<'idle' | 'waiting' | 'creds'>('idle')
   const [username, setUsername] = useState('')
@@ -518,52 +492,47 @@ function SiteCard({ site, name, description, url, externalUrl, connected, loginS
   }, [connected])
 
   return (
-    <GlowCard
-      className="transition-all duration-300"
-      glowColor={connected ? 'rgba(16,185,129,0.10)' : undefined}
-      style={connected ? { boxShadow: `0 0 24px ${color}33` } : {}}
-    >
+    <section className={`moodle-v2-card moodle-v2-site tone-${tone}${connected ? ' connected' : ''}`}>
       {/* Main row */}
-      <div className="flex items-center gap-4 p-5">
-        <div className="relative flex-shrink-0">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center"
-               style={{ background: `${color}18` }}>
-            <Icon size={20} style={{ color }} />
+      <div className="moodle-v2-site-row">
+        <div className="moodle-v2-site-icon-wrap">
+          <div className="moodle-v2-site-icon">
+            <Icon size={20} />
           </div>
-          <div className={`pulse-dot absolute -top-1 -right-1 ${connected ? 'green' : 'gray'}`} />
+          <span className={`moodle-v2-site-dot${connected ? ' on' : ''}`} />
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="font-semibold text-ink">{name}</p>
+        <div className="moodle-v2-site-info">
+          <div className="moodle-v2-site-title">
+            <p>{name}</p>
             {connected
-              ? <span className="flex items-center gap-1 text-xs" style={{ color: '#10b981' }}>
+              ? <span className="moodle-v2-site-pill on">
                   <CheckCircle size={12} /> מחובר
                 </span>
-              : <span className="flex items-center gap-1 text-xs text-ink-muted">
+              : <span className="moodle-v2-site-pill">
                   <WifiOff size={12} /> לא מחובר
                 </span>
             }
           </div>
-          <p className="text-xs text-ink-muted mt-0.5">{description}</p>
-          <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.2)' }} dir="ltr">{url}</p>
+          <p className="moodle-v2-site-desc">{description}</p>
+          <p className="moodle-v2-site-url" dir="ltr">{url}</p>
         </div>
 
         {!connected && (
-          <div className="flex flex-col gap-1.5 flex-shrink-0">
+          <div className="moodle-v2-site-actions">
             <button
               onClick={handleConnect}
               disabled={loading}
-              className="px-4 py-2 rounded-xl text-sm font-medium transition-all btn-gradient shadow-glow-sm flex items-center justify-center gap-1.5"
+              className="moodle-v2-btn primary"
             >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+              {loading ? <Loader2 size={14} className="spin" /> : <ExternalLink size={14} />}
               התחבר
             </button>
             {serverMode && site === 'moodle' && (
               <button
                 onClick={() => setStep(step === 'creds' ? 'idle' : 'creds')}
                 disabled={loading}
-                className="text-xs text-ink-muted hover:text-ink underline transition-colors"
+                className="moodle-v2-site-toggle"
               >
                 {step === 'creds' ? 'ביטול' : 'נייד? התחבר עם סיסמה'}
               </button>
@@ -571,10 +540,7 @@ function SiteCard({ site, name, description, url, externalUrl, connected, loginS
           </div>
         )}
         {connected && (
-          <span className="px-4 py-2 rounded-xl text-sm flex-shrink-0 text-ink-muted"
-                style={{ background: 'rgba(255,255,255,0.05)' }}>
-            מחובר ✓
-          </span>
+          <span className="moodle-v2-site-connected">מחובר ✓</span>
         )}
       </div>
 
@@ -586,54 +552,52 @@ function SiteCard({ site, name, description, url, externalUrl, connected, loginS
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden"
+            className="moodle-v2-site-expand"
           >
-            <form
-              onSubmit={handleCredsSubmit}
-              className="px-5 pb-5 pt-4 space-y-3 border-t"
-              style={{ borderColor: 'rgba(255,255,255,0.06)' }}
-            >
-              <div className="flex items-start gap-2 text-xs text-ink-muted">
+            <form onSubmit={handleCredsSubmit} className="moodle-v2-creds">
+              <div className="moodle-v2-creds-note">
                 <span>🔒</span>
                 <span>
                   הפרטים נשלחים ב-HTTPS לשרת, משמשים פעם אחת לכניסה ל-Moodle
                   ולא נשמרים. רק ה-session cookies שמורים בשרת.
                 </span>
               </div>
-              <div>
-                <label className="text-xs text-ink-muted block mb-1">שם משתמש Moodle</label>
+              <div className="moodle-v2-creds-field">
+                <label htmlFor="moodle-username">שם משתמש Moodle</label>
                 <input
+                  id="moodle-username"
                   type="text"
                   autoComplete="username"
                   value={username}
                   onChange={e => setUsername(e.target.value)}
                   placeholder="שם המשתמש שלך באוניברסיטה"
                   dir="ltr"
-                  className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 focus:border-indigo-400/50 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 text-ink"
+                  className="moodle-v2-input"
                   required
                 />
               </div>
-              <div>
-                <label className="text-xs text-ink-muted block mb-1">סיסמה</label>
+              <div className="moodle-v2-creds-field">
+                <label htmlFor="moodle-password">סיסמה</label>
                 <input
+                  id="moodle-password"
                   type="password"
                   autoComplete="current-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   dir="ltr"
-                  className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 focus:border-indigo-400/50 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 text-ink"
+                  className="moodle-v2-input"
                   required
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading || !username.trim() || !password.trim()}
-                className="w-full py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 transition-all btn-gradient shadow-glow-sm flex items-center justify-center gap-2"
+                className="moodle-v2-btn primary full"
               >
-                {loading ? <Loader2 size={14} className="animate-spin" /> : null}
+                {loading ? <Loader2 size={14} className="spin" /> : null}
                 {loading ? 'מתחבר ל-Moodle...' : 'התחבר'}
               </button>
-              <p className="text-xs text-ink-muted text-center">
+              <p className="moodle-v2-creds-foot">
                 הכניסה headless — לוקחת 10-20 שניות
               </p>
             </form>
@@ -649,51 +613,42 @@ function SiteCard({ site, name, description, url, externalUrl, connected, loginS
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden"
+            className="moodle-v2-site-expand"
           >
-            <div className="px-5 pb-5 pt-1 space-y-3 border-t"
-                 style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-
-              <div className="flex items-start gap-3 pt-2">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-                     style={{ background: 'rgba(99,102,241,0.2)' }}>
-                  <span className="text-sm">1</span>
-                </div>
-                <p className="text-sm text-ink-muted pt-1">
+            <div className="moodle-v2-waiting">
+              <div className="moodle-v2-waiting-step">
+                <div className="moodle-v2-waiting-num">1</div>
+                <p>
                   התחבר ל-{name} בטאב שנפתח עם שם המשתמש והסיסמה שלך
                 </p>
               </div>
 
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-                     style={{ background: 'rgba(99,102,241,0.2)' }}>
-                  <span className="text-sm">2</span>
-                </div>
-                <div className="pt-1">
-                  <p className="text-sm text-ink-muted">
-                    לחץ על אייקון התוסף <span className="text-lg">🎓</span> בסרגל הדפדפן
+              <div className="moodle-v2-waiting-step">
+                <div className="moodle-v2-waiting-num">2</div>
+                <div>
+                  <p>
+                    לחץ על אייקון התוסף <span className="moodle-v2-emoji">🎓</span> בסרגל הדפדפן
                   </p>
-                  <p className="text-xs text-ink-muted mt-0.5">
+                  <p className="sub">
                     לא רואה אותו? לחץ על <Puzzle size={11} className="inline" /> ← אתר את TEEPO Study Organizer ← נעץ אותו
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-                     style={{ background: 'rgba(99,102,241,0.2)' }}>
-                  <span className="text-sm">3</span>
-                </div>
-                <p className="text-sm text-ink-muted pt-1">
-                  לחץ <strong className="text-ink">"שלח Session ל-App"</strong> בתוסף — הסטטוס ישתנה לירוק
+              <div className="moodle-v2-waiting-step">
+                <div className="moodle-v2-waiting-num">3</div>
+                <p>
+                  לחץ <strong>&quot;שלח Session ל-App&quot;</strong> בתוסף — הסטטוס ישתנה לירוק
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <Loader2 size={13} className="animate-spin text-ink-muted" />
-                <p className="text-xs text-ink-muted">ממתין לחיבור...</p>
-                <button onClick={() => setStep('idle')}
-                        className="mr-auto text-xs text-ink-muted hover:text-ink underline">
+              <div className="moodle-v2-waiting-pending">
+                <Loader2 size={13} className="spin" />
+                <p>ממתין לחיבור...</p>
+                <button
+                  onClick={() => setStep('idle')}
+                  className="moodle-v2-waiting-cancel"
+                >
                   ביטול
                 </button>
               </div>
@@ -701,6 +656,6 @@ function SiteCard({ site, name, description, url, externalUrl, connected, loginS
           </motion.div>
         )}
       </AnimatePresence>
-    </GlowCard>
+    </section>
   )
 }
