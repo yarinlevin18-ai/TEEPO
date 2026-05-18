@@ -36,8 +36,15 @@ export interface UserSettings {
   takes_summer?: boolean
   /** Loose moodle-connection mirror for the TopNav pill. Authoritative state
    *  lives in the backend; this is set after a successful /api/university/connect
-   *  so the pill stays green across page loads without a refetch. */
+   *  so the pill stays green across page loads without a refetch. Re-mirrored
+   *  every 90s by useMoodleStatus while a dashboard tab is open. */
   moodle_connected?: boolean
+  /** ISO timestamp of the last automatic background sync (see useAutoSync).
+   *  Drives the dashboard-load auto-sync cooldown — we won't auto-fire a
+   *  new sync until at least AUTO_SYNC_INTERVAL_HOURS have passed. Manual
+   *  syncs (the "מסנכרן" button) do NOT update this field, so a user can
+   *  still hit refresh whenever they want without delaying the next auto. */
+  last_auto_sync_at?: string
   /** True once the user finished or dismissed the /setup first-run wizard.
    *  When unset AND the user has zero courses, the dashboard redirects to /setup. */
   setup_seen?: boolean
