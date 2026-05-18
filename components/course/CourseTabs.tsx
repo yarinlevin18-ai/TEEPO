@@ -1,78 +1,22 @@
 'use client'
 
 /**
- * Course workspace — a click-minimized dashboard for a single course.
+ * Course workspace mini-cards — `TasksMini` and `AssignmentsMini`.
  *
- * UX principles:
- *  1. Lessons are the centerpiece — summaries live *per-lesson*, not at
- *     the course level (the parent renders the lessons list via
- *     `lessonsSlot`).
- *  2. Every side panel has an inline "type + Enter = added" input. No
- *     modals, no toggle flows, no "+ click → form → submit".
- *  3. Empty states are small inline hints, not huge empty cards.
+ * Originally this file held a full tabbed workspace (tasks / assignments /
+ * notes / AI chat). The notes tab moved to per-lesson summaries, and the
+ * AI chat panel was retired together with the lesson notebook page. The
+ * course detail page now embeds just the two compact lists below.
+ *
+ * Both cards are inline-add: type → Enter → row appears. No modals, no
+ * "+ click → form → submit" flows. Empty states are one-line hints.
  */
 
-import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  CheckSquare, FileText, StickyNote, MessageCircle, Trash2,
-  Loader2, Calendar, Send, Sparkles,
-} from 'lucide-react'
-import { io, Socket } from 'socket.io-client'
-import { useDB } from '@/lib/db-context'
-import { useAuth } from '@/lib/auth-context'
-import { BACKEND_URL as BACKEND } from '@/lib/backend-url'
-import QuickAddInput from './QuickAddInput'
-import type { Assignment, StudyTask, ChatMessage } from '@/types'
+import { CheckSquare, FileText, Trash2, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
-
-// Kept for backward compatibility with callers that still import the tabs.
-export type CourseTab = 'tasks' | 'assignments' | 'notes' | 'ai'
-export const COURSE_TAB_META: { id: CourseTab; label: string; icon: any }[] = [
-  { id: 'tasks',       label: 'משימות',   icon: CheckSquare  },
-  { id: 'assignments', label: 'מטלות',    icon: FileText     },
-  { id: 'notes',       label: 'סיכומים',  icon: StickyNote   },
-  { id: 'ai',          label: 'עוזר AI',  icon: MessageCircle },
-]
-
-// ═══════════════════════════════════════════════════════════════
-// MAIN WORKSPACE
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Dashboard layout for a course. Notes editor is the hero on the left,
- * compact inline-add panels stack on the right.
- *
- * `lessonsSlot` is an optional render-slot for the existing lessons UI
- * from the course page — we leave that to the parent so we don't
- * re-implement file uploads and AI summarization here.
- */
-export function CourseWorkspace({
-  courseId,
-  courseTitle,
-  lessonsSlot,
-}: {
-  courseId: string
-  courseTitle: string
-  lessonsSlot?: React.ReactNode
-}) {
-  // Tasks and Assignments now live inside the course header card on the
-  // parent page — the workspace keeps the lessons stack and only the AI
-  // helper in the right column.
-  return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-      {/* LEFT — Lessons (each lesson holds its own summary) */}
-      <section className="min-w-0 space-y-5">
-        {lessonsSlot}
-      </section>
-
-      {/* RIGHT — AI helper only */}
-      <aside className="space-y-4 min-w-0">
-        <AIMini courseId={courseId} courseTitle={courseTitle} />
-      </aside>
-    </div>
-  )
-}
+import { useDB } from '@/lib/db-context'
+import QuickAddInput from './QuickAddInput'
+import type { Assignment, StudyTask } from '@/types'
 
 // ═══════════════════════════════════════════════════════════════
 // TASKS MINI — inline quick-add, compact list
@@ -250,174 +194,6 @@ function AssignmentRow({ a, onUpdate, onDelete }: {
       >
         <Trash2 size={11} />
       </button>
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════
-// AI MINI — collapsible chat in the side column
-// ═══════════════════════════════════════════════════════════════
-
-function AIMini({ courseId, courseTitle }: { courseId: string; courseTitle: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="glass rounded-2xl overflow-hidden">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/[0.02] transition-colors"
-      >
-        <span className="text-sm font-semibold text-ink flex items-center gap-2">
-          <Sparkles size={14} className="text-violet-400" />
-          עוזר AI
-        </span>
-        <span className="text-[11px] text-ink-subtle">
-          {open ? 'סגור' : 'שאל משהו…'}
-        </span>
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-t border-white/5"
-          >
-            <AIChat courseId={courseId} courseTitle={courseTitle} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-function AIChat({ courseId, courseTitle }: { courseId: string; courseTitle: string }) {
-  const { user } = useAuth()
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [input, setInput] = useState('')
-  const [typing, setTyping] = useState(false)
-  const [connected, setConnected] = useState(false)
-  const socketRef = useRef<Socket | null>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const socket = io(BACKEND, { transports: ['websocket', 'polling'] })
-    socketRef.current = socket
-
-    socket.on('connect', () => {
-      setConnected(true)
-      socket.emit('join', { user_id: user?.id || 'anonymous', agent_type: 'study_buddy' })
-    })
-    socket.on('disconnect', () => setConnected(false))
-    socket.on('connected', () => {
-      if (messages.length === 0) {
-        setMessages([{ role: 'assistant', content: `היי! שאל שאלה על "${courseTitle}".` }])
-      }
-    })
-    socket.on('history_loaded', ({ messages: hist }) => {
-      if (hist && hist.length > 0) setMessages(hist)
-    })
-    socket.on('typing', () => setTyping(true))
-    socket.on('reply', ({ text }: { text: string }) => {
-      setTyping(false)
-      setMessages(prev => [...prev, { role: 'assistant', content: text }])
-    })
-    socket.on('error', ({ message }: { message: string }) => {
-      setTyping(false)
-      setMessages(prev => [...prev, { role: 'assistant', content: `❌ ${message}` }])
-    })
-
-    return () => { socket.disconnect() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseId])
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, typing])
-
-  const send = () => {
-    const text = input.trim()
-    if (!text || !socketRef.current) return
-    setMessages(prev => [...prev, { role: 'user', content: text }])
-    socketRef.current.emit('message', { text, agent_type: 'study_buddy', course_id: courseId })
-    setInput('')
-    setTyping(true)
-  }
-
-  return (
-    <div className="flex flex-col" style={{ height: 340 }}>
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>
-            <div
-              className={`max-w-[90%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
-                m.role === 'user'
-                  ? 'bg-indigo-500/20 text-ink border border-indigo-500/20'
-                  : 'bg-white/5 text-ink border border-white/5'
-              }`}
-              style={{ whiteSpace: 'pre-wrap' }}
-            >
-              {m.content}
-            </div>
-          </div>
-        ))}
-        {typing && (
-          <div className="flex justify-end">
-            <div className="bg-white/5 border border-white/5 rounded-xl px-3 py-2">
-              <div className="flex gap-1">
-                <span className="w-1 h-1 rounded-full bg-violet-400 animate-bounce" />
-                <span className="w-1 h-1 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '0.15s' }} />
-                <span className="w-1 h-1 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '0.3s' }} />
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-      <div className="p-2 border-t border-white/5 flex items-end gap-2">
-        <textarea
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-          placeholder="שאלה לעוזר…"
-          rows={1}
-          className="input-dark flex-1 text-xs resize-none max-h-20"
-        />
-        <button
-          onClick={send}
-          disabled={!input.trim() || !connected}
-          className="btn-gradient p-2 rounded-lg text-white disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <Send size={13} />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════
-// BACKWARD-COMPAT: old tab-switching component (kept in case any
-// other caller still imports `CourseTabs`). Routes now use the new
-// `CourseWorkspace` component instead. The `notes` tab is a no-op —
-// summaries are per-lesson now.
-// ═══════════════════════════════════════════════════════════════
-
-interface LegacyTabsProps {
-  courseId: string
-  activeTab: CourseTab
-  courseTitle: string
-}
-
-export default function CourseTabs({ courseId, activeTab, courseTitle }: LegacyTabsProps) {
-  return (
-    <div>
-      {activeTab === 'tasks'       && <TasksMini courseId={courseId} />}
-      {activeTab === 'assignments' && <AssignmentsMini courseId={courseId} />}
-      {activeTab === 'notes'       && (
-        <p className="text-sm text-ink-muted p-6 text-center">
-          סיכומים נכתבים כעת בתוך השיעור עצמו.
-        </p>
-      )}
-      {activeTab === 'ai'          && <AIMini courseId={courseId} courseTitle={courseTitle} />}
     </div>
   )
 }
