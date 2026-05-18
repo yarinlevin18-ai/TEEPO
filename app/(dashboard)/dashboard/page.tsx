@@ -218,7 +218,11 @@ export default function DashboardPage() {
             <div className="dcard">
               <div className="dcard-head">
                 <h3>היום בלוח <span className="badge-num">{todaySchedule.length} שיעורים</span></h3>
-                <Link href="/tasks">השבוע →</Link>
+                {/* "השבוע" jumps to Google Calendar's week view (we don't
+                    have an internal calendar route — the dashboard +
+                    Drive folders cover the views we own). External link
+                    matches the same target used by other cal cards below. */}
+                <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer">השבוע →</a>
               </div>
               {todaySchedule.length === 0 ? (
                 <EmptyCard
