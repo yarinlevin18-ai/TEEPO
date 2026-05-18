@@ -42,7 +42,11 @@ export default function CountryClock() {
   return (
     <div className="country-clock-widget" title="זהה את המדינה לפי השעון">
       <AnalogClock
-        size={42}
+        // 42 px was too small to read the hand positions — at that size the
+        // user couldn't actually tell what time the clock showed (which is
+        // the whole point of the country guess). 56 px gives ~33% more
+        // angular resolution per hand without disturbing the header row.
+        size={56}
         utcOffset={TODAY_COUNTRY.utcOffset}
         ringColor={TODAY_COUNTRY.ringColor}
         className="mini-clock"
