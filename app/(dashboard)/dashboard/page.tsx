@@ -485,17 +485,33 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
             const topPx = Math.round((ev.minute / 60) * CAL_ROW_PX) + 3
             const heightPx = Math.max(22, Math.round((ev.durationMins / 60) * CAL_ROW_PX) - 6)
             const eventStyle = { top: `${topPx}px`, height: `${heightPx}px` }
+            // Time label: HH:MM at the start, optionally HH:MM–HH:MM when
+            // the event is tall enough (>= 1h) so the range reads cleanly.
+            const startStr = `${pad2(ev.hour)}:${pad2(ev.minute)}`
+            const endTotal = ev.hour * 60 + ev.minute + ev.durationMins
+            const endStr = `${pad2(Math.floor(endTotal / 60) % 24)}:${pad2(endTotal % 60)}`
+            const showRange = ev.durationMins >= 60
+            const timeLabel = showRange ? `${startStr}–${endStr}` : startStr
+            // Sub-30min event has barely room for the title — drop the time
+            // label to avoid a cluttered single line.
+            const showTime = ev.durationMins >= 30
+            const eventContent = (
+              <>
+                {showTime && <span className="cal-event-time">{timeLabel}</span>}
+                <span className="cal-event-title">{ev.title}</span>
+                {ev.meta && <small>{ev.meta}</small>}
+              </>
+            )
             return (
               <div key={`c-${di}-${h}`} className="cal-cell">
                 {matched ? (
                   <Link
                     href={`/summaries?course=${encodeURIComponent(matched.id)}&lesson=${encodeURIComponent(ev.title)}`}
                     className={className}
-                    title={titleAttr}
+                    title={`${timeLabel} · ${titleAttr}`}
                     style={eventStyle}
                   >
-                    {ev.title}
-                    {ev.meta && <small>{ev.meta}</small>}
+                    {eventContent}
                   </Link>
                 ) : (
                   <a
@@ -503,11 +519,10 @@ function CalendarWeek({ courses }: { courses: Course[] }) {
                     target="_blank"
                     rel="noopener noreferrer"
                     className={className}
-                    title={titleAttr}
+                    title={`${timeLabel} · ${titleAttr}`}
                     style={eventStyle}
                   >
-                    {ev.title}
-                    {ev.meta && <small>{ev.meta}</small>}
+                    {eventContent}
                   </a>
                 )}
               </div>
