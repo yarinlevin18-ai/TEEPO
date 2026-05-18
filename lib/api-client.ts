@@ -1,13 +1,20 @@
 /**
- * API Client - תקשורת עם שרת ה-Flask Backend
+ * API Client — Flask backend wrapper.
+ *
+ * Trimmed to the live surface after the Drive-DB migration. CRUD for
+ * courses/tasks/assignments/notes/lessons now goes through `useDB()` (see
+ * lib/db-context.tsx). What remains here are the backend-only endpoints:
+ * AI helpers, audio transcription, grades scrape, and the static catalog.
+ *
+ * If you're adding a new method, ask first: does this belong in Drive DB
+ * instead? The general rule is: per-user user data → Drive DB, AI/scrape
+ * work that needs the server → here.
  */
 import { supabase } from './supabase'
 import {
   getTracks as _catalogTracks,
   getTrackWithCourses as _catalogTrack,
-  getDepartments as _catalogDepartments,
   searchCatalogCourses as _catalogSearch,
-  computeCreditSummary as _catalogCredits,
 } from './catalog'
 import { BACKEND_URL as BACKEND } from './backend-url'
 
@@ -39,41 +46,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json()
 }
 
-// ---- Courses ----
 export const api = {
-  courses: {
-    list: () => request<any[]>('/api/courses'),
-    get: (id: string) => request<any>(`/api/courses/${id}`),
-    update: (id: string, data: Record<string, any>) =>
-      request<any>(`/api/courses/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }),
-    extract: (url: string) =>
-      request<any>('/api/courses/extract', {
-        method: 'POST',
-        body: JSON.stringify({ url }),
-      }),
-  },
-
-  tasks: {
-    list: (date?: string) =>
-      request<any[]>(`/api/tasks${date ? `?date=${date}` : ''}`),
-    create: (data: Record<string, any>) =>
-      request<any>('/api/tasks', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Record<string, any>) =>
-      request<any>(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-    delete: (id: string) =>
-      request<any>(`/api/tasks/${id}`, { method: 'DELETE' }),
-  },
-
   assignments: {
-    list: () => request<any[]>('/api/assignments'),
-    update: (id: string, data: Record<string, any>) =>
-      request<any>(`/api/assignments/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }),
+    /** Claude breakdown of an assignment into checklist sub-tasks. */
     breakdown: (title: string, description: string, deadline: string) =>
       request<any>('/api/assignments/breakdown', {
         method: 'POST',
@@ -104,11 +79,11 @@ export const api = {
   },
 
   academic: {
+    /** Claude-powered "should I take this course?" advisor. v2.1 picks BGU/TAU variant. */
     advise: (
       courseName: string,
       major?: string,
       yourCourses?: string[],
-      /** v2.1 — picks BGU vs TAU advisor variant on the backend. */
       university?: string,
     ) =>
       request<any>('/api/academic/advise', {
@@ -117,67 +92,10 @@ export const api = {
       }),
   },
 
-  notes: {
-    list: (courseId: string) =>
-      request<any[]>(`/api/courses/${courseId}/notes`),
-    create: (courseId: string, data: { title: string; content: string; note_type?: string; file_name?: string }) =>
-      request<any>(`/api/courses/${courseId}/notes`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-    update: (courseId: string, noteId: string, data: { title?: string; content?: string }) =>
-      request<any>(`/api/courses/${courseId}/notes/${noteId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }),
-    delete: (courseId: string, noteId: string) =>
-      request<any>(`/api/courses/${courseId}/notes/${noteId}`, {
-        method: 'DELETE',
-      }),
-    summarize: (courseId: string, content: string, title?: string, fileName?: string) =>
-      request<any>(`/api/courses/${courseId}/notes/summarize`, {
-        method: 'POST',
-        body: JSON.stringify({ content, title, file_name: fileName }),
-      }),
-  },
-
-  gdocs: {
-    fetch: (url: string) =>
-      request<{ content: string; title: string; char_count: number }>('/api/gdocs/fetch', {
-        method: 'POST',
-        body: JSON.stringify({ url }),
-      }),
-  },
-
   lessons: {
-    create: (courseId: string, data: { title: string; content?: string; files?: any[] }) =>
-      request<any>(`/api/courses/${courseId}/lessons`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-    update: (id: string, data: Record<string, any>) =>
-      request<any>(`/api/lessons/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }),
-    delete: (id: string) =>
-      request<any>(`/api/lessons/${id}`, {
-        method: 'DELETE',
-      }),
-    summarize: (content: string, title?: string) =>
-      request<any>('/api/lessons/summarize', {
-        method: 'POST',
-        body: JSON.stringify({ content, title }),
-      }),
-    generateQuiz: (content: string, numQuestions = 10) =>
-      request<any>('/api/lessons/quiz', {
-        method: 'POST',
-        body: JSON.stringify({ content, num_questions: numQuestions }),
-      }),
     /**
      * Upload a recording of a class → Whisper transcription → Claude summary.
-     * Goes through multipart/form-data, so we skip the generic `request()`
-     * helper (which forces JSON Content-Type).
+     * Multipart/form-data, so we bypass the JSON `request()` helper.
      */
     transcribe: async (
       lessonId: string,
@@ -200,8 +118,8 @@ export const api = {
     },
     /**
      * Async large-recording pipeline. Uploads audio/video up to 500 MB,
-     * gets back a `job_id`, then the caller polls `transcribeJob(jobId)`
-     * every ~2 s until stage === 'done' or 'error'.
+     * returns a `job_id`, then poll `transcribeJob(jobId)` every ~2 s
+     * until stage === 'done' or 'error'.
      */
     startTranscribe: async (
       lessonId: string,
@@ -253,55 +171,13 @@ export const api = {
       }>(`/api/transcribe/jobs/${jobId}`),
   },
 
-  university: {
-    status: () => request<any>('/api/university/status'),
-    grades: () => request<any>('/api/university/grades'),
-    courses: () => request<any>('/api/university/courses'),
-    assignmentsAll: () => request<any>('/api/university/assignments/all'),
-    schedule: () => request<any>('/api/university/schedule'),
-    degree: () => request<any>('/api/university/degree'),
-    saveDegree: (data: Record<string, any>) =>
-      request<any>('/api/university/degree', { method: 'POST', body: JSON.stringify(data) }),
-  },
-
   catalog: {
-    // ── Static catalog data (tracks/departments/course catalog) ──
-    // Served from /public/catalog.<uni>.json (v2.1) with /catalog.json as a
-    // legacy fallback. Optional `university` param picks which file. Backend
-    // Supabase catalog tables exist (Tzvi #36) but the frontend stays
-    // file-bundled for speed — these are static shnaton reference anyway.
-    departments: (university?: 'bgu' | 'tau') => _catalogDepartments(university),
+    // Static catalog data only — per-user data lives in Drive DB now.
+    // Served from /public/catalog.<uni>.json (v2.1) with /catalog.json
+    // legacy fallback. Optional `university` param picks the file.
     tracks: (university?: 'bgu' | 'tau') => _catalogTracks(university),
     track: (id: string, university?: 'bgu' | 'tau') => _catalogTrack(id, university),
     searchCourses: (q: string, dept?: string, track?: string, university?: 'bgu' | 'tau') =>
       _catalogSearch(q, dept, track, university),
-
-    // ── Per-user data (profile + my courses) — still backend ──
-    profile: () => request<any>('/api/catalog/profile'),
-    saveProfile: (data: Record<string, any>) =>
-      request<any>('/api/catalog/profile', { method: 'POST', body: JSON.stringify(data) }),
-    myCourses: () => request<any[]>('/api/catalog/my-courses'),
-    addCourse: (data: Record<string, any>) =>
-      request<any>('/api/catalog/my-courses', { method: 'POST', body: JSON.stringify(data) }),
-    addCoursesBulk: (courses: any[]) =>
-      request<any>('/api/catalog/my-courses/bulk', { method: 'POST', body: JSON.stringify({ courses }) }),
-    removeCourse: (courseId: string) =>
-      request<any>(`/api/catalog/my-courses/${courseId}`, { method: 'DELETE' }),
-
-    // ── Credit summary — compute client-side from local catalog + backend my-courses
-    credits: async () => {
-      try {
-        const profileRes: any = await request<any>('/api/catalog/profile')
-        if (!profileRes?.profile?.track_id) return { status: 'no_profile' }
-        const myCourses = await request<any[]>('/api/catalog/my-courses').catch(() => [])
-        return await _catalogCredits(
-          profileRes.profile.track_id,
-          myCourses as any,
-          profileRes.profile.current_year,
-        )
-      } catch (err: any) {
-        return { status: 'error', message: err?.message || 'שגיאת חישוב נק״ז' }
-      }
-    },
   },
 }
