@@ -6616,6 +6616,62 @@ html.dark .cream-page::before { opacity: .35; }
 }
 .bulk-org-cta-btn:disabled { opacity: .6; cursor: not-allowed; }
 
+/* Status pill below the CTA banner — surfaces scan/execute results
+ * (success, "nothing to organize", error). Stays visible until the
+ * user dismisses it so messages aren't missed. */
+.bulk-org-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  animation: bulkOrgStatusIn .25s ease both;
+}
+@keyframes bulkOrgStatusIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.bulk-org-status > span { flex: 1; min-width: 0; }
+.bulk-org-status-success {
+  background: rgba(22, 163, 74, .12);
+  border: 1px solid rgba(22, 163, 74, .35);
+  color: #14532d;
+}
+.bulk-org-status-info {
+  background: rgba(99, 102, 241, .10);
+  border: 1px solid rgba(99, 102, 241, .35);
+  color: #312e81;
+}
+.bulk-org-status-error {
+  background: rgba(225, 29, 72, .10);
+  border: 1px solid rgba(225, 29, 72, .35);
+  color: #9f1239;
+}
+.bulk-org-status-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  opacity: .6;
+  cursor: pointer;
+  transition: opacity .15s, background .15s;
+}
+.bulk-org-status-close:hover { opacity: 1; background: rgba(0, 0, 0, .08); }
+/* Dark-mode adjustments — keep the same color hue but flip text legibility */
+html.dark .bulk-org-status-success { color: #4ade80; background: rgba(22, 163, 74, .18); }
+html.dark .bulk-org-status-info    { color: #a5b4fc; background: rgba(99, 102, 241, .18); }
+html.dark .bulk-org-status-error   { color: #fda4af; background: rgba(225, 29, 72, .18); }
+html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
+
 /* Per-course block inside the bulk-organize preview modal. */
 .bulk-org-modal { width: min(640px, 100%); }
 .bulk-org-course {
