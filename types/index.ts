@@ -56,6 +56,46 @@ export interface UserSettings {
 }
 
 /**
+ * Moodle forum announcement post (news / "הודעות" forum). Pulled by the
+ * backend's scrape_course_announcements and persisted into the user's
+ * Drive DB so they survive page reloads + sync cooldowns.
+ *
+ * Stored capped (last 50 across all courses, see lib/use-auto-sync) so
+ * the db.json size stays bounded. Dedup key is `url` — Moodle forum
+ * discussion URLs are stable per post.
+ */
+export interface Announcement {
+  /** Stable id — `${course_id}::${url}`. Used as React key + dedup key. */
+  id: string
+  /** Frontend course uuid (Drive DB id). Null if we couldn't match. */
+  course_id: string | null
+  /** Cached course name + color at pull time. Course renames don't
+   *  invalidate old announcements; we'd rather show the stale name
+   *  than blow them away. */
+  course_name: string
+  course_color: string | null
+  /** Post title. */
+  title: string
+  /** Plain-text preview (~300 chars, ellipsized). Full body at `url`. */
+  body: string
+  /** Author display name (instructor / staff). */
+  author: string
+  /** ISO timestamp — when the post was last modified on Moodle.
+   *  (We convert the backend's unix seconds to ISO here for consistency.) */
+  posted_at: string
+  /** Direct deep-link to the post on Moodle. */
+  url: string
+  /** Source forum's display name ("הודעות" / "Announcements" / etc.). */
+  forum_name: string
+  /** When TEEPO picked this up (vs posted_at = when Moodle did). Drives
+   *  the "new since last visit" dot in the dashboard. */
+  synced_at: string
+  /** Set when the user explicitly marks the post as read. Drives the
+   *  "X new" counter in the topnav. Null = unread. */
+  acknowledged_at?: string | null
+}
+
+/**
  * Teaching assistant attached to a course. Pulled from Moodle/Portal where
  * available; user-editable when not.
  */

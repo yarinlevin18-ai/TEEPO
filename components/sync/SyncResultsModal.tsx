@@ -48,6 +48,20 @@ export interface SyncResultItem {
   course_name?: string
 }
 
+/** Announcement post pulled from a course's news/announcements forum.
+ *  Distinct from SyncResultItem because the shape is announcement-specific
+ *  (HTML body preview, author, unix-seconds timestamp). */
+export interface SyncAnnouncementItem {
+  title: string
+  /** Plain-text preview, ~300 chars, ellipsized. Full body lives at `url`. */
+  body: string
+  author: string
+  /** Unix seconds (Moodle's `timemodified`). Frontend formats relative. */
+  posted_at: number
+  url: string
+  forum_name: string
+}
+
 export interface SyncCourseResult {
   course_id?: string | null
   moodle_id: string
@@ -56,6 +70,10 @@ export interface SyncCourseResult {
   new_assignments: SyncResultItem[]
   new_files: SyncResultItem[]
   new_grades: SyncResultItem[]
+  /** Announcement posts from course's news/announcements forum(s).
+   *  Optional for backwards compatibility with backends that haven't
+   *  shipped the announcements scraper yet. */
+  new_announcements?: SyncAnnouncementItem[]
   error?: string | null
 }
 
@@ -71,6 +89,8 @@ export interface SyncResultsPayload {
     new_assignments: number
     new_files: number
     new_grades: number
+    /** Optional — older backends won't return this. Treat undefined as 0. */
+    new_announcements?: number
   }
 }
 
