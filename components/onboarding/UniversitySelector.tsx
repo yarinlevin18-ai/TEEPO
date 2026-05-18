@@ -16,7 +16,6 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { GraduationCap, Loader2 } from 'lucide-react'
 import type { UniversityCode } from '@/types'
-import GlowCard from '@/components/ui/GlowCard'
 
 interface University {
   code: UniversityCode
@@ -69,27 +68,21 @@ export default function UniversitySelector({
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-4">
+    <div className="uni-picker-v2">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
-        className="text-center mb-8"
+        className="uni-picker-v2-head"
       >
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
-          style={{
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.10))',
-            boxShadow: 'inset 0 0 0 1px rgba(99,102,241,0.18), 0 0 30px rgba(99,102,241,0.10)',
-          }}
-        >
-          <GraduationCap size={26} className="text-accent-400" />
+        <div className="uni-picker-v2-icon">
+          <GraduationCap size={26} />
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-ink mb-3">{title}</h1>
-        <p className="text-sm text-ink-muted leading-relaxed max-w-md mx-auto">{subtitle}</p>
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
       </motion.div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="uni-picker-v2-grid">
         {UNIVERSITIES.map((u, i) => {
           const isLoading = savingCode === u.code
           const otherIsLoading = savingCode !== null && !isLoading
@@ -103,27 +96,22 @@ export default function UniversitySelector({
               whileTap={!savingCode ? { scale: 0.98 } : undefined}
               onClick={() => handlePick(u.code)}
               disabled={!!savingCode}
-              className="text-right disabled:cursor-not-allowed"
+              className="uni-picker-v2-card"
             >
-              <GlowCard
-                glowColor={`${u.color}1A`}
-                className="p-6 h-full transition-all"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-sm"
-                    style={{
-                      background: `linear-gradient(135deg, ${u.color}, ${u.color}AA)`,
-                      boxShadow: `0 6px 20px ${u.color}33`,
-                    }}
-                  >
-                    {u.short}
-                  </div>
-                  {isLoading && <Loader2 size={18} className="animate-spin text-ink-muted" />}
+              <div className="uni-picker-v2-card-top">
+                <div
+                  className="uni-picker-v2-card-badge"
+                  style={{
+                    background: `linear-gradient(135deg, ${u.color}, ${u.color}AA)`,
+                    boxShadow: `0 6px 18px ${u.color}33`,
+                  }}
+                >
+                  {u.short}
                 </div>
-                <p className="font-bold text-ink text-base leading-tight">{u.name}</p>
-                <p className="text-xs text-ink-subtle mt-1">{u.short}</p>
-              </GlowCard>
+                {isLoading && <Loader2 size={18} className="spin" />}
+              </div>
+              <p className="uni-picker-v2-name">{u.name}</p>
+              <p className="uni-picker-v2-short">{u.short}</p>
             </motion.button>
           )
         })}
@@ -133,13 +121,13 @@ export default function UniversitySelector({
         <motion.p
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center text-sm text-red-400 mt-6"
+          className="uni-picker-v2-error"
         >
           {error}
         </motion.p>
       )}
 
-      <p className="text-center text-xs text-ink-subtle mt-8">
+      <p className="uni-picker-v2-foot">
         אוניברסיטות נוספות (טכניון, האוניברסיטה העברית, רייכמן ועוד) יתווספו בשלב 3.
       </p>
     </div>
