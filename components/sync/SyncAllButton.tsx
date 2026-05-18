@@ -17,67 +17,13 @@
 import { useCallback, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
-import { supabase } from '@/lib/supabase'
-import { BACKEND_URL as BACKEND } from '@/lib/backend-url'
+import { runSync } from '@/lib/run-sync'
 import type { Course } from '@/types'
 import SyncResultsModal, {
   type SyncProgress,
   type SyncResultsPayload,
   type SyncStage,
 } from './SyncResultsModal'
-
-/** Backend on Render free tier sleeps after ~15min idle. The first
- *  request after that takes 30-60s to wake the container, and the
- *  browser kills the connection long before — surfacing as a generic
- *  "Failed to fetch". We do a separate /health ping FIRST with a 90s
- *  timeout to absorb the cold-start; the real sync call then runs
- *  against a warm server. */
-/** Returns 'awake' on 2xx, 'suspended' when Render returns no-server
- *  (every endpoint 404s with x-render-routing: no-server header — the
- *  service is suspended/missing, not just cold-starting), or 'unreachable'
- *  on any network failure. */
-async function wakeBackend(): Promise<'awake' | 'suspended' | 'unreachable'> {
-  try {
-    const res = await fetch(`${BACKEND}/health`, {
-      method: 'GET',
-      signal: AbortSignal.timeout(90_000),
-    })
-    if (res.ok) return 'awake'
-    // Render's routing layer returns this header when there's no app
-    // container behind it (service suspended on free tier inactivity,
-    // failed deploy, or service deleted). All endpoints will 404.
-    if (res.headers.get('x-render-routing') === 'no-server') return 'suspended'
-    // Other 404/5xx — backend reachable, /health endpoint just missing.
-    // Treat as awake and let the main fetch decide.
-    return 'awake'
-  } catch {
-    return 'unreachable'
-  }
-}
-
-async function authHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession()
-  return session?.access_token
-    ? { Authorization: `Bearer ${session.access_token}` }
-    : {}
-}
-
-// Deterministic palette index — must match /assignments and /summaries so the
-// course dots in the modal use the same color the user sees elsewhere.
-const COURSE_PALETTE: Array<{ color: string; soft: string }> = [
-  { color: '#e11d48', soft: 'rgba(225,29,72,.12)' }, // rose
-  { color: '#0d9488', soft: 'rgba(13,148,136,.12)' }, // teal
-  { color: '#6366f1', soft: 'rgba(99,102,241,.12)' }, // indigo
-  { color: '#d97706', soft: 'rgba(217,119,6,.12)' }, // amber
-  { color: '#8b5cf6', soft: 'rgba(139,92,246,.12)' }, // violet
-  { color: '#16a34a', soft: 'rgba(22,163,74,.12)' }, // accent
-]
-
-function paletteIdx(key: string): number {
-  let h = 0
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0
-  return Math.abs(h) % COURSE_PALETTE.length
-}
 
 interface Props {
   variant?: 'mini' | 'ghost'
@@ -104,123 +50,70 @@ export default function SyncAllButton({ variant = 'mini', label, className = '' 
 
   const run = useCallback(async () => {
     const courses = (db?.courses ?? []) as Course[]
-    // Snapshot the moodle-sourced courses for the request — anything without
-    // a moodle_id can't be synced from Moodle anyway.
-    const payload = courses
-      .filter((c) => (c as any).moodle_id || c.source_url)
-      .map((c) => {
-        const idx = paletteIdx(c.id)
-        return {
-          course_id: c.id,
-          moodle_id: (c as any).moodle_id ?? '',
-          title: c.title,
-          source_url: c.source_url ?? '',
-          color: COURSE_PALETTE[idx].color,
-          last_synced_at: c.last_synced_at,
-        }
-      })
-
     setStage('progress')
     setError(null)
-    setProgress({ current: 0, total: payload.length, label: 'מעיר את השרת…' })
+    setProgress({ current: 0, total: 0, label: 'מעיר את השרת…' })
 
-    // Wake the Render free-tier backend first — first request after
-    // ~15min idle takes ~60s as the container boots. Short-circuit on
-    // 'suspended' so the user sees a useful error instead of waiting
-    // 2 minutes for a guaranteed-fail sync.
-    const wake = await wakeBackend()
-    if (wake === 'suspended') {
-      setError(
-        'שרת הסנכרון לא רץ ב-Render כרגע (suspended / לא פרוס). ' +
-        'התחבר ל-Render dashboard כדי לראות למה השירות נפל ולהפעיל אותו מחדש.',
-      )
-      setStage('error')
-      return
-    }
-    if (wake === 'unreachable') {
-      setError(
-        'אין חיבור לשרת. בדוק שיש חיבור לאינטרנט, ושכתובת ה-backend ב-Vercel ' +
-        'מצביעה על שירות פעיל ב-Render.',
-      )
-      setStage('error')
-      return
-    }
-    setProgress({ current: 0, total: payload.length, label: payload[0]?.title ?? 'מתחיל…' })
+    const result = await runSync({
+      courses,
+      onProgress: (p) => setProgress(p),
+    })
 
-    // Cheap progress animation — the backend call is a single round-trip,
-    // so we fake the "checking course X of Y" step to keep the modal alive.
-    let ticker: ReturnType<typeof setInterval> | null = null
-    if (payload.length > 0) {
-      let i = 0
-      ticker = setInterval(() => {
-        i = Math.min(i + 1, payload.length)
-        setProgress({
-          current: i,
-          total: payload.length,
-          label: payload[Math.min(i, payload.length - 1)]?.title ?? '',
+    switch (result.kind) {
+      case 'nothing-to-sync':
+        setStage('results')
+        setResults({
+          courses_scanned: 0,
+          synced_at: new Date().toISOString(),
+          results: [],
+          totals: { new_assignments: 0, new_files: 0, new_grades: 0 },
         })
-      }, 600)
-    }
+        return
 
-    try {
-      const headers = await authHeaders()
-      const res = await fetch(`${BACKEND}/api/sync/all`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({ courses: payload }),
-        signal: AbortSignal.timeout(120_000),
-      })
-      if (ticker) clearInterval(ticker)
-      if (res.status === 401) {
-        throw new Error('הסשן פג. צא והתחבר מחדש כדי לסנכרן.')
-      }
-      if (!res.ok) {
-        const detail = await res.text().catch(() => '')
-        throw new Error(detail.slice(0, 200) || `HTTP ${res.status}`)
-      }
-      const data = (await res.json()) as SyncResultsPayload
-      // Short-circuit when the backend tells us Moodle isn't connected —
-      // show the "connect" CTA instead of confusing empty results.
-      if (data.moodle_connected === false) {
-        setNotConnectedReason(data.moodle_error ?? null)
+      case 'wake-failed':
+        setError(
+          result.reason === 'suspended'
+            ? 'שרת הסנכרון לא רץ ב-Render כרגע (suspended / לא פרוס). ' +
+              'התחבר ל-Render dashboard כדי לראות למה השירות נפל ולהפעיל אותו מחדש.'
+            : 'אין חיבור לשרת. בדוק שיש חיבור לאינטרנט, ושכתובת ה-backend ב-Vercel מצביעה על שירות פעיל ב-Render.',
+        )
+        setStage('error')
+        return
+
+      case 'not-connected':
+        setNotConnectedReason(result.reason)
         setStage('not_connected')
         return
-      }
-      setResults(data)
-      setStage('results')
 
-      // Mirror the cutoff onto Drive-DB courses so the next sync sends
-      // the right baseline. Best-effort — if mutate isn't wired we just
-      // skip and the next sync re-checks the full window.
-      if (mutate && data.synced_at) {
-        const syncedIds = new Set(data.results.map((r) => r.course_id).filter(Boolean))
-        try {
-          await mutate((d: any) => ({
-            ...d,
-            courses: (d.courses ?? []).map((c: any) =>
-              syncedIds.has(c.id) ? { ...c, last_synced_at: data.synced_at } : c,
-            ),
-          }))
-        } catch {
-          // non-fatal — modal still shows results
+      case 'error':
+        setError(result.error)
+        setStage('error')
+        return
+
+      case 'ok': {
+        setResults(result.results)
+        setStage('results')
+
+        // Mirror the cutoff onto Drive-DB courses so the next sync sends
+        // the right baseline. Best-effort — if mutate isn't wired we just
+        // skip and the next sync re-checks the full window.
+        if (mutate && result.results.synced_at) {
+          const syncedIds = new Set(
+            result.results.results.map((r) => r.course_id).filter(Boolean),
+          )
+          try {
+            await mutate((d: any) => ({
+              ...d,
+              courses: (d.courses ?? []).map((c: any) =>
+                syncedIds.has(c.id) ? { ...c, last_synced_at: result.results.synced_at } : c,
+              ),
+            }))
+          } catch {
+            // non-fatal — modal still shows results
+          }
         }
+        return
       }
-    } catch (e: any) {
-      if (ticker) clearInterval(ticker)
-      // Translate the common low-level failures into Hebrew the user
-      // can actually act on. "Failed to fetch" is the WebKit/Blink
-      // umbrella message for network errors — most often it means the
-      // Render backend timed out waking up, sometimes it means we're
-      // offline.
-      let msg = e?.message || 'שגיאה לא ידועה'
-      const lower = msg.toLowerCase()
-      if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
-        msg = 'השרת לא הגיב תוך 2 דקות — נסה שוב בעוד דקה (השרת בRender מתעורר 30-60 שניות אחרי חוסר פעילות).'
-      } else if (lower.includes('failed to fetch') || lower.includes('networkerror')) {
-        msg = 'לא הצלחנו להגיע לשרת. ודא שיש חיבור לאינטרנט ונסה שוב — אם זו הריצה הראשונה היום, השרת ב-Render לוקח כדקה להתעורר.'
-      }
-      setError(msg)
-      setStage('error')
     }
   }, [db?.courses, mutate])
 
