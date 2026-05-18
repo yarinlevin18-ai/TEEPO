@@ -29,10 +29,13 @@ import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, CheckCircle2, Circle, BookOpen, Sparkles, MessageSquare,
-  ChevronLeft, ChevronRight, X, FileText,
+  ChevronLeft, ChevronRight, X, FileText, ChevronDown,
   User, ExternalLink, Plus, Link as LinkIcon, Mail, Users,
+  RefreshCw, Loader2,
 } from 'lucide-react'
 import { useDB, useCourse, useLessons } from '@/lib/db-context'
+import { useDriveFiles } from '@/lib/use-drive-files'
+import { supabase } from '@/lib/supabase'
 import NotebookPaper, { type NotebookPrefs } from '@/components/course/NotebookPaper'
 import LessonNotebookChat from '@/components/course/LessonNotebookChat'
 import LessonRecorder from '@/components/course/LessonRecorder'
@@ -60,7 +63,7 @@ export default function CoursePage() {
   const router = useRouter()
   const courseId = params.id as string
 
-  const { ready, updateLesson, createLesson: dbCreateLesson } = useDB()
+  const { ready, updateLesson, createLesson: dbCreateLesson, updateCourse, flushSave } = useDB() as any
   const course = useCourse(courseId)
   const lessons = useLessons(courseId)
 
@@ -104,6 +107,72 @@ export default function CoursePage() {
     const id = setTimeout(() => setNotice(null), 4000)
     return () => clearTimeout(id)
   }, [notice])
+
+  // Per-course Moodle resync — pulls the global course list from the
+  // backend (same endpoint /moodle's "סנכרן הכל" uses) and merges only
+  // THIS course's fresh metadata into the local DB. Useful when the
+  // user updates a syllabus / TA in Moodle and wants to see it on
+  // their TEEPO course page without round-tripping through /moodle.
+  const [syncing, setSyncing] = useState(false)
+  const syncFromMoodle = async () => {
+    if (!course || syncing) return
+    setSyncing(true)
+    try {
+      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers: Record<string, string> = session?.access_token
+        ? { Authorization: `Bearer ${session.access_token}` }
+        : {}
+      const res = await fetch(`${BACKEND}/api/university/courses`, {
+        headers,
+        signal: AbortSignal.timeout(60_000),
+      })
+      if (!res.ok) throw new Error(`Backend ${res.status}`)
+      const data = await res.json()
+      if (data.status === 'error') throw new Error(data.message || 'הסנכרון נכשל')
+      const scraped: any[] = data.courses || []
+      // Find THIS course in the scraped list — prefer source_url match,
+      // fall back to title.
+      const match = scraped.find((c: any) =>
+        (course.source_url && c.url === course.source_url) ||
+        c.title === course.title
+      )
+      if (!match) {
+        setNotice('הקורס לא נמצא בסנכרון. אולי הוא הוסר מ-Moodle?')
+        return
+      }
+      // Merge the fresh enrichment fields. Don't touch user-set
+      // classification (year_of_study, semester) — same logic as
+      // /moodle's bulk sync.
+      const isManual = (course as any).classified_manually === true
+      await updateCourse(course.id, {
+        source: 'bgu',
+        source_url: match.url || course.source_url,
+        shortname: match.shortname,
+        moodle_startdate: match.startdate || undefined,
+        moodle_enddate: match.enddate || undefined,
+        category_name: match.category_name,
+        ...(match.lecturer_email !== undefined ? { lecturer_email: match.lecturer_email ?? undefined } : {}),
+        ...(match.syllabus_url !== undefined ? { syllabus_url: match.syllabus_url ?? undefined } : {}),
+        ...(match.teaching_assistants !== undefined ? { teaching_assistants: match.teaching_assistants } : {}),
+        ...(match.course_links !== undefined ? { course_links: match.course_links } : {}),
+        ...(match.portal_metadata !== undefined ? { portal_metadata: match.portal_metadata } : {}),
+      })
+      if (typeof flushSave === 'function') {
+        try { await flushSave() } catch {}
+      }
+      setNotice('הקורס סונכרן בהצלחה מ-Moodle ✓')
+    } catch (e: any) {
+      if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+        setNotice('השרת לא הגיב — נסה שוב בעוד דקה')
+      } else {
+        console.warn('[course-sync]', e)
+        setNotice('שגיאה בסנכרון: ' + (e?.message || 'נסה שוב'))
+      }
+    } finally {
+      setSyncing(false)
+    }
+  }
 
 
   // ── Save state + editor stats (shown in the NotebookPaper footer) ──
@@ -231,6 +300,24 @@ export default function CoursePage() {
             <span>· {completedCount} מתוך {lessons.length} פרקים הושלמו</span>
           </div>
         </div>
+
+        {/* Per-course Moodle sync — only when the course was originally
+            pulled from Moodle (source: 'bgu'). Pulls fresh syllabus / TA /
+            link enrichment without forcing the user to go to /moodle and
+            re-sync every course. */}
+        {course.source === 'bgu' && (
+          <button
+            onClick={syncFromMoodle}
+            disabled={syncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-indigo-500/15 text-indigo-300 border border-indigo-400/20 hover:bg-indigo-500/25 disabled:opacity-50 flex-shrink-0"
+            title="משוך נתונים מעודכנים על הקורס מ-Moodle"
+          >
+            {syncing
+              ? <Loader2 size={13} className="animate-spin" />
+              : <RefreshCw size={13} />}
+            {syncing ? 'מסנכרן…' : 'סנכרן מ-Moodle'}
+          </button>
+        )}
       </div>
 
       {/* ── Notebook (TOC + focused chapter + AI) ────────── */}
@@ -282,6 +369,13 @@ export default function CoursePage() {
                 <Plus size={11} /> פרק חדש
               </button>
             </>
+          )}
+
+          {/* Lesson-folder file shortcuts — live from Drive. Lets the user
+              click straight from the chapter sidebar to the lecture file
+              they're summarizing without bouncing through /summaries. */}
+          {course.drive_folder_ids?.lessons && (
+            <LessonFilesSidebar folderId={course.drive_folder_ids.lessons} />
           )}
         </aside>
 
@@ -613,6 +707,69 @@ function summaryToHtml(text: string, dateLabel: string): string {
  * we show a one-line hint pointing the user to /summaries where the
  * "צור תיקיות" flow lives.
  */
+/**
+ * Lesson-folder file shortcuts inside the chapter sidebar. Lists files
+ * from the course's שיעורים folder as quick external links to Drive,
+ * collapsible so it doesn't dominate the sidebar. Auto-hides when the
+ * folder is empty or unreachable.
+ */
+function LessonFilesSidebar({ folderId }: { folderId: string }) {
+  const { files, loading, error } = useDriveFiles(folderId)
+  const [open, setOpen] = useState(true)
+  const visible = files.filter(f => !f.id.startsWith('tmp-'))
+
+  // Don't show the section at all on first load to avoid a flash of
+  // "אין קבצים" before the Drive list arrives.
+  if (loading && visible.length === 0) return null
+  if (error) return null
+  if (visible.length === 0) return null
+
+  const SHOW_LIMIT = 8
+  const shown = visible.slice(0, SHOW_LIMIT)
+  const moreCount = visible.length - shown.length
+
+  return (
+    <div className="mt-4 border-t border-white/8 pt-3">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-muted hover:text-ink"
+      >
+        <span className="flex items-center gap-1.5">
+          <FileText size={12} /> קבצי שיעורים
+        </span>
+        <ChevronDown
+          size={12}
+          className={`transition-transform ${open ? '' : '-rotate-90'}`}
+        />
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-0.5">
+          {shown.map(f => (
+            <li key={f.id}>
+              <a
+                href={f.webViewLink || '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full text-right flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-ink-muted hover:text-indigo-300 hover:bg-white/5 transition-colors"
+                title={f.name}
+              >
+                <FileText size={10} className="flex-shrink-0 opacity-60" />
+                <span className="flex-1 truncate">{f.name}</span>
+              </a>
+            </li>
+          ))}
+          {moreCount > 0 && (
+            <li className="px-2 pt-1 text-[10px] text-ink-muted/70 text-center">
+              +{moreCount} עוד · <a href="/summaries" className="text-indigo-400 hover:text-indigo-300">פתח הכל</a>
+            </li>
+          )}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 function CourseDriveShelf({ course }: { course: import('@/types').Course }) {
   const ids = course.drive_folder_ids
   if (!ids?.course) {
