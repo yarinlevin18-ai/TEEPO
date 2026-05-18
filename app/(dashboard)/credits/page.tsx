@@ -14,6 +14,7 @@ import { useDB } from '@/lib/db-context'
 import { computeCreditSummary } from '@/lib/catalog'
 import Modal from '@/components/ui/Modal'
 import ErrorAlert from '@/components/ui/ErrorAlert'
+import PageSkeleton from '@/components/ui/PageSkeleton'
 import GradesList from '@/components/credits/GradesList'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -92,23 +93,7 @@ export default function CreditsPage() {
   }, [profile?.track_id, university])
 
   if (!ready || dbLoading || trackLoading) {
-    return (
-      <div className="cream-page credits-v2">
-        <div className="credits-v2-main animate-fade-in" dir="rtl">
-          <div className="credits-v2-skeleton">
-            <div className="shimmer h-8 w-48 rounded-lg" />
-            <div className="shimmer h-4 w-64 rounded-lg" />
-          </div>
-          <div className="credits-v2-stat-grid">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="shimmer h-24 rounded-2xl" />
-            ))}
-          </div>
-          <div className="shimmer h-48 rounded-2xl" />
-          <div className="shimmer h-64 rounded-2xl" />
-        </div>
-      </div>
-    )
+    return <PageSkeleton statCount={4} cardCount={2} />
   }
 
   if (needsOnboarding) {
