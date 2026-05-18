@@ -13,7 +13,7 @@ import OnboardingGate from '@/components/onboarding/OnboardingGate'
  *  fallback) for unknown routes so we don't accidentally clobber it. */
 function pageTitleFor(pathname: string): string {
   // Sub-routes match too — /courses/123 → "קורסים", /summaries?course=x → "המוח"
-  if (pathname.startsWith('/dashboard'))      return 'בית'
+  if (pathname.startsWith('/dashboard'))      return 'סקירה'
   if (pathname.startsWith('/summaries'))      return 'המוח'
   if (pathname.startsWith('/tasks'))          return 'מטלות'
   if (pathname.startsWith('/todos'))          return 'משימות'

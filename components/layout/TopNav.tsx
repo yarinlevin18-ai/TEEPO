@@ -29,8 +29,11 @@ import { useUniversityName, useUniversityCode } from '@/lib/use-university'
 import { useDB } from '@/lib/db-context'
 import { resolveDisplayName, resolveInitials } from '@/lib/display-name'
 
+// Mockup labels (teepo-design/mockup_dashboard.html + sibling mockups):
+// "סקירה" (overview) for /dashboard, NOT "בית" — matches the rest of
+// the v3 mockup set which uniformly uses סקירה for the dashboard tab.
 const PRIMARY = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'בית' },
+  { href: '/dashboard', icon: LayoutDashboard, label: 'סקירה' },
   { href: '/tasks',     icon: CheckSquare,    label: 'מטלות',  countKey: 'tasks' as const },
   { href: '/todos',     icon: ListChecks,     label: 'משימות', countKey: 'todos' as const },
   { href: '/summaries', icon: Brain,          label: 'המוח' },
