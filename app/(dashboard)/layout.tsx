@@ -127,8 +127,11 @@ function DashboardShell({
 
   return (
     <div className="qa min-h-screen flex flex-col cream-page">
+      <a href="#main-content" className="ui-skip-link">
+        דלג לתוכן הראשי
+      </a>
       <TopNav mobileOpen={mobileOpen} onMobileToggle={() => setMobileOpen(o => !o)} />
-      <main className="flex-1 relative">
+      <main id="main-content" tabIndex={-1} className="flex-1 relative">
         <DriveConnectionBanner />
         <WakeupBanner />
         <OnboardingGate>{children}</OnboardingGate>

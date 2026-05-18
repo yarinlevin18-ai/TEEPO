@@ -88,6 +88,10 @@ export default function Modal({
           <motion.div
             ref={panelRef}
             tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={title ? 'modal-title' : undefined}
+            aria-describedby={subtitle ? 'modal-subtitle' : undefined}
             className={`modal-panel ${sizeClasses[size]} ${className}`}
             initial={{ opacity: 0, scale: 0.95, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -100,12 +104,12 @@ export default function Modal({
               <div className="modal-header">
                 <div className="flex-1 min-w-0">
                   {title && (
-                    <h2 className="text-base font-bold text-white truncate">
+                    <h2 id="modal-title" className="text-base font-bold text-white truncate">
                       {title}
                     </h2>
                   )}
                   {subtitle && (
-                    <p className="text-xs text-ink-muted mt-0.5 truncate">
+                    <p id="modal-subtitle" className="text-xs text-ink-muted mt-0.5 truncate">
                       {subtitle}
                     </p>
                   )}
