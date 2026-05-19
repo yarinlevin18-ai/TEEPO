@@ -6,8 +6,9 @@
  *
  * Structure (top → bottom):
  *   1. Hero — LCD date pill + LCD time pill + h1 "שלום {name}, השבוע שלך {accent}."
- *   2. השיעורים של היום — auto-fit grid of class cards with
- *      .done / .live / .next state derived from the current time.
+ *   2. היום שלך — <DayBoard />: vertical timeline (right) of today's
+ *      Google Calendar events + live details panel (left) showing
+ *      course meta or event notes for the selected row.
  *   3. Two widgets side-by-side:
  *        - המטלות שלי (read-only) — 3 most-urgent open assignments,
  *          each row links to /assignments?focus=<id>.
@@ -16,6 +17,8 @@
  *   4. הלוז השבועי — section header + wrapper card around the
  *      existing <CalendarWeek> grid (preserved verbatim; the iframe in
  *      the mockup is a placeholder for whatever real calendar we ship).
+ *   5. המעקב האקדמי שלי — <AcademicSummary />: credits-earned progress
+ *      + current-GPA card driven by useAcademicProgress().
  *
  * Per the "swap visuals, keep mechanics" rule: every data source +
  * handler below is an existing hook from db-context / use-week-calendar
@@ -26,6 +29,8 @@
  *   - CountryClock guessing game
  *   - Old 3-card bottom row ("היום בלוח" / "מטלות ועבודות" / "משימות")
  *   - Time-aware "now" hero card
+ *   - Horizontal "class cards row" .dash-v2-classes-row (replaced by the
+ *     vertical .day-timeline inside <DayBoard />)
  */
 
 import Link from 'next/link'
@@ -38,11 +43,14 @@ import { matchCourseForEvent } from '@/lib/event-course-match'
 import { resolveFirstName } from '@/lib/display-name'
 import type { Course, Assignment, StudyTask } from '@/types'
 import {
-  Plus, Check, X, MapPin, Clock, User as UserIcon,
+  Plus, Check, X,
   ClipboardCheck, ListTodo,
 } from 'lucide-react'
 import LCDDisplay from '@/components/ui/LCDDisplay'
 import AnnouncementsCard from '@/components/dashboard/AnnouncementsCard'
+import DayBoard from '@/components/dashboard/DayBoard'
+import AcademicSummary from '@/components/dashboard/AcademicSummary'
+import { useAcademicProgress } from '@/lib/use-academic-progress'
 
 // Accent word at the end of the greeting cycles through this list every
 // 30 minutes (a slow, deterministic rotation — same word for all clients
@@ -93,18 +101,6 @@ function useNow(intervalMs: number = 60_000): Date {
     return () => clearInterval(id)
   }, [intervalMs])
   return now
-}
-
-/** Derive a small kind label for the class card eyebrow. The Google
- *  Calendar event title is the only signal we have — heuristic match
- *  on Hebrew keywords. Default → "הרצאה" (lecture). */
-function deriveClassKind(title: string): string {
-  const t = title.toLowerCase()
-  if (t.includes('תרגול') || t.includes('targul')) return 'תרגול'
-  if (t.includes('סמינר')) return 'סמינר'
-  if (t.includes('מעבדה')) return 'מעבדה'
-  if (t.includes('בוחן') || t.includes('מבחן')) return 'מבחן'
-  return 'הרצאה'
 }
 
 /** Map an Assignment to the .ar-due pill tone. */
@@ -197,55 +193,20 @@ export default function DashboardPage() {
 
   const calendar = useWeekCalendar()
   const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
+  const allAssignments = useMemo<Assignment[]>(
+    () => (db?.assignments ?? []) as Assignment[],
+    [db?.assignments],
+  )
 
-  // ── Today's classes ─────────────────────────────────────────────────
-  // Same source as the legacy "היום בלוח" widget: filter to today's
-  // dayIndex, sort by hour:minute. Derive .done / .live / .next state
-  // from the current time + each slot's duration.
-  const todaysClasses = useMemo(() => {
+  // Count of today's calendar items, used for the section-head badge.
+  const todayItemCount = useMemo(() => {
     const todayDow = now.getDay()
-    const nowMin = now.getHours() * 60 + now.getMinutes()
-    const palette = ['#8b5cf6', '#d97706', '#0d9488', '#6366f1', '#e11d48', '#16a34a']
-    const slots = calendar.slots
-      .filter(s => s.dayIndex === todayDow)
-      .sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute))
-
-    // First-future-slot wins the "next" badge; subsequent future slots
-    // render in the default state.
-    let nextAssigned = false
-
-    return slots.map((s, i) => {
-      const startMin = s.hour * 60 + s.minute
-      const endMin = startMin + s.durationMins
-      const isDone = endMin <= nowMin
-      const isLive = startMin <= nowMin && nowMin < endMin
-      const isNext = !isDone && !isLive && !nextAssigned
-      if (isNext) nextAssigned = true
-
-      const match = matchCourseForEvent(s.title, courses)
-      const color = palette[i % palette.length]
-      const href = match
-        ? `/summaries?course=${encodeURIComponent(match.id)}&lesson=${encodeURIComponent(s.title)}`
-        : s.htmlLink || 'https://calendar.google.com'
-
-      return {
-        slot: s,
-        kind: deriveClassKind(s.title),
-        title: s.title,
-        time: `${pad2(s.hour)}:${pad2(s.minute)}`,
-        location: s.meta || '',
-        durationMins: s.durationMins,
-        color,
-        state: isDone ? 'done' : isLive ? 'live' : isNext ? 'next' : 'default',
-        href,
-        external: !match,
-      } as const
-    })
-  }, [calendar.slots, courses, now])
+    return calendar.slots.filter(s => s.dayIndex === todayDow).length
+  }, [calendar.slots, now])
 
   // ── Assignments widget — 3 most urgent open ─────────────────────────
   const openAssignments = useMemo(() => {
-    const list = ((db?.assignments ?? []) as Assignment[])
+    const list = allAssignments
       .filter(a => a.status !== 'submitted' && a.status !== 'graded')
     // Sort by deadline asc (no-deadline last), then by priority high→low.
     const priorityRank: Record<Assignment['priority'], number> = { high: 0, medium: 1, low: 2 }
@@ -272,7 +233,7 @@ export default function DashboardPage() {
           chipLabel: assignmentLabel(tone),
         }
       })
-  }, [db?.assignments, courses])
+  }, [allAssignments, courses])
 
   // ── Todos widget — open + a few done at the bottom ──────────────────
   const todoRows = useMemo(() => {
@@ -349,70 +310,27 @@ export default function DashboardPage() {
           </h1>
         </section>
 
-        {/* ===== TODAY'S CLASSES ===== */}
+        {/* ===== היום שלך — DayBoard (timeline + live panel) ===== */}
         <div className="dash-v2-section-head">
           <h2>
-            השיעורים של היום{' '}
+            היום שלך{' '}
             <span className="badge">
-              {todaysClasses.length === 0
-                ? 'אין שיעורים'
-                : todaysClasses.length === 1
-                  ? 'שיעור אחד'
-                  : `${todaysClasses.length} שיעורים`}
+              {todayItemCount === 0
+                ? 'אין אירועים'
+                : todayItemCount === 1
+                  ? 'אירוע אחד'
+                  : `${todayItemCount} אירועים`}
             </span>
           </h2>
         </div>
-        {todaysClasses.length === 0 ? (
-          <div className="dash-v2-empty">
-            {calendar.error
-              ? `שגיאה בקריאת היומן: ${calendar.error.slice(0, 80)}`
-              : calendar.loading
-                ? 'טוען את היומן…'
-                : 'אין שיעורים היום ביומן.'}
-            <a
-              className="dash-v2-empty-cta"
-              href="https://calendar.google.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              פתח Google Calendar →
-            </a>
-          </div>
-        ) : (
-          <div className="dash-v2-classes-row">
-            {todaysClasses.map((c, i) => {
-              const eyebrow = c.state === 'done'
-                ? `${c.kind} · הסתיים`
-                : c.state === 'next'
-                  ? 'השיעור הבא'
-                  : c.kind
-              const link = c.external
-                ? (
-                  <a
-                    key={i}
-                    href={c.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`dash-v2-class-card ${c.state}`}
-                    style={{ ['--course-color' as any]: c.color }}
-                  >
-                    {classCardInner(eyebrow, c)}
-                  </a>
-                )
-                : (
-                  <Link
-                    key={i}
-                    href={c.href}
-                    className={`dash-v2-class-card ${c.state}`}
-                    style={{ ['--course-color' as any]: c.color }}
-                  >
-                    {classCardInner(eyebrow, c)}
-                  </Link>
-                )
-              return link
-            })}
-          </div>
-        )}
+        <DayBoard
+          slots={calendar.slots}
+          courses={courses}
+          assignments={allAssignments}
+          now={now}
+          loading={calendar.loading}
+          error={calendar.error}
+        />
 
         {/* ===== TWO WIDGETS ===== */}
         <div className="dash-v2-widgets">
@@ -539,37 +457,36 @@ export default function DashboardPage() {
           <CalendarWeek courses={courses} />
         </div>
 
+        {/* ===== ACADEMIC SUMMARY ===== */}
+        <div className="dash-v2-section-head" style={{ marginTop: 30 }}>
+          <h2>
+            המעקב האקדמי שלי
+            <AcademicSummaryBadge />
+          </h2>
+        </div>
+        <AcademicSummary />
+
       </main>
     </div>
   )
 }
 
+/** Tiny inline component that surfaces the "degree · dept · university"
+ *  pill in the section head. Lives outside <AcademicSummary> so the
+ *  badge can live in the head and stay aligned with the other section
+ *  heads on the page. Reuses useAcademicProgress so we don't double-fetch. */
+function AcademicSummaryBadge() {
+  const { trackName, university } = useAcademicProgress()
+  if (!trackName && !university) return null
+  const parts = ['תואר ראשון']
+  if (trackName) parts.push(trackName)
+  if (university) parts.push(university.toUpperCase())
+  return <span className="badge">{parts.join(' · ')}</span>
+}
+
 // ──────────────────────────────────────────────────────────────────────
 // Small leaf components / helpers
 // ──────────────────────────────────────────────────────────────────────
-
-function classCardInner(
-  eyebrow: string,
-  c: { time: string; title: string; location: string; durationMins: number },
-): React.ReactNode {
-  return (
-    <>
-      <div className="ctop">
-        <span className="ckind">{eyebrow}</span>
-        <span className="ctime">{c.time}</span>
-      </div>
-      <div className="ctitle">{c.title}</div>
-      <div className="cmeta">
-        {c.location && (
-          <span><MapPin size={11} /> {c.location}</span>
-        )}
-        {c.durationMins > 0 && (
-          <span><Clock size={11} /> {c.durationMins} דק'</span>
-        )}
-      </div>
-    </>
-  )
-}
 
 /** Inline single-row task adder at the top of the todos widget. */
 function TodoQuickAdd({ onAdd }: { onAdd: (title: string) => Promise<void> }) {
