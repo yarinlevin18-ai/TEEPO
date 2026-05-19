@@ -31,10 +31,10 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ArrowRight, CheckCircle2, X, Mail, Users,
+  ArrowRight, CheckCircle2, Check, X, Mail, Trash2,
   RefreshCw, Loader2, Plus, MapPin, Calendar as CalendarIcon,
   User as UserIcon, FileText, ExternalLink, Folder, Link as LinkIcon,
-  GraduationCap, MessageCircle, BookOpen, ClipboardCheck, NotebookPen,
+  BookOpen, ClipboardCheck, NotebookPen,
 } from 'lucide-react'
 import { useDB, useCourse } from '@/lib/db-context'
 import { FolderSection } from '@/components/summaries/CourseDrivePanel'
@@ -42,7 +42,6 @@ import { useDriveFiles } from '@/lib/use-drive-files'
 import { useAuth } from '@/lib/auth-context'
 import { useWeekCalendar, type WeekCalendarSlot } from '@/lib/use-week-calendar'
 import { matchCourseForEvent } from '@/lib/event-course-match'
-import { TasksMini, AssignmentsMini } from '@/components/course/CourseTabs'
 import { groupFilesByLesson } from '@/lib/lesson-grouping'
 import { ensureSubfolder } from '@/lib/drive-folders'
 import { moveFile } from '@/lib/drive-files'
@@ -71,7 +70,6 @@ function paletteIdx(key: string): number {
 
 const HEB_DAYS_SHORT = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
 const HEB_DAYS_SHORTER = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
-const HEB_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר']
 
 function pad2(n: number): string {
   return n.toString().padStart(2, '0')
@@ -165,7 +163,11 @@ export default function CoursePage() {
   const router = useRouter()
   const courseId = params.id as string
 
-  const { db, ready, updateCourse, flushSave, createTask } = useDB() as any
+  const {
+    db, ready, updateCourse, flushSave,
+    createTask, updateTask, deleteTask,
+    createAssignment, updateAssignment, deleteAssignment,
+  } = useDB() as any
   const course = useCourse(courseId)
   const courses = useMemo<Course[]>(() => (db?.courses ?? []) as Course[], [db?.courses])
   const calendar = useWeekCalendar()
@@ -267,11 +269,31 @@ export default function CoursePage() {
 
   // ── Derived data ───────────────────────────────────────────────────
   const filesCount = useDriveFiles(course?.drive_folder_ids?.course ?? null).files.length
-  const openAssignmentsCount = useMemo(() => {
+
+  // All assignments scoped to this course — pending vs done split for the tab body.
+  const courseAssignments = useMemo<Assignment[]>(() => {
     return ((db?.assignments ?? []) as Assignment[])
-      .filter(a => a.course_id === courseId && a.status !== 'submitted' && a.status !== 'graded')
-      .length
+      .filter(a => a.course_id === courseId)
   }, [db?.assignments, courseId])
+  const openAssignments = useMemo(() => {
+    return courseAssignments
+      .filter(a => a.status !== 'submitted' && a.status !== 'graded')
+      .sort((a, b) => {
+        // Sort by deadline ascending, undefined deadlines last.
+        if (!a.deadline && !b.deadline) return 0
+        if (!a.deadline) return 1
+        if (!b.deadline) return -1
+        return a.deadline.localeCompare(b.deadline)
+      })
+  }, [courseAssignments])
+  const openAssignmentsCount = openAssignments.length
+
+  // Personal study tasks scoped to this course — pending vs done split.
+  const courseTasks = useMemo<StudyTask[]>(() => {
+    return ((db?.tasks ?? []) as StudyTask[]).filter(t => t.course_id === courseId)
+  }, [db?.tasks, courseId])
+  const pendingTasks = useMemo(() => courseTasks.filter(t => !t.is_completed), [courseTasks])
+  const doneTasks = useMemo(() => courseTasks.filter(t => t.is_completed), [courseTasks])
 
   const courseNotes = useMemo<CourseNote[]>(() => {
     return ((db?.notes ?? []) as CourseNote[]).filter(n => n.course_id === courseId)
@@ -546,13 +568,106 @@ export default function CoursePage() {
               </div>
             )}
 
-            {/* PANEL: TASKS — reuses TasksMini + AssignmentsMini side-by-side */}
+            {/* PANEL: TASKS — cream-styled inline lists matching mockup.
+                Mockup shows "מטלות פתוחות (N)" + quick-add + chips + a
+                "synced from Moodle" footnote. We expand on it by showing
+                the actual lists (assignments + personal tasks) inline so
+                the user can act without bouncing to /assignments. The
+                Moodle sync footnote and the /assignments link are kept. */}
             {tab === 'tasks' && (
               <div className="course-v2-panel">
-                <div className="course-v2-tasks-grid">
-                  <TasksMini courseId={courseId} />
-                  <AssignmentsMini courseId={courseId} />
-                </div>
+                {/* Assignments (academic) */}
+                <section className="course-v2-card">
+                  <h2 className="course-v2-card-title">
+                    <span className="h2-icon"><ClipboardCheck size={14} /></span>
+                    מטלות פתוחות ({openAssignmentsCount})
+                  </h2>
+
+                  <AssignmentsQuickAdd
+                    busy={false}
+                    onAdd={async (title) => {
+                      if (typeof createAssignment !== 'function') return
+                      try {
+                        await createAssignment({
+                          title,
+                          course_id: courseId,
+                          priority: 'medium',
+                        })
+                        setNotice('נוספה מטלה לקורס ✓')
+                      } catch (err) {
+                        console.warn('[course-assignment-add] failed', err)
+                        setNotice('שגיאה ביצירת המטלה')
+                      }
+                    }}
+                  />
+
+                  {courseAssignments.length === 0 ? (
+                    <div className="course-v2-empty" style={{ marginTop: 12 }}>
+                      <p>אין עדיין מטלות לקורס.</p>
+                      <span className="course-v2-empty-hint">
+                        סנכרן מ-Moodle או הוסף מטלה חדשה למעלה.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="course-v2-rows" role="list">
+                      {openAssignments.map(a => (
+                        <AssignmentRow
+                          key={a.id}
+                          a={a}
+                          onUpdate={updateAssignment}
+                          onDelete={deleteAssignment}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="course-v2-card-foot">
+                    <Link href="/assignments" className="course-v2-foot-link">
+                      פתח את כל המטלות בעמוד המטלות <ArrowRight size={12} />
+                    </Link>
+                  </div>
+                </section>
+
+                {/* Personal study tasks (todos scoped to this course) */}
+                <section className="course-v2-card" style={{ marginTop: 14 }}>
+                  <h2 className="course-v2-card-title">
+                    <span className="h2-icon"><Check size={14} /></span>
+                    משימות ({pendingTasks.length})
+                  </h2>
+
+                  {courseTasks.length === 0 ? (
+                    <div className="course-v2-empty">
+                      <p>אין עדיין משימות אישיות לקורס.</p>
+                      <span className="course-v2-empty-hint">
+                        השתמש בהוסף מהיר למטה כדי להוסיף משימה ראשונה.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="course-v2-rows" role="list">
+                      {pendingTasks.map(t => (
+                        <StudyTaskRow
+                          key={t.id}
+                          task={t}
+                          onToggle={updateTask}
+                          onDelete={deleteTask}
+                        />
+                      ))}
+                      {doneTasks.length > 0 && (
+                        <details className="course-v2-done-group">
+                          <summary>הושלמו ({doneTasks.length})</summary>
+                          {doneTasks.map(t => (
+                            <StudyTaskRow
+                              key={t.id}
+                              task={t}
+                              onToggle={updateTask}
+                              onDelete={deleteTask}
+                            />
+                          ))}
+                        </details>
+                      )}
+                    </div>
+                  )}
+                </section>
               </div>
             )}
 
@@ -920,6 +1035,156 @@ function CourseLessonsActions({
       <span className="course-v2-organize-hint">
         קבצים בעלי שם "Week N" / "שיעור N" יקובצו לתת-תיקיות.
       </span>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Tasks-tab leaf components: cream-themed inline rows + quick-add. These
+// replace the legacy `TasksMini` / `AssignmentsMini` widgets (which
+// shipped with dark-theme `glass` styling). All call-sites of useDB
+// stay the same — only the markup changes.
+// ──────────────────────────────────────────────────────────────────────
+
+function AssignmentsQuickAdd({
+  busy,
+  onAdd,
+}: {
+  busy: boolean
+  onAdd: (title: string) => Promise<void>
+}) {
+  const [value, setValue] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const submit = useCallback(async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    const title = value.trim()
+    if (!title || submitting || busy) return
+    setSubmitting(true)
+    setValue('')
+    try { await onAdd(title) }
+    catch { /* surfaced via the page-level toast */ }
+    finally { setSubmitting(false) }
+  }, [value, busy, submitting, onAdd])
+
+  return (
+    <>
+      <form className="course-v2-quick-add" onSubmit={submit}>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder='הוסף מטלה — למשל "תרגיל 3 — סיכום פרק 4"'
+          maxLength={200}
+          disabled={submitting}
+        />
+        <button
+          type="submit"
+          className="course-v2-qa-btn"
+          aria-label="הוסף מטלה"
+          disabled={!value.trim() || submitting}
+        >
+          {submitting ? <Loader2 size={13} className="course-v2-spin" /> : <Plus size={13} />}
+        </button>
+      </form>
+      <div className="course-v2-chips" style={{ marginTop: 10 }}>
+        {['תרגיל', 'מבחן', 'פרויקט', 'חזרה', 'קריאה'].map(label => (
+          <button
+            key={label}
+            type="button"
+            className="course-v2-chip"
+            onClick={() => setValue(label)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function AssignmentRow({
+  a, onUpdate, onDelete,
+}: {
+  a: Assignment
+  onUpdate: (id: string, patch: Partial<Assignment>) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+}) {
+  const priorityChip = a.priority === 'high'
+    ? { color: '#9f1239', bg: '#fee2e2', label: 'דחוף' }
+    : a.priority === 'low'
+      ? { color: '#15803d', bg: '#dcfce7', label: 'רגיל' }
+      : { color: '#b45309', bg: '#fef3c7', label: 'בינוני' }
+  return (
+    <div className="course-v2-row" role="listitem">
+      <span
+        className="course-v2-row-prio"
+        style={{ background: priorityChip.bg, color: priorityChip.color }}
+        title={`עדיפות: ${priorityChip.label}`}
+      >
+        {priorityChip.label}
+      </span>
+      <span className="course-v2-row-title">{a.title}</span>
+      {a.deadline && (
+        <span className="course-v2-row-due">
+          <CalendarIcon size={11} /> {a.deadline.slice(5)}
+        </span>
+      )}
+      <select
+        value={a.status}
+        onChange={(e) => onUpdate(a.id, { status: e.target.value as Assignment['status'] })}
+        className="course-v2-row-status"
+        aria-label="סטטוס המטלה"
+      >
+        <option value="todo">לא התחיל</option>
+        <option value="in_progress">בתהליך</option>
+        <option value="submitted">הוגש</option>
+        <option value="graded">נבדק</option>
+      </select>
+      <button
+        type="button"
+        onClick={() => onDelete(a.id)}
+        className="course-v2-row-del"
+        aria-label="מחק מטלה"
+      >
+        <Trash2 size={12} />
+      </button>
+    </div>
+  )
+}
+
+function StudyTaskRow({
+  task, onToggle, onDelete,
+}: {
+  task: StudyTask
+  onToggle: (id: string, patch: Partial<StudyTask>) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+}) {
+  return (
+    <div className={`course-v2-row ${task.is_completed ? 'done' : ''}`} role="listitem">
+      <button
+        type="button"
+        className="course-v2-row-check"
+        aria-label={task.is_completed ? 'בטל סימון כהושלם' : 'סמן כהושלם'}
+        aria-pressed={task.is_completed}
+        onClick={() => onToggle(task.id, { is_completed: !task.is_completed })}
+      >
+        {task.is_completed && <Check size={11} />}
+      </button>
+      <span className="course-v2-row-title">{task.title}</span>
+      {task.scheduled_date && (
+        <span className="course-v2-row-due">
+          <CalendarIcon size={11} /> {task.scheduled_date.slice(5)}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={() => onDelete(task.id)}
+        className="course-v2-row-del"
+        aria-label="מחק משימה"
+      >
+        <Trash2 size={12} />
+      </button>
     </div>
   )
 }
