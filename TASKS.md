@@ -2,8 +2,9 @@
 
 הקובץ הזה הוא מקור האמת היחיד למה כל אחד מאיתנו עושה. כל שינוי אליו עובר ב-PR. לפני שמתחילים משימה — מסתכלים פה. אחרי שגומרים — PR קטן שמסמן ✅.
 
-> **עדכון 2026-05-05:** כל 20 משימות v2.1 הליבה הושלמו. נשארה רק סקירה ויזואלית (#21).
+> **עדכון 2026-05-10:** כל 20 משימות v2.1 הליבה הושלמו. נשאר רק mobile sweep (#21).
 > Tzvi לא זמין כרגע — Yarin מתקדם סולו. ראה סעיף "מצב צוות" למטה.
+> Pytest backend תשתית + 5 בדיקות נחתו (#50, #51). OAuth refresh-token Stage 1 (backend) מחכה למיזוג ב-#53.
 
 ## איך עובדים עם הקובץ
 
@@ -114,9 +115,10 @@ gh pr create --draft                    # 5. PR — מאשר ומוזג בעצמ
 לא חלק מ-21 המקוריות, אבל נדרש לפני השקה:
 
 - [ ] **#21 — mobile sweep** (light-mode כבר נעשה ב-#45)
-- [ ] **OAuth refresh-token** מנגנון רחב יותר — דורש backend (storage של refresh token ב-Supabase) → מחכה ל-Tzvi
+- [x] **Pytest backend setup + 5 בדיקות** — ✅ #50 + תיקון monkeypatch ב-#51
+- [ ] **OAuth refresh-token** — Stage 1 backend פתוח ב-#53 (encrypted storage, AES-256-GCM, RLS service-role only). Stage 2 frontend בא אחרי merge.
 - [ ] **בדיקות E2E ל-auth + course-import** — דורש credentials של חשבון Google ייעודי + BGU
-- [ ] **Pytest backend setup + 5 בדיקות** — Tzvi's lane, מחכה לחזרתו
+- [ ] **TEEPO locked theme + cream re-skin** — ✅ #52 #54 #55
 - [ ] **דומיין מותאם** ב-Vercel + Render
 - [ ] **Supabase Pro / Render Starter** — שדרוג בתשלום לפני השקה
 - [ ] **סקירה משפטית** של privacy policy + terms
