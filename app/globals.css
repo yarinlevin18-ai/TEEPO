@@ -5030,20 +5030,26 @@ html.dark .cream-page::before { opacity: .35; }
 .summaries-page .sem-grid { position: relative; }
 
 /* SVG overlay styling — the hook paints <path>/<line>/<circle.junction>
- * into .tree-svg, and these rules give them their stroke color/width. */
+ * into .tree-svg, and these rules give them their stroke color/width.
+ *
+ * Color tuned to match the green branch lines in mockup_summaries.html.
+ * Earlier we used --lp-line (warm brown), which read as "structural
+ * border" instead of "living branch"; the mockup explicitly uses the
+ * green accent so the tree carries the same botanical feel the rest of
+ * the cream theme leans into. */
 .summaries-page .tree-svg {
   overflow: visible;
 }
 .summaries-page .tree-svg path,
 .summaries-page .tree-svg line {
   fill: none;
-  stroke: var(--lp-line);
-  stroke-width: 2;
+  stroke: var(--lp-accent);
+  stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 .summaries-page .tree-svg circle.junction {
-  fill: var(--lp-line);
+  fill: var(--lp-accent);
   stroke: none;
 }
 
@@ -5127,14 +5133,18 @@ html.dark .cream-page::before { opacity: .35; }
   margin-inline-start: 4px;
 }
 
-/* Connector line between tree and the panel below */
+/* Connector line between tree and the panel below — visually bridges
+ * the tree card's bottom edge into the course panel below it. Matches
+ * mockup_summaries.html: full-opacity green hairline that the eye
+ * follows down to the panel. */
 .summaries-page .connector-line {
   height: 28px;
   width: 2px;
   background: var(--lp-accent);
   border-radius: 1px;
-  margin: -8px auto 12px;
-  opacity: .8;
+  margin: -8px auto -4px;
+  transform-origin: top;
+  animation: lineInY .4s ease-out .25s both;
 }
 
 /* Course panel — wider card with bigger padding, gradient icon header */
@@ -5398,12 +5408,20 @@ html.dark .cream-page::before { opacity: .35; }
   text-align: right;
 }
 .summaries-page .course-card-folder-row .num {
-  font-size: 11px;
-  padding: 1px 6px;
-  background: white;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 8px;
+  background: var(--lp-bg-card);
   border-radius: 999px;
   font-weight: 700;
   color: var(--lp-muted);
+  min-width: 18px;
+  text-align: center;
+  transition: background .15s, color .15s;
+}
+.summaries-page .course-card-folder-row:hover:not(:disabled) .num {
+  background: white;
+  color: var(--course-color, var(--lp-accent));
 }
 
 /* Subtle hint at the bottom of the page */
@@ -5424,6 +5442,55 @@ html.dark .cream-page::before { opacity: .35; }
     grid-template-columns: 1fr 1fr;
   }
   .summaries-page .sum-h1 { font-size: 30px; }
+}
+
+/* ── Staggered entrance animations ─────────────────────────────────────
+ * Matches mockup_summaries.html: tree nodes fade-up in cascade from the
+ * TEEPO root down through the degree pills into the semester chips, and
+ * the course cards swim in after the panel. Respects prefers-reduced-
+ * motion via the @media block below — no movement, instant visibility. */
+@keyframes summariesNodeIn {
+  from { opacity: 0; transform: translateY(8px) scale(.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.summaries-page .tree-root .node.root,
+.summaries-page .degree-header .node.degree,
+.summaries-page .year-row-head .node.year,
+.summaries-page .sem-chip-wrap .node.sem,
+.summaries-page .course-grid > .course-card {
+  animation: summariesNodeIn .45s cubic-bezier(.4,0,.2,1) both;
+}
+.summaries-page .tree-root .node.root { animation-delay: 0s; }
+.summaries-page .degree-column:nth-child(1) .degree-header .node.degree { animation-delay: .15s; }
+.summaries-page .degree-column:nth-child(2) .degree-header .node.degree { animation-delay: .2s; }
+.summaries-page .year-row:nth-of-type(1) .year-row-head .node.year { animation-delay: .25s; }
+.summaries-page .year-row:nth-of-type(2) .year-row-head .node.year { animation-delay: .3s; }
+.summaries-page .year-row:nth-of-type(3) .year-row-head .node.year { animation-delay: .35s; }
+.summaries-page .year-row:nth-of-type(4) .year-row-head .node.year { animation-delay: .4s; }
+.summaries-page .sem-chip-wrap:nth-child(1) .node.sem { animation-delay: .35s; }
+.summaries-page .sem-chip-wrap:nth-child(2) .node.sem { animation-delay: .4s; }
+.summaries-page .sem-chip-wrap:nth-child(3) .node.sem { animation-delay: .45s; }
+.summaries-page .sem-chip-wrap:nth-child(4) .node.sem { animation-delay: .5s; }
+.summaries-page .sem-chip-wrap:nth-child(5) .node.sem { animation-delay: .55s; }
+.summaries-page .sem-chip-wrap:nth-child(6) .node.sem { animation-delay: .6s; }
+.summaries-page .course-grid > .course-card:nth-child(1) { animation-delay: .15s; }
+.summaries-page .course-grid > .course-card:nth-child(2) { animation-delay: .2s; }
+.summaries-page .course-grid > .course-card:nth-child(3) { animation-delay: .25s; }
+.summaries-page .course-grid > .course-card:nth-child(4) { animation-delay: .3s; }
+.summaries-page .course-grid > .course-card:nth-child(5) { animation-delay: .35s; }
+.summaries-page .course-grid > .course-card:nth-child(6) { animation-delay: .4s; }
+.summaries-page .course-grid > .course-card:nth-child(n+7) { animation-delay: .45s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .summaries-page .tree-root .node.root,
+  .summaries-page .degree-header .node.degree,
+  .summaries-page .year-row-head .node.year,
+  .summaries-page .sem-chip-wrap .node.sem,
+  .summaries-page .course-grid > .course-card,
+  .summaries-page .connector-line,
+  .summaries-page .course-panel {
+    animation: none !important;
+  }
 }
 
 /* Inside the panel */
