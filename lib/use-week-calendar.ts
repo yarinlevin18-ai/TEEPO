@@ -16,12 +16,20 @@ import { getWeekEvents, type GoogleCalendarEvent } from './google-calendar'
 
 /** A single positioned event for the dashboard grid. */
 export interface WeekCalendarSlot {
+  /** Google Calendar event id — stable across syncs. Used by the
+   *  DayBoard panel as the React key + as the lookup key for any
+   *  future per-event store (EventNote, prep checklist, etc.). */
+  id: string
   dayIndex: number     // 0 = Sunday
   hour: number         // local 24h
   minute: number       // local 0–59
   durationMins: number
   title: string
   meta?: string        // location or short subtitle
+  /** Free-text description from Google Calendar. Rendered by the
+   *  DayBoard live-panel for notes-type events; safe to ignore for
+   *  course-matched events (the course detail page has its own meta). */
+  description?: string
   color: 'amber' | 'blue' | 'green' | 'rose' | 'purple'
   htmlLink?: string
 }
@@ -54,12 +62,14 @@ function toSlot(event: GoogleCalendarEvent): WeekCalendarSlot | null {
   const end = endStr ? new Date(endStr) : new Date(start.getTime() + 60 * 60_000)
   const durationMs = end.getTime() - start.getTime()
   return {
+    id: event.id,
     dayIndex: start.getDay(),
     hour: start.getHours(),
     minute: start.getMinutes(),
     durationMins: Math.max(30, Math.round(durationMs / 60_000)),
     title: event.summary || '(ללא כותרת)',
     meta: event.location ?? undefined,
+    description: event.description ?? undefined,
     color: colorFor(event.summary || ''),
     htmlLink: event.htmlLink,
   }
