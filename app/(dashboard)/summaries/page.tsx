@@ -972,9 +972,10 @@ function SemesterCoursesPanel({
                     rel="noopener noreferrer"
                     className="course-card-external"
                     title="פתח ב-Google Drive"
+                    aria-label={`פתח את הקורס ${c.title} ב-Google Drive`}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <ExternalLink size={14} />
+                    <ExternalLink size={14} aria-hidden />
                   </a>
                 )}
               </div>
