@@ -1,40 +1,37 @@
 'use client'
 
 /**
- * /assignments — master-detail rebuild per `mockups/assignments.html`.
+ * /assignments — academic-assignments page (locked-design v2).
  *
- * Layout:
- *   - Page head: title + green check icon, "סנכרן הכל מ-Moodle" (ghost) +
- *     "מטלה חדשה" (gradient) buttons
- *   - Filter bar: status pills + sort pills + search input
- *   - Two-column split:
- *       - Right (list pane, 380px): flat list, course-color left bar,
- *         title, course dot+name, deadline pill with urgency tone,
- *         optional progress bar from subtasks
- *       - Left (detail pane): course chip + title + source line, 3 meta
- *         cards (deadline / grade weight / estimated time), status &
- *         priority pickers, description box, linked Drive folder panel,
- *         subtasks list, footer with delete + cancel/save
+ * Visual structure mirrors `teepo-design/mockup_tasks_v2.html`.
+ * Page head: title + glass summary pills + gradient "מטלה חדשה" button.
+ * 3 tabs: הכל (flat by due) / לפי תאריך (grouped) / לפי קורס (grouped).
+ * Task card: course badge + colored left stripe, title, due-date pill,
+ * group/solo indicator, priority chip, "פתח בדרייב" button.
  *
- * The Drive folder panel uses the SELECTED assignment's course's
- * assignments folder (we don't have per-assignment folders yet) — once
- * the user runs sync-all that pulls hw3.pdf into TEEPO/<course>/מטלות,
- * the panel surfaces the files via the existing useDriveFiles hook.
+ * Mechanics preserved verbatim from the previous master-detail page:
+ * useDB() hooks, the existing add-assignment modal, the existing detail
+ * panel (now inline under the clicked card so the list stays clean).
+ *
+ * Real data only: course colors derive from the same paletteIdx hash
+ * used elsewhere; collaborator names + Drive folder URLs come from the
+ * Assignment / Course models. Missing values render clean empty states
+ * or disabled controls — never fabricated mockup samples.
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  CheckSquare, Plus, RefreshCw, Search, FileText, BarChart2, Clock,
-  Edit, MoreHorizontal, ExternalLink, Upload, Folder, Loader2, CheckCircle2,
-  AlertCircle, Sparkles, GripVertical,
+  Plus, FileText, Clock, ExternalLink, MoreHorizontal,
+  CheckCircle2, Folder, Upload, AlertCircle, Loader2, GripVertical, Sparkles,
+  User as UserIcon, Users as UsersIcon, List as ListIcon,
+  Calendar as CalendarIcon, BookOpen as BookOpenIcon,
 } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
 import { useDriveFiles } from '@/lib/use-drive-files'
 import { api } from '@/lib/api-client'
 import SyncAllButton from '@/components/sync/SyncAllButton'
 import type { Assignment, AssignmentTask, Course } from '@/types'
-
-// ── Helpers ─────────────────────────────────────────────────────────────
 
 // Deterministic palette index — shared with /tasks + /summaries so a
 // course's color matches everywhere.
@@ -54,6 +51,7 @@ function paletteIdx(key: string): number {
 }
 
 const HEB_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר']
+const HEB_WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
 
 function daysUntil(deadline?: string): number | null {
   if (!deadline) return null
@@ -64,11 +62,11 @@ function daysUntil(deadline?: string): number | null {
   return Math.round((dd.getTime() - today.getTime()) / 86_400_000)
 }
 
-interface DuePill {
-  label: string
-  tone: 'urgent' | 'normal' | 'calm' | 'undated'
-}
+type DueTone = 'urgent' | 'soon' | 'normal' | 'calm' | 'undated'
+interface DuePill { label: string; tone: DueTone }
 
+/** Compose the short due-date label shown on the v2 card pill.
+ *  Tone drives the color (urgent/soon/normal/calm/undated). */
 function duePill(deadline: string | undefined, status: Assignment['status']): DuePill {
   if (status === 'submitted') return { label: 'הוגש', tone: 'calm' }
   if (status === 'graded') return { label: 'נבדק', tone: 'calm' }
@@ -82,8 +80,11 @@ function duePill(deadline: string | undefined, status: Assignment['status']): Du
   if (dn < 0) return { label: `איחור · ${Math.abs(dn)} ימים`, tone: 'urgent' }
   if (dn === 0) return { label: hasTime ? `היום · ${hh}:${mm}` : 'היום', tone: 'urgent' }
   if (dn === 1) return { label: hasTime ? `מחר · ${hh}:${mm}` : 'מחר', tone: 'urgent' }
-  if (dn <= 7) return { label: `בעוד ${dn} ימים`, tone: 'normal' }
-  if (dn <= 14) return { label: 'בעוד שבועיים', tone: 'normal' }
+  if (dn <= 4) {
+    const wd = HEB_WEEKDAYS[d.getDay()]
+    return { label: hasTime ? `${wd} · ${hh}:${mm}` : wd, tone: 'soon' }
+  }
+  if (dn <= 14) return { label: `${d.getDate()} ב${HEB_MONTHS[d.getMonth()]}`, tone: 'normal' }
   return { label: `${d.getDate()} ב${HEB_MONTHS[d.getMonth()]}`, tone: 'calm' }
 }
 
@@ -99,13 +100,24 @@ function formatDateLong(deadline?: string): string {
   return `${dayLabel}${d.getDate()} ב${HEB_MONTHS[d.getMonth()]}${time}`
 }
 
-function progressOf(a: Assignment): number {
-  const t = a.assignment_tasks ?? []
-  if (t.length === 0) return 0
-  return Math.round((t.filter(x => x.is_completed).length / t.length) * 100)
+/** True iff the assignment is "open" (counts toward the פתוחות pill). */
+function isOpen(a: Assignment): boolean {
+  return a.status === 'todo' || a.status === 'in_progress'
 }
 
-// Status / priority labels
+/** True iff the assignment hints at group work. We have no boolean on the
+ *  model yet — looks for קבוצתי/group keywords in title or description.
+ *  Conservative on false-positives. */
+function isGroupWork(a: Assignment): { group: boolean; collaborator?: string } {
+  const hay = `${a.title} ${a.description ?? ''}`
+  const group = /(קבוצת|זוגית|בזוגות|בקבוצה|group\b|pair\b)/i.test(hay)
+  if (!group) return { group: false }
+  const heb = a.description?.match(/עם\s+([֐-׿\w][֐-׿\w\s'"-]{0,40}?)(?:[\.,]|$)/)
+  const eng = a.description?.match(/\bwith\s+([\w][\w\s'-]{0,40}?)(?:[\.,]|$)/i)
+  const collaborator = (heb?.[1] || eng?.[1])?.trim()
+  return { group: true, collaborator }
+}
+
 const STATUS_LABEL: Record<Assignment['status'], string> = {
   todo: 'לא התחלתי',
   in_progress: 'בתהליך',
@@ -114,20 +126,28 @@ const STATUS_LABEL: Record<Assignment['status'], string> = {
 }
 const PRIORITY_LABEL: Record<Assignment['priority'], string> = {
   high: 'דחוף',
-  medium: 'בינוני',
-  low: 'נמוך',
+  medium: 'רגיל',
+  low: 'נמוכה',
+}
+const PRIORITY_CLASS: Record<Assignment['priority'], 'high' | 'med' | 'low'> = {
+  high: 'high', medium: 'med', low: 'low',
 }
 
-type StatusFilter = 'all' | Assignment['status']
-type SortBy = 'deadline' | 'priority' | 'course'
+type TabKey = 'all' | 'deadline' | 'course'
+interface DeadlineBucket {
+  key: 'week' | 'next' | 'later' | 'undated'
+  label: string
+  icon: string
+  items: Assignment[]
+}
+
+const LIST_STAGGER = 0.05
+const CARD_DURATION = 0.32
 
 // ── Page ─────────────────────────────────────────────────────────────────
 
 export default function AssignmentsPage() {
   const { db, ready, createAssignment, updateAssignment, deleteAssignment } = useDB()
-  // Memoize array reads from the DB context so downstream useMemo deps
-  // don't refire every render (the `?? []` fallback returns a brand-new
-  // array on each call, which thrashes the dependency-comparison check).
   const assignments = useMemo(() => (db?.assignments ?? []) as Assignment[], [db?.assignments])
   const courses = useMemo(() => (db?.courses ?? []) as Course[], [db?.courses])
 
@@ -137,101 +157,112 @@ export default function AssignmentsPage() {
     return m
   }, [courses])
 
-  // Filter + sort state
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [sortBy, setSortBy] = useState<SortBy>('deadline')
-  const [query, setQuery] = useState('')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [tab, setTab] = useState<TabKey>('all')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  // Add form
   const [showAdd, setShowAdd] = useState(false)
   const [addForm, setAddForm] = useState({ title: '', description: '', deadline: '', course_id: '' })
   const [adding, setAdding] = useState(false)
 
-  // Edit buffer for the selected assignment (cancel/save semantics)
   const [editBuffer, setEditBuffer] = useState<Partial<Assignment> | null>(null)
 
-  // Counts per status (drives the filter pill numbers)
-  const counts = useMemo(() => {
-    const c: Record<StatusFilter, number> = {
-      all: assignments.length,
-      todo: 0, in_progress: 0, submitted: 0, graded: 0,
+  // Page-head summary pill counts — derived from real data, no fabrication.
+  const summary = useMemo(() => {
+    let urgent = 0, open = 0, groupCount = 0
+    for (const a of assignments) {
+      if (!isOpen(a)) continue
+      open++
+      const dn = daysUntil(a.deadline)
+      if (dn !== null && dn <= 1) urgent++
+      if (isGroupWork(a).group) groupCount++
     }
-    for (const a of assignments) c[a.status]++
-    return c
+    return { urgent, open, group: groupCount }
   }, [assignments])
 
-  // Filter + sort the list
-  const filtered = useMemo(() => {
-    let list = assignments
-    if (statusFilter !== 'all') list = list.filter(a => a.status === statusFilter)
-    if (query.trim()) {
-      const q = query.trim()
-      list = list.filter(a => a.title.includes(q) || a.description?.includes(q))
-    }
-    const sorted = [...list].sort((a, b) => {
-      switch (sortBy) {
-        case 'deadline': {
-          const da = daysUntil(a.deadline) ?? Number.POSITIVE_INFINITY
-          const db_ = daysUntil(b.deadline) ?? Number.POSITIVE_INFINITY
-          return da - db_
-        }
-        case 'priority': {
-          const ord: Record<Assignment['priority'], number> = { high: 0, medium: 1, low: 2 }
-          return ord[a.priority] - ord[b.priority]
-        }
-        case 'course': {
-          const ca = a.course_id ? courseById.get(a.course_id)?.title || '' : ''
-          const cb = b.course_id ? courseById.get(b.course_id)?.title || '' : ''
-          return ca.localeCompare(cb, 'he')
-        }
-      }
+  const sorted = useMemo(() => {
+    return [...assignments].sort((a, b) => {
+      const da = daysUntil(a.deadline) ?? Number.POSITIVE_INFINITY
+      const db_ = daysUntil(b.deadline) ?? Number.POSITIVE_INFINITY
+      return da - db_
     })
-    return sorted
-  }, [assignments, statusFilter, query, sortBy, courseById])
+  }, [assignments])
 
-  // Auto-select the first item whenever the visible list changes and the
-  // currently-selected one isn't in it.
-  useEffect(() => {
-    if (filtered.length === 0) { setSelectedId(null); return }
-    if (!selectedId || !filtered.find(a => a.id === selectedId)) {
-      setSelectedId(filtered[0].id)
+  const deadlineBuckets = useMemo<DeadlineBucket[]>(() => {
+    const week: Assignment[] = []
+    const next: Assignment[] = []
+    const later: Assignment[] = []
+    const undated: Assignment[] = []
+    for (const a of sorted) {
+      const dn = daysUntil(a.deadline)
+      if (dn === null) { undated.push(a); continue }
+      if (dn <= 7) week.push(a)
+      else if (dn <= 14) next.push(a)
+      else later.push(a)
     }
-  }, [filtered, selectedId])
+    const buckets: DeadlineBucket[] = []
+    if (week.length)    buckets.push({ key: 'week',  label: 'השבוע',     icon: '🔥', items: week })
+    if (next.length)    buckets.push({ key: 'next',  label: 'השבוע הבא', icon: '📅', items: next })
+    if (later.length)   buckets.push({ key: 'later', label: 'בהמשך',     icon: '💭', items: later })
+    if (undated.length) buckets.push({ key: 'undated', label: 'ללא תאריך', icon: '⏳', items: undated })
+    return buckets
+  }, [sorted])
 
-  const selected = useMemo(
-    () => (selectedId ? assignments.find(a => a.id === selectedId) ?? null : null),
-    [selectedId, assignments],
+  // Course-grouped — sorted by earliest due assignment so "תאריך הגשה
+  // הקרוב ביותר" surfaces first.
+  const courseBuckets = useMemo(() => {
+    const map = new Map<string, Assignment[]>()
+    const noCourse: Assignment[] = []
+    for (const a of sorted) {
+      if (!a.course_id) { noCourse.push(a); continue }
+      const arr = map.get(a.course_id) ?? []
+      arr.push(a)
+      map.set(a.course_id, arr)
+    }
+    const buckets = Array.from(map.entries()).map(([cid, items]) => {
+      const c = courseById.get(cid)
+      const earliest = items.reduce((min, a) => {
+        const dn = daysUntil(a.deadline) ?? Number.POSITIVE_INFINITY
+        return Math.min(min, dn)
+      }, Number.POSITIVE_INFINITY)
+      return { courseId: cid, course: c, items, earliest }
+    })
+    buckets.sort((a, b) => a.earliest - b.earliest)
+    if (noCourse.length) {
+      buckets.push({ courseId: '__none', course: undefined, items: noCourse, earliest: Number.POSITIVE_INFINITY })
+    }
+    return buckets
+  }, [sorted, courseById])
+
+  const expanded = useMemo(
+    () => (expandedId ? assignments.find(a => a.id === expandedId) ?? null : null),
+    [expandedId, assignments],
   )
-  const selectedCourse = selected?.course_id ? courseById.get(selected.course_id) ?? null : null
-  const selectedPalette = selected ? COURSE_PALETTE[paletteIdx(selected.course_id || selected.id)] : COURSE_PALETTE[0]
+  const expandedCourse = expanded?.course_id ? courseById.get(expanded.course_id) ?? null : null
+  const expandedPalette = expanded ? COURSE_PALETTE[paletteIdx(expanded.course_id || expanded.id)] : COURSE_PALETTE[0]
 
-  // Reset edit buffer when selection changes
   useEffect(() => {
-    if (!selected) { setEditBuffer(null); return }
+    if (!expanded) { setEditBuffer(null); return }
     setEditBuffer({
-      title: selected.title,
-      description: selected.description ?? '',
-      status: selected.status,
-      priority: selected.priority,
-      deadline: selected.deadline,
+      title: expanded.title,
+      description: expanded.description ?? '',
+      status: expanded.status,
+      priority: expanded.priority,
+      deadline: expanded.deadline,
     })
-  }, [selected])
+  }, [expanded])
 
   const isDirty = useMemo(() => {
-    if (!selected || !editBuffer) return false
-    return (editBuffer.title !== selected.title) ||
-      ((editBuffer.description ?? '') !== (selected.description ?? '')) ||
-      (editBuffer.status !== selected.status) ||
-      (editBuffer.priority !== selected.priority) ||
-      ((editBuffer.deadline ?? '') !== (selected.deadline ?? ''))
-  }, [editBuffer, selected])
+    if (!expanded || !editBuffer) return false
+    return (editBuffer.title !== expanded.title) ||
+      ((editBuffer.description ?? '') !== (expanded.description ?? '')) ||
+      (editBuffer.status !== expanded.status) ||
+      (editBuffer.priority !== expanded.priority) ||
+      ((editBuffer.deadline ?? '') !== (expanded.deadline ?? ''))
+  }, [editBuffer, expanded])
 
-  // ── Handlers ────────────────────────────────────────────────────────────
-
-  const onSaveSelected = async () => {
-    if (!selected || !editBuffer || !isDirty) return
-    await updateAssignment(selected.id, {
+  const onSaveExpanded = async () => {
+    if (!expanded || !editBuffer || !isDirty) return
+    await updateAssignment(expanded.id, {
       title: editBuffer.title,
       description: editBuffer.description,
       status: editBuffer.status as Assignment['status'],
@@ -240,43 +271,43 @@ export default function AssignmentsPage() {
     })
   }
   const onCancelEdit = () => {
-    if (!selected) return
+    if (!expanded) return
     setEditBuffer({
-      title: selected.title,
-      description: selected.description ?? '',
-      status: selected.status,
-      priority: selected.priority,
-      deadline: selected.deadline,
+      title: expanded.title,
+      description: expanded.description ?? '',
+      status: expanded.status,
+      priority: expanded.priority,
+      deadline: expanded.deadline,
     })
   }
-  const onDeleteSelected = async () => {
-    if (!selected) return
-    if (!confirm(`למחוק את "${selected.title}"?`)) return
-    await deleteAssignment(selected.id)
-    setSelectedId(null)
+  const onDeleteExpanded = async () => {
+    if (!expanded) return
+    if (!confirm(`למחוק את "${expanded.title}"?`)) return
+    await deleteAssignment(expanded.id)
+    setExpandedId(null)
   }
   const onToggleSubtask = async (st: AssignmentTask) => {
-    if (!selected) return
-    const next = (selected.assignment_tasks ?? []).map(x =>
+    if (!expanded) return
+    const next = (expanded.assignment_tasks ?? []).map(x =>
       x.id === st.id ? { ...x, is_completed: !x.is_completed } : x,
     )
-    await updateAssignment(selected.id, { assignment_tasks: next })
+    await updateAssignment(expanded.id, { assignment_tasks: next })
   }
   const onAddSubtask = async () => {
-    if (!selected) return
+    if (!expanded) return
     const title = window.prompt('שלב חדש:')
     if (!title?.trim()) return
     const next: AssignmentTask[] = [
-      ...(selected.assignment_tasks ?? []),
+      ...(expanded.assignment_tasks ?? []),
       {
         id: `at_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        assignment_id: selected.id,
+        assignment_id: expanded.id,
         title: title.trim(),
-        order_index: (selected.assignment_tasks?.length ?? 0) + 1,
+        order_index: (expanded.assignment_tasks?.length ?? 0) + 1,
         is_completed: false,
       },
     ]
-    await updateAssignment(selected.id, { assignment_tasks: next })
+    await updateAssignment(expanded.id, { assignment_tasks: next })
   }
 
   const onCreate = async () => {
@@ -308,184 +339,172 @@ export default function AssignmentsPage() {
       })
       setAddForm({ title: '', description: '', deadline: '', course_id: '' })
       setShowAdd(false)
-      setSelectedId(created.id)
+      setExpandedId(created.id)
     } finally {
       setAdding(false)
     }
   }
 
+  const toggleExpand = (id: string) => {
+    setExpandedId(prev => (prev === id ? null : id))
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="cream-page asn-page" dir="rtl">
-      <main className="asn-main">
+    <div className="cream-page tasks-v2-page" dir="rtl">
+      <main className="tasks-v2-main">
 
         {/* Page head */}
-        <header className="asn-head">
-          <div className="asn-title">
-            <div className="asn-title-icon" aria-hidden>
-              <CheckSquare size={22} />
-            </div>
+        <header className="tasks-v2-head">
+          <div className="tasks-v2-title-block">
             <h1>המטלות שלי</h1>
+            <div className="tasks-v2-summary" aria-label="סיכום מטלות">
+              <span className="tasks-v2-pill urgent">
+                דחוף · <span className="num">{summary.urgent}</span>
+              </span>
+              <span className="tasks-v2-pill">
+                פתוחות · <span className="num">{summary.open}</span>
+              </span>
+              <span className="tasks-v2-pill">
+                קבוצתיות · <span className="num">{summary.group}</span>
+              </span>
+            </div>
           </div>
-          <div className="asn-head-actions">
+          <div className="tasks-v2-head-actions">
             <SyncAllButton variant="ghost" />
             <button
               type="button"
-              className="asn-btn asn-btn-primary"
+              className="tasks-v2-add-btn"
               onClick={() => setShowAdd(true)}
             >
-              <Plus size={15} /> מטלה חדשה
+              <Plus size={16} strokeWidth={2.5} />
+              מטלה חדשה
             </button>
           </div>
         </header>
 
-        {/* Filter bar */}
-        <section className="asn-filter">
-          <span className="asn-filter-label">סטטוס</span>
-          {(['all', 'todo', 'in_progress', 'submitted', 'graded'] as const).map(k => {
-            const label = k === 'all' ? 'הכל' : STATUS_LABEL[k as Assignment['status']]
-            return (
-              <button
-                key={k}
-                type="button"
-                className={`asn-filter-pill ${statusFilter === k ? 'on' : ''}`}
-                onClick={() => setStatusFilter(k as StatusFilter)}
-              >
-                {label}
-                <span className="asn-filter-pill-count">{counts[k]}</span>
-              </button>
-            )
-          })}
-          <div className="asn-filter-divider" />
-          <span className="asn-filter-label">מיון</span>
-          {(['deadline', 'priority', 'course'] as const).map(k => (
-            <button
-              key={k}
-              type="button"
-              className={`asn-filter-pill ${sortBy === k ? 'on' : ''}`}
-              onClick={() => setSortBy(k)}
-            >
-              {k === 'deadline' ? 'תאריך הגשה' : k === 'priority' ? 'עדיפות' : 'קורס'}
-            </button>
-          ))}
-          <div className="asn-filter-search">
-            <Search size={14} />
-            <input
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="חיפוש מטלה…"
-            />
-          </div>
-        </section>
-
-        {/* Master-detail split */}
-        <div className="asn-split">
-
-          {/* LIST PANE (right in RTL). Plain div (not <aside>) — the
-              dashboard layout's global `html.light aside` rule paints a
-              blue-tinted gradient with !important that overrides our
-              cream bg. */}
-          <div className="asn-list-pane">
-            <div className="asn-list-meta">
-              מציג <strong>{filtered.length}</strong> מטלות · ממוין לפי{' '}
-              <strong>{sortBy === 'deadline' ? 'תאריך הגשה' : sortBy === 'priority' ? 'עדיפות' : 'קורס'}</strong>
-            </div>
-            {!ready ? (
-              <div className="asn-list-skel">
-                {[0, 1, 2].map(i => <div key={i} className="asn-skel-row" />)}
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="asn-empty">
-                <FileText size={28} />
-                <p>אין מטלות תואמות לסינון</p>
-              </div>
-            ) : (
-              filtered.map(a => {
-                const pal = COURSE_PALETTE[paletteIdx(a.course_id || a.id)]
-                const course = a.course_id ? courseById.get(a.course_id) : null
-                const due = duePill(a.deadline, a.status)
-                const pct = progressOf(a)
-                return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    className={`asn-item ${selectedId === a.id ? 'selected' : ''} ${
-                      a.status === 'submitted' || a.status === 'graded' ? 'is-done' : ''
-                    }`}
-                    onClick={() => setSelectedId(a.id)}
-                  >
-                    <div className="asn-bar" style={{ background: pal.color }} aria-hidden />
-                    <div className="asn-item-main">
-                      <div className="asn-item-title">{a.title}</div>
-                      <div className="asn-item-meta">
-                        <span className="asn-item-course">
-                          <span className="asn-item-course-dot" style={{ background: pal.color }} />
-                          {course?.title ?? 'ללא קורס'}
-                        </span>
-                        <span className={`asn-item-due tone-${due.tone}`}>{due.label}</span>
-                      </div>
-                      {pct > 0 && (
-                        <div className="asn-item-progress" aria-label={`התקדמות ${pct}%`}>
-                          <div className="asn-item-progress-fill" style={{ width: `${pct}%` }} />
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                )
-              })
-            )}
-          </div>
-
-          {/* DETAIL PANE */}
-          {selected && editBuffer ? (
-            <section
-              className="asn-detail"
-              style={{
-                ['--course-color' as any]: selectedPalette.color,
-                ['--course-soft' as any]: selectedPalette.soft,
-                ['--course-deep' as any]: selectedPalette.deep,
-              }}
-            >
-              <DetailContent
-                assignment={selected}
-                buffer={editBuffer}
-                setBuffer={(p) => setEditBuffer(b => ({ ...b!, ...p }))}
-                course={selectedCourse}
-                onToggleSubtask={onToggleSubtask}
-                onAddSubtask={onAddSubtask}
-                onSave={onSaveSelected}
-                onCancel={onCancelEdit}
-                onDelete={onDeleteSelected}
-                isDirty={isDirty}
-              />
-            </section>
-          ) : (
-            <section className="asn-detail asn-detail-empty">
-              <Sparkles size={42} />
-              <h3>בחר מטלה כדי לערוך</h3>
-              <p>הרשימה מימין מציגה את כל המטלות הפעילות. לחיצה על מטלה תפתח אותה לעריכה כאן.</p>
-            </section>
-          )}
+        {/* Tabs */}
+        <div className="tasks-v2-tabs" role="tablist" aria-label="תצוגות מטלות">
+          <TabButton active={tab === 'all'}      onClick={() => setTab('all')}      icon={<ListIcon size={14} />}     label="הכל"        count={assignments.length} />
+          <TabButton active={tab === 'deadline'} onClick={() => setTab('deadline')} icon={<CalendarIcon size={14} />} label="לפי תאריך" />
+          <TabButton active={tab === 'course'}   onClick={() => setTab('course')}   icon={<BookOpenIcon size={14} />} label="לפי קורס"  />
         </div>
+
+        {/* PANELS */}
+        {!ready ? (
+          <div className="tasks-v2-list">
+            {[0, 1, 2].map(i => <div key={i} className="tasks-v2-skel" />)}
+          </div>
+        ) : assignments.length === 0 ? (
+          <EmptyState onAdd={() => setShowAdd(true)} />
+        ) : tab === 'all' ? (
+          <FlatPanel
+            items={sorted}
+            courseById={courseById}
+            expandedId={expandedId}
+            onToggle={toggleExpand}
+            expanded={expanded}
+            editBuffer={editBuffer}
+            setBuffer={(p) => setEditBuffer(b => ({ ...b!, ...p }))}
+            expandedCourse={expandedCourse}
+            expandedPalette={expandedPalette}
+            isDirty={isDirty}
+            onToggleSubtask={onToggleSubtask}
+            onAddSubtask={onAddSubtask}
+            onSave={onSaveExpanded}
+            onCancel={onCancelEdit}
+            onDelete={onDeleteExpanded}
+          />
+        ) : tab === 'deadline' ? (
+          deadlineBuckets.length === 0 ? (
+            <EmptyState onAdd={() => setShowAdd(true)} />
+          ) : (
+            deadlineBuckets.map(b => (
+              <section key={b.key} className={`tasks-v2-section tone-${b.key}`}>
+                <div className="tasks-v2-sec-head">
+                  <span className="tasks-v2-sec-icon" aria-hidden>{b.icon}</span>
+                  <span className="tasks-v2-sec-label">{b.label}</span>
+                  <span className="tasks-v2-sec-count">
+                    {b.items.length} {b.items.length === 1 ? 'מטלה' : 'מטלות'}
+                  </span>
+                </div>
+                <FlatPanel
+                  items={b.items}
+                  courseById={courseById}
+                  expandedId={expandedId}
+                  onToggle={toggleExpand}
+                  expanded={expanded}
+                  editBuffer={editBuffer}
+                  setBuffer={(p) => setEditBuffer(b => ({ ...b!, ...p }))}
+                  expandedCourse={expandedCourse}
+                  expandedPalette={expandedPalette}
+                  isDirty={isDirty}
+                  onToggleSubtask={onToggleSubtask}
+                  onAddSubtask={onAddSubtask}
+                  onSave={onSaveExpanded}
+                  onCancel={onCancelEdit}
+                  onDelete={onDeleteExpanded}
+                />
+              </section>
+            ))
+          )
+        ) : (
+          // tab === 'course'
+          courseBuckets.length === 0 ? (
+            <EmptyState onAdd={() => setShowAdd(true)} />
+          ) : (
+            courseBuckets.map(({ courseId, course, items }) => {
+              const pal = COURSE_PALETTE[paletteIdx(courseId)]
+              const label = course?.title ?? 'ללא קורס'
+              return (
+                <section key={courseId} className="tasks-v2-section">
+                  <div className="tasks-v2-sec-head">
+                    <span className="tasks-v2-sec-icon" aria-hidden style={{ color: pal.color }}>📘</span>
+                    <span className="tasks-v2-sec-label">{label}</span>
+                    <span className="tasks-v2-sec-count">
+                      {items.filter(isOpen).length} פתוחות · {items.length} סה״כ
+                    </span>
+                  </div>
+                  <FlatPanel
+                    items={items}
+                    courseById={courseById}
+                    expandedId={expandedId}
+                    onToggle={toggleExpand}
+                    expanded={expanded}
+                    editBuffer={editBuffer}
+                    setBuffer={(p) => setEditBuffer(b => ({ ...b!, ...p }))}
+                    expandedCourse={expandedCourse}
+                    expandedPalette={expandedPalette}
+                    isDirty={isDirty}
+                    onToggleSubtask={onToggleSubtask}
+                    onAddSubtask={onAddSubtask}
+                    onSave={onSaveExpanded}
+                    onCancel={onCancelEdit}
+                    onDelete={onDeleteExpanded}
+                  />
+                </section>
+              )
+            })
+          )
+        )}
       </main>
 
-      {/* Add modal */}
+      {/* Add modal — unchanged mechanics from the previous page. */}
       {showAdd && (
         <div
-          className="asn-add-overlay"
+          className="tasks-v2-modal-overlay"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="asn-add-title"
+          aria-labelledby="tasks-v2-add-title"
           onClick={e => { if (e.target === e.currentTarget) setShowAdd(false) }}
         >
-          <div className="asn-add-modal">
-            <header className="asn-add-head">
-              <h2 id="asn-add-title">מטלה חדשה</h2>
+          <div className="tasks-v2-modal">
+            <header className="tasks-v2-modal-head">
+              <h2 id="tasks-v2-add-title">מטלה חדשה</h2>
               <button type="button" onClick={() => setShowAdd(false)} aria-label="סגור">×</button>
             </header>
-            <div className="asn-add-body">
+            <div className="tasks-v2-modal-body">
               <label>
                 <span>שם המטלה *</span>
                 <input
@@ -524,13 +543,13 @@ export default function AssignmentsPage() {
                 />
               </label>
             </div>
-            <footer className="asn-add-foot">
-              <button type="button" className="asn-btn asn-btn-ghost" onClick={() => setShowAdd(false)}>
+            <footer className="tasks-v2-modal-foot">
+              <button type="button" className="tasks-v2-btn-ghost" onClick={() => setShowAdd(false)}>
                 ביטול
               </button>
               <button
                 type="button"
-                className="asn-btn asn-btn-primary"
+                className="tasks-v2-btn-primary"
                 onClick={onCreate}
                 disabled={!addForm.title.trim() || adding}
               >
@@ -546,10 +565,212 @@ export default function AssignmentsPage() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Detail content — extracted so the parent stays readable.
+// Tab button — semantic role + aria-selected for screen readers.
 // ─────────────────────────────────────────────────────────────────────────
 
-function DetailContent({
+function TabButton({
+  active, onClick, icon, label, count,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+  count?: number
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      className={`tasks-v2-tab-btn ${active ? 'active' : ''}`}
+      onClick={onClick}
+    >
+      {icon}
+      {label}
+      {typeof count === 'number' && <span className="tasks-v2-tab-count">{count}</span>}
+    </button>
+  )
+}
+
+function EmptyState({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div className="tasks-v2-empty">
+      <span className="em" aria-hidden>🌱</span>
+      <p>אין מטלות פתוחות. סנכרן מ-Moodle או צור מטלה חדשה כדי להתחיל.</p>
+      <button type="button" className="tasks-v2-btn-primary" onClick={onAdd}>
+        <Plus size={14} /> מטלה חדשה
+      </button>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// FlatPanel — vertical list of v2 task cards, with an inline AnimatePresence
+// detail panel under whichever card is expanded.
+// ─────────────────────────────────────────────────────────────────────────
+
+interface FlatPanelProps {
+  items: Assignment[]
+  courseById: Map<string, Course>
+  expandedId: string | null
+  onToggle: (id: string) => void
+
+  // Detail wiring (only used by the currently-expanded card)
+  expanded: Assignment | null
+  editBuffer: Partial<Assignment> | null
+  setBuffer: (p: Partial<Assignment>) => void
+  expandedCourse: Course | null
+  expandedPalette: { color: string; soft: string; deep: string }
+  isDirty: boolean
+  onToggleSubtask: (st: AssignmentTask) => void
+  onAddSubtask: () => void
+  onSave: () => void
+  onCancel: () => void
+  onDelete: () => void
+}
+
+function FlatPanel(props: FlatPanelProps) {
+  const { items, courseById, expandedId, onToggle } = props
+  return (
+    <div className="tasks-v2-list">
+      <AnimatePresence initial={false}>
+        {items.map((a, idx) => {
+          const pal = COURSE_PALETTE[paletteIdx(a.course_id || a.id)]
+          const course = a.course_id ? courseById.get(a.course_id) : null
+          const due = duePill(a.deadline, a.status)
+          const grp = isGroupWork(a)
+          const isExpanded = expandedId === a.id
+          const driveFolderId = course?.drive_folder_ids?.assignments
+          const driveUrl = driveFolderId
+            ? `https://drive.google.com/drive/folders/${driveFolderId}`
+            : undefined
+
+          return (
+            <motion.div
+              key={a.id}
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 12 }}
+              transition={{
+                duration: CARD_DURATION,
+                delay: Math.min(idx * LIST_STAGGER, 0.4),
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              className={`tasks-v2-card-wrap ${isExpanded ? 'is-expanded' : ''}`}
+              style={{
+                ['--course-color' as any]: pal.color,
+                ['--course-soft' as any]: pal.soft,
+                ['--course-deep' as any]: pal.deep,
+              }}
+            >
+              <button
+                type="button"
+                className="tasks-v2-card"
+                onClick={() => onToggle(a.id)}
+                aria-expanded={isExpanded}
+              >
+                <span className="tasks-v2-stripe" aria-hidden />
+                <div className="tasks-v2-card-left">
+                  <span className="tasks-v2-course-badge">
+                    <span className="dot" />
+                    {course?.title ?? 'ללא קורס'}
+                  </span>
+                </div>
+                <div className="tasks-v2-card-body">
+                  <div className="tasks-v2-card-title">{a.title}</div>
+                  <div className="tasks-v2-card-meta">
+                    <span className={`tasks-v2-meta-item due tone-${due.tone}`}>
+                      <Clock size={12} />
+                      {due.label}
+                    </span>
+                    {grp.group ? (
+                      <span className="tasks-v2-meta-item group">
+                        <UsersIcon size={12} />
+                        {grp.collaborator ? `קבוצתי · ${grp.collaborator}` : 'קבוצתי'}
+                      </span>
+                    ) : (
+                      <span className="tasks-v2-meta-item solo">
+                        <UserIcon size={12} />
+                        יחיד
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="tasks-v2-card-right">
+                  <span className={`tasks-v2-priority ${PRIORITY_CLASS[a.priority]}`}>
+                    {PRIORITY_LABEL[a.priority]}
+                  </span>
+                  {driveUrl ? (
+                    <a
+                      href={driveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="tasks-v2-drive-btn"
+                      onClick={e => e.stopPropagation()}
+                      aria-label={`פתח את תיקיית הקורס ב-Drive — ${course?.title ?? ''}`}
+                    >
+                      <Folder size={12} />
+                      פתח בדרייב
+                    </a>
+                  ) : (
+                    <span
+                      className="tasks-v2-drive-btn disabled"
+                      title="אין תיקיית דרייב — סנכרן מ-Moodle"
+                      aria-label="אין תיקיית דרייב — סנכרן מ-Moodle"
+                    >
+                      <Folder size={12} />
+                      פתח בדרייב
+                    </span>
+                  )}
+                </div>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {isExpanded && props.expanded?.id === a.id && props.editBuffer && (
+                  <motion.section
+                    key="detail"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                    className="tasks-v2-detail"
+                    style={{
+                      ['--course-color' as any]: props.expandedPalette.color,
+                      ['--course-soft' as any]: props.expandedPalette.soft,
+                      ['--course-deep' as any]: props.expandedPalette.deep,
+                    }}
+                  >
+                    <ExpandedDetail
+                      assignment={props.expanded}
+                      buffer={props.editBuffer}
+                      setBuffer={props.setBuffer}
+                      course={props.expandedCourse}
+                      onToggleSubtask={props.onToggleSubtask}
+                      onAddSubtask={props.onAddSubtask}
+                      onSave={props.onSave}
+                      onCancel={props.onCancel}
+                      onDelete={props.onDelete}
+                      isDirty={props.isDirty}
+                    />
+                  </motion.section>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )
+        })}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ExpandedDetail — inline detail panel under a clicked task card.
+// Mirrors the previous master-detail right-pane mechanics (status / priority
+// pickers, description, Drive folder, subtasks, save/cancel/delete) — only
+// the styling moved to the v2 cream container.
+// ─────────────────────────────────────────────────────────────────────────
+
+function ExpandedDetail({
   assignment, buffer, setBuffer, course,
   onToggleSubtask, onAddSubtask, onSave, onCancel, onDelete, isDirty,
 }: {
@@ -570,64 +791,60 @@ function DetailContent({
   const courseDisplayName = course?.title ?? 'ללא קורס'
 
   return (
-    <>
-      {/* Head */}
-      <div className="asn-detail-head">
-        <div className="asn-detail-title-block">
-          <div className="asn-detail-course">
+    <div className="tasks-v2-detail-inner">
+      <div className="tasks-v2-detail-head">
+        <div className="tasks-v2-detail-title-block">
+          <div className="tasks-v2-detail-course">
             <span className="dot" aria-hidden />
             {courseDisplayName}
           </div>
           <h2>{assignment.title}</h2>
-          <div className="asn-detail-source">
+          <div className="tasks-v2-detail-source">
             {assignment.deadline ? <>הגשה: <strong>{formatDateLong(assignment.deadline)}</strong></> : 'ללא תאריך הגשה'}
           </div>
         </div>
-        <div className="asn-detail-actions">
-          <button type="button" className="asn-icon-btn" title="עוד" aria-label="פעולות נוספות">
+        <div className="tasks-v2-detail-actions">
+          <button type="button" className="tasks-v2-icon-btn" title="עוד" aria-label="פעולות נוספות">
             <MoreHorizontal size={16} />
           </button>
         </div>
       </div>
 
-      {/* Meta row */}
-      <div className="asn-meta-row">
-        <div className="asn-meta-card deadline">
-          <div className="asn-meta-label">תאריך הגשה</div>
-          <div className="asn-meta-value">
+      <div className="tasks-v2-meta-row">
+        <div className="tasks-v2-meta-card deadline">
+          <div className="tasks-v2-meta-label">תאריך הגשה</div>
+          <div className="tasks-v2-meta-value">
             <Clock size={14} />
             {assignment.deadline ? formatDateLong(assignment.deadline) : '—'}
           </div>
         </div>
-        <div className="asn-meta-card">
-          <div className="asn-meta-label">משקל מהציון</div>
-          <div className="asn-meta-value">
-            <BarChart2 size={14} />
-            {/* Not in the type yet — placeholder */}
-            —
+        <div className="tasks-v2-meta-card">
+          <div className="tasks-v2-meta-label">סטטוס</div>
+          <div className="tasks-v2-meta-value">
+            <CheckCircle2 size={14} />
+            {STATUS_LABEL[assignment.status]}
           </div>
         </div>
-        <div className="asn-meta-card">
-          <div className="asn-meta-label">זמן משוער</div>
-          <div className="asn-meta-value">
+        <div className="tasks-v2-meta-card">
+          <div className="tasks-v2-meta-label">זמן משוער</div>
+          <div className="tasks-v2-meta-value">
             <Clock size={14} />
             {hoursEst > 0 ? `${hoursEst} שעות` : '—'}
           </div>
         </div>
       </div>
 
-      {/* Status + priority pickers */}
-      <section className="asn-section">
-        <header className="asn-section-head">
+      <section className="tasks-v2-sub-section">
+        <header className="tasks-v2-sub-head">
           <h3><CheckCircle2 size={16} /> סטטוס ועדיפות</h3>
         </header>
-        <div className="asn-pickers">
-          <div className="asn-picker-row">
+        <div className="tasks-v2-pickers">
+          <div className="tasks-v2-picker-row">
             {(['todo', 'in_progress', 'submitted', 'graded'] as const).map(s => (
               <button
                 key={s}
                 type="button"
-                className={`asn-status-opt ${buffer.status === s ? 'on' : ''}`}
+                className={`tasks-v2-status-opt ${buffer.status === s ? 'on' : ''}`}
                 onClick={() => setBuffer({ status: s })}
               >
                 <span className="sdot" aria-hidden />
@@ -635,12 +852,12 @@ function DetailContent({
               </button>
             ))}
           </div>
-          <div className="asn-picker-row">
+          <div className="tasks-v2-picker-row">
             {(['high', 'medium', 'low'] as const).map(p => (
               <button
                 key={p}
                 type="button"
-                className={`asn-status-opt asn-priority-opt ${buffer.priority === p ? `on ${p === 'high' ? 'high' : p === 'medium' ? 'med' : 'low'}` : ''}`}
+                className={`tasks-v2-status-opt priority-opt ${buffer.priority === p ? `on ${PRIORITY_CLASS[p]}` : ''}`}
                 onClick={() => setBuffer({ priority: p })}
               >
                 <span className="sdot" aria-hidden />
@@ -651,13 +868,12 @@ function DetailContent({
         </div>
       </section>
 
-      {/* Description */}
-      <section className="asn-section">
-        <header className="asn-section-head">
+      <section className="tasks-v2-sub-section">
+        <header className="tasks-v2-sub-head">
           <h3><FileText size={16} /> תיאור המטלה</h3>
         </header>
         <textarea
-          className="asn-desc-box"
+          className="tasks-v2-desc-box"
           value={buffer.description ?? ''}
           onChange={e => setBuffer({ description: e.target.value })}
           rows={5}
@@ -665,45 +881,43 @@ function DetailContent({
         />
       </section>
 
-      {/* Drive folder */}
-      <section className="asn-section">
-        <header className="asn-section-head">
+      <section className="tasks-v2-sub-section">
+        <header className="tasks-v2-sub-head">
           <h3><Folder size={16} /> תיקיית Drive מקושרת</h3>
         </header>
         {driveFolderId ? (
           <DrivePanel folderId={driveFolderId} courseTitle={courseDisplayName} assignmentTitle={assignment.title} />
         ) : (
-          <button type="button" className="asn-drive-cta">
+          <div className="tasks-v2-drive-empty-cta">
             <Folder size={20} />
-            <span>+ קישור לתיקייה ב-Drive — סווג קודם את הקורס</span>
-          </button>
+            <span>אין תיקיית דרייב מסונכרנת לקורס. סווג את הקורס תחת תואר/שנה/סמסטר ב-״המוח״ — תיקיית Drive תיווצר אוטומטית.</span>
+          </div>
         )}
       </section>
 
-      {/* Subtasks */}
-      <section className="asn-section">
-        <header className="asn-section-head">
+      <section className="tasks-v2-sub-section">
+        <header className="tasks-v2-sub-head">
           <h3><CheckCircle2 size={16} /> פירוק למשימות</h3>
-          <button type="button" className="asn-section-link" onClick={onAddSubtask}>+ הוסף שלב</button>
+          <button type="button" className="tasks-v2-sub-link" onClick={onAddSubtask}>+ הוסף שלב</button>
         </header>
         {subtasks.length === 0 ? (
-          <div className="asn-subtask-empty">אין שלבים עדיין. השתמש ב-AI כדי לפרק את המטלה לשלבים, או הוסף ידנית.</div>
+          <div className="tasks-v2-subtask-empty">אין שלבים עדיין. השתמש ב-AI כדי לפרק את המטלה לשלבים, או הוסף ידנית.</div>
         ) : (
-          <ul className="asn-subtasks">
+          <ul className="tasks-v2-subtasks">
             {subtasks.map(st => (
-              <li key={st.id} className={`asn-subtask ${st.is_completed ? 'done' : ''}`}>
+              <li key={st.id} className={`tasks-v2-subtask ${st.is_completed ? 'done' : ''}`}>
                 <button
                   type="button"
-                  className={`asn-checkbox ${st.is_completed ? 'checked' : ''}`}
+                  className={`tasks-v2-checkbox ${st.is_completed ? 'checked' : ''}`}
                   onClick={() => onToggleSubtask(st)}
                   aria-label={st.is_completed ? 'בטל סימון' : 'סמן כהושלם'}
                 >
                   {st.is_completed && <CheckCircle2 size={11} />}
                 </button>
-                <GripVertical size={13} className="asn-subtask-grip" />
-                <span className="asn-subtask-title">{st.title}</span>
+                <GripVertical size={13} className="tasks-v2-subtask-grip" aria-hidden />
+                <span className="tasks-v2-subtask-title">{st.title}</span>
                 {typeof st.estimated_hours === 'number' && st.estimated_hours > 0 && (
-                  <span className="asn-subtask-hours">~{st.estimated_hours} שעות</span>
+                  <span className="tasks-v2-subtask-hours">~{st.estimated_hours} שעות</span>
                 )}
               </li>
             ))}
@@ -711,13 +925,12 @@ function DetailContent({
         )}
       </section>
 
-      {/* Footer */}
-      <footer className="asn-detail-foot">
-        <button type="button" className="asn-danger-link" onClick={onDelete}>מחק מטלה</button>
-        <div className="asn-detail-foot-right">
+      <footer className="tasks-v2-detail-foot">
+        <button type="button" className="tasks-v2-danger-link" onClick={onDelete}>מחק מטלה</button>
+        <div className="tasks-v2-detail-foot-right">
           <button
             type="button"
-            className="asn-btn asn-btn-ghost"
+            className="tasks-v2-btn-ghost"
             onClick={onCancel}
             disabled={!isDirty}
           >
@@ -725,7 +938,7 @@ function DetailContent({
           </button>
           <button
             type="button"
-            className="asn-btn asn-btn-primary"
+            className="tasks-v2-btn-primary"
             onClick={onSave}
             disabled={!isDirty}
           >
@@ -733,12 +946,13 @@ function DetailContent({
           </button>
         </div>
       </footer>
-    </>
+    </div>
   )
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Drive panel — uses the existing useDriveFiles hook to render real files.
+// DrivePanel — uses the existing useDriveFiles hook to render real files.
+// Visuals updated to match the v2 cream palette.
 // ─────────────────────────────────────────────────────────────────────────
 
 function DrivePanel({
@@ -751,69 +965,62 @@ function DrivePanel({
   const { files, loading, error } = useDriveFiles(folderId)
   const previewFiles = files?.slice(0, 6) ?? []
   return (
-    <div className="asn-drive-panel">
-      <div className="asn-drive-head">
-        <div className="asn-drive-folder">
-          <div className="asn-drive-folder-icon"><Folder size={18} /></div>
-          <div className="asn-drive-folder-meta">
-            <div className="asn-drive-folder-name">{assignmentTitle}</div>
-            <div className="asn-drive-folder-path">TEEPO / {courseTitle} / מטלות</div>
+    <div className="tasks-v2-drive-panel">
+      <div className="tasks-v2-drive-head">
+        <div className="tasks-v2-drive-folder">
+          <div className="tasks-v2-drive-folder-icon"><Folder size={18} /></div>
+          <div className="tasks-v2-drive-folder-meta">
+            <div className="tasks-v2-drive-folder-name">{assignmentTitle}</div>
+            <div className="tasks-v2-drive-folder-path">TEEPO / {courseTitle} / מטלות</div>
           </div>
         </div>
-        <div className="asn-drive-actions">
+        <div className="tasks-v2-drive-actions">
           <a
             href={`https://drive.google.com/drive/folders/${folderId}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="asn-icon-btn"
+            className="tasks-v2-icon-btn"
             title="פתח ב-Drive"
+            aria-label="פתח ב-Drive"
           >
             <ExternalLink size={16} />
           </a>
-          <button type="button" className="asn-icon-btn" title="העלאה">
+          <button type="button" className="tasks-v2-icon-btn" title="העלאה" aria-label="העלאה">
             <Upload size={16} />
           </button>
         </div>
       </div>
 
       {error ? (
-        <div className="asn-drive-error">
+        <div className="tasks-v2-drive-error">
           <AlertCircle size={14} /> שגיאה בטעינת התיקייה
         </div>
       ) : loading ? (
-        <div className="asn-drive-loading">
+        <div className="tasks-v2-drive-loading">
           <Loader2 size={16} className="sync-icon-spin" /> טוען קבצים…
         </div>
       ) : previewFiles.length === 0 ? (
-        <div className="asn-drive-empty">אין קבצים בתיקייה עדיין.</div>
+        <div className="tasks-v2-drive-empty">אין קבצים בתיקייה עדיין.</div>
       ) : (
-        <div className="asn-drive-files">
+        <div className="tasks-v2-drive-files">
           {previewFiles.map(f => (
             <a
               key={f.id}
               href={f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`}
               target="_blank"
               rel="noopener noreferrer"
-              className="asn-drive-file"
+              className="tasks-v2-drive-file"
               title={f.name}
             >
               <FileText size={14} />
-              <span className="asn-drive-file-name">{f.name}</span>
+              <span className="tasks-v2-drive-file-name">{f.name}</span>
               {f.size && (
-                <span className="asn-drive-file-size">{formatBytes(parseInt(f.size, 10) || 0)}</span>
+                <span className="tasks-v2-drive-file-size">{formatBytes(parseInt(f.size, 10) || 0)}</span>
               )}
             </a>
           ))}
         </div>
       )}
-
-      <button type="button" className="asn-upload">
-        <Upload size={20} />
-        <div>
-          <strong>גרור קבצים לכאן</strong>
-          <small> או לחץ להעלאה ידנית</small>
-        </div>
-      </button>
     </div>
   )
 }
