@@ -1,18 +1,23 @@
 'use client'
 
 /**
- * Login page — Google OAuth, BGU/TAU domain-restricted.
+ * Login page (v2 cream redesign) — Google OAuth, BGU/TAU domain-restricted.
  *
- * Implementation of teepo-design/mockup_login.html using locked tokens.
- * Domain restriction notice expanded per CLAUDE_CODE_PROMPT.md to mention
- * both BGU + TAU email patterns.
+ * Visual source of truth: teepo-design/mockup_login.html.
+ * CSS namespace: .login-v2-* (defined at the END of app/globals.css), composed
+ * with .cream-page for the shared paper-grain + drifting color-wash background.
  *
- * v3 audit (PR #168) — verified against mockup_login.html. The structure
- * (auth-card with eyebrow → h1 → sub → google-btn → bgu-restriction →
- * next-list → footer pills) matches the mockup; the user-facing copy is
- * intentionally extended for TAU support so we don't regress that.
- * If you're updating, keep the dual-university copy: the mockup is a
- * BGU-only static example, not a constraint.
+ * Mechanics preserved verbatim from previous v3 implementation:
+ *   - useAuth() / signInWithGoogle() flow
+ *   - Already-signed-in redirect to /dashboard
+ *   - Dual-university (BGU + TAU) restriction copy (mockup is BGU-only sample;
+ *     real domain list lives in production copy, do not regress to BGU-only).
+ *   - Disabled state on submit, error surfaced via role="alert".
+ *
+ * Visual changes from previous version:
+ *   - Drops static .bg-glow divs in favor of .cream-page's animated drift.
+ *   - Adds a handwritten squiggly underline beneath "teepo." (CSS ::after).
+ *   - Card gains a fadeUp entry + a thin top gradient accent line.
  */
 
 import { useState, useEffect } from 'react'
@@ -46,41 +51,39 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="teepo-login" dir="rtl">
-      <div className="bg-glow bg-glow-1" aria-hidden />
-      <div className="bg-glow bg-glow-2" aria-hidden />
-
-      <nav className="topnav">
+    <main className="login-v2 cream-page" dir="rtl">
+      <nav className="login-v2-topnav">
         <Logo variant="large" href="/" />
-        <div className="spacer" />
-        <Link href="/" className="back-link">
+        <div className="login-v2-spacer" />
+        <Link href="/" className="login-v2-back-link" aria-label="חזרה לדף הבית">
           ← חזרה לדף הבית
         </Link>
       </nav>
 
-      <section className="center">
-        <div className="auth-card">
-          <div className="auth-eyebrow">
-            <span className="dot" />
+      <section className="login-v2-center">
+        <div className="login-v2-card">
+          <div className="login-v2-eyebrow">
+            <span className="login-v2-eyebrow-dot" aria-hidden />
             אוניברסיטת בן-גוריון / תל אביב
           </div>
 
-          <h1>
+          <h1 className="login-v2-title">
             ברוכים הבאים
             <br />
-            ל-<span className="accent">teepo.</span>
+            ל-<span className="login-v2-title-accent">teepo.</span>
           </h1>
-          <p className="sub">
+          <p className="login-v2-sub">
             התחברו עם חשבון Google של BGU או TAU. בלי סיסמה חדשה. בלי טפסים.
           </p>
 
           <button
             type="button"
-            className="google-btn"
+            className="login-v2-google-btn"
             onClick={handleGoogle}
             disabled={submitting}
+            aria-label="התחברות עם חשבון Google"
           >
-            <svg className="g-logo" viewBox="0 0 24 24" aria-hidden>
+            <svg className="login-v2-g-logo" viewBox="0 0 24 24" aria-hidden>
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -101,8 +104,15 @@ export default function LoginPage() {
             {submitting ? 'מעביר אתכם ל-Google...' : 'המשך עם Google'}
           </button>
 
-          <div className="bgu-restriction">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+          <div className="login-v2-restriction">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden
+            >
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
             <span>
@@ -115,16 +125,16 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="login-error" role="alert">
+            <div className="login-v2-error" role="alert">
               {error}
             </div>
           )}
 
-          <div className="divider">מה קורה אחרי החיבור</div>
+          <div className="login-v2-divider">מה קורה אחרי החיבור</div>
 
-          <ul className="next-list">
+          <ul className="login-v2-next-list">
             <li>
-              <span className="check" aria-hidden>
+              <span className="login-v2-check" aria-hidden>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
@@ -132,7 +142,7 @@ export default function LoginPage() {
               אישור חיבור Moodle ופורטל (חד-פעמי)
             </li>
             <li>
-              <span className="check" aria-hidden>
+              <span className="login-v2-check" aria-hidden>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
@@ -140,7 +150,7 @@ export default function LoginPage() {
               סנכרון אוטומטי של הקורסים, המטלות והציונים
             </li>
             <li>
-              <span className="check" aria-hidden>
+              <span className="login-v2-check" aria-hidden>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
@@ -149,7 +159,7 @@ export default function LoginPage() {
             </li>
           </ul>
 
-          <p className="auth-foot">
+          <p className="login-v2-foot">
             בהתחברות אתם מאשרים את{' '}
             <Link href="/legal/terms-of-service">תנאי השימוש</Link> ואת{' '}
             <Link href="/legal/privacy-policy">מדיניות הפרטיות</Link>.
@@ -157,22 +167,22 @@ export default function LoginPage() {
         </div>
       </section>
 
-      <footer className="login-footer">
-        <div className="pill">
-          <svg className="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+      <footer className="login-v2-footer">
+        <div className="login-v2-pill">
+          <svg className="login-v2-pill-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
             <rect x="3" y="11" width="18" height="11" rx="2" />
             <path d="M7 11V7a5 5 0 0110 0v4" />
           </svg>
           מאובטח עם Google OAuth
         </div>
-        <div className="pill">
-          <svg className="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+        <div className="login-v2-pill">
+          <svg className="login-v2-pill-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
           הפרטים שלכם נשארים שלכם
         </div>
-        <div className="pill">
-          <svg className="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+        <div className="login-v2-pill">
+          <svg className="login-v2-pill-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
             <circle cx="12" cy="12" r="10" />
             <path d="M12 6v6l4 2" />
           </svg>
