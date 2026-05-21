@@ -1,49 +1,52 @@
 /**
- * Landing page — locked design 2026-05-11, content-enriched 2026-05-11.
+ * Landing page — locked-design v2 (cream redesign).
  *
- * Visual language ported verbatim from teepo-design/mockup_landing.html.
- * Section structure follows TEEPO_SPEC.md §5.1 + the v2.1 features that
- * actually shipped (BGU + TAU scrapers, AI on user's content, נק"ז tracker,
- * Drive + Calendar sync via drive.file).
+ * Source of truth: teepo-design/mockup_landing.html (locked 2026-05-19).
  *
- * Order of marketing flow (top → bottom):
- *   1. Top nav (small logo + "כניסה" link)
- *   2. Hero: book logo + "חכמה" gradient + Google CTA + trust badges + restriction pill
- *   3. Features bar — 4 concrete capabilities tied to shipped PRs
- *   4. How it works — 3 onboarding steps from spec §3.1–§3.4
- *   5. Final CTA — second Google sign-in entry point
- *   6. Browser-chrome footer
+ * Section order (top → bottom, mirrors the mockup):
+ *   1. Logo row — shared <Logo variant="hero" /> (open book + wordmark)
+ *   2. Hero    — h1 "פלטפורמת לימודים חכמה לסטודנטים." + 2 sublines
+ *                + Google CTA → /auth + restriction pill
+ *   3. Features — 3 leaf-themed cards (🍃 🌳 🍂)
+ *   4. UI footer — browser-chrome motif (traffic-light dots + links)
+ *
+ * The page opts into the global `.cream-page` shell for the warm paper
+ * grain background + slow drifting color washes (same pattern dashboard-v2
+ * and settings-v2 use). All page-specific styling lives under the
+ * `.landing-v2-*` namespace at the end of app/globals.css.
+ *
+ * Mockup-only elements deliberately omitted in production:
+ *   - The falling-leaves animation overlay (.leaves-fall) — performance
+ *     hit on mobile, not part of the brand spec.
+ *
+ * The previous landing implementation (with top nav, "how it works" steps,
+ * trust badges, and final CTA) was replaced wholesale per the v2 mockup,
+ * which is a single-page funnel: see the book, read the promise, click
+ * sign-in. No marketing scroll, no second CTA.
  */
 import Logo from '@/components/Logo'
-import TopNav from '@/components/landing/TopNav'
-import Hero from '@/components/landing/Hero'
-import FeaturesBar from '@/components/landing/FeaturesBar'
-import HowItWorks from '@/components/landing/HowItWorks'
-import FinalCTA from '@/components/landing/FinalCTA'
-import UIFooter from '@/components/landing/UIFooter'
+import HeroV2 from '@/components/landing/v2/Hero'
+import FeaturesBarV2 from '@/components/landing/v2/FeaturesBar'
+import UIFooterV2 from '@/components/landing/v2/UIFooter'
 
 export const metadata = {
   title: 'teepo — פלטפורמת לימודים חכמה לסטודנטים',
   description:
-    'פלטפורמה אחת ל-BGU ו-TAU. ייבוא Moodle, ציונים מהפורטל, AI על החומר שלך, ונתונים שנשארים אצלך ב-Google Drive.',
+    'פלטפורמה אחת לכל החיים האקדמיים. קבצים, סיכומים ולוח זמנים — נשמרים אצלך ב-Google Drive. פתוח לסטודנטים של אונ׳ בן-גוריון ואונ׳ תל-אביב.',
 }
 
 export default function LandingPage() {
   return (
-    <div className="landing-page">
-      <TopNav />
-
-      <div className="content-wrapper">
-        <div className="logo-row">
+    <div className="cream-page landing-v2">
+      <div className="landing-v2-content">
+        <div className="landing-v2-logo-row">
           <Logo variant="hero" />
         </div>
-        <Hero />
+        <HeroV2 />
       </div>
 
-      <FeaturesBar />
-      <HowItWorks />
-      <FinalCTA />
-      <UIFooter />
+      <FeaturesBarV2 />
+      <UIFooterV2 />
     </div>
   )
 }
