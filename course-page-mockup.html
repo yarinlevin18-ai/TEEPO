@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>TEEPO – עמוד קורס (Mockup v2)</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:           #f4efe4;
+    --surface:      #fbf7ed;
+    --surface-2:    #ffffff;
+    --border:       #e6dec9;
+    --border-soft:  #efe8d4;
+    --text:         #2a2a26;
+    --muted:        #7a7361;
+    --muted-2:      #a39a82;
+    --green:        #2e7d4f;
+    --green-hover:  #256640;
+    --green-soft:   #e3f1e6;
+    --accent:       #c2783a;
+    --accent-soft:  #f7e7d4;
+    --blue-soft:    #e7eef8;
+    --blue:         #3470b3;
+    --yellow-soft:  #fff4d6;
+    --yellow:       #b58a14;
+    --pink:         #d94e75;
+    --pink-soft:    #fbe1ea;
+    --shadow-sm:    0 1px 2px rgba(60,45,20,.06);
+    --shadow-md:    0 4px 14px rgba(60,45,20,.08);
+    --radius:       14px;
+    --radius-sm:    10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'Heebo',system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    direction:rtl;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    font-size:14px;
+    line-height:1.45;
+  }
+  .wrap{max-width:1240px;margin:0 auto;padding:24px 28px 80px}
+
+  /* breadcrumb */
+  .crumb{
+    display:flex;justify-content:flex-end;gap:6px;
+    color:var(--muted);font-size:12.5px;margin-bottom:14px;
+  }
+  .crumb a{color:var(--muted);text-decoration:none}
+  .crumb a:hover{color:var(--text)}
+
+  /* HEADER (compact) */
+  .header{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-right:4px solid var(--green);
+    border-radius:var(--radius);
+    padding:26px 26px;
+    box-shadow:var(--shadow-sm);
+    display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+  }
+  .header-main{flex:1;min-width:280px}
+  .header h1{
+    font-size:30px;font-weight:800;margin:0;
+    line-height:1.2;letter-spacing:-.6px;
+    color:#1a4d30;
+  }
+  .header-meta{
+    display:flex;gap:14px;flex-wrap:wrap;
+    color:var(--muted);font-size:13px;
+  }
+  .header-meta span{display:inline-flex;align-items:center;gap:5px}
+  .header-meta .dim{color:var(--muted-2);font-style:italic}
+  .header-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* buttons */
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;
+    border:1px solid var(--border);
+    background:var(--surface-2);
+    color:var(--text);
+    padding:8px 14px;border-radius:10px;
+    font-family:inherit;font-size:13px;font-weight:500;
+    cursor:pointer;transition:.15s;text-decoration:none;
+  }
+  .btn:hover{background:#fff;border-color:#d8cfb8}
+  .btn-primary{background:var(--green);color:#fff;border-color:var(--green)}
+  .btn-primary:hover{background:var(--green-hover);border-color:var(--green-hover)}
+  .btn-ghost{background:transparent;border-color:transparent;color:var(--muted)}
+  .btn-ghost:hover{background:rgba(0,0,0,.04);color:var(--text)}
+  .btn-sm{padding:5px 10px;font-size:12px;border-radius:8px}
+
+  /* QUICK ADD (full width now) */
+  .quick-add{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:14px 18px;
+    box-shadow:var(--shadow-sm);
+    margin-top:16px;
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    gap:14px;align-items:center;
+  }
+  .quick-add h3{
+    margin:0;font-size:17px;font-weight:800;color:#1a4d30;
+    white-space:nowrap;letter-spacing:-.2px;
+    display:inline-flex;align-items:center;gap:9px;
+  }
+  .quick-add h3::before{
+    content:'✨';font-size:17px;
+  }
+  .quick-add-input{
+    display:flex;gap:8px;align-items:center;
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:10px;padding:5px 10px;
+  }
+  .quick-add-input input{
+    flex:1;border:none;outline:none;background:transparent;
+    font-family:inherit;font-size:13.5px;color:var(--text);
+    padding:6px 4px;direction:rtl;
+  }
+  .quick-add-input input::placeholder{color:var(--muted-2)}
+  .quick-add-btn{
+    width:28px;height:28px;border-radius:8px;border:none;
+    background:var(--green);color:#fff;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:16px;
+  }
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:999px;padding:4px 11px;
+    font-size:12px;color:var(--muted);cursor:pointer;transition:.15s;
+  }
+  .chip:hover{background:var(--green-soft);color:var(--green);border-color:#c7e0cd}
+
+  /* MAIN GRID */
+  .main{
+    display:grid;
+    grid-template-columns: 1fr 280px;
+    gap:16px;
+    margin-top:16px;
+  }
+  @media (max-width:880px){.main{grid-template-columns:1fr}}
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow-sm);
+    overflow:hidden;
+  }
+  .card-head{
+    padding:18px 22px;
+    border-bottom:1px solid var(--border-soft);
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .card-head h2{
+    margin:0;font-size:22px;font-weight:800;
+    color:#1a4d30;
+    display:inline-flex;align-items:center;gap:12px;
+    letter-spacing:-.3px;
+  }
+  .card-head h2 .h2-ico{
+    width:34px;height:34px;border-radius:10px;
+    background:var(--green-soft);
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:17px;
+    box-shadow:0 1px 2px rgba(46,125,79,.15);
+  }
+  .card-head .sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+  /* TABS */
+  .tabs{
+    display:flex;gap:2px;padding:0 14px;
+    border-bottom:1px solid var(--border-soft);
+    background:var(--surface);
+  }
+  .tab{
+    background:none;border:none;
+    padding:12px 18px;
+    font-family:inherit;font-size:14px;color:var(--muted);
+    cursor:pointer;border-bottom:2px solid transparent;
+    margin-bottom:-1px;font-weight:500;
+    display:inline-flex;align-items:center;gap:7px;
+  }
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--green);border-bottom-color:var(--green);font-weight:600}
+  .tab .count{
+    background:var(--border-soft);color:var(--muted);
+    border-radius:999px;padding:1px 8px;font-size:11.5px;font-weight:600;
+  }
+  .tab.active .count{background:var(--green-soft);color:var(--green)}
+
+  .tab-actions{
+    padding:10px 18px;display:flex;justify-content:space-between;align-items:center;
+    background:var(--surface);border-bottom:1px solid var(--border-soft);
+  }
+  .tab-actions .left{font-size:12.5px;color:var(--muted)}
+  .tab-actions .right{display:flex;gap:6px}
+
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
+
+  /* LESSON TABLE — uniform, tight */
+  .lessons{padding:0}
+  .lesson{border-bottom:1px solid var(--border-soft)}
+  .lesson:last-child{border-bottom:none}
+
+  .lesson-header{
+    display:grid;
+    grid-template-columns: 14px 28px 1fr 70px 14px;
+    align-items:center;gap:10px;
+    padding:4px 14px;cursor:pointer;
+    transition:.1s;user-select:none;
+    min-height:28px;
+    font-size:12.5px;
+  }
+  .lesson-header:hover{background:rgba(255,255,255,.55)}
+
+  .lesson-chev{
+    color:var(--muted-2);font-size:9px;transition:.2s;
+    text-align:center;
+  }
+  .lesson.open .lesson-chev{transform:rotate(90deg);color:var(--green)}
+
+  .lesson-num{
+    height:18px;border-radius:5px;
+    background:var(--border-soft);color:var(--muted);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:600;font-size:11px;
+  }
+
+  .lesson-title{
+    color:var(--text);font-weight:500;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+
+  .lesson-date{
+    font-size:11.5px;color:var(--muted-2);
+    text-align:left;font-variant-numeric:tabular-nums;
+  }
+
+  .lesson-dot{
+    width:6px;height:6px;border-radius:50%;
+    background:transparent;justify-self:center;
+  }
+  .lesson.has-summary .lesson-dot{background:var(--green)}
+  .lesson.has-material .lesson-dot{background:var(--blue)}
+  .lesson.has-both .lesson-dot{
+    background:linear-gradient(90deg, var(--green) 50%, var(--blue) 50%);
+  }
+
+  .lesson.open .lesson-header{
+    background:rgba(255,255,255,.55);
+    border-bottom:1px dashed var(--border-soft);
+  }
+
+  .lesson-body{
+    display:none;
+    background:rgba(255,255,255,.3);
+    padding:10px 16px 14px 38px;
+  }
+  .lesson.open .lesson-body{display:block}
+
+  .lesson-section{margin-top:10px}
+  .lesson-section-title{
+    font-size:12.5px;font-weight:700;color:var(--green);
+    margin-bottom:6px;letter-spacing:-.1px;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .lesson-section-title span::before{
+    content:'•';margin-left:5px;color:var(--green);font-size:14px;
+  }
+  .file-row{
+    display:flex;align-items:center;gap:10px;
+    padding:8px 10px;border-radius:8px;
+    transition:.15s;
+  }
+  .file-row:hover{background:var(--surface-2)}
+  .file-icon{
+    width:30px;height:30px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;flex-shrink:0;
+  }
+  .file-icon.sum{background:var(--green-soft);color:var(--green)}
+  .file-icon.mat{background:var(--blue-soft);color:var(--blue)}
+  .file-name{flex:1;font-size:13px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .file-meta{font-size:11.5px;color:var(--muted)}
+  .file-actions{display:flex;gap:2px;opacity:0;transition:.15s}
+  .file-row:hover .file-actions{opacity:1}
+  .icon-btn{
+    width:26px;height:26px;border-radius:6px;border:none;background:transparent;
+    color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;
+    font-size:13px;
+  }
+  .icon-btn:hover{background:var(--border-soft);color:var(--text)}
+
+  .upload-slot{
+    display:flex;align-items:center;justify-content:center;gap:6px;
+    padding:9px;border:1px dashed var(--border);border-radius:8px;
+    color:var(--muted);font-size:12.5px;cursor:pointer;
+    background:transparent;font-family:inherit;width:100%;
+    transition:.15s;
+  }
+  .upload-slot:hover{border-color:var(--green);color:var(--green);background:var(--green-soft)}
+
+  /* TASKS panel */
+  .tasks-list{padding:6px 18px}
+  .task{
+    display:flex;align-items:center;gap:12px;
+    padding:12px 6px;border-bottom:1px solid var(--border-soft);
+  }
+  .task:last-child{border-bottom:none}
+  .task-check{
+    width:20px;height:20px;border-radius:6px;
+    border:1.5px solid var(--border);background:var(--surface-2);
+    cursor:pointer;flex-shrink:0;
+  }
+  .task-body{flex:1;min-width:0}
+  .task-title{font-size:13.5px;color:var(--text)}
+  .task-meta{font-size:11.5px;color:var(--muted);margin-top:2px;display:flex;gap:8px}
+  .task-due{
+    font-size:11.5px;padding:3px 9px;border-radius:999px;
+    background:var(--accent-soft);color:var(--accent);font-weight:500;
+  }
+  .task-due.urgent{background:#fde0e6;color:#c44563}
+
+  .empty{
+    padding:36px 18px;text-align:center;color:var(--muted-2);font-size:13px;
+  }
+  .empty .ico{font-size:30px;opacity:.5;margin-bottom:8px}
+  .empty .cta{margin-top:10px}
+
+  /* SIDEBAR */
+  .side{display:flex;flex-direction:column;gap:14px}
+  .side-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:14px 16px;
+    box-shadow:var(--shadow-sm);
+  }
+  .side-card h3{
+    font-size:16px;font-weight:800;color:#1a4d30;
+    margin:0 0 14px;letter-spacing:-.2px;
+    display:inline-flex;align-items:center;gap:9px;
+  }
+  .side-card h3 .h3-ico{
+    width:28px;height:28px;border-radius:9px;
+    background:var(--green-soft);
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:15px;
+    box-shadow:0 1px 2px rgba(46,125,79,.12);
+  }
+  .info-row{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    padding:7px 0;border-bottom:1px dashed var(--border-soft);
+    font-size:13px;gap:10px;
+  }
+  .info-row:last-child{border-bottom:none}
+  .info-row .key{color:var(--muted);flex-shrink:0}
+  .info-row .val{color:var(--text);text-align:left;flex:1}
+  .info-row .val.empty-val{color:var(--muted-2);font-style:italic;font-size:12px}
+  .info-row .add{color:var(--green);font-size:12px;cursor:pointer;text-decoration:none}
+  .info-row .add:hover{text-decoration:underline}
+
+  /* next-lesson mini in sidebar */
+  .next-mini{
+    display:flex;gap:10px;align-items:center;padding-bottom:10px;
+    border-bottom:1px dashed var(--border-soft);margin-bottom:8px;
+  }
+  .next-mini .n{
+    background:var(--green);color:#fff;width:38px;height:38px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;font-weight:700;flex-shrink:0;
+  }
+  .next-mini .t{font-size:13px;font-weight:600}
+  .next-mini .s{font-size:11.5px;color:var(--muted)}
+
+  .links{display:flex;flex-direction:column;gap:4px}
+  .links a{
+    display:flex;align-items:center;gap:8px;
+    padding:7px 10px;border-radius:8px;
+    text-decoration:none;color:var(--text);font-size:13px;transition:.15s;
+  }
+  .links a:hover{background:var(--surface-2)}
+  .lico{
+    width:24px;height:24px;border-radius:6px;
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;
+  }
+  .lico.moodle{background:var(--blue-soft);color:var(--blue)}
+  .lico.drive{background:var(--yellow-soft);color:var(--yellow)}
+
+  .mockup-note{
+    margin-top:28px;padding:14px 18px;
+    background:rgba(46,125,79,.07);
+    border:1px dashed #b9d4bf;border-radius:10px;
+    color:var(--green);font-size:12.5px;text-align:center;
+  }
+  .ic{display:inline-block;width:1em;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="crumb">
+    <a href="#">הבית</a> <span>›</span>
+    <a href="#">סמסטר ב'</a> <span>›</span>
+    <span>מבוא לגישות ושיטות בחקר הפוליטיקה והממשל</span>
+  </div>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-main">
+      <h1>מבוא לגישות ושיטות בחקר הפוליטיקה והממשל</h1>
+    </div>
+    <div class="header-actions">
+      <button class="btn"><span class="ic">🔄</span> סנכרון מ-Moodle</button>
+      <button class="btn btn-primary"><span class="ic">＋</span> הוסף תוכן</button>
+    </div>
+  </div>
+
+  <!-- QUICK ADD (full width — countdown removed) -->
+  <div class="quick-add">
+    <h3>הוסף משימה במהירות</h3>
+    <div class="quick-add-input">
+      <input type="text" placeholder="מה אתה צריך לעשות לקורס הזה?">
+      <button class="quick-add-btn">+</button>
+    </div>
+    <div class="chips">
+      <span class="chip">שיעורי בית</span>
+      <span class="chip">קריאה</span>
+      <span class="chip">פרזנטציה</span>
+      <span class="chip">חזרה למבחן</span>
+      <span class="chip">פרויקט</span>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- Materials card: lesson-centric -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2><span class="h2-ico">📂</span>תיק הקורס</h2>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="lessons">שיעורים <span class="count">12</span></button>
+        <button class="tab" data-tab="tasks">מטלות <span class="count">0</span></button>
+      </div>
+
+      <div class="tab-actions">
+        <div class="left">לחץ על שיעור כדי לראות סיכומים וחומרי לימוד</div>
+        <div class="right">
+          <button class="btn btn-sm"><span class="ic">＋</span> הוסף שיעור</button>
+          <button class="btn btn-sm"><span class="ic">⬇</span> העלאת קובץ</button>
+        </div>
+      </div>
+
+      <!-- LESSONS PANEL — uniform compact table -->
+      <div class="tab-panel active" data-panel="lessons">
+        <div class="lessons">
+
+          <div class="lesson">
+            <div class="lesson-header">
+              <span class="lesson-chev">›</span>
+              <span class="lesson-num">12</span>
+              <span class="lesson-title">שיעור 12</span>
+              <span class="lesson-date">31.5.2026</span>
+              <span class="lesson-dot"></span>
+            </div>
+            <div class="lesson-body">
+              <div class="lesson-section">
+                <div class="lesson-section-title"><span>חומרי לימוד</span></div>
+                <button class="upload-slot">＋ העלה הרצאה / מצגת / קריאה</button>
+              </div>
+              <div class="lesson-section">
+                <div class="lesson-section-title"><span>סיכומים</span></div>
+                <button class="upload-slot">＋ העלה סיכום</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="lesson has-summary open">
+            <div class="lesson-header">
+              <span class="lesson-chev">›</span>
+              <span class="lesson-num">11</span>
+              <span class="lesson-title">שיעור 11</span>
+              <span class="lesson-date">17.5.2026</span>
+              <span class="lesson-dot" title="סיכום"></span>
+            </div>
+            <div class="lesson-body">
+              <div class="lesson-section">
+                <div class="lesson-section-title"><span>סיכומים</span></div>
+                <div class="file-row">
+                  <div class="file-icon sum">📝</div>
+                  <div class="file-name">2026-05-17 — סיכום</div>
+                  <div class="file-meta">1.0 KB</div>
+                  <div class="file-actions">
+                    <button class="icon-btn" title="פתח">↗</button>
+                    <button class="icon-btn" title="מחק">🗑</button>
+                  </div>
+                </div>
+                <button class="upload-slot" style="margin-top:6px">＋ העלה סיכום</button>
+              </div>
+              <div class="lesson-section">
+                <div class="lesson-section-title"><span>חומרי לימוד</span></div>
+                <button class="upload-slot">＋ העלה הרצאה / מצגת / קריאה</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="lesson has-material">
+            <div class="lesson-header">
+              <span class="lesson-chev">›</span>
+              <span class="lesson-num">10</span>
+              <span class="lesson-title">שיעור 10</span>
+              <span class="lesson-date">10.5.2026</span>
+              <span class="lesson-dot" title="חומרי לימוד"></span>
+            </div>
+            <div class="lesson-body">
+              <div class="lesson-section">
+                <div class="lesson-section-title"><span>חומרי לימוד</span></div>
+                <div class="file-row">
+                  <div class="file-icon mat">📄</div>
+                  <div class="file-name">Week 10 — הרצאה.pdf</div>
+                  <div class="file-meta">2.4 MB</div>
+                </div>
+                <div class="file-row">
+                  <div class="file-icon mat">📊</div>
+                  <div class="file-name">Week 10 — מצגת.pptx</div>
+                  <div class="file-meta">5.1 MB</div>
+                </div>
+              </div>
+              <div class="lesson-section">
+                <div class="lesson-section-title"><span>סיכומים</span></div>
+                <button class="upload-slot">＋ העלה סיכום</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="lesson">
+            <div class="lesson-header">
+              <span class="lesson-chev">›</span>
+              <span class="lesson-num">9</span>
+              <span class="lesson-title">שיעור 9</span>
+              <span class="lesson-date">3.5.2026</span>
+              <span class="lesson-dot"></span>
+            </div>
+            <div class="lesson-body">
+              <div class="lesson-section"><div class="lesson-section-title"><span>חומרי לימוד</span></div>
+                <button class="upload-slot">＋ העלה חומרי לימוד</button></div>
+              <div class="lesson-section"><div class="lesson-section-title"><span>סיכומים</span></div>
+                <button class="upload-slot">＋ העלה סיכום</button></div>
+            </div>
+          </div>
+
+          <div class="lesson">
+            <div class="lesson-header">
+              <span class="lesson-chev">›</span>
+              <span class="lesson-num">8</span>
+              <span class="lesson-title">שיעור 8</span>
+              <span class="lesson-date">26.4.2026</span>
+              <span class="lesson-dot"></span>
+            </div>
+            <div class="lesson-body">
+              <div class="lesson-section"><div class="lesson-section-title"><span>חומרי לימוד</span></div>
+                <button class="upload-slot">＋ העלה חומרי לימוד</button></div>
+            </div>
+          </div>
+
+          <div class="lesson">
+            <div class="lesson-header">
+              <span class="lesson-chev">›</span>
+              <span class="lesson-num">7</span>
+              <span class="lesson-title">שיעור 7</span>
+              <span class="lesson-date">19.4.2026</span>
+              <span class="lesson-dot"></span>
+            </div>
+            <div class="lesson-body">
+              <div class="lesson-section"><div class="lesson-section-title"><span>חומרי לימוד</span></div>
+                <button class="upload-slot">＋ העלה חומרי לימוד</button></div>
+            </div>
+          </div>
+
+          <div class="lesson">
+            <div class="lesson-header">
+              <span class="lesson-chev">›</span>
+              <span class="lesson-num">6</span>
+              <span class="lesson-title">שיעור 6</span>
+              <span class="lesson-date">12.4.2026</span>
+              <span class="lesson-dot"></span>
+            </div>
+            <div class="lesson-body">
+              <div class="lesson-section"><div class="lesson-section-title"><span>חומרי לימוד</span></div>
+                <button class="upload-slot">＋ העלה חומרי לימוד</button></div>
+            </div>
+          </div>
+
+          <div class="lesson">
+            <div class="lesson-header">
+              <span class="lesson-chev">›</span>
+              <span class="lesson-num">5</span>
+              <span class="lesson-title">שיעור 5</span>
+              <span class="lesson-date">5.4.2026</span>
+              <span class="lesson-dot"></span>
+            </div>
+            <div class="lesson-body">
+              <div class="lesson-section"><div class="lesson-section-title"><span>חומרי לימוד</span></div>
+                <button class="upload-slot">＋ העלה חומרי לימוד</button></div>
+            </div>
+          </div>
+
+          <div class="lesson">
+            <div class="lesson-header">
+              <span class="lesson-chev">›</span>
+              <span class="lesson-num">4</span>
+              <span class="lesson-title">שיעור 4</span>
+              <span class="lesson-date">29.3.2026</span>
+              <span class="lesson-dot"></span>
+            </div>
+            <div class="lesson-body">
+              <div class="lesson-section"><div class="lesson-section-title"><span>חומרי לימוד</span></div>
+                <button class="upload-slot">＋ העלה חומרי לימוד</button></div>
+            </div>
+          </div>
+
+          <div class="lesson">
+            <div class="lesson-header">
+              <span class="lesson-chev">›</span>
+              <span class="lesson-num">3</span>
+              <span class="lesson-title">שיעור 3</span>
+              <span class="lesson-date">22.3.2026</span>
+              <span class="lesson-dot"></span>
+            </div>
+            <div class="lesson-body">
+              <div class="lesson-section"><div class="lesson-section-title"><span>חומרי לימוד</span></div>
+                <button class="upload-slot">＋ העלה חומרי לימוד</button></div>
+            </div>
+          </div>
+
+          <div class="lesson">
+            <div class="lesson-header">
+              <span class="lesson-chev">›</span>
+              <span class="lesson-num">2</span>
+              <span class="lesson-title">שיעור 2</span>
+              <span class="lesson-date">15.3.2026</span>
+              <span class="lesson-dot"></span>
+            </div>
+            <div class="lesson-body">
+              <div class="lesson-section"><div class="lesson-section-title"><span>חומרי לימוד</span></div>
+                <button class="upload-slot">＋ העלה חומרי לימוד</button></div>
+            </div>
+          </div>
+
+          <div class="lesson">
+            <div class="lesson-header">
+              <span class="lesson-chev">›</span>
+              <span class="lesson-num">1</span>
+              <span class="lesson-title">שיעור 1</span>
+              <span class="lesson-date">8.3.2026</span>
+              <span class="lesson-dot"></span>
+            </div>
+            <div class="lesson-body">
+              <div class="lesson-section"><div class="lesson-section-title"><span>חומרי לימוד</span></div>
+                <button class="upload-slot">＋ העלה חומרי לימוד</button></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- TASKS PANEL -->
+      <div class="tab-panel" data-panel="tasks">
+        <div class="tasks-list">
+          <div class="task">
+            <div class="task-check"></div>
+            <div class="task-body">
+              <div class="task-title">קריאה לשיעור 12 — פרק 4</div>
+              <div class="task-meta"><span>שיעור 12</span><span>·</span><span>נוסף ידנית</span></div>
+            </div>
+            <span class="task-due">31.5</span>
+          </div>
+          <div class="task">
+            <div class="task-check"></div>
+            <div class="task-body">
+              <div class="task-title">להגיש תרגיל 3</div>
+              <div class="task-meta"><span>מטלה</span><span>·</span><span>1 קובץ מצורף</span></div>
+            </div>
+            <span class="task-due urgent">3 ימים</span>
+          </div>
+          <div class="task">
+            <div class="task-check"></div>
+            <div class="task-body">
+              <div class="task-title">פרזנטציה בקבוצה</div>
+              <div class="task-meta"><span>פרויקט</span></div>
+            </div>
+            <span class="task-due">14.6</span>
+          </div>
+
+          <div style="text-align:center;padding:14px 0 4px">
+            <button class="btn"><span class="ic">＋</span> הוסף מטלה</button>
+            <button class="btn"><span class="ic">⬇</span> צרף קובץ למטלה</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="side">
+
+      <div class="side-card">
+        <h3><span class="h3-ico">📅</span>השיעור הבא</h3>
+        <div class="next-mini">
+          <div class="n">31</div>
+          <div>
+            <div class="t">בעוד 6 ימים</div>
+            <div class="s">יום ראשון · 10:00</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);text-align:center">שיעור 12 · 31.5.2026</div>
+      </div>
+
+      <div class="side-card">
+        <h3><span class="h3-ico">📋</span>פרטי הקורס</h3>
+        <div class="info-row">
+          <span class="key">מרצה</span>
+          <span class="val empty-val">לא משויך</span>
+        </div>
+        <div class="info-row">
+          <span class="key">מקום</span>
+          <span class="val empty-val">לא הוגדר</span>
+        </div>
+        <div class="info-row">
+          <span class="key">מס' קורס</span>
+          <span class="val empty-val">—</span>
+        </div>
+        <div class="info-row">
+          <span class="key">סילבוס</span>
+          <a href="#" class="add">+ העלה</a>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <h3><span class="h3-ico">🔗</span>קישורים מהירים</h3>
+        <div class="links">
+          <a href="#"><span class="lico moodle">M</span><span>Moodle של הקורס</span></a>
+          <a href="#"><span class="lico drive">D</span><span>תיקיית Drive</span></a>
+        </div>
+      </div>
+
+    </aside>
+
+  </div>
+
+  <div class="mockup-note">
+    🎨 Mockup v6 — כותרות גדולות יותר עם נוכחות: H1 ב-30px ירוק כהה עשיר · "תיק הקורס" ב-22px עם אייקון תיקייה גדול בריבוע ירוק · כותרות סיידבר ב-16px עם אייקונים גדולים יותר
+  </div>
+
+</div>
+
+<script>
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click',()=>{
+      const target=t.dataset.tab;
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      document.querySelector(`.tab-panel[data-panel="${target}"]`).classList.add('active');
+      const labels={
+        lessons:'לחץ על שיעור כדי לראות סיכומים וחומרי לימוד',
+        tasks:'מטלות פתוחות'
+      };
+      document.querySelector('.tab-actions .left').textContent=labels[target];
+    });
+  });
+
+  // Lesson accordion
+  document.querySelectorAll('.lesson-header').forEach(h=>{
+    h.addEventListener('click',()=>{
+      h.parentElement.classList.toggle('open');
+    });
+  });
+
+  // Chip → fill input
+  document.querySelectorAll('.chip').forEach(c=>{
+    c.addEventListener('click',()=>{
+      const input=document.querySelector('.quick-add-input input');
+      input.value=c.textContent+': ';
+      input.focus();
+    });
+  });
+</script>
+</body>
+</html>
