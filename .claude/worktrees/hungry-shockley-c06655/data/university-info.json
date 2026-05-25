@@ -1,0 +1,107 @@
+{
+  "shnaton_general_2026": {
+    "university_overview": {
+      "name": "אוניברסיטת בן-גוריון בנגב",
+      "establishment": {
+        "founded_year": 1964,
+        "original_name": "המכון להשכלה גבוהה בנגב",
+        "official_naming_date": "דצמבר 1973"
+      },
+      "campuses": [
+        "באר-שבע",
+        "שדה בוקר",
+        "אילת"
+      ],
+      "degrees_authorized": [
+        "בוגר (תואר ראשון)",
+        "מוסמך (תואר שני)",
+        "דוקטור לפילוסופיה (Ph.D)"
+      ]
+    },
+    "academic_leadership_2026": {
+      "president": "פרופ' דניאל חיימוביץ",
+      "rector": "פרופ' חיים היימס",
+      "student_dean": "פרופ' ארנה אלמוג",
+      "academic_secretary": "גב' מירה גולומב"
+    },
+    "academic_faculties": [
+      {
+        "faculty_name": "הפקולטה למדעי ההנדסה",
+        "dean": "פרופ' יניב גלבשטיין",
+        "study_duration_bsc": "4 שנים"
+      },
+      {
+        "faculty_name": "הפקולטה למדעי הרוח והחברה",
+        "dean": "פרופ' נירית בן אריה דבי",
+        "study_duration_ba": "3 שנים"
+      },
+      {
+        "faculty_name": "הפקולטה למדעי הטבע",
+        "dean": "פרופ' גבריאל למקוף",
+        "study_duration_bsc": "3 שנים"
+      },
+      {
+        "faculty_name": "הפקולטה למדעי הבריאות",
+        "dean": "פרופ' רלי הרשקוביץ",
+        "medicine_program_duration": "6 שנים + שנת סטאז'"
+      },
+      {
+        "faculty_name": "הפקולטה לניהול ע\"ש גילפורד גלייזר",
+        "dean": "פרופ' יותם לוריא"
+      },
+      {
+        "faculty_name": "הפקולטה למדעי המחשב והמידע ע\"ש שטיין",
+        "dean": "פרופ' מתיא כץ"
+      }
+    ],
+    "academic_requirements": {
+      "english_language": {
+        "mandatory_courses": "החל מתשפ\"ב, כל סטודנט לתואר ראשון נדרש ללמוד שני קורסי תוכן באנגלית.",
+        "exemption_level": "רמת 'פטור' מקבילה לסיום קורס 'מתקדמים ב'.",
+        "time_limit": "חובה לסיים את כל לימודי האנגלית במהלך השנתיים הראשונות לתואר."
+      },
+      "hebrew_language": {
+        "exemption_score": "ציון 132 ומעלה בבחינת ידע בעברית מקנה פטור.",
+        "mandatory_continuance": "סטודנטים המחויבים בעברית חייבים ללמוד ברציפות מהסמסטר הראשון."
+      },
+      "sexual_harassment_prevention": {
+        "requirement_type": "קורס חובה (לומדה) לכל הסטודנטים בכל התארים.",
+        "deadline": "יש להשלים את הלומדה במהלך הסמסטר הראשון ללימודים."
+      }
+    },
+    "excellence_and_awards": {
+      "rector_award": {
+        "threshold_avg": 95,
+        "quota": "10% מכלל מקבלי תעודות ההצטיינות"
+      },
+      "dean_award": {
+        "threshold_avg": 91,
+        "quota": "30% מכלל מקבלי תעודות ההצטיינות"
+      },
+      "department_head_award": {
+        "threshold_avg": 87,
+        "quota": "60% מכלל מקבלי תעודות ההצטיינות"
+      }
+    },
+    "academic_calendar_2025_2026": {
+      "autumn_semester_start": "2025-10-26",
+      "autumn_semester_end": "2026-01-23",
+      "spring_semester_start": "2026-03-08",
+      "spring_semester_end": "2026-06-26",
+      "holidays": [
+        { "name": "חנוכה", "date": "2025-12-21" },
+        { "name": "פסח", "start": "2026-03-29", "end": "2026-04-08" },
+        { "name": "יום העצמאות", "date": "2026-04-22" }
+      ]
+    },
+    "student_services_and_dekanat": {
+      "financial_aid": "מלגות סיוע על בסיס כלכלי, הלוואות בתנאים נוחים ומלגות הצטיינות חברתית.",
+      "academic_support": [
+        "שיעורי עזר פרטניים וקבוצתיים (עזרתונים)",
+        "מרתונים לקראת בחינות",
+        "תכנית 'מעלה' למניעת נשירה"
+      ],
+      "psychological_services": "טיפול פרטני, קבוצתי וייעוץ פסיכיאטרי תחת סודיות קפדנית."
+    }
+  }
+}
