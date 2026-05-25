@@ -1,0 +1,35 @@
+SmartDesk — Proprietary License
+Copyright (c) 2026 Yarin Levin. All Rights Reserved.
+
+This source code, documentation, design, and all associated materials
+(the "Software") are the proprietary and confidential property of
+Yarin Levin ("the Author").
+
+NO LICENSE IS GRANTED. Unless a separate written agreement signed by
+the Author states otherwise, you may NOT:
+
+  1. Copy, reproduce, or distribute the Software or any portion of it.
+  2. Modify, adapt, translate, or create derivative works based on the
+     Software.
+  3. Publish, sublicense, sell, rent, lease, or otherwise transfer any
+     rights in the Software.
+  4. Reverse-engineer, decompile, or disassemble the Software except
+     to the extent such activity is expressly permitted by applicable
+     law notwithstanding this limitation.
+  5. Remove or alter any copyright, trademark, or other proprietary
+     notices.
+  6. Use the Software, in whole or in part, to train, fine-tune, or
+     evaluate machine-learning models, or to create competing products
+     or services.
+
+Viewing this repository (if made public for portfolio or transparency
+purposes) does not grant any license to use its contents.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-
+INFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM,
+DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION
+WITH THE SOFTWARE OR ITS USE.
+
+Contact: yarinlevin18@gmail.com

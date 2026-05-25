@@ -1,0 +1,37 @@
+name: Test
+
+# Runs frontend unit tests on every PR + push to master.
+# Backend tests live separately (pytest, see backend/ — separate workflow).
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+# Cancel old runs of the same PR if a new commit lands — avoids burning
+# minutes on stale code.
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (Vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test

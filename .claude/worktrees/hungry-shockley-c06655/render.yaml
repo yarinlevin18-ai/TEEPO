@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: bgu-study-backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    # Disable auto-deploy on every master push. Most commits these days
+    # only touch the Next.js frontend / chrome extension, yet Render still
+    # tries to rebuild the Python backend image — which has been failing
+    # and spamming the owner's inbox. To deploy backend changes from now
+    # on, push to master and click "Manual Deploy" in the Render dashboard
+    # (or set this back to true when the backend is actively maintained).
+    autoDeploy: false
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: FLASK_SECRET_KEY
+        sync: false
+      - key: CLAUDE_MODEL
+        value: claude-sonnet-4-6
+      - key: RENDER
+        value: "true"
+      # Suppress Flask's debug mode + dev reloader on Render. Was
+      # defaulting to "development" because we never set it, which
+      # turned on the debug reloader and broke Render's process tracking
+      # (container kept being marked unhealthy / no-server).
+      - key: FLASK_ENV
+        value: production
