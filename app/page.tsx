@@ -3,6 +3,9 @@ import { ArrowRight, Link as LinkIcon, RefreshCw, Target, Brain, Calendar, ListT
 import { Logo } from "@/components/teepo/logo"
 import { HeroVisual } from "@/components/teepo/hero-visual"
 import { DashboardMockup } from "@/components/teepo/dashboard-mockup"
+import { HeroReveal, HeroRevealItem } from "@/components/patterns/hero-reveal"
+import { ScrollStagger, ScrollStaggerItem } from "@/components/patterns/scroll-stagger"
+import { FadeScale } from "@/components/patterns/fade-scale"
 
 export const metadata = {
   title: "teepo — כל הלימודים שלך, במקום אחד",
@@ -20,27 +23,37 @@ export default function LandingPage() {
 
         <div className="flex-1 flex flex-col lg:flex-row items-center gap-12 lg:gap-20 max-w-7xl mx-auto w-full">
           <div className="flex-1 flex justify-center order-2 lg:order-1">
-            <HeroVisual />
+            <FadeScale trigger="mount" delay={0.4}>
+              <HeroVisual />
+            </FadeScale>
           </div>
 
           <div className="flex-1 text-right order-1 lg:order-2">
-            <h1 className="text-5xl lg:text-6xl font-bold leading-tight mb-6 text-[#2B1F0F]">
-              כל הלימודים שלך,
-              <br />
-              במקום אחד
-            </h1>
-            <p className="text-lg lg:text-xl text-[#6B5A47] mb-8 leading-relaxed">
-              TEEPO מסנכרן את Google Drive, Calendar ו-Moodle לפלטפורמה אחת.
-              <br />
-              בלי לחפש בעשרה אתרים שונים.
-            </p>
-            <Link
-              href="/auth"
-              className="inline-flex items-center gap-3 bg-[#1B6B64] hover:bg-[#155753] text-white px-8 py-4 rounded-xl text-lg font-medium transition-colors shadow-lg"
-            >
-              <span>התחבר עם Google</span>
-              <ArrowRight className="w-5 h-5 rotate-180" />
-            </Link>
+            <HeroReveal stagger={0.06} delay={0.05} duration={0.8} distance={16} easing="easeOut">
+              <HeroRevealItem>
+                <h1 className="text-5xl lg:text-6xl font-bold leading-tight mb-6 text-[#2B1F0F]">
+                  כל הלימודים שלך,
+                  <br />
+                  במקום אחד
+                </h1>
+              </HeroRevealItem>
+              <HeroRevealItem>
+                <p className="text-lg lg:text-xl text-[#6B5A47] mb-8 leading-relaxed">
+                  TEEPO מסנכרן את Google Drive, Calendar ו-Moodle לפלטפורמה אחת.
+                  <br />
+                  בלי לחפש בעשרה אתרים שונים.
+                </p>
+              </HeroRevealItem>
+              <HeroRevealItem>
+                <Link
+                  href="/auth"
+                  className="inline-flex items-center gap-3 bg-[#1B6B64] hover:bg-[#155753] text-white px-8 py-4 rounded-xl text-lg font-medium transition-colors shadow-lg"
+                >
+                  <span>התחבר עם Google</span>
+                  <ArrowRight className="w-5 h-5 rotate-180" />
+                </Link>
+              </HeroRevealItem>
+            </HeroReveal>
           </div>
         </div>
 
@@ -55,34 +68,42 @@ export default function LandingPage() {
             איך זה עובד?
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-[#F5EDD8] rounded-2xl p-8 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#1B6B64] text-white font-bold mb-4">1</div>
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10 mb-4">
-                <LinkIcon className="w-6 h-6 text-[#1B6B64]" />
-              </div>
-              <h3 className="text-xl font-bold mb-3 text-[#2B1F0F]">התחבר</h3>
-              <p className="text-[#6B5A47] leading-relaxed">חבר את Google Drive, Calendar ו-Moodle בקליק אחד</p>
-            </div>
+          <ScrollStagger stagger={0.08} duration={0.5} distance={30} threshold={0.2} direction="up" easing="easeOut">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <ScrollStaggerItem>
+                <div className="bg-[#F5EDD8] rounded-2xl p-8 text-center h-full">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#1B6B64] text-white font-bold mb-4">1</div>
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10 mb-4">
+                    <LinkIcon className="w-6 h-6 text-[#1B6B64]" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3 text-[#2B1F0F]">התחבר</h3>
+                  <p className="text-[#6B5A47] leading-relaxed">חבר את Google Drive, Calendar ו-Moodle בקליק אחד</p>
+                </div>
+              </ScrollStaggerItem>
 
-            <div className="bg-[#F5EDD8] rounded-2xl p-8 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#1B6B64] text-white font-bold mb-4">2</div>
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10 mb-4">
-                <RefreshCw className="w-6 h-6 text-[#1B6B64]" />
-              </div>
-              <h3 className="text-xl font-bold mb-3 text-[#2B1F0F]">סנכרן</h3>
-              <p className="text-[#6B5A47] leading-relaxed">TEEPO מארגן את הקבצים, האירועים, והמשימות שלך אוטומטית</p>
-            </div>
+              <ScrollStaggerItem>
+                <div className="bg-[#F5EDD8] rounded-2xl p-8 text-center h-full">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#1B6B64] text-white font-bold mb-4">2</div>
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10 mb-4">
+                    <RefreshCw className="w-6 h-6 text-[#1B6B64]" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3 text-[#2B1F0F]">סנכרן</h3>
+                  <p className="text-[#6B5A47] leading-relaxed">TEEPO מארגן את הקבצים, האירועים, והמשימות שלך אוטומטית</p>
+                </div>
+              </ScrollStaggerItem>
 
-            <div className="bg-[#F5EDD8] rounded-2xl p-8 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#1B6B64] text-white font-bold mb-4">3</div>
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10 mb-4">
-                <Target className="w-6 h-6 text-[#1B6B64]" />
-              </div>
-              <h3 className="text-xl font-bold mb-3 text-[#2B1F0F]">התמקד</h3>
-              <p className="text-[#6B5A47] leading-relaxed">תראה הכל במקום אחד ותתחיל ללמוד חכם יותר</p>
+              <ScrollStaggerItem>
+                <div className="bg-[#F5EDD8] rounded-2xl p-8 text-center h-full">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#1B6B64] text-white font-bold mb-4">3</div>
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10 mb-4">
+                    <Target className="w-6 h-6 text-[#1B6B64]" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3 text-[#2B1F0F]">התמקד</h3>
+                  <p className="text-[#6B5A47] leading-relaxed">תראה הכל במקום אחד ותתחיל ללמוד חכם יותר</p>
+                </div>
+              </ScrollStaggerItem>
             </div>
-          </div>
+          </ScrollStagger>
         </div>
       </section>
 
@@ -92,47 +113,57 @@ export default function LandingPage() {
             מה תקבל עם TEEPO?
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-[#FAEFD9] rounded-2xl p-8 text-right">
-              <div className="flex justify-start mb-4">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10">
-                  <Brain className="w-6 h-6 text-[#1B6B64]" />
+          <ScrollStagger stagger={0.08} duration={0.5} distance={30} threshold={0.2} direction="up" easing="easeOut">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <ScrollStaggerItem>
+                <div className="bg-[#FAEFD9] rounded-2xl p-8 text-right h-full">
+                  <div className="flex justify-start mb-4">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10">
+                      <Brain className="w-6 h-6 text-[#1B6B64]" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold mb-2 text-[#2B1F0F]">Brain</h3>
+                  <p className="text-[#6B5A47] leading-relaxed">כל התיקיות שלך מ-Google Drive, מאורגנות חזותית</p>
                 </div>
-              </div>
-              <h3 className="text-xl font-bold mb-2 text-[#2B1F0F]">Brain</h3>
-              <p className="text-[#6B5A47] leading-relaxed">כל התיקיות שלך מ-Google Drive, מאורגנות חזותית</p>
-            </div>
+              </ScrollStaggerItem>
 
-            <div className="bg-[#FAEFD9] rounded-2xl p-8 text-right">
-              <div className="flex justify-start mb-4">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10">
-                  <Calendar className="w-6 h-6 text-[#1B6B64]" />
+              <ScrollStaggerItem>
+                <div className="bg-[#FAEFD9] rounded-2xl p-8 text-right h-full">
+                  <div className="flex justify-start mb-4">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10">
+                      <Calendar className="w-6 h-6 text-[#1B6B64]" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold mb-2 text-[#2B1F0F]">לוח זמנים חכם</h3>
+                  <p className="text-[#6B5A47] leading-relaxed">סנכרון אוטומטי עם Google Calendar</p>
                 </div>
-              </div>
-              <h3 className="text-xl font-bold mb-2 text-[#2B1F0F]">לוח זמנים חכם</h3>
-              <p className="text-[#6B5A47] leading-relaxed">סנכרון אוטומטי עם Google Calendar</p>
-            </div>
+              </ScrollStaggerItem>
 
-            <div className="bg-[#FAEFD9] rounded-2xl p-8 text-right">
-              <div className="flex justify-start mb-4">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10">
-                  <ListTodo className="w-6 h-6 text-[#1B6B64]" />
+              <ScrollStaggerItem>
+                <div className="bg-[#FAEFD9] rounded-2xl p-8 text-right h-full">
+                  <div className="flex justify-start mb-4">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10">
+                      <ListTodo className="w-6 h-6 text-[#1B6B64]" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold mb-2 text-[#2B1F0F]">מעקב משימות</h3>
+                  <p className="text-[#6B5A47] leading-relaxed">רואה מה דחוף, מה חשוב, בלי לפספס</p>
                 </div>
-              </div>
-              <h3 className="text-xl font-bold mb-2 text-[#2B1F0F]">מעקב משימות</h3>
-              <p className="text-[#6B5A47] leading-relaxed">רואה מה דחוף, מה חשוב, בלי לפספס</p>
-            </div>
+              </ScrollStaggerItem>
 
-            <div className="bg-[#FAEFD9] rounded-2xl p-8 text-right">
-              <div className="flex justify-start mb-4">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10">
-                  <BarChart3 className="w-6 h-6 text-[#1B6B64]" />
+              <ScrollStaggerItem>
+                <div className="bg-[#FAEFD9] rounded-2xl p-8 text-right h-full">
+                  <div className="flex justify-start mb-4">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B6B64]/10">
+                      <BarChart3 className="w-6 h-6 text-[#1B6B64]" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold mb-2 text-[#2B1F0F]">מעקב ציונים</h3>
+                  <p className="text-[#6B5A47] leading-relaxed">לוח בקרה של כל הציונים שלך</p>
                 </div>
-              </div>
-              <h3 className="text-xl font-bold mb-2 text-[#2B1F0F]">מעקב ציונים</h3>
-              <p className="text-[#6B5A47] leading-relaxed">לוח בקרה של כל הציונים שלך</p>
+              </ScrollStaggerItem>
             </div>
-          </div>
+          </ScrollStagger>
         </div>
       </section>
 
@@ -141,15 +172,21 @@ export default function LandingPage() {
           <h2 className="text-4xl lg:text-5xl font-bold text-center mb-16 text-[#2B1F0F]">
             זה איך זה נראה
           </h2>
-          <DashboardMockup />
+          <FadeScale trigger="scroll" threshold={0.2}>
+            <DashboardMockup />
+          </FadeScale>
         </div>
       </section>
 
       <section className="px-6 lg:px-16 py-24">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-4xl lg:text-5xl font-bold mb-8 text-[#2B1F0F]">
-            מוכן להתחיל ללמוד חכם יותר?
-          </h2>
+          <HeroReveal stagger={0} delay={0} duration={0.8} distance={16} easing="easeOut">
+            <HeroRevealItem>
+              <h2 className="text-4xl lg:text-5xl font-bold mb-8 text-[#2B1F0F]">
+                מוכן להתחיל ללמוד חכם יותר?
+              </h2>
+            </HeroRevealItem>
+          </HeroReveal>
           <Link
             href="/auth"
             className="inline-flex items-center gap-3 bg-[#1B6B64] hover:bg-[#155753] text-white px-8 py-4 rounded-xl text-lg font-medium transition-colors shadow-lg"
