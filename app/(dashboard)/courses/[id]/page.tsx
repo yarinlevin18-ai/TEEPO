@@ -406,6 +406,14 @@ export default function CoursePage() {
               </div>
             </div>
             <div className="course-v2-hero-actions">
+              <Link
+                href={`/courses/${course.id}/practice`}
+                className="course-v2-btn"
+                title="בוחן תרגול מהחומר של הקורס"
+              >
+                <ClipboardCheck size={14} />
+                תרגול
+              </Link>
               {course.source === 'bgu' && (
                 <button
                   type="button"

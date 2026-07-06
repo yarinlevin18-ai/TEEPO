@@ -22,7 +22,7 @@ import {
 import { ensureCourseFolders, ensurePath, moveFolder, pathForCourse, sanitizeFolderName } from './drive-folders'
 import type {
   Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings,
-  Announcement,
+  Announcement, PracticeQuiz, PracticeAttempt,
 } from '@/types'
 import {
   acknowledgeAnnouncement as ackOne,
@@ -81,6 +81,12 @@ interface DBContextType {
   // need a createAnnouncement here.
   acknowledgeAnnouncement: (id: string) => Promise<void>
   acknowledgeAllAnnouncements: () => Promise<void>
+
+  // Practice quizzes (retrieval practice — see docs/REBUILD_PLAN.md)
+  createPracticeQuiz: (input: Omit<PracticeQuiz, 'id' | 'created_at'>) => Promise<PracticeQuiz>
+  /** Deletes the quiz AND all its attempts. */
+  deletePracticeQuiz: (id: string) => Promise<void>
+  savePracticeAttempt: (input: Omit<PracticeAttempt, 'id'>) => Promise<PracticeAttempt>
 
   // Student catalog (credits tracking)
   setStudentProfile: (patch: Partial<StudentProfile> & { track_id: string; start_year: number; current_year: number }) => Promise<void>
@@ -464,6 +470,35 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     mutate(d => ({ ...d, notes: d.notes.filter(n => n.id !== id) }))
   }, [mutate])
 
+  // ── Practice quizzes ───────────────────────────────────────
+  const createPracticeQuiz = useCallback(async (
+    input: Omit<PracticeQuiz, 'id' | 'created_at'>,
+  ): Promise<PracticeQuiz> => {
+    const quiz: PracticeQuiz = {
+      ...input,
+      id: newId('pquiz'),
+      created_at: new Date().toISOString(),
+    }
+    mutate(d => ({ ...d, practice_quizzes: [quiz, ...(d.practice_quizzes ?? [])] }))
+    return quiz
+  }, [mutate])
+
+  const deletePracticeQuiz = useCallback(async (id: string) => {
+    mutate(d => ({
+      ...d,
+      practice_quizzes: (d.practice_quizzes ?? []).filter(q => q.id !== id),
+      practice_attempts: (d.practice_attempts ?? []).filter(a => a.quiz_id !== id),
+    }))
+  }, [mutate])
+
+  const savePracticeAttempt = useCallback(async (
+    input: Omit<PracticeAttempt, 'id'>,
+  ): Promise<PracticeAttempt> => {
+    const attempt: PracticeAttempt = { ...input, id: newId('pattempt') }
+    mutate(d => ({ ...d, practice_attempts: [attempt, ...(d.practice_attempts ?? [])] }))
+    return attempt
+  }, [mutate])
+
   // ── Settings ───────────────────────────────────────────────
   const updateSettings = useCallback(async (patch: Partial<UserSettings>) => {
     mutate(d => ({ ...d, settings: { ...(d.settings || {}), ...patch } }))
@@ -805,6 +840,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createTask, updateTask, deleteTask,
     createAssignment, updateAssignment, deleteAssignment,
     createNote, updateNote, deleteNote,
+    createPracticeQuiz, deletePracticeQuiz, savePracticeAttempt,
     updateSettings, replaceCourses,
     acknowledgeAnnouncement, acknowledgeAllAnnouncements,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
@@ -816,6 +852,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createTask, updateTask, deleteTask,
     createAssignment, updateAssignment, deleteAssignment,
     createNote, updateNote, deleteNote,
+    createPracticeQuiz, deletePracticeQuiz, savePracticeAttempt,
     updateSettings, replaceCourses,
     acknowledgeAnnouncement, acknowledgeAllAnnouncements,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
@@ -848,4 +885,16 @@ export function useLessons(courseId: string | undefined) {
   return db.lessons
     .filter(l => l.course_id === courseId)
     .sort((a, b) => a.order_index - b.order_index)
+}
+
+export function usePracticeQuizzes(courseId: string | undefined) {
+  const { db } = useDB()
+  if (!courseId) return []
+  return (db.practice_quizzes ?? []).filter(q => q.course_id === courseId)
+}
+
+export function usePracticeAttempts(quizId: string | undefined) {
+  const { db } = useDB()
+  if (!quizId) return []
+  return (db.practice_attempts ?? []).filter(a => a.quiz_id === quizId)
 }

@@ -286,6 +286,65 @@ export interface QuizQuestion {
   order_index: number
 }
 
+// ============================================================
+// Practice quizzes (retrieval practice) — Phosphor-style module
+// quizzes generated from the student's own course material.
+// Constructed-response questions graded by Claude against a rubric.
+// See docs/REBUILD_PLAN.md. Distinct from the legacy `Quiz` types
+// above, which pre-date this feature and are unused.
+// ============================================================
+
+/** One constructed-response question inside a PracticeQuiz. */
+export interface PracticeQuestion {
+  id: string
+  /** The question text, in the language of the source material. */
+  question: string
+  /** Grading rubric (criteria + point weights). Hidden from the student
+   *  until their answer has been graded — revealing it early defeats
+   *  the retrieval practice. */
+  rubric: string
+  /** Concise model answer, revealed alongside the rubric after grading. */
+  model_answer?: string
+  order_index: number
+}
+
+/** A generated quiz over a set of Drive source files for one course. */
+export interface PracticeQuiz {
+  id: string
+  course_id: string
+  /** Display title, e.g. "תרגול — אלגברה לינארית · שבוע 3". */
+  title: string
+  /** The Drive files the questions were generated from (id + cached name —
+   *  renames/deletes in Drive don't invalidate the quiz). */
+  source_files: { id: string; name: string }[]
+  questions: PracticeQuestion[]
+  created_at: string
+}
+
+/** Grading result for a single answered question inside an attempt. */
+export interface PracticeAnswerGrade {
+  question_id: string
+  /** The student's free-text answer. Empty string = skipped. */
+  answer: string
+  /** 0–100 against the rubric. Null when the question was skipped. */
+  score: number | null
+  feedback?: string
+  strengths?: string[]
+  gaps?: string[]
+}
+
+/** One sitting of a PracticeQuiz. A quiz can be retaken → multiple attempts. */
+export interface PracticeAttempt {
+  id: string
+  quiz_id: string
+  course_id: string
+  started_at: string
+  completed_at?: string
+  grades: PracticeAnswerGrade[]
+  /** Mean of the non-skipped question scores, 0–100. */
+  score?: number
+}
+
 /** Where a grade came from. v2.1 added `'manual'` so users can enter grades
  *  that aren't in Moodle or the Portal yet. */
 export type GradeSource = 'moodle' | 'portal' | 'manual'

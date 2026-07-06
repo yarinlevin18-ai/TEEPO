@@ -22,6 +22,8 @@ import type {
   StudentProfile,
   StudentCourse,
   Announcement,
+  PracticeQuiz,
+  PracticeAttempt,
 } from '@/types'
 
 // Re-export for backward compat — existing callers import these from
@@ -76,6 +78,11 @@ export interface DriveDB {
    *  when newer arrive) — keeps db.json size bounded. Sorted by
    *  posted_at descending. Optional → undefined treated as []. */
   announcements?: Announcement[]
+  /** Retrieval-practice quizzes generated from the user's course material.
+   *  Optional → undefined treated as []. See docs/REBUILD_PLAN.md. */
+  practice_quizzes?: PracticeQuiz[]
+  /** Graded sittings of practice quizzes. Optional → undefined treated as []. */
+  practice_attempts?: PracticeAttempt[]
 }
 
 export const EMPTY_DB: DriveDB = {
@@ -89,6 +96,8 @@ export const EMPTY_DB: DriveDB = {
   settings: {},
   student_courses: [],
   announcements: [],
+  practice_quizzes: [],
+  practice_attempts: [],
 }
 
 // ── Migrations ────────────────────────────────────────────────
