@@ -21,6 +21,7 @@ function pageTitleFor(pathname: string): string {
   if (pathname.startsWith('/todos'))          return 'משימות'
   if (pathname.startsWith('/assignments'))    return 'מטלות ועבודות'
   if (pathname.startsWith('/courses'))        return 'הקורסים שלי'
+  if (pathname.startsWith('/practice'))       return 'תרגול'
   if (pathname.startsWith('/credits'))        return 'מעקב נק״ז'
   if (pathname.startsWith('/university'))     return 'על האוניברסיטה'
   if (pathname.startsWith('/settings'))       return 'הגדרות'

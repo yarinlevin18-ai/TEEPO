@@ -8,7 +8,8 @@
  * Body: { question, rubric, model_answer?, answer }
  * Auth: Bearer <google_access_token>. Verified against Google's tokeninfo
  *       endpoint — this route doesn't touch Drive, so without the check
- *       anyone could burn the Anthropic quota anonymously.
+ *       anyone could burn the Anthropic quota anonymously. Skipped under
+ *       the dev auth bypass (same flag + prod guard as middleware.ts).
  *
  * Response: { score: 0-100, feedback, strengths: string[], gaps: string[] }
  */
@@ -61,9 +62,16 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  if (!token || !(await verifyGoogleToken(token))) {
-    return NextResponse.json({ error: 'Missing or invalid Google token' }, { status: 401 })
+  // Dev-only bypass — same guard as middleware.ts. Never active in prod.
+  const devBypass =
+    process.env.NODE_ENV !== 'production' &&
+    process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true'
+
+  if (!devBypass) {
+    const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+    if (!token || !(await verifyGoogleToken(token))) {
+      return NextResponse.json({ error: 'Missing or invalid Google token' }, { status: 401 })
+    }
   }
 
   const parsed = BodySchema.safeParse(await req.json().catch(() => null))

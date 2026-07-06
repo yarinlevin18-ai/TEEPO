@@ -6,13 +6,17 @@
  * grading rubric and a model answer. Phosphor-style — see docs/REBUILD_PLAN.md.
  *
  * Body: {
- *   files: [{ id, name, mimeType }, ...]   // 1–6 Drive files
+ *   files?: [{ id, name, mimeType }, ...]   // 0–6 Drive files
+ *   text?: string                            // pasted material (no Drive needed)
  *   courseName: string
- *   questionCount?: number                  // 3–8, default 5
+ *   questionCount?: number                   // 3–8, default 5
  * }
+ * At least one of files/text must yield material.
  * Auth: Bearer <google_access_token> (drive.file scope — same files TEEPO
  *       already manages). The token doubles as the auth gate: if Drive
  *       rejects it, the request dies before any Anthropic tokens are spent.
+ *       Under the dev auth bypass (same flag + prod guard as middleware.ts)
+ *       the token is not required — text-only generation works offline.
  *
  * Response: { title, questions: [{ question, rubric, model_answer }], skipped: string[] }
  *
@@ -32,6 +36,11 @@ export const maxDuration = 60
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3'
 
+// Dev-only bypass — same guard as middleware.ts. Never active in prod.
+const DEV_AUTH_BYPASS =
+  process.env.NODE_ENV !== 'production' &&
+  process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true'
+
 /** Per-PDF and total caps keep us inside Anthropic's request limit (and
  *  Vercel's memory) — a full semester scan is not the use case, one week is. */
 const MAX_PDF_BYTES = 8 * 1024 * 1024
@@ -43,7 +52,9 @@ const BodySchema = z.object({
     id: z.string().min(1),
     name: z.string().min(1),
     mimeType: z.string().min(1),
-  })).min(1).max(6),
+  })).max(6).default([]),
+  /** Pasted material — an alternative (or addition) to Drive files. */
+  text: z.string().trim().min(40).max(200_000).optional(),
   courseName: z.string().min(1),
   questionCount: z.number().int().min(3).max(8).default(5),
 })
@@ -81,7 +92,7 @@ export async function POST(req: NextRequest) {
   }
 
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  if (!token) {
+  if (!token && !DEV_AUTH_BYPASS) {
     return NextResponse.json({ error: 'Missing Google token' }, { status: 401 })
   }
 
@@ -89,55 +100,75 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid body', details: parsed.error.flatten() }, { status: 400 })
   }
-  const { files, courseName, questionCount } = parsed.data
+  const { files, text, courseName, questionCount } = parsed.data
+  if (files.length === 0 && !text) {
+    return NextResponse.json({ error: 'בחר קבצים או הדבק טקסט' }, { status: 400 })
+  }
 
   // ── Pull material out of Drive ──────────────────────────────────────
   const blocks: ContentBlock[] = []
   const skipped: string[] = []
   let totalBytes = 0
 
-  for (const f of files) {
-    try {
-      if (GOOGLE_EXPORTABLE.has(f.mimeType)) {
-        const res = await driveFetch(
-          token,
-          `${DRIVE_API}/files/${f.id}/export?mimeType=${encodeURIComponent('text/plain')}`,
-        )
-        if (res.status === 401) return NextResponse.json({ error: 'Google token expired' }, { status: 401 })
-        if (!res.ok) { skipped.push(f.name); continue }
-        const text = (await res.text()).slice(0, MAX_TEXT_CHARS)
-        if (!text.trim()) { skipped.push(f.name); continue }
-        blocks.push({ type: 'text', text: `--- קובץ: ${f.name} ---\n${text}` })
-      } else if (f.mimeType === 'application/pdf') {
-        const res = await driveFetch(token, `${DRIVE_API}/files/${f.id}?alt=media`)
-        if (res.status === 401) return NextResponse.json({ error: 'Google token expired' }, { status: 401 })
-        if (!res.ok) { skipped.push(f.name); continue }
-        const buf = await res.arrayBuffer()
-        if (buf.byteLength > MAX_PDF_BYTES || totalBytes + buf.byteLength > MAX_TOTAL_BYTES) {
+  if (!token) {
+    // Dev bypass without a real Google token — Drive is unreachable.
+    skipped.push(...files.map(f => f.name))
+  } else {
+    for (const f of files) {
+      try {
+        if (GOOGLE_EXPORTABLE.has(f.mimeType)) {
+          const res = await driveFetch(
+            token,
+            `${DRIVE_API}/files/${f.id}/export?mimeType=${encodeURIComponent('text/plain')}`,
+          )
+          // Under the bypass a 401 just means the fake token can't reach
+          // Drive — degrade to "skipped" instead of failing the request.
+          if (res.status === 401 && !DEV_AUTH_BYPASS) {
+            return NextResponse.json({ error: 'Google token expired' }, { status: 401 })
+          }
+          if (!res.ok) { skipped.push(f.name); continue }
+          const body = (await res.text()).slice(0, MAX_TEXT_CHARS)
+          if (!body.trim()) { skipped.push(f.name); continue }
+          blocks.push({ type: 'text', text: `--- קובץ: ${f.name} ---\n${body}` })
+        } else if (f.mimeType === 'application/pdf') {
+          const res = await driveFetch(token, `${DRIVE_API}/files/${f.id}?alt=media`)
+          if (res.status === 401 && !DEV_AUTH_BYPASS) {
+            return NextResponse.json({ error: 'Google token expired' }, { status: 401 })
+          }
+          if (!res.ok) { skipped.push(f.name); continue }
+          const buf = await res.arrayBuffer()
+          if (buf.byteLength > MAX_PDF_BYTES || totalBytes + buf.byteLength > MAX_TOTAL_BYTES) {
+            skipped.push(f.name)
+            continue
+          }
+          totalBytes += buf.byteLength
+          blocks.push({
+            type: 'document',
+            source: {
+              type: 'base64',
+              media_type: 'application/pdf',
+              data: Buffer.from(buf).toString('base64'),
+            },
+          })
+        } else if (f.mimeType.startsWith('text/')) {
+          const res = await driveFetch(token, `${DRIVE_API}/files/${f.id}?alt=media`)
+          if (res.status === 401 && !DEV_AUTH_BYPASS) {
+            return NextResponse.json({ error: 'Google token expired' }, { status: 401 })
+          }
+          if (!res.ok) { skipped.push(f.name); continue }
+          const body = (await res.text()).slice(0, MAX_TEXT_CHARS)
+          blocks.push({ type: 'text', text: `--- קובץ: ${f.name} ---\n${body}` })
+        } else {
           skipped.push(f.name)
-          continue
         }
-        totalBytes += buf.byteLength
-        blocks.push({
-          type: 'document',
-          source: {
-            type: 'base64',
-            media_type: 'application/pdf',
-            data: Buffer.from(buf).toString('base64'),
-          },
-        })
-      } else if (f.mimeType.startsWith('text/')) {
-        const res = await driveFetch(token, `${DRIVE_API}/files/${f.id}?alt=media`)
-        if (res.status === 401) return NextResponse.json({ error: 'Google token expired' }, { status: 401 })
-        if (!res.ok) { skipped.push(f.name); continue }
-        const text = (await res.text()).slice(0, MAX_TEXT_CHARS)
-        blocks.push({ type: 'text', text: `--- קובץ: ${f.name} ---\n${text}` })
-      } else {
+      } catch {
         skipped.push(f.name)
       }
-    } catch {
-      skipped.push(f.name)
     }
+  }
+
+  if (text) {
+    blocks.push({ type: 'text', text: `--- חומר שהודבק ---\n${text.slice(0, MAX_TEXT_CHARS)}` })
   }
 
   if (blocks.length === 0) {
