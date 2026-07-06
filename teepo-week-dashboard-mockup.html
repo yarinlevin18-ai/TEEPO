@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TEEPO — My Week (Mockup)</title>
+<style>
+  :root{
+    --green-900:#1f5d33;--green-700:#2f8f4e;--green-500:#3aa655;--green-400:#57c074;
+    --cream-50:#faf3e7;--cream-100:#f3e7d3;--ink:#33402f;--ink-soft:#6b7363;
+    --lilac:#b79bd6;--lilac-soft:#e7dcf3;--card:#fffdf8;--line:#e7d9bf;
+    --shadow:0 14px 38px -20px rgba(40,70,40,.32);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:"Segoe UI",system-ui,-apple-system,Inter,Roboto,Arial,sans-serif;color:var(--ink);
+    background:radial-gradient(800px 420px at 90% -8%,#fff7ea,transparent 60%),linear-gradient(160deg,#faf3e7,#f1e4cf);min-height:100vh}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 24px 60px}
+
+  /* topbar */
+  .topbar{display:flex;align-items:center;justify-content:space-between;animation:rise .6s ease both}
+  .pill-time{display:inline-flex;align-items:center;gap:10px;background:#1f2a20;color:#9af0b4;font-weight:700;
+    border-radius:12px;padding:8px 14px;font-variant-numeric:tabular-nums;letter-spacing:.5px;box-shadow:var(--shadow);font-size:14px}
+  .pill-time .clock{font-size:18px;color:#bdf7cd}
+  .pill-time .sep{color:#5e7a64}
+  .toggle{display:inline-flex;background:#efe2cd;border:1px solid var(--line);border-radius:999px;padding:3px}
+  .toggle span{padding:6px 14px;border-radius:999px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer}
+  .toggle span.on{background:#fff;color:var(--green-900);box-shadow:0 2px 6px rgba(0,0,0,.08)}
+
+  .hero{margin:20px 0 6px;animation:rise .7s ease .05s both}
+  .hero h1{margin:0;font-size:30px;color:var(--green-900)}
+  .hero h1 b{color:var(--green-500)}
+  .hero p{margin:5px 0 0;color:var(--ink-soft);font-size:14px}
+
+  /* reconnect banner */
+  .banner{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    background:linear-gradient(120deg,#fff6e9,#fdeede);border:1px solid #f0d8b2;border-left:5px solid #e6a23c;
+    border-radius:16px;padding:14px 18px;margin:16px 0;box-shadow:var(--shadow);animation:rise .7s ease .1s both}
+  .banner .l b{color:#b9772a;font-size:14px;display:flex;align-items:center;gap:8px}
+  .banner .l small{display:block;color:var(--ink-soft);font-size:12.5px;margin-top:3px}
+  .badge-err{font-family:ui-monospace,Menlo,Consolas,monospace;background:#fdeaea;color:#c0392b;font-size:11px;
+    padding:2px 8px;border-radius:6px;font-weight:700}
+  .btn-g{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;color:#fff;font-weight:700;font-size:13.5px;
+    background:linear-gradient(135deg,var(--green-500),var(--green-700));border-radius:11px;padding:10px 16px;
+    box-shadow:0 10px 22px -10px rgba(47,143,78,.7);position:relative;overflow:hidden;transition:transform .18s}
+  .btn-g:hover{transform:translateY(-2px)}
+  .btn-g::after{content:"";position:absolute;top:0;left:-120%;width:55%;height:100%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-18deg);animation:shine 3.4s ease-in-out infinite}
+  @keyframes shine{0%{left:-120%}55%,100%{left:150%}}
+
+  /* small cards row */
+  .row3{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 18px;box-shadow:var(--shadow);animation:rise .7s ease both}
+  .card .ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .card .ch b{font-size:14.5px;color:var(--green-900);display:flex;align-items:center;gap:8px}
+  .count{background:#eafaee;color:var(--green-700);font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px}
+  .count.warn{background:#fdeaea;color:#c0392b}
+
+  /* tasks */
+  .task{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:14px}
+  .task .box{width:19px;height:19px;border-radius:6px;border:2px solid #cbb98f;flex:none;cursor:pointer;transition:.15s;display:grid;place-items:center}
+  .task.done .box{background:var(--green-500);border-color:var(--green-500);color:#fff;font-size:12px}
+  .task.done span{color:var(--ink-soft);text-decoration:line-through}
+  .addrow{display:flex;align-items:center;gap:8px;margin-top:8px;border-top:1px dashed #e3d6bd;padding-top:10px}
+  .addrow input{flex:1;border:none;outline:none;background:transparent;font-size:13.5px;color:var(--ink)}
+  .addrow .plus{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--green-500),var(--green-700));
+    color:#fff;display:grid;place-items:center;cursor:pointer;font-size:16px}
+
+  /* notifications */
+  .notif{display:flex;gap:10px;padding:9px 0;font-size:13px;border-top:1px solid #f0e7d6}
+  .notif:first-of-type{border-top:none}
+  .notif .d{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:none;background:var(--green-500)}
+  .notif.alert .d{background:#e6a23c}
+  .notif small{display:block;color:var(--ink-soft);font-size:11.5px;margin-top:2px}
+
+  /* personal note wide */
+  .note{background:linear-gradient(135deg,#f3ecfa,#fbf5ea);border:1px solid var(--lilac-soft);text-align:center;padding:22px}
+  .note .ic{font-size:26px}
+  .note h4{margin:8px 0 4px;color:var(--green-900);font-size:15px}
+  .note p{margin:0;color:var(--ink-soft);font-size:13px}
+
+  /* calendar */
+  .calwrap{margin-top:18px;animation:rise .8s ease .15s both}
+  .calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .calhead .title{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;color:var(--green-900)}
+  .gcal{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-soft);background:var(--card);
+    border:1px solid var(--line);border-radius:10px;padding:6px 11px}
+  .gcal .gdot{width:18px;height:18px;border-radius:5px;background:#4285F4;display:grid;place-items:center;color:#fff;font-size:11px}
+  .weekpick{display:inline-flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-soft);background:var(--card);
+    border:1px solid var(--line);border-radius:10px;padding:6px 12px}
+  .weekpick .nav{cursor:pointer;color:var(--green-700);font-weight:700}
+
+  .cal{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:var(--shadow)}
+  .cal .allday{display:flex;align-items:center;gap:10px;background:#fdeaea;border-bottom:1px solid #f3d6d2;padding:9px 14px;font-size:12.5px;color:#c0392b}
+  .cal .allday .chip{background:#fff;border:1px solid #f0c8c2;border-radius:7px;padding:3px 9px;font-weight:600}
+  .calgrid{display:grid;grid-template-columns:46px repeat(7,1fr)}
+  .daycol{border-left:1px solid #f1e8d7;position:relative}
+  .daycol:first-child{border-left:none}
+  .dh{padding:9px 4px;text-align:center;border-bottom:1px solid #efe5d2;background:#fbf5ea}
+  .dh small{display:block;font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em}
+  .dh b{font-size:16px;color:var(--ink);display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;margin-top:3px}
+  .dh.today b{background:linear-gradient(135deg,var(--green-500),var(--green-700));color:#fff}
+  .timecol .slot{height:42px;border-bottom:1px solid #f4ecdb;font-size:10px;color:#b6a988;text-align:right;padding:2px 6px 0 0}
+  .slot{height:42px;border-bottom:1px solid #f4ecdb;position:relative}
+  .ev{position:absolute;left:4px;right:4px;border-radius:8px;padding:5px 7px;font-size:11px;color:#fff;overflow:hidden;
+    box-shadow:0 6px 14px -6px rgba(0,0,0,.3);cursor:pointer;transition:.16s;animation:pop .5s ease both}
+  .ev:hover{transform:scale(1.03);z-index:5}
+  .ev b{display:block;font-size:11.5px;font-weight:700}.ev span{font-size:10px;opacity:.9}
+  @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  /* goals footer */
+  .goals{margin-top:20px;background:linear-gradient(135deg,#eafaee,#fbf5ea);border:1px solid #bfe6c8;border-radius:18px;
+    text-align:center;padding:26px;box-shadow:var(--shadow);animation:rise .8s ease .2s both}
+  .goals .lab{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--green-700);font-weight:700}
+  .goals h3{margin:8px 0 5px;color:var(--green-900);font-size:19px}
+  .goals p{margin:0 0 14px;color:var(--ink-soft);font-size:13.5px}
+
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+  @media(max-width:860px){.row3{grid-template-columns:1fr}.calgrid{grid-template-columns:40px repeat(7,1fr);font-size:11px}.timecol .slot{font-size:9px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="toggle"><span class="on">This week</span><span>Next week</span></div>
+    <div class="pill-time">
+      <span class="clock" id="clock">18:18</span>
+      <span class="sep">·</span>
+      <span id="today">Wed · June 24, 2026</span>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <h1>Hi <b>Dev</b>, your week is on track.</h1>
+    <p>3 tasks due today · 2 classes · 1 deadline coming up</p>
+  </div>
+
+  <!-- RECONNECT BANNER -->
+  <div class="banner">
+    <div class="l">
+      <b>⚠ Google Calendar disconnected <span class="badge-err">TOKEN_EXPIRED</span></b>
+      <small>Your session expired. Reconnect to keep your weekly schedule in sync.</small>
+    </div>
+    <button class="btn-g">🗓 Reconnect Google Calendar</button>
+  </div>
+
+  <!-- TASKS + NOTIFICATIONS -->
+  <div class="row3">
+    <div class="card">
+      <div class="ch"><b>✅ Today's tasks</b><span class="count">2 left</span></div>
+      <div class="task done"><div class="box">✓</div><span>Review Calculus lecture 07</span></div>
+      <div class="task"><div class="box"></div><span>Finish CS exercise set 4</span></div>
+      <div class="task"><div class="box"></div><span>Email Prof. Cohen about exam</span></div>
+      <div class="addrow"><div class="plus">+</div><input placeholder="Add a task for today…"></div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><b>🔔 Notifications</b><span class="count warn">3 new</span></div>
+      <div class="notif alert"><div class="d"></div><div>Calendar token expired<small>Action needed · just now</small></div></div>
+      <div class="notif"><div class="d"></div><div>New file synced to “Linear Algebra”<small>12 min ago</small></div></div>
+      <div class="notif"><div class="d"></div><div>Summary ready for Lecture 07<small>1 hour ago</small></div></div>
+    </div>
+  </div>
+
+  <!-- PERSONAL NOTE -->
+  <div class="card note">
+    <div class="ic">💬</div>
+    <h4>Your personal note for the week</h4>
+    <p>“Block 2 focused hours every morning for exam prep — future you will thank you.”</p>
+  </div>
+
+  <!-- WEEKLY CALENDAR -->
+  <div class="calwrap">
+    <div class="calhead">
+      <div class="title">🗓 Weekly schedule</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div class="weekpick"><span class="nav">‹</span> Jun 21 – 27, 2026 <span class="nav">›</span></div>
+        <div class="gcal"><span class="gdot">G</span> Google Calendar</div>
+      </div>
+    </div>
+
+    <div class="cal">
+      <div class="allday">📌 <b>All-day:</b> <span class="chip">Stats assignment due</span><span class="chip">Library books return</span></div>
+      <div class="calgrid" id="calgrid"></div>
+    </div>
+  </div>
+
+  <!-- GOALS -->
+  <div class="goals">
+    <div class="lab">My personal progress</div>
+    <h3>Let's set your goals for the semester</h3>
+    <p>Define weekly targets and TEEPO will keep you on pace, automatically.</p>
+    <button class="btn-g">🎯 Set my goals</button>
+  </div>
+</div>
+
+<script>
+  // live clock
+  function tick(){
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2,'0');
+    const mm = String(d.getMinutes()).padStart(2,'0');
+    document.getElementById('clock').textContent = hh+':'+mm;
+    const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const mon=['Jan','Feb','Mar','Apr','May','June','Jul','Aug','Sep','Oct','Nov','Dec'];
+    document.getElementById('today').textContent =
+      days[d.getDay()]+' · '+mon[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear();
+  }
+  tick(); setInterval(tick,15000);
+
+  // build calendar grid (Mon–Sun) with time rows + events
+  const days = [
+    {n:'Mon',d:21},{n:'Tue',d:22},{n:'Wed',d:23},
+    {n:'Thu',d:24,today:true},{n:'Fri',d:25},{n:'Sat',d:26},{n:'Sun',d:27}
+  ];
+  const startH = 8, endH = 18; // 08:00 – 18:00
+  const slotH = 42;
+  // events keyed by day index (0=Mon)
+  const events = [
+    {day:0,start:9,len:1.5,title:'Calculus I',sub:'Hall 305',c:'#4285F4'},
+    {day:0,start:13,len:2,title:'CS Lab',sub:'Lab B',c:'#A142F4'},
+    {day:1,start:10,len:1,title:'Linear Algebra',sub:'Hall 112',c:'#34A853'},
+    {day:2,start:11,len:1.5,title:'Statistics',sub:'Online',c:'#FBBC05'},
+    {day:3,start:9,len:2,title:'Study block',sub:'Exam prep',c:'#3aa655'},
+    {day:3,start:15,len:1,title:'Office hours',sub:'Prof. Cohen',c:'#EA4335'},
+    {day:4,start:12,len:1.5,title:'CS Lecture',sub:'Hall 201',c:'#A142F4'},
+    {day:5,start:10,len:2.5,title:'Calculus exam',sub:'Hall 305 · 09:00',c:'#c0392b'},
+  ];
+
+  const grid = document.getElementById('calgrid');
+  const rows = endH - startH;
+
+  // time column
+  let tc = '<div class="daycol timecol"><div class="dh"><small>&nbsp;</small><b style="visibility:hidden">0</b></div>';
+  for(let h=startH; h<endH; h++) tc += '<div class="slot">'+String(h).padStart(2,'0')+':00</div>';
+  tc += '</div>';
+  grid.insertAdjacentHTML('beforeend', tc);
+
+  // day columns
+  days.forEach((day,i)=>{
+    let col = '<div class="daycol">';
+    col += '<div class="dh'+(day.today?' today':'')+'"><small>'+day.n+'</small><b>'+day.d+'</b></div>';
+    col += '<div style="position:relative">';
+    for(let h=startH; h<endH; h++) col += '<div class="slot"></div>';
+    // events
+    events.filter(e=>e.day===i).forEach((e,k)=>{
+      const top = (e.start-startH)*slotH;
+      const hgt = e.len*slotH - 4;
+      col += '<div class="ev" style="top:'+top+'px;height:'+hgt+'px;background:'+e.c+';animation-delay:'+(0.2+k*0.08)+'s">'
+           + '<b>'+e.title+'</b><span>'+e.sub+'</span></div>';
+    });
+    col += '</div></div>';
+    grid.insertAdjacentHTML('beforeend', col);
+  });
+</script>
+</body>
+</html>
