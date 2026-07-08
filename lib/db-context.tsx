@@ -22,12 +22,8 @@ import {
 import { ensureCourseFolders, ensurePath, moveFolder, pathForCourse, sanitizeFolderName } from './drive-folders'
 import type {
   Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings,
-  Announcement, PracticeQuiz, PracticeAttempt,
+  PracticeQuiz, PracticeAttempt,
 } from '@/types'
-import {
-  acknowledgeAnnouncement as ackOne,
-  acknowledgeAllAnnouncements as ackAll,
-} from './announcements-merge'
 
 interface DBContextType {
   db: DriveDB
@@ -73,14 +69,6 @@ interface DBContextType {
   updateSettings: (patch: Partial<UserSettings>) => Promise<void>
   /** Replace all courses at once (used by re-classifier to apply bulk updates efficiently) */
   replaceCourses: (courses: Course[]) => Promise<void>
-
-  // Moodle announcements — persistent list mirrored from sync results
-  // (see lib/announcements-merge + useAutoSync). The dashboard widget
-  // calls these two helpers to mark items as read; the auto-sync hook
-  // is the one writing fresh announcements in via mutate() so we don't
-  // need a createAnnouncement here.
-  acknowledgeAnnouncement: (id: string) => Promise<void>
-  acknowledgeAllAnnouncements: () => Promise<void>
 
   // Practice quizzes (retrieval practice — see docs/REBUILD_PLAN.md)
   createPracticeQuiz: (input: Omit<PracticeQuiz, 'id' | 'created_at'>) => Promise<PracticeQuiz>
@@ -522,19 +510,6 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     mutate(d => ({ ...d, courses }))
   }, [mutate])
 
-  // ── Announcements (Moodle forum posts) ────────────────────
-  // The persistent list itself is written by useAutoSync (via the
-  // shared mergeAnnouncements helper). These two methods just flip
-  // the read-state flag — used by the dashboard widget's per-row
-  // "פתח" link and the "סמן הכל כנקרא" CTA.
-  const acknowledgeAnnouncement = useCallback(async (id: string) => {
-    mutate(d => ({ ...d, announcements: ackOne(d.announcements, id) }))
-  }, [mutate])
-
-  const acknowledgeAllAnnouncements = useCallback(async () => {
-    mutate(d => ({ ...d, announcements: ackAll(d.announcements) }))
-  }, [mutate])
-
   // ── Student catalog ────────────────────────────────────────
   const setStudentProfile = useCallback(async (
     patch: Partial<StudentProfile> & { track_id: string; start_year: number; current_year: number },
@@ -842,7 +817,6 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createNote, updateNote, deleteNote,
     createPracticeQuiz, deletePracticeQuiz, savePracticeAttempt,
     updateSettings, replaceCourses,
-    acknowledgeAnnouncement, acknowledgeAllAnnouncements,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
     syncCourseFolders, syncAllCourseFolders, reclassifyCourse, resetAccountData, flushSave,
   }), [
@@ -854,7 +828,6 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createNote, updateNote, deleteNote,
     createPracticeQuiz, deletePracticeQuiz, savePracticeAttempt,
     updateSettings, replaceCourses,
-    acknowledgeAnnouncement, acknowledgeAllAnnouncements,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
     syncCourseFolders, syncAllCourseFolders, reclassifyCourse, resetAccountData, flushSave,
   ])

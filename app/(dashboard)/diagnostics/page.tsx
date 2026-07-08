@@ -5,8 +5,8 @@
  *
  * Used for two things:
  *   1. When something stops working — the user can come here and see exactly
- *      which layer is broken (Drive scope? db.json missing? Moodle backend
- *      cold?) rather than guess.
+ *      which layer is broken (Drive scope? db.json missing? Calendar API?)
+ *      rather than guess.
  *   2. As a permanent escape hatch from the friendly /setup wizard for users
  *      who want the raw status.
  *
@@ -21,13 +21,6 @@ import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
 import { useWeekCalendar } from '@/lib/use-week-calendar'
 import { probeTokenScopes } from '@/lib/drive-db'
-import { supabase } from '@/lib/supabase'
-import { BACKEND_URL as BACKEND } from '@/lib/backend-url'
-
-async function authHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession()
-  return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
-}
 
 interface ScopeInfo {
   hasDriveFile?: boolean
@@ -37,20 +30,12 @@ interface ScopeInfo {
   error?: string
 }
 
-interface MoodleProbe {
-  connected: boolean
-  reachable: boolean
-  error: string | null
-}
-
 export default function DiagnosticsPage() {
   const { user, googleToken, reconnectGoogle } = useAuth()
   const { db, ready, error: dbError, handle, reload } = useDB() as any
   const calendar = useWeekCalendar()
   const [scopes, setScopes] = useState<ScopeInfo | null>(null)
   const [scopesLoading, setScopesLoading] = useState(false)
-  const [moodle, setMoodle] = useState<MoodleProbe>({ connected: false, reachable: false, error: null })
-  const [moodleProbing, setMoodleProbing] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
 
   const probeScopes = async () => {
@@ -69,36 +54,8 @@ export default function DiagnosticsPage() {
     }
   }
 
-  const probeMoodleBackend = async () => {
-    setMoodleProbing(true)
-    setMoodle((m) => ({ ...m, error: null }))
-    try {
-      const headers = await authHeaders()
-      const res = await fetch(`${BACKEND}/api/university/status`, {
-        headers,
-        signal: AbortSignal.timeout(10_000),
-      })
-      if (!res.ok) throw new Error(`status ${res.status}`)
-      const data = await res.json()
-      setMoodle({ connected: Boolean(data.moodle), reachable: true, error: null })
-    } catch (e) {
-      const msg = (e as Error)?.message ?? 'lookup failed'
-      const cold = msg.includes('timeout') || msg.includes('Failed to fetch')
-      setMoodle({
-        connected: false,
-        reachable: false,
-        error: cold
-          ? 'השרת לא הגיב (אולי בשינה — Render Free נדרשת תקופת התעוררות של 30-60ש)'
-          : msg.slice(0, 160),
-      })
-    } finally {
-      setMoodleProbing(false)
-    }
-  }
-
   useEffect(() => {
     void probeScopes()
-    void probeMoodleBackend()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [googleToken])
 
@@ -114,7 +71,6 @@ export default function DiagnosticsPage() {
   const driveOk = ready && !dbError && !!handle?.folderId
   const calOk = !!googleToken && !calendar.error && !calendar.loading
   const scopesOk = scopes?.hasDriveFile && scopes?.hasCalendar
-  const moodleOk = moodle.connected
 
   return (
     <div className="cream-page diag-page">
@@ -228,34 +184,9 @@ export default function DiagnosticsPage() {
           </DiagRow>
         </section>
 
-        {/* ── Section: Moodle backend ───────────────────────────────────── */}
-        <section className="diag-section">
-          <h2>
-            Moodle Backend
-            <button
-              type="button"
-              className="diag-section-refresh"
-              onClick={probeMoodleBackend}
-              disabled={moodleProbing}
-              aria-label="רענן"
-            >
-              <RefreshCw size={13} className={moodleProbing ? 'spin' : ''} />
-            </button>
-          </h2>
-          <DiagRow label="שרת זמין" status={moodle.reachable ? 'ok' : moodleProbing ? 'checking' : 'error'}>
-            {moodle.reachable ? 'מגיב' : moodle.error ?? 'לא נבדק'}
-          </DiagRow>
-          <DiagRow label="חיבור Moodle" status={moodleOk ? 'ok' : moodle.reachable ? 'pending' : 'checking'}>
-            {moodleOk ? 'מסונכרן' : <Link href="/moodle" className="diag-link">התחבר ←</Link>}
-          </DiagRow>
-        </section>
-
         {/* ── Section: Environment ──────────────────────────────────────── */}
         <section className="diag-section">
           <h2>סביבה</h2>
-          <DiagRow label="Backend URL">
-            <ClipChip id="backend" value={BACKEND} copied={copied} onCopy={copyToClipboard} />
-          </DiagRow>
           <DiagRow label="Frontend URL">
             <ClipChip id="frontend" value={typeof window !== 'undefined' ? window.location.origin : ''} copied={copied} onCopy={copyToClipboard} />
           </DiagRow>

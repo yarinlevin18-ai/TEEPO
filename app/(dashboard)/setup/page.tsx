@@ -5,42 +5,27 @@
  *
  * Lands here automatically the first time a fresh account opens
  * /dashboard with zero courses (see app/(dashboard)/dashboard/page.tsx
- * redirect). Surfaces the three integrations TEEPO depends on:
+ * redirect). Surfaces the two integrations TEEPO depends on:
  *
  *   1. Google Drive — DBProvider auto-creates TEEPO/db.json on first
  *      successful load, so if useDB().ready is true, this is green.
  *   2. Google Calendar — already authed (same OAuth as Drive). The
  *      useWeekCalendar() probe surfaces failures (token revoked, API
  *      disabled, etc.).
- *   3. Moodle — POST /api/university/connect/moodle on the backend
- *      (Render). Polled via /api/university/status.
  *
  * The page is informational, not modal — the user can always click
  * "דלג ועבור לקורסים" to leave without finishing.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, AlertTriangle, Loader2, Folder, Calendar, GraduationCap, ArrowLeft, RefreshCw } from 'lucide-react'
+import { Check, AlertTriangle, Loader2, Folder, Calendar } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
 import { useWeekCalendar } from '@/lib/use-week-calendar'
-import { supabase } from '@/lib/supabase'
-import { BACKEND_URL as BACKEND } from '@/lib/backend-url'
 
 type StepStatus = 'pending' | 'checking' | 'ok' | 'error' | 'skipped'
-
-interface MoodleStatus {
-  moodle: boolean
-  portal: boolean
-  login_status?: Record<string, string>
-}
-
-async function authHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession()
-  return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
-}
 
 export default function SetupPage() {
   const router = useRouter()
@@ -65,40 +50,6 @@ export default function SetupPage() {
     return 'ok'
   }, [googleToken, calendar.error, calendar.loading])
 
-  // ── Step 3: Moodle — backend status (polled) ─────────────────────────
-  const [moodle, setMoodle] = useState<MoodleStatus | null>(null)
-  const [moodleProbing, setMoodleProbing] = useState(false)
-  const [moodleErr, setMoodleErr] = useState<string | null>(null)
-
-  const probeMoodle = async () => {
-    setMoodleProbing(true)
-    setMoodleErr(null)
-    try {
-      const res = await fetch(`${BACKEND}/api/university/status`, {
-        headers: await authHeaders(),
-        signal: AbortSignal.timeout(8_000),
-      })
-      if (!res.ok) throw new Error(`status ${res.status}`)
-      setMoodle(await res.json())
-    } catch (e) {
-      setMoodleErr((e as Error)?.message ?? 'lookup failed')
-    } finally {
-      setMoodleProbing(false)
-    }
-  }
-
-  useEffect(() => {
-    void probeMoodle()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const moodleStatus: StepStatus = useMemo(() => {
-    if (moodleProbing) return 'checking'
-    if (moodleErr) return 'error'
-    if (moodle?.moodle) return 'ok'
-    return 'pending'
-  }, [moodle, moodleProbing, moodleErr])
-
   const allDone = driveStatus === 'ok' && calStatus === 'ok'
 
   const onFinish = async () => {
@@ -122,7 +73,7 @@ export default function SetupPage() {
             בואו <span className="accent">נחבר</span> אותך.
           </h1>
           <p className="setup-sub">
-            שלושה דברים שאנחנו צריכים — שניים מתחילים אוטומטית, אחד דורש דקה ממך.
+            שני דברים שאנחנו צריכים — שניהם מתחילים אוטומטית.
           </p>
         </header>
 
@@ -143,37 +94,6 @@ export default function SetupPage() {
             subtitle="האירועים השבועיים מוצגים בdashboard. drive.file + calendar.readonly היחידים שביקשנו."
             status={calStatus}
             errorText={calendar.error ?? undefined}
-          />
-
-          <Step
-            n={3}
-            icon={<GraduationCap />}
-            title="Moodle"
-            subtitle="חיבור לMoodle של האוניברסיטה כדי לייבא קורסים, ציונים ומטלות אוטומטית."
-            status={moodleStatus}
-            errorText={moodleErr ?? undefined}
-            cta={
-              moodleStatus === 'ok' ? (
-                <Link href="/moodle" className="setup-cta secondary">
-                  עבור ל-Moodle <ArrowLeft size={14} />
-                </Link>
-              ) : (
-                <div className="setup-cta-row">
-                  <Link href="/moodle" className="setup-cta primary">
-                    התחבר ל-Moodle <ArrowLeft size={14} />
-                  </Link>
-                  <button
-                    type="button"
-                    className="setup-cta secondary"
-                    onClick={probeMoodle}
-                    disabled={moodleProbing}
-                  >
-                    <RefreshCw size={14} className={moodleProbing ? 'spin' : ''} />
-                    בדוק שוב
-                  </button>
-                </div>
-              )
-            }
           />
         </ol>
 

@@ -3,31 +3,21 @@
 /**
  * Grades list with source badges (task #17).
  *
- * Reads from `api.grades.list()` (which returns DB-saved grades merged with
- * live Moodle/Portal scrapes). Each row shows the grade source badge so the
- * user can tell where each value came from. Includes a "+ הוסף ציון ידני"
- * button that opens ManualGradeModal.
+ * The Python backend (Moodle/Portal grade scrape) has been retired. Grades now
+ * live entirely in the Drive DB as `student_courses[]` entries that carry a
+ * `grade` field. This component derives its list from `useDB()` — every
+ * StudentCourse with a grade set — and shows a source badge per row. Includes a
+ * "+ הוסף ציון ידני" button that opens ManualGradeModal, which writes back into
+ * the Drive DB via `upsertStudentCourse`.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Award, Plus, Loader2, RefreshCw } from 'lucide-react'
-import { api } from '@/lib/api-client'
+import { Award, Plus } from 'lucide-react'
+import { useDB } from '@/lib/db-context'
+import type { StudentCourse } from '@/types'
 import GradeSourceBadge from './GradeSourceBadge'
 import ManualGradeModal from './ManualGradeModal'
-
-interface BackendGrade {
-  course_id?: string
-  course_name: string
-  grade?: number | null
-  grade_text?: string | null
-  semester?: string | null
-  academic_year?: string | null
-  credits?: number | null
-  rank?: string | null
-  component?: string | null
-  source?: string | null
-}
 
 function getGradeColor(grade: number | null | undefined): string {
   if (grade == null) return '#94a3b8'
@@ -39,29 +29,29 @@ function getGradeColor(grade: number | null | undefined): string {
 }
 
 export default function GradesList() {
-  const [grades, setGrades] = useState<BackendGrade[]>([])
-  const [average, setAverage] = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { db } = useDB()
   const [modalOpen, setModalOpen] = useState(false)
 
-  const reload = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await api.grades.list()
-      setGrades(data.grades || [])
-      setAverage(data.average ?? null)
-    } catch (e: any) {
-      setError(e?.message || 'טעינת ציונים נכשלה')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  // Grades come straight from the Drive DB: every student_course that has a
+  // numeric grade set. No network fetch, no loading/error state.
+  const grades = useMemo<StudentCourse[]>(
+    () => (db.student_courses || []).filter(c => c.grade != null),
+    [db.student_courses],
+  )
 
-  useEffect(() => {
-    reload()
-  }, [reload])
+  // Credit-weighted average across graded courses (falls back to a plain mean
+  // when credits are missing/zero).
+  const average = useMemo<number | null>(() => {
+    if (grades.length === 0) return null
+    let weightSum = 0
+    let gradeSum = 0
+    for (const g of grades) {
+      const w = g.credits && g.credits > 0 ? g.credits : 1
+      weightSum += w
+      gradeSum += (g.grade as number) * w
+    }
+    return weightSum > 0 ? gradeSum / weightSum : null
+  }, [grades])
 
   return (
     <section className="grades-v2-card">
@@ -87,15 +77,6 @@ export default function GradesList() {
         </div>
         <div className="grades-v2-actions">
           <button
-            onClick={reload}
-            disabled={loading}
-            className="grades-v2-refresh"
-            title="רענון"
-            aria-label="רענן רשימת ציונים"
-          >
-            <RefreshCw size={14} className={loading ? 'spin' : ''} />
-          </button>
-          <button
             onClick={() => setModalOpen(true)}
             className="grades-v2-add"
           >
@@ -106,22 +87,16 @@ export default function GradesList() {
       </div>
 
       {/* Body */}
-      {loading && grades.length === 0 ? (
-        <div className="grades-v2-loading">
-          <Loader2 size={16} className="spin" />
-        </div>
-      ) : error ? (
-        <p className="grades-v2-error">{error}</p>
-      ) : grades.length === 0 ? (
+      {grades.length === 0 ? (
         <div className="grades-v2-empty">
           <p className="title">אין ציונים עדיין</p>
-          <p className="sub">סנכרן את ה-Moodle או הוסף ציון ידני</p>
+          <p className="sub">הוסף ציון ידני כדי להתחיל</p>
         </div>
       ) : (
         <div className="grades-v2-list">
           {grades.map((g, i) => (
             <motion.div
-              key={`${g.course_name}-${g.semester || ''}-${g.component || ''}-${i}`}
+              key={g.id}
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: Math.min(i * 0.02, 0.4) }}
@@ -136,7 +111,7 @@ export default function GradesList() {
                   border: `1px solid ${getGradeColor(g.grade)}30`,
                 }}
               >
-                {g.grade != null ? g.grade : g.grade_text || '—'}
+                {g.grade != null ? g.grade : '—'}
               </div>
 
               {/* Course meta */}
@@ -144,9 +119,6 @@ export default function GradesList() {
                 <p className="name">{g.course_name}</p>
                 <div className="meta">
                   <GradeSourceBadge source={g.source} size="compact" />
-                  {g.component && (
-                    <span>{g.component}</span>
-                  )}
                   {(g.semester || g.academic_year) && (
                     <span>
                       {[g.semester, g.academic_year].filter(Boolean).join(' · ')}
@@ -165,7 +137,6 @@ export default function GradesList() {
       <ManualGradeModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSuccess={reload}
       />
     </section>
   )

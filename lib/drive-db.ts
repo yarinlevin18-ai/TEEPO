@@ -21,7 +21,6 @@ import type {
   UserSettings,
   StudentProfile,
   StudentCourse,
-  Announcement,
   PracticeQuiz,
   PracticeAttempt,
 } from '@/types'
@@ -73,11 +72,6 @@ export interface DriveDB {
   student_profile?: StudentProfile
   /** Courses the student has taken / is taking / plans to take, for credits tracking. */
   student_courses?: StudentCourse[]
-  /** Recent Moodle forum announcements, pulled by useAutoSync.
-   *  Capped to the most-recent 50 across all courses (older are pruned
-   *  when newer arrive) — keeps db.json size bounded. Sorted by
-   *  posted_at descending. Optional → undefined treated as []. */
-  announcements?: Announcement[]
   /** Retrieval-practice quizzes generated from the user's course material.
    *  Optional → undefined treated as []. See docs/REBUILD_PLAN.md. */
   practice_quizzes?: PracticeQuiz[]
@@ -95,7 +89,6 @@ export const EMPTY_DB: DriveDB = {
   notes: [],
   settings: {},
   student_courses: [],
-  announcements: [],
   practice_quizzes: [],
   practice_attempts: [],
 }

@@ -3,14 +3,16 @@
 /**
  * Modal for manual grade entry (task #17).
  *
- * Posts to POST /api/grades/manual. The endpoint upserts on
- * (course_name, semester, component) — re-submitting the same triplet
- * overwrites, which doubles as "edit" without a separate UI.
+ * The Python backend has been retired — manual grades now persist into the
+ * Drive DB via `upsertStudentCourse` (see lib/db-context.tsx). Each submit
+ * creates a new student_course row keyed by a synthesized `manual_<ts>`
+ * course_id, so re-opening the modal adds another entry rather than editing
+ * in place (editing lives elsewhere, keyed by course_id).
  */
 
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { api } from '@/lib/api-client'
+import { useDB } from '@/lib/db-context'
 import Modal from '@/components/ui/Modal'
 
 interface Props {
@@ -31,6 +33,7 @@ export default function ManualGradeModal({
   defaultCourseName = '',
   defaultSemester = '',
 }: Props) {
+  const { upsertStudentCourse } = useDB()
   const [courseName, setCourseName] = useState(defaultCourseName)
   const [grade, setGrade] = useState('')
   const [credits, setCredits] = useState('')
@@ -81,13 +84,17 @@ export default function ManualGradeModal({
     setSubmitting(true)
     setError(null)
     try {
-      await api.grades.createManual({
+      // Persist into the Drive DB as a manual student_course. No catalog id
+      // exists for hand-entered grades, so synthesize a unique one.
+      await upsertStudentCourse({
+        course_id: `manual_${Date.now()}`,
         course_name: courseName.trim(),
+        credits: creditsNum ?? 0,
         grade: gradeNum,
-        credits: creditsNum,
+        status: 'completed',
         semester: semester.trim() || undefined,
         academic_year: academicYear.trim() || undefined,
-        component: component.trim() || undefined,
+        source: 'manual',
       })
       onSuccess?.()
       reset()

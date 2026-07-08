@@ -47,7 +47,6 @@ import {
   ClipboardCheck, ListTodo,
 } from 'lucide-react'
 import LCDDisplay from '@/components/ui/LCDDisplay'
-import AnnouncementsCard from '@/components/dashboard/AnnouncementsCard'
 import DayBoard from '@/components/dashboard/DayBoard'
 import AcademicSummary from '@/components/dashboard/AcademicSummary'
 import { useAcademicProgress } from '@/lib/use-academic-progress'
@@ -423,15 +422,6 @@ export default function DashboardPage() {
           </section>
 
         </div>
-
-        {/* ===== ANNOUNCEMENTS ===== */}
-        {/* Persistent list of Moodle forum posts, populated by useAutoSync
-            after each successful sync. Sits between the widget grid
-            and the calendar so it doesn't compete for the 2-col layout
-            above, but stays high on the page since announcements are
-            time-sensitive. Hidden gracefully when db.announcements
-            is empty (the card renders its own empty state). */}
-        <AnnouncementsCard />
 
         {/* ===== WEEKLY CALENDAR — wraps the existing CalendarWeek grid ===== */}
         <div className="dash-v2-section-head">

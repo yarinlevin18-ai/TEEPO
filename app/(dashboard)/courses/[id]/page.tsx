@@ -32,7 +32,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, CheckCircle2, Check, X, Mail, Trash2,
-  RefreshCw, Loader2, Plus, MapPin, Calendar as CalendarIcon,
+  Loader2, Plus, MapPin, Calendar as CalendarIcon,
   User as UserIcon, FileText, ExternalLink, Folder, Link as LinkIcon,
   BookOpen, ClipboardCheck, NotebookPen,
 } from 'lucide-react'
@@ -45,8 +45,6 @@ import { matchCourseForEvent } from '@/lib/event-course-match'
 import { groupFilesByLesson } from '@/lib/lesson-grouping'
 import { ensureSubfolder } from '@/lib/drive-folders'
 import { moveFile } from '@/lib/drive-files'
-import { supabase } from '@/lib/supabase'
-import { BACKEND_URL } from '@/lib/backend-url'
 import type { Assignment, Course, CourseNote, StudyTask, TeachingAssistant } from '@/types'
 
 // ──────────────────────────────────────────────────────────────────────
@@ -164,7 +162,7 @@ export default function CoursePage() {
   const courseId = params.id as string
 
   const {
-    db, ready, updateCourse, flushSave,
+    db, ready,
     createTask, updateTask, deleteTask,
     createAssignment, updateAssignment, deleteAssignment,
   } = useDB() as any
@@ -183,63 +181,6 @@ export default function CoursePage() {
   // Tab state — defaults to קבצים (mockup's default landing).
   type Tab = 'files' | 'tasks' | 'notes'
   const [tab, setTab] = useState<Tab>('files')
-
-  // Per-course Moodle resync — pulls the global course list from the
-  // backend (same endpoint /moodle's "סנכרן הכל" uses) and merges only
-  // THIS course's fresh metadata into the local DB.
-  const [syncing, setSyncing] = useState(false)
-  const syncFromMoodle = async () => {
-    if (!course || syncing) return
-    setSyncing(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const headers: Record<string, string> = session?.access_token
-        ? { Authorization: `Bearer ${session.access_token}` }
-        : {}
-      const res = await fetch(`${BACKEND_URL}/api/university/courses`, {
-        headers,
-        signal: AbortSignal.timeout(60_000),
-      })
-      if (!res.ok) throw new Error(`Backend ${res.status}`)
-      const data = await res.json()
-      if (data.status === 'error') throw new Error(data.message || 'הסנכרון נכשל')
-      const scraped: any[] = data.courses || []
-      const match = scraped.find((c: any) =>
-        (course.source_url && c.url === course.source_url) ||
-        c.title === course.title
-      )
-      if (!match) {
-        setNotice('הקורס לא נמצא בסנכרון. אולי הוא הוסר מ-Moodle?')
-        return
-      }
-      await updateCourse(course.id, {
-        source: 'bgu',
-        source_url: match.url || course.source_url,
-        shortname: match.shortname,
-        moodle_startdate: match.startdate || undefined,
-        moodle_enddate: match.enddate || undefined,
-        category_name: match.category_name,
-        ...(match.lecturer_email !== undefined ? { lecturer_email: match.lecturer_email ?? undefined } : {}),
-        ...(match.syllabus_url !== undefined ? { syllabus_url: match.syllabus_url ?? undefined } : {}),
-        ...(match.teaching_assistants !== undefined ? { teaching_assistants: match.teaching_assistants } : {}),
-        ...(match.course_links !== undefined ? { course_links: match.course_links } : {}),
-        ...(match.portal_metadata !== undefined ? { portal_metadata: match.portal_metadata } : {}),
-      })
-      if (typeof flushSave === 'function') {
-        try { await flushSave() } catch {}
-      }
-      setNotice('הקורס סונכרן בהצלחה מ-Moodle ✓')
-    } catch (e: any) {
-      if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
-        setNotice('השרת לא הגיב — נסה שוב בעוד דקה')
-      } else {
-        console.warn('[course-sync]', e)
-        setNotice('שגיאה בסנכרון: ' + (e?.message || 'נסה שוב'))
-      }
-    } finally {
-      setSyncing(false)
-    }
-  }
 
   // Quick-add a StudyTask tagged to this course. The mockup's "הוסף
   // מטלה או משימה במהירות" footer maps to this single call.
@@ -414,19 +355,6 @@ export default function CoursePage() {
                 <ClipboardCheck size={14} />
                 תרגול
               </Link>
-              {course.source === 'bgu' && (
-                <button
-                  type="button"
-                  onClick={syncFromMoodle}
-                  disabled={syncing}
-                  className="course-v2-btn"
-                >
-                  {syncing
-                    ? <Loader2 size={14} className="course-v2-spin" />
-                    : <RefreshCw size={14} />}
-                  {syncing ? 'מסנכרן…' : 'סנכרן מ-Moodle'}
-                </button>
-              )}
               <a
                 href={driveUrl}
                 target="_blank"
@@ -613,7 +541,7 @@ export default function CoursePage() {
                     <div className="course-v2-empty" style={{ marginTop: 12 }}>
                       <p>אין עדיין מטלות לקורס.</p>
                       <span className="course-v2-empty-hint">
-                        סנכרן מ-Moodle או הוסף מטלה חדשה למעלה.
+                        הוסף מטלה חדשה למעלה.
                       </span>
                     </div>
                   ) : (
@@ -920,7 +848,7 @@ function LecturerSidebar({
     return (
       <div className="course-v2-side-card">
         <h3>מרצה</h3>
-        <p className="course-v2-side-empty">אין פרטי מרצה. סנכרן מ-Moodle לשליפה אוטומטית.</p>
+        <p className="course-v2-side-empty">אין פרטי מרצה.</p>
       </div>
     )
   }

@@ -29,8 +29,6 @@ import {
 } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
 import { useDriveFiles } from '@/lib/use-drive-files'
-import { api } from '@/lib/api-client'
-import SyncAllButton from '@/components/sync/SyncAllButton'
 import type { Assignment, AssignmentTask, Course } from '@/types'
 
 // Deterministic palette index — shared with /tasks + /summaries so a
@@ -314,20 +312,9 @@ export default function AssignmentsPage() {
     if (!addForm.title.trim()) return
     setAdding(true)
     try {
-      let subtasks: AssignmentTask[] = []
-      try {
-        const r = await api.assignments.breakdown(addForm.title, addForm.description, addForm.deadline)
-        const tasks: any[] = r?.tasks ?? []
-        subtasks = tasks.map((t, i) => ({
-          id: `at_${Date.now()}_${i}`,
-          assignment_id: '',
-          title: t.title,
-          description: t.description,
-          order_index: t.order ?? i + 1,
-          is_completed: false,
-          estimated_hours: t.estimated_hours,
-        }))
-      } catch { /* AI down — ship without breakdown */ }
+      // The AI breakdown backend has been retired — create the assignment
+      // without auto-generated subtasks. Users can add steps manually
+      // (see onAddSubtask).
       const created = await createAssignment({
         title: addForm.title.trim(),
         description: addForm.description.trim() || undefined,
@@ -335,7 +322,7 @@ export default function AssignmentsPage() {
         course_id: addForm.course_id || undefined,
         status: 'todo',
         priority: 'medium',
-        assignment_tasks: subtasks,
+        assignment_tasks: [],
       })
       setAddForm({ title: '', description: '', deadline: '', course_id: '' })
       setShowAdd(false)
@@ -372,7 +359,6 @@ export default function AssignmentsPage() {
             </div>
           </div>
           <div className="tasks-v2-head-actions">
-            <SyncAllButton variant="ghost" />
             <button
               type="button"
               className="tasks-v2-add-btn"
