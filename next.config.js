@@ -4,26 +4,15 @@
 // Note: Next.js in dev needs 'unsafe-eval'; we relax it only outside production.
 const isDev = process.env.NODE_ENV !== 'production'
 
-// Allow the configured Flask backend (Render) + any *.onrender.com fallback
-// so production fetches from the dashboard pages aren't blocked by CSP.
-const backendOrigin = (() => {
-  try {
-    if (process.env.NEXT_PUBLIC_BACKEND_URL) return new URL(process.env.NEXT_PUBLIC_BACKEND_URL).origin
-  } catch {}
-  return ''
-})()
-
 const connectSrc = [
   "'self'",
-  backendOrigin,
-  'https://*.onrender.com',
   'https://*.supabase.co',
   'wss://*.supabase.co',
   'https://accounts.google.com',
   'https://oauth2.googleapis.com',
   'https://www.googleapis.com',
   'https://apis.google.com',
-  isDev ? 'http://localhost:5000' : '',
+  'https://api.anthropic.com',
   isDev ? 'ws://localhost:*' : '',
   'https://my.spline.design',
   'https://prod.spline.design',
@@ -59,12 +48,7 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  i18n: {
-    locales: ['he'],
-    defaultLocale: 'he',
-  },
   env: {
-    NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000',
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
   },
