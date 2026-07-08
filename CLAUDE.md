@@ -25,7 +25,7 @@ The human-facing workflow rules live in [CONTRIBUTING.md](./CONTRIBUTING.md). Re
 - English, present tense, imperative mood: `add notebook export`, not `added` or `adds`.
 - Keep each commit focused. Split unrelated changes into separate commits.
 - Never use `--no-verify`, `--force`, or `--amend` on a pushed commit without explicit user approval.
-- Never commit `.env*`, credentials, API keys, or anything from `backend/data/chrome_profile/`. The `.gitignore` covers most of this — do not bypass it.
+- Never commit `.env*`, credentials, or API keys. The `.gitignore` covers most of this — do not bypass it.
 
 ## Pull requests
 
@@ -43,8 +43,8 @@ The human-facing workflow rules live in [CONTRIBUTING.md](./CONTRIBUTING.md). Re
 - Frontend: prefer server components. Reach for `"use client"` only when state, effects, or browser APIs are actually needed.
 - Reuse primitives in `components/ui/` before introducing new ones.
 - Run `npm run lint` before pushing.
-- Backend: Python 3.11+, type hints on public functions. Routes in `backend/routes/`, agents in `backend/agents/`, business logic in `backend/services/`. Secrets only via `config.py`.
-- Database: schema changes require a new numbered migration (`backend/migrate_NNN.sql`) — never edit existing migrations. Update `supabase/schema.sql` and re-verify `supabase/rls_audit.sql`.
+- **Frontend-only — there is no server.** The Python backend was retired (see [docs/REBUILD_PLAN.md](./docs/REBUILD_PLAN.md)). App logic lives in the Next.js app + a few serverless routes under `app/api/`. Server-side secrets (e.g. `ANTHROPIC_API_KEY`) are read from the environment inside those routes only — never `NEXT_PUBLIC_*`.
+- **Data storage:** per-user data is a JSON blob in the user's Google Drive (`TEEPO/db.json`, via `lib/drive-db.ts` + `lib/db-context.tsx`), NOT a database. Supabase is auth-only (`supabase/README.md`). To add a persisted field, extend the `DriveDB` interface + `EMPTY_DB` and add CRUD to the db-context — no SQL migration.
 
 ## Coordination between contributors
 
