@@ -20,6 +20,8 @@ import {
   StudentProfile, StudentCourse,
 } from './drive-db'
 import { ensureCourseFolders, ensurePath, moveFolder, pathForCourse, sanitizeFolderName } from './drive-folders'
+import { isDevAuthBypassEnabled } from './dev-auth-bypass'
+import { loadDevDB, saveDevDB, resetDevDB } from './dev-db'
 import type {
   Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings,
   PracticeQuiz, PracticeAttempt,
@@ -161,6 +163,17 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   // Load DB on mount / when token becomes available
   const reload = useCallback(async () => {
     if (!user) return
+    // Dev bypass: no real Google token exists, so Drive is unreachable.
+    // Load the localStorage-backed demo DB instead (see lib/dev-db.ts) so
+    // every page works offline instead of dead-ending on a Drive banner.
+    if (isDevAuthBypassEnabled()) {
+      setDb(loadDevDB())
+      setHandle(null)
+      setReady(true)
+      setLoading(false)
+      setError(null)
+      return
+    }
     setLoading(true)
     setError(null)
     try {
@@ -212,6 +225,11 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   // `lib/drive-db` so writes from any context (workers, signOut handlers) share
   // the same queue. We just kick it and react to the eventual settled Promise.
   const scheduleSave = useCallback((next: DriveDB) => {
+    // Dev bypass: persist to localStorage synchronously — no Drive, no debounce.
+    if (isDevAuthBypassEnabled()) {
+      saveDevDB(next)
+      return
+    }
     if (!handle) return
     withToken(t => saveDBDebounced(t, handle, next))
       .then(saved => setDb(prev => ({ ...prev, updated_at: saved.updated_at })))
@@ -751,6 +769,11 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   const resetAccountData = useCallback(async (
     opts: { wipeDriveFolders?: boolean } = {},
   ): Promise<{ trashedFolders: number }> => {
+    // Dev bypass: "reset" means wipe localStorage and reseed the demo data.
+    if (isDevAuthBypassEnabled()) {
+      setDb(resetDevDB())
+      return { trashedFolders: 0 }
+    }
     if (!handle) throw new Error('מסד הנתונים טרם נטען.')
     const teepoFolderId = handle.folderId
     let trashed = 0

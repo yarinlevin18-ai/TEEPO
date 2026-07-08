@@ -21,6 +21,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useDB } from '@/lib/db-context'
 import { useWeekCalendar } from '@/lib/use-week-calendar'
 import { probeTokenScopes } from '@/lib/drive-db'
+import { isDevAuthBypassEnabled } from '@/lib/dev-auth-bypass'
 
 interface ScopeInfo {
   hasDriveFile?: boolean
@@ -41,6 +42,11 @@ export default function DiagnosticsPage() {
   const probeScopes = async () => {
     if (!googleToken) {
       setScopes({ error: 'no_token' })
+      return
+    }
+    // Dev bypass: the fake token would just 400 against tokeninfo.
+    if (isDevAuthBypassEnabled()) {
+      setScopes({ error: 'dev-bypass (אין טוקן אמיתי במצב פיתוח)' })
       return
     }
     setScopesLoading(true)

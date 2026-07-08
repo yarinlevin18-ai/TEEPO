@@ -48,7 +48,7 @@
      thin aliases pointing at the new tokens so we don't have to retire
      every reference at once. The actual font variables are injected by
      `next/font/google` in app/layout.tsx and exposed on <html>. */
-  --font-script: var(--font-fredoka, 'Assistant', sans-serif);
+  --font-script: var(--font-fredoka, var(--font-assistant), 'Assistant', sans-serif);
   --bg1: var(--bg);
   --bg2: var(--bg-elev);
   --glow1: 22, 163, 74;
@@ -132,7 +132,7 @@ select:focus-visible {
   padding: 8px 14px;
   background: var(--lp-accent, #16a34a);
   color: white;
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   font-size: 13px;
   font-weight: 700;
   border-radius: 8px;
@@ -1771,7 +1771,7 @@ html.light .badge-danger {
    ════════════════════════════════════════════════════════════════════ */
 
 .teepo-login {
-  font-family: 'Assistant', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', sans-serif;
   color: var(--ink);
   line-height: 1.55;
   min-height: 100vh;
@@ -1851,7 +1851,7 @@ html.light .badge-danger {
   --lp-shadow-lg: 0 24px 50px -10px rgba(120,70,30,.22), 0 8px 20px rgba(120,70,30,.1);
 
   caret-color: transparent; /* avoid stray text-caret bleed on focusable bodies */
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   color: var(--lp-ink);
   background-color: var(--lp-bg);
   /* matte paper grain — static, tiles over the whole page */
@@ -1988,7 +1988,7 @@ html.dark .cream-page::before { opacity: .35; }
   display: flex;
   align-items: center;
   gap: 14px;
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
 }
 .topnav-v2 .tn-section { display: flex; gap: 1px; }
 .topnav-v2 .tn-divider {
@@ -2206,7 +2206,7 @@ html.dark .cream-page::before { opacity: .35; }
    Source: teepo-design/mockup_dashboard.html `.lcd-date`, `.lcd-time`.
    ════════════════════════════════════════════════════════════════════ */
 .lcd {
-  font-family: 'VT323', 'Share Tech Mono', monospace;
+  font-family: var(--font-vt323), 'VT323', 'Share Tech Mono', monospace;
   color: #a3e635;
   background: linear-gradient(180deg, #1a1410 0%, #0d0907 100%);
   padding: 4px 14px 2px;
@@ -2292,7 +2292,7 @@ html.dark .cream-page::before { opacity: .35; }
   font-size: 18px;
   color: var(--lp-ink-soft, #5c3f2f);
   font-weight: 500;
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   margin-top: 8px;
 }
 .loading-dots {
@@ -2595,7 +2595,7 @@ html.dark .cream-page::before { opacity: .35; }
   animation: fadeUp .55s ease .1s both;
 }
 .setup-eyebrow {
-  font-family: 'Frank Ruhl Libre', serif;
+  font-family: var(--font-serif), 'Frank Ruhl Libre', serif;
   font-style: italic;
   font-weight: 700;
   color: var(--lp-accent);
@@ -2604,7 +2604,7 @@ html.dark .cream-page::before { opacity: .35; }
   margin-bottom: 8px;
 }
 .setup-h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(38px, 5vw, 54px);
   font-weight: 900;
   letter-spacing: -2px;
@@ -2670,7 +2670,7 @@ html.dark .cream-page::before { opacity: .35; }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-weight: 800;
   font-size: 14px;
 }
@@ -2697,7 +2697,7 @@ html.dark .cream-page::before { opacity: .35; }
 
 .setup-step-body { min-width: 0; }
 .setup-step-body h3 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 17px;
   font-weight: 700;
   color: var(--lp-ink);
@@ -2803,7 +2803,7 @@ html.dark .cream-page::before { opacity: .35; }
   color: white;
   border: 0;
   border-radius: 14px;
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-weight: 700;
   font-size: 16px;
   padding: 14px 20px;
@@ -2868,7 +2868,7 @@ html.dark .cream-page::before { opacity: .35; }
 }
 .courses-error-body { flex: 1; min-width: 0; }
 .courses-error-body h2 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 17px;
   font-weight: 800;
   color: #7c2d12;
@@ -2924,7 +2924,7 @@ html.dark .cream-page::before { opacity: .35; }
   justify-content: center;
 }
 .courses-empty h2 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(24px, 3vw, 32px);
   font-weight: 900;
   letter-spacing: -1px;
@@ -3014,7 +3014,7 @@ html.dark .cream-page::before { opacity: .35; }
   margin-bottom: 32px;
 }
 .diag-eyebrow {
-  font-family: 'Frank Ruhl Libre', serif;
+  font-family: var(--font-serif), 'Frank Ruhl Libre', serif;
   font-style: italic;
   font-weight: 700;
   color: var(--lp-accent);
@@ -3023,7 +3023,7 @@ html.dark .cream-page::before { opacity: .35; }
   margin-bottom: 8px;
 }
 .diag-h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(32px, 4vw, 48px);
   font-weight: 900;
   letter-spacing: -1.5px;
@@ -3057,7 +3057,7 @@ html.dark .cream-page::before { opacity: .35; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 14px;
   font-weight: 800;
   letter-spacing: -.3px;
@@ -3143,7 +3143,7 @@ html.dark .cream-page::before { opacity: .35; }
   background: var(--lp-bg);
   border: 1px solid var(--lp-line);
   border-radius: 999px;
-  font-family: 'VT323', monospace;
+  font-family: var(--font-vt323), 'VT323', monospace;
   font-size: 13px;
   color: var(--lp-ink);
   cursor: pointer;
@@ -3244,7 +3244,7 @@ html.dark .cream-page::before { opacity: .35; }
   padding: 26px 28px 30px;
 }
 .summaries-page .sum-eyebrow {
-  font-family: 'Frank Ruhl Libre', serif;
+  font-family: var(--font-serif), 'Frank Ruhl Libre', serif;
   font-style: italic;
   font-size: 14px;
   font-weight: 700;
@@ -3253,7 +3253,7 @@ html.dark .cream-page::before { opacity: .35; }
   margin-bottom: 8px;
 }
 .summaries-page .sum-h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(38px, 5vw, 54px);
   font-weight: 900;
   letter-spacing: -2px;
@@ -4211,7 +4211,7 @@ html.dark .cream-page::before { opacity: .35; }
   margin-bottom: 10px;
 }
 .classify-page .classify-head h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(28px, 4vw, 40px);
   font-weight: 900;
   letter-spacing: -1px;
@@ -4224,7 +4224,7 @@ html.dark .cream-page::before { opacity: .35; }
   line-height: 1.6;
 }
 .classify-page .classify-sub code {
-  font-family: 'VT323', 'Share Tech Mono', monospace;
+  font-family: var(--font-vt323), 'VT323', 'Share Tech Mono', monospace;
   background: var(--lp-bg-elev);
   padding: 1px 6px;
   border-radius: 4px;
@@ -4398,7 +4398,7 @@ html.dark .cream-page::before { opacity: .35; }
   max-width: 500px; margin: 0 auto 24px;
 }
 .classify-page .classify-success code {
-  font-family: 'VT323', 'Share Tech Mono', monospace;
+  font-family: var(--font-vt323), 'VT323', 'Share Tech Mono', monospace;
   background: var(--lp-bg-elev);
   padding: 1px 6px;
   border-radius: 4px;
@@ -5802,7 +5802,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
      (some browsers + Caret Browsing render a hairline on focused regions) */
   caret-color: transparent;
 
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   color: var(--lp-ink);
   background-color: var(--lp-bg);
   /* fine matte paper grain — static, repeats over the whole page */
@@ -5872,7 +5872,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
   animation: lpFadeUp 1s ease .15s both;
 }
 .landing-page h1.tagline {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(42px, 6vw, 72px);
   font-weight: 900;
   line-height: 1.15;
@@ -5927,7 +5927,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
   font-weight: 700;
   border-radius: 14px;
   cursor: pointer;
-  font-family: 'Assistant', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', sans-serif;
   text-decoration: none;
   box-shadow: 0 8px 20px -4px rgba(22,163,74,.4), 0 3px 8px rgba(22,163,74,.2);
   transition: transform .2s ease, box-shadow .2s ease;
@@ -6079,7 +6079,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
   filter: drop-shadow(0 2px 4px rgba(91, 70, 52, .15));
 }
 .landing-page .lp-nav-word {
-  font-family: 'Fredoka', sans-serif;
+  font-family: var(--font-fredoka), 'Fredoka', sans-serif;
   font-size: 24px;
   font-weight: 600;
   color: var(--lp-brand-teal);
@@ -6090,7 +6090,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: 'Assistant', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', sans-serif;
   font-size: 15px;
   font-weight: 600;
   color: var(--lp-ink);
@@ -6147,7 +6147,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
    subtitle in muted ink-soft. Same treatment across features + how it works. */
 .landing-page .section-eyebrow {
   display: block;
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(34px, 4.5vw, 52px);
   font-weight: 900;
   letter-spacing: -1.2px;
@@ -6157,7 +6157,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
   margin-bottom: 16px;
 }
 .landing-page .section-head h2 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(20px, 2.4vw, 28px);
   font-weight: 600;
   letter-spacing: -0.4px;
@@ -6186,7 +6186,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
   box-shadow: var(--lp-shadow-lg);
 }
 .landing-page .step-num {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 56px;
   font-weight: 900;
   line-height: 1;
@@ -6238,7 +6238,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
 }
 .landing-page .final-cta-inner > * { position: relative; z-index: 1; }
 .landing-page .final-cta h2 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(26px, 3.5vw, 38px);
   font-weight: 900;
   letter-spacing: -1px;
@@ -6257,7 +6257,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
   gap: 8px;
   background: #fff;
   color: #14532d;
-  font-family: 'Assistant', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', sans-serif;
   font-size: 17px;
   font-weight: 700;
   padding: 14px 32px;
@@ -6556,7 +6556,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
 /* ──────────── DEMO (landing iframe) ──────────── */
 
 .teepo-demo {
-  font-family: 'Assistant', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', sans-serif;
   color: var(--ink);
   min-height: 100vh;
 }
@@ -6862,7 +6862,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
   display: flex;
   align-items: center;
   gap: 12px;
-  font-family: 'Assistant', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', sans-serif;
 }
 .tn-logo {
   font-size: 22px;
@@ -7173,7 +7173,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
   flex-wrap: wrap;
 }
 .tasks-v2 .t-title-block h1 {
-  font-family: 'Heebo', 'Assistant', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', var(--font-assistant), 'Assistant', sans-serif;
   font-size: clamp(34px, 4.5vw, 52px);
   font-weight: 900;
   letter-spacing: -1.8px;
@@ -7287,7 +7287,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
 .tasks-v2 .t-section.week   .t-sec-icon { color: #d97706; }
 .tasks-v2 .t-section.later  .t-sec-icon { color: #6366f1; }
 .tasks-v2 .t-sec-label {
-  font-family: 'Frank Ruhl Libre', 'Heebo', serif;
+  font-family: var(--font-serif), 'Frank Ruhl Libre', var(--font-heebo), 'Heebo', serif;
   font-size: 22px;
   font-weight: 700;
   font-style: italic;
@@ -7667,7 +7667,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
 }
 .sync-modal-head h2 {
   margin: 0;
-  font-family: 'Frank Ruhl Libre', Georgia, serif;
+  font-family: var(--font-serif), 'Frank Ruhl Libre', Georgia, serif;
   font-size: 22px; font-weight: 700;
   color: var(--ink, #2d1810);
 }
@@ -7697,7 +7697,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
   border-radius: 12px; padding: 12px 14px; text-align: center;
 }
 .sync-sum-num {
-  font-family: 'Heebo', sans-serif; font-weight: 800; font-size: 24px; line-height: 1;
+  font-family: var(--font-heebo), 'Heebo', sans-serif; font-weight: 800; font-size: 24px; line-height: 1;
   background: var(--gradient-warm, linear-gradient(135deg, #16a34a, #84cc16));
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
@@ -7713,7 +7713,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
 }
 .sync-course-block-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .sync-course-block-head h3 {
-  font-family: 'Heebo', sans-serif; font-size: 15px; font-weight: 700;
+  font-family: var(--font-heebo), 'Heebo', sans-serif; font-size: 15px; font-weight: 700;
   margin: 0; flex: 1; color: var(--ink, #2d1810);
 }
 .sync-course-block-head small { font-size: 12px; color: var(--muted, #8a7261); font-weight: 600; }
@@ -7777,7 +7777,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
   animation: sync-icon-spin 1s linear infinite;
 }
 .sync-progress h3 {
-  margin: 0 0 4px; font-family: 'Heebo', sans-serif;
+  margin: 0 0 4px; font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 17px; font-weight: 700; color: var(--ink, #2d1810);
 }
 .sync-progress p { margin: 0 0 18px; font-size: 13.5px; color: var(--muted, #8a7261); }
@@ -7815,7 +7815,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
   padding: 50px 24px; text-align: center;
 }
 .sync-empty-ico { color: var(--accent, #16a34a); margin-bottom: 8px; }
-.sync-empty h3 { margin: 0 0 8px; font-family: 'Heebo', sans-serif; font-weight: 800; color: var(--ink, #2d1810); }
+.sync-empty h3 { margin: 0 0 8px; font-family: var(--font-heebo), 'Heebo', sans-serif; font-weight: 800; color: var(--ink, #2d1810); }
 .sync-empty p { margin: 0; color: var(--muted, #8a7261); font-size: 13.5px; }
 
 /* Extension bridge CTA — sits above sync-modal-body on results state */
@@ -7914,7 +7914,7 @@ html.dark .bulk-org-status-close:hover { background: rgba(255, 255, 255, .08); }
 }
 .sync-not-connected h3 {
   margin: 0 0 4px;
-  font-family: 'Heebo', sans-serif; font-weight: 800;
+  font-family: var(--font-heebo), 'Heebo', sans-serif; font-weight: 800;
   color: var(--ink, #2d1810);
   font-size: 18px;
 }
@@ -8223,7 +8223,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   animation: fadeUp .55s ease .05s both;
 }
 .dashboard-v2 .dash-v2-h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(32px, 4.2vw, 52px);
   font-weight: 900;
   letter-spacing: -2px;
@@ -8251,7 +8251,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   padding: 0 4px;
 }
 .dashboard-v2 .dash-v2-section-head h2 {
-  font-family: 'Frank Ruhl Libre', serif;
+  font-family: var(--font-serif), 'Frank Ruhl Libre', serif;
   font-size: 22px;
   font-weight: 700;
   font-style: italic;
@@ -8262,7 +8262,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   gap: 10px;
 }
 .dashboard-v2 .dash-v2-section-head .badge {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 11px;
   font-weight: 700;
   color: var(--lp-muted);
@@ -8306,7 +8306,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   gap: 14px;
   align-items: flex-start;
   box-shadow: var(--lp-shadow-sm);
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
 }
 
 /* ── Timeline column (right) ─────────────────────────────────────── */
@@ -8315,7 +8315,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   padding: 6px 0 8px;
   display: flex;
   flex-direction: column;
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
 }
 /* Hairline spine that the dots sit on. */
 .dashboard-v2 .day-timeline::before {
@@ -8356,7 +8356,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 }
 /* Time pill */
 .dashboard-v2 .tl-time {
-  font-family: 'Share Tech Mono', 'VT323', monospace;
+  font-family: 'Share Tech Mono', var(--font-vt323), 'VT323', monospace;
   font-size: 11.5px;
   letter-spacing: .4px;
   color: var(--lp-ink-soft);
@@ -8515,7 +8515,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   flex-direction: column;
   min-height: 300px;
   transition: box-shadow .25s;
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
 }
 .dashboard-v2 .day-panel:hover { box-shadow: var(--lp-shadow); }
 .dashboard-v2 .dp-head {
@@ -8546,7 +8546,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   display: inline-block;
 }
 .dashboard-v2 .dp-title {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 20px;
   font-weight: 900;
   color: var(--lp-ink);
@@ -8710,7 +8710,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   margin-bottom: 30px;
   animation: fadeUp .55s ease .58s both;
   position: relative;
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
 }
 .dashboard-v2 .academic-summary::before {
   content: '';
@@ -8747,7 +8747,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   letter-spacing: 1.4px;
 }
 .dashboard-v2 .stat-big {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 44px;
   font-weight: 900;
   color: var(--lp-ink);
@@ -8884,7 +8884,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 .dashboard-v2 .dash-v2-widget .w-icon svg { width: 16px; height: 16px; }
 .dashboard-v2 .dash-v2-widget .w-title {
   flex: 1;
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 15px;
   font-weight: 800;
   color: var(--lp-ink);
@@ -9250,7 +9250,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 }
 .dashboard-v2 .dash-v2-announcements .ann-title {
   flex: 1;
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 15px;
   font-weight: 800;
   color: var(--lp-ink);
@@ -9385,7 +9385,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 }
 
 .dashboard-v2 .dash-v2-announcements .ann-row-title {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 14.5px;
   font-weight: 700;
   color: var(--lp-ink);
@@ -9459,7 +9459,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
    ════════════════════════════════════════════════════════════════════ */
 
 .course-v2 {
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   color: var(--lp-ink);
 }
 .course-v2-main {
@@ -9569,7 +9569,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   z-index: 1;
 }
 .course-v2-hero h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(28px, 3.6vw, 40px);
   font-weight: 900;
   letter-spacing: -1.3px;
@@ -9915,7 +9915,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   animation: courseV2SlideUp .45s ease .42s both;
 }
 .course-v2-card-title {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 15px;
   font-weight: 800;
   color: var(--lp-ink);
@@ -10353,7 +10353,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
    ════════════════════════════════════════════════════════════════════ */
 
 .settings-v2 {
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   color: var(--lp-ink);
 }
 .settings-v2-main {
@@ -10381,7 +10381,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   flex-shrink: 0;
 }
 .settings-v2-head h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 28px;
   font-weight: 900;
   color: var(--lp-ink);
@@ -10423,7 +10423,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 }
 .settings-v2-card-head h2 {
   flex: 1;
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 16px;
   font-weight: 800;
   color: var(--lp-ink);
@@ -10723,7 +10723,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   text-align: end;
 }
 .settings-v2-info-row code {
-  font-family: 'VT323', monospace;
+  font-family: var(--font-vt323), 'VT323', monospace;
   font-size: 13px;
 }
 
@@ -10780,7 +10780,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 .settings-v2-storage-breakdown li > span:first-child { color: var(--lp-ink-soft); }
 .settings-v2-storage-breakdown li > span:last-child {
   color: var(--lp-muted);
-  font-family: 'VT323', monospace;
+  font-family: var(--font-vt323), 'VT323', monospace;
 }
 .settings-v2-storage-counts {
   display: grid;
@@ -11010,7 +11010,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
    ════════════════════════════════════════════════════════════════════ */
 
 .credits-v2 {
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   color: var(--lp-ink);
 }
 .credits-v2-main {
@@ -11037,7 +11037,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   gap: 4px;
 }
 .credits-v2-h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 28px;
   font-weight: 900;
   letter-spacing: -1px;
@@ -11120,7 +11120,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   gap: 14px;
 }
 .credits-v2-card-title {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 16px;
   font-weight: 800;
   color: var(--lp-ink);
@@ -11172,7 +11172,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   color: #6d28d9;
 }
 .credits-v2-stat-value {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 28px;
   font-weight: 900;
   color: var(--lp-ink);
@@ -11561,7 +11561,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   box-shadow: 0 8px 18px -6px var(--lp-accent);
 }
 .credits-v2-wizard-title {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 24px;
   font-weight: 900;
   color: var(--lp-ink);
@@ -11574,7 +11574,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   margin: 0;
 }
 .credits-v2-wizard-h2 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 17px;
   font-weight: 800;
   color: var(--lp-ink);
@@ -11842,7 +11842,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
    ════════════════════════════════════════════════════════════════════ */
 
 .moodle-v2 {
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   color: var(--lp-ink);
 }
 .moodle-v2-main {
@@ -11873,7 +11873,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   flex-shrink: 0;
 }
 .moodle-v2-head h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 24px;
   font-weight: 900;
   color: var(--lp-ink);
@@ -11933,7 +11933,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   gap: 14px;
 }
 .moodle-v2-card-title {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 15px;
   font-weight: 800;
   color: var(--lp-accent-deep, var(--lp-accent));
@@ -12304,7 +12304,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
    ════════════════════════════════════════════════════════════════════ */
 
 .uni-v2 {
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   color: var(--lp-ink);
 }
 .uni-v2-main {
@@ -12335,7 +12335,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 }
 .uni-v2-head-info { flex: 1; min-width: 0; }
 .uni-v2-head-info h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 26px;
   font-weight: 900;
   color: var(--lp-ink);
@@ -12367,7 +12367,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 14px;
   font-weight: 800;
   color: var(--lp-ink);
@@ -12412,7 +12412,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   text-align: left;
 }
 .uni-v2-semester-remaining .value {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 24px;
   font-weight: 900;
   color: var(--lp-accent);
@@ -12614,7 +12614,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   color: inherit;
 }
 .uni-v2-award-value {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 26px;
   font-weight: 900;
   color: var(--lp-ink);
@@ -12701,7 +12701,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
    ════════════════════════════════════════════════════════════════════ */
 
 .extract-v2 {
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   color: var(--lp-ink);
 }
 .extract-v2-main {
@@ -12715,7 +12715,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 
 /* Header */
 .extract-v2-head h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 24px;
   font-weight: 900;
   color: var(--lp-ink);
@@ -12891,7 +12891,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   display: flex;
   flex-direction: column;
   gap: 14px;
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   color: var(--lp-ink);
 }
 .grades-v2-head {
@@ -12917,7 +12917,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   justify-content: center;
 }
 .grades-v2-title h2 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 15px;
   font-weight: 800;
   color: var(--lp-ink);
@@ -13049,7 +13049,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
    ════════════════════════════════════════════════════════════════════ */
 
 .uni-picker-v2 {
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   width: 100%;
   max-width: 640px;
   margin: 0 auto;
@@ -13073,7 +13073,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   border: 1px solid var(--lp-line);
 }
 .uni-picker-v2-head h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(22px, 3.5vw, 28px);
   font-weight: 900;
   color: var(--lp-ink);
@@ -13169,7 +13169,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   background: rgba(225,29,72,.06);
   border: 1px solid rgba(225,29,72,.22);
   color: var(--lp-rose, #be123c);
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
 }
 .ui-error-alert-icon {
   flex-shrink: 0;
@@ -13207,7 +13207,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   padding: 40px 28px 32px;
   text-align: center;
   box-shadow: var(--lp-shadow-sm);
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -13225,7 +13225,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   margin-bottom: 6px;
 }
 .ui-empty-state-title {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 18px;
   font-weight: 800;
   color: var(--lp-ink);
@@ -13243,7 +13243,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 
 /* PageSkeleton (.ui-page-skeleton) */
 .ui-page-skeleton {
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
 }
 .ui-page-skeleton-main {
   padding: 36px 24px 80px;
@@ -13343,7 +13343,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   font-size: 18px;
   color: var(--lp-ink-soft, #5c3f2f);
   font-weight: 500;
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   margin-top: 8px;
 }
 
@@ -13459,7 +13459,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 }
 .drive-organize-v2 .do-v2-banner-text { flex: 1; min-width: 0; text-align: right; }
 .drive-organize-v2 .do-v2-banner-title {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 18px;
   font-weight: 800;
   color: var(--lp-ink);
@@ -13808,7 +13808,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
    ════════════════════════════════════════════════════════════════════ */
 
 .tasks-v2-page {
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   color: var(--lp-ink);
 }
 .tasks-v2-main {
@@ -13836,7 +13836,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   flex-wrap: wrap;
 }
 .tasks-v2-title-block h1 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: clamp(36px, 4.5vw, 52px);
   font-weight: 900;
   letter-spacing: -1.8px;
@@ -13963,7 +13963,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   font-size: 18px;
 }
 .tasks-v2-sec-label {
-  font-family: 'Frank Ruhl Libre', serif;
+  font-family: var(--font-serif), 'Frank Ruhl Libre', serif;
   font-size: 22px;
   font-weight: 700;
   font-style: italic;
@@ -14270,7 +14270,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   background: var(--course-color, var(--lp-accent));
 }
 .tasks-v2-detail h2 {
-  font-family: 'Frank Ruhl Libre', Georgia, serif;
+  font-family: var(--font-serif), 'Frank Ruhl Libre', Georgia, serif;
   font-size: 24px;
   font-weight: 700;
   line-height: 1.25;
@@ -14348,7 +14348,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   margin-bottom: 10px;
 }
 .tasks-v2-sub-head h3 {
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
   font-size: 14.5px;
   font-weight: 700;
   margin: 0;
@@ -14688,7 +14688,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 }
 .tasks-v2-modal-head h2 {
   margin: 0;
-  font-family: 'Frank Ruhl Libre', Georgia, serif;
+  font-family: var(--font-serif), 'Frank Ruhl Libre', Georgia, serif;
   font-size: 20px;
   font-weight: 700;
 }
@@ -14758,7 +14758,7 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   gap: 8px;
   padding: 11px 18px;
   border-radius: 12px;
-  font-family: 'Assistant', 'Heebo', sans-serif;
+  font-family: var(--font-assistant), 'Assistant', var(--font-heebo), 'Heebo', sans-serif;
   font-size: 14px;
   font-weight: 700;
   border: none;
@@ -14785,3 +14785,402 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   background: var(--lp-bg-hover, #f1e3c4);
 }
 
+
+/* ════════════════════════════════════════════════════════════════════
+   Todos page v2 — app/(dashboard)/todos/page.tsx
+   Source: teepo-design/mockup_todos.html
+   ────────────────────────────────────────────────────────────────────
+   Cream redesign: 4 grouped sections (היום / השבוע / בהמשך / הושלמו)
+   with a quick-add input on top. Mirrors the .dashboard-v2 / .settings-v2
+   namespace convention so dark-mode + cream tokens cascade in cleanly
+   from the parent .cream-page wrapper. Framer-motion drives section +
+   row enter animations from the page component; the CSS below only
+   handles layout, color, and hover/done states.
+   ════════════════════════════════════════════════════════════════════ */
+.todos-v2 .todos-v2-main {
+  padding: 32px 32px 60px;
+  max-width: 880px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 10;
+}
+
+/* ─── Page head ─────────────────────────────────────────────────── */
+.todos-v2-head {
+  margin-bottom: 28px;
+  padding: 20px 8px 4px;
+}
+.todos-v2-eyebrow {
+  font-family: var(--font-serif), 'Frank Ruhl Libre', serif;
+  font-size: 14px;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--lp-accent);
+  letter-spacing: .2px;
+  margin-bottom: 6px;
+  opacity: 0;
+  animation: fadeUp .5s ease .05s both;
+}
+.todos-v2-h1 {
+  font-family: var(--font-heebo), 'Heebo', sans-serif;
+  font-size: clamp(38px, 5vw, 54px);
+  font-weight: 900;
+  letter-spacing: -2px;
+  line-height: 1.05;
+  color: var(--lp-ink);
+  opacity: 0;
+  animation: fadeUp .55s ease .15s both;
+  margin: 0;
+}
+.todos-v2-h1 .accent {
+  background: var(--lp-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.todos-v2-summary {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  opacity: 0;
+  animation: fadeUp .55s ease .25s both;
+}
+.todos-v2-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px;
+  border-radius: 99px;
+  background: rgba(253, 246, 227, .55);
+  border: 1px solid rgba(224, 205, 168, .55);
+  backdrop-filter: blur(8px);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--lp-ink-soft);
+  font-size: 13.5px;
+}
+.todos-v2-pill .num { font-weight: 800; color: var(--lp-ink); }
+.todos-v2-pill.today { color: var(--lp-ink); }
+.todos-v2-pill.done  { color: var(--lp-accent); }
+
+/* ─── Quick add ─────────────────────────────────────────────────── */
+.todos-v2-quick-add {
+  margin-bottom: 24px;
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 16px;
+  padding: 6px 16px 6px 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--lp-shadow-sm);
+  transition: box-shadow .2s, border-color .2s, transform .2s;
+  opacity: 0;
+  animation: fadeUp .5s ease .3s both;
+}
+.todos-v2-quick-add:focus-within {
+  border-color: var(--lp-accent);
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, .1), var(--lp-shadow);
+}
+.todos-v2-plus-btn {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  background: var(--lp-gradient);
+  border: 0;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  transition: transform .15s;
+}
+.todos-v2-plus-btn:hover { transform: scale(1.08); }
+.todos-v2-plus-btn:focus-visible {
+  outline: 2px solid var(--lp-accent);
+  outline-offset: 2px;
+}
+.todos-v2-quick-add input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--lp-ink);
+  outline: none;
+  padding: 10px 0;
+  caret-color: var(--lp-ink);
+}
+.todos-v2-quick-add input::placeholder {
+  color: var(--lp-muted);
+  font-weight: 400;
+}
+.todos-v2-hint {
+  font-size: 12px;
+  color: var(--lp-muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.todos-v2-hint kbd {
+  background: var(--lp-bg-elev);
+  border: 1px solid var(--lp-line);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: var(--font-vt323), 'VT323', monospace;
+  font-size: 12px;
+  color: var(--lp-ink-soft);
+}
+
+/* ─── Section ───────────────────────────────────────────────────── */
+.todos-v2-section {
+  margin-bottom: 32px;
+}
+.todos-v2-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+.todos-v2-section-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+}
+.todos-v2-section-today .todos-v2-section-icon { color: var(--lp-rose); }
+.todos-v2-section-week  .todos-v2-section-icon { color: var(--lp-amber); }
+.todos-v2-section-later .todos-v2-section-icon { color: var(--lp-indigo); }
+.todos-v2-section-done  .todos-v2-section-icon { color: var(--lp-accent); }
+.todos-v2-section-label {
+  font-family: var(--font-serif), 'Frank Ruhl Libre', serif;
+  font-size: 22px;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--lp-ink);
+  letter-spacing: -.3px;
+  line-height: 1;
+  margin: 0;
+}
+.todos-v2-section-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--lp-muted);
+  background: rgba(253, 246, 227, .65);
+  border: 1px solid var(--lp-line);
+  border-radius: 99px;
+  padding: 2px 9px;
+  letter-spacing: 0;
+}
+
+/* ─── List card (whole group is a single card, rows are dividers) ─ */
+.todos-v2-list {
+  background: var(--lp-bg-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--lp-shadow-sm);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ─── Empty placeholder ─────────────────────────────────────────── */
+.todos-v2-empty {
+  text-align: center;
+  padding: 36px 20px;
+  background: rgba(253, 246, 227, .4);
+  border: 1px dashed var(--lp-line);
+  border-radius: 14px;
+  color: var(--lp-muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+.todos-v2-empty .em {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* ─── Row ───────────────────────────────────────────────────────── */
+.todos-v2-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--lp-line-soft);
+  transition: background .15s;
+}
+.todos-v2-item:last-child { border-bottom: none; }
+.todos-v2-item:hover { background: var(--lp-bg-hover); }
+
+/* Checkbox — real <button role="checkbox"> with animated check icon. */
+.todos-v2-check {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--lp-line);
+  border-radius: 8px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s, transform .2s;
+  flex-shrink: 0;
+  position: relative;
+  color: white;
+  padding: 0;
+}
+.todos-v2-check:hover { border-color: var(--lp-accent); transform: scale(1.08); }
+.todos-v2-check:focus-visible {
+  outline: 2px solid var(--lp-accent);
+  outline-offset: 2px;
+}
+.todos-v2-check svg {
+  opacity: 0;
+  transform: scale(.5);
+  transition: opacity .25s cubic-bezier(.34, 1.56, .64, 1), transform .25s cubic-bezier(.34, 1.56, .64, 1);
+}
+.todos-v2-item.done .todos-v2-check {
+  background: var(--lp-gradient);
+  border-color: transparent;
+}
+.todos-v2-item.done .todos-v2-check svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Title + meta column. */
+.todos-v2-info { min-width: 0; }
+.todos-v2-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--lp-ink);
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.todos-v2-item.done .todos-v2-title .text {
+  color: var(--lp-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: var(--lp-accent);
+}
+.todos-v2-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: var(--lp-bg-elev);
+  color: var(--lp-ink-soft);
+  white-space: nowrap;
+}
+.todos-v2-tag.course { color: white; }
+.todos-v2-meta {
+  font-size: 12.5px;
+  color: var(--lp-muted);
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.todos-v2-meta-piece {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.todos-v2-meta-sep { opacity: .7; }
+
+/* Due-date pill — tone-coloured. */
+.todos-v2-due {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 99px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.todos-v2-due.urgent { background: #fee2e2; color: #b91c1c; }
+.todos-v2-due.soon   { background: #fef3c7; color: #92400e; }
+.todos-v2-due.later  { background: #e0e7ff; color: #3730a3; }
+.todos-v2-due.done   { background: var(--lp-accent-soft); color: var(--lp-accent-deep); }
+
+/* Delete (×) button — invisible until row is hovered or button is focused. */
+.todos-v2-delete {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--lp-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity .15s, background .15s, color .15s;
+  padding: 0;
+}
+.todos-v2-item:hover .todos-v2-delete,
+.todos-v2-delete:focus-visible {
+  opacity: 1;
+}
+.todos-v2-delete:hover {
+  background: rgba(225, 29, 72, .1);
+  color: var(--lp-rose);
+}
+.todos-v2-delete:focus-visible {
+  outline: 2px solid var(--lp-rose);
+  outline-offset: 2px;
+}
+
+/* ─── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .todos-v2 .todos-v2-main { padding: 24px 18px 60px; }
+  .todos-v2-item {
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      'check info due'
+      'check info delete';
+    gap: 12px;
+    padding: 12px 14px;
+  }
+  .todos-v2-check { grid-area: check; }
+  .todos-v2-info  { grid-area: info; }
+  .todos-v2-due   { grid-area: due; justify-self: end; }
+  .todos-v2-delete {
+    grid-area: delete;
+    justify-self: end;
+    width: 24px;
+    height: 24px;
+    opacity: .55; /* always visible on touch — no hover */
+  }
+}
+@media (max-width: 540px) {
+  .todos-v2-hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .todos-v2-eyebrow,
+  .todos-v2-h1,
+  .todos-v2-summary,
+  .todos-v2-quick-add { animation: none; opacity: 1; }
+  .todos-v2-check { transition: none; }
+  .todos-v2-check svg { transition: none; }
+}

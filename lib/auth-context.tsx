@@ -159,6 +159,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Public refresh: backend first, Supabase fallback. Dedupe concurrent callers.
   const refreshGoogleToken = useCallback(async (): Promise<string | null> => {
+    // Dev bypass: there is no real Google session to refresh — hand back the
+    // fake token so callers don't spam Supabase/Google with doomed refreshes.
+    if (isDevAuthBypassEnabled()) return 'dev-bypass-google-token'
     if (refreshInFlightRef.current) return refreshInFlightRef.current
     const promise = (async () => {
       // 1. Preferred: backend → Google token endpoint

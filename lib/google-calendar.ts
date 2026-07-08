@@ -2,6 +2,7 @@
  * Google Calendar API helper
  * Uses the provider_token from Supabase Google OAuth session
  */
+import { isDevAuthBypassEnabled } from './dev-auth-bypass'
 
 export interface GoogleCalendarEvent {
   id: string
@@ -27,6 +28,10 @@ export async function fetchCalendarEvents(
   timeMax: string,
   refreshToken?: () => Promise<string | null>,
 ): Promise<GoogleCalendarEvent[]> {
+  // Dev bypass: no real Google token — return an empty calendar instead of
+  // surfacing TOKEN_EXPIRED errors on the dashboard. (Hard no-op in prod.)
+  if (isDevAuthBypassEnabled()) return []
+
   const params = new URLSearchParams({
     timeMin,
     timeMax,

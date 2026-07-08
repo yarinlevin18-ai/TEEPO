@@ -413,19 +413,23 @@ function TaskCard({ assignment, course }: { assignment: Assignment; course: Cour
       </div>
       <div className="t-card-right">
         <span className={`t-priority ${priority.cls}`}>{priority.label}</span>
-        <a
-          href={driveHref}
-          target="_blank"
-          rel="noopener noreferrer"
+        {/* button, not <a>: the whole card is already a Link, and nested
+            anchors are invalid HTML (hydration error). */}
+        <button
+          type="button"
           className="t-drive-btn"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            window.open(driveHref, '_blank', 'noopener,noreferrer')
+          }}
           title={driveAssignmentsId
             ? 'פתח את תיקיית המטלות של הקורס ב-Drive'
             : 'פתח את Google Drive'}
         >
           <FolderOpen size={12} />
           פתח בדרייב
-        </a>
+        </button>
       </div>
     </Link>
   )
