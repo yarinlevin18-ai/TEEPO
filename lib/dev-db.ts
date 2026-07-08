@@ -13,9 +13,15 @@
  */
 
 import { DriveDB, EMPTY_DB, CURRENT_DB_VERSION } from './drive-db'
-import type { Assignment, Course, StudentCourse, StudyTask } from '@/types'
+import type { Assignment, Course, StudentCourse, StudentProfile, StudyTask } from '@/types'
 
-const KEY = 'teepo_dev_db_v1'
+// The only track in public/catalog.bgu.json — seed it so /credits lands on
+// the real tracking view instead of the onboarding wizard.
+const DEV_TRACK_ID = 'yz_politics'
+
+// Bump this when seedDevDB's shape changes so stale cached demo data
+// (e.g. a seed without student_profile) is discarded on next load.
+const KEY = 'teepo_dev_db_v2'
 const DEV_USER = '00000000-0000-0000-0000-000000000dev'
 
 /** ISO date string N days from now (date-only, local midnight). */
@@ -129,6 +135,13 @@ export function seedDevDB(): DriveDB {
     { id: 'dev-sc-5', course_id: 'manual_5', course_name: 'חשבון אינפיניטסימלי 1', credits: 6, status: 'in_progress', semester: 'א', academic_year: '2025', source: 'manual', updated_at: nowIso() },
   ]
 
+  const student_profile: StudentProfile = {
+    track_id: DEV_TRACK_ID,
+    start_year: 2024,
+    current_year: 2,
+    updated_at: nowIso(),
+  }
+
   return {
     ...EMPTY_DB,
     version: CURRENT_DB_VERSION,
@@ -137,6 +150,7 @@ export function seedDevDB(): DriveDB {
     tasks,
     assignments,
     student_courses,
+    student_profile,
     settings: {
       university: 'bgu',
       setup_seen: true,
