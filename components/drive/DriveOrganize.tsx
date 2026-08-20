@@ -220,6 +220,7 @@ function DegreeColumnView({ degree }: { degree: DegreeColumn }) {
           type="button"
           aria-label={degree.name || 'תואר'}
           role="treeitem"
+          aria-selected={false}
           aria-level={2}
           aria-expanded={realYears.length > 0}
         >
@@ -247,6 +248,7 @@ function YearGroupView({ group }: { group: YearGroupColumn }) {
           type="button"
           aria-label={group.yearLabel}
           role="treeitem"
+          aria-selected={false}
           aria-level={3}
           aria-expanded={group.chips.length > 0}
         >
