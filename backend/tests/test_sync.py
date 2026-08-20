@@ -39,7 +39,7 @@ class TestSyncAll:
         body = res.get_json()
         assert body["courses_scanned"] == 0
         assert body["results"] == []
-        assert body["totals"] == {"new_assignments": 0, "new_files": 0, "new_grades": 0}
+        assert body["totals"] == {"new_assignments": 0, "new_files": 0, "new_grades": 0, "new_announcements": 0}
         assert "synced_at" in body
 
     def test_first_sync_surfaces_everything(self, client, mocker, supabase_mock):
@@ -86,7 +86,7 @@ class TestSyncAll:
         assert len(result["new_grades"]) == 1
         assert len(result["new_files"]) == 1
         assert result["error"] is None
-        assert body["totals"] == {"new_assignments": 2, "new_files": 1, "new_grades": 1}
+        assert body["totals"] == {"new_assignments": 2, "new_files": 1, "new_grades": 1, "new_announcements": 0}
 
     def test_filters_assignments_by_last_synced_at(self, client, mocker, supabase_mock):
         """An assignment with `deadline` earlier than the cutoff is filtered out."""
