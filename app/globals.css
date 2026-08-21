@@ -12006,6 +12006,10 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   color: var(--lp-accent-deep, var(--lp-accent));
   text-decoration: underline;
   font-weight: 600;
+  /* Grow the tap area without shifting layout (audit: 15px-tall links). */
+  display: inline-block;
+  padding: 8px 4px;
+  margin: -8px -4px;
 }
 .moodle-v2-link:hover { color: var(--lp-accent); }
 .moodle-v2-note {
@@ -14958,6 +14962,10 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 .landing-v2-footer-links a {
   color: var(--ink-soft);
   text-decoration: none;
+  /* Comfortable tap area for the footer links without changing layout. */
+  display: inline-block;
+  padding: 10px 6px;
+  margin: -10px -6px;
 }
 .landing-v2-footer-links a:hover { color: var(--accent-deep); text-decoration: underline; }
 @media (max-width: 700px) {
@@ -15151,7 +15159,13 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   color: var(--muted);
   line-height: 1.6;
 }
-.login-v2-foot a { color: var(--accent-deep); text-decoration: underline; }
+.login-v2-foot a {
+  color: var(--accent-deep);
+  text-decoration: underline;
+  display: inline-block;
+  padding: 8px 4px;
+  margin: -8px -4px;
+}
 .login-v2-footer {
   display: flex;
   justify-content: center;
