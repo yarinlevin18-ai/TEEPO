@@ -30,6 +30,11 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     locale: 'he-IL',
+    // Environments with a system Chromium (e.g. remote sandboxes) can point
+    // at it instead of downloading a browser: PLAYWRIGHT_CHROMIUM_PATH=/path
+    ...(process.env.PLAYWRIGHT_CHROMIUM_PATH
+      ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH } }
+      : {}),
   },
 
   projects: [
