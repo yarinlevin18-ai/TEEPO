@@ -9006,8 +9006,9 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   box-shadow: 0 0 0 3px rgba(22, 163, 74, .1);
 }
 .dashboard-v2 .dash-v2-widget .todo-add .ta-plus {
-  width: 24px;
-  height: 24px;
+  /* 36px visual (was 24px) — minimum comfortable touch target. */
+  width: 36px;
+  height: 36px;
   background: var(--lp-gradient);
   color: white;
   border: none;
