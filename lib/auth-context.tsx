@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback } f
 import { supabase } from './supabase'
 import type { User, Session } from '@supabase/supabase-js'
 import { isDevAuthBypassEnabled, FAKE_USER, FAKE_SESSION } from './dev-auth-bypass'
+import { refreshGoogleAccessToken, storeGoogleRefreshToken } from './auth-backend'
 
 const GOOGLE_TOKEN_KEY = 'smartdesk_google_token'
 const GOOGLE_REFRESH_KEY = 'smartdesk_google_refresh_token'
@@ -93,6 +94,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   )
 
+  // Best-effort upload of the refresh token for encrypted server-side
+  // storage (see /api/auth/store-google-refresh), so other devices with a
+  // valid Supabase session can refresh without re-OAuth. Deduped per token
+  // so TOKEN_REFRESHED events don't spam the endpoint; never blocks auth.
+  const lastUploadedRefreshRef = useRef<string | null>(null)
+  const maybeUploadRefreshToken = useCallback(
+    (refreshToken: string | null | undefined, jwt: string | null | undefined) => {
+      if (!refreshToken || !jwt) return
+      if (lastUploadedRefreshRef.current === refreshToken) return
+      lastUploadedRefreshRef.current = refreshToken
+      void storeGoogleRefreshToken(refreshToken, jwt).then((stored) => {
+        if (!stored) lastUploadedRefreshRef.current = null // retry on next event
+      })
+    },
+    []
+  )
+
   // Load stored Google token from localStorage
   const loadStoredGoogleToken = useCallback(() => {
     try {
@@ -124,35 +142,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshViaBackend = useCallback(async (): Promise<string | null> => {
     let refreshToken: string | null = null
     try { refreshToken = localStorage.getItem(GOOGLE_REFRESH_KEY) } catch {}
-    if (!refreshToken) return null
 
-    // Same-origin Next.js route. Used to hit the Python backend on Render
-    // via ${BACKEND}/api/auth/refresh-google — but Render free-tier could be
-    // asleep or down, which silently failed and left the stored token to
-    // expire. The route now lives on Vercel (always up) at /api/auth/refresh-google.
+    // JWT-first ladder (see lib/auth-backend.ts): the server-stored
+    // encrypted refresh token is tried before the localStorage copy, so a
+    // fresh device / cleared cache still refreshes without re-OAuth.
+    let jwt: string | null = null
     try {
-      const res = await fetch('/api/auth/refresh-google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-        signal: AbortSignal.timeout(10000),
-      })
-      if (!res.ok) {
-        // 401 = refresh token invalid/revoked → user must sign in again.
-        if (res.status === 401) {
-          // Keep the stored access token (may still have a few seconds left),
-          // but drop the refresh token so callers know to force-reconnect.
-          try { localStorage.removeItem(GOOGLE_REFRESH_KEY) } catch {}
-        }
-        return null
-      }
-      const data = await res.json()
-      if (data?.access_token) {
-        persistGoogleToken(data.access_token, refreshToken, data.expires_in)
-        return data.access_token
-      }
-    } catch {
-      // Network error — caller will fall back to Supabase refresh.
+      const { data } = await supabase.auth.getSession()
+      jwt = data.session?.access_token ?? null
+    } catch {}
+    if (!jwt && !refreshToken) return null
+
+    const result = await refreshGoogleAccessToken({ jwt, localRefreshToken: refreshToken })
+    if (result.ok) {
+      persistGoogleToken(result.accessToken, refreshToken, result.expiresIn)
+      return result.accessToken
+    }
+    if (result.revoked) {
+      // Every credential was rejected → user must sign in again. Keep the
+      // stored access token (may still have a few seconds left), but drop
+      // the refresh token so callers know to force-reconnect.
+      try { localStorage.removeItem(GOOGLE_REFRESH_KEY) } catch {}
     }
     return null
   }, [persistGoogleToken])
@@ -287,6 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             persistGoogleToken(session.provider_token, session.provider_refresh_token ?? null, realExpiry)
           }
+          maybeUploadRefreshToken(session.provider_refresh_token, session.access_token)
         } else if (session) {
           // Returning user — see if stored token is still fresh, else refresh.
           const stored = loadStoredGoogleToken()
@@ -324,6 +335,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               session.provider_refresh_token ?? null,
               realExpiry ?? 300
             )
+            maybeUploadRefreshToken(session.provider_refresh_token, session.access_token)
             scheduleRefresh()
           }
         } catch (e) {
