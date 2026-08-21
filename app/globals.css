@@ -2242,6 +2242,13 @@ html.dark .cream-page::before { opacity: .35; }
 @keyframes colonBlink {
   50% { opacity: .25; }
 }
+/* Small phones: the nowrap date string ("יום שישי · 21 באוגוסט 2026")
+   is wider than a 320px viewport at 19px — shrink instead of clipping. */
+@media (max-width: 420px) {
+  .lcd { max-width: 100%; padding: 4px 10px 2px; }
+  .lcd-date { font-size: 14px; letter-spacing: .5px; }
+  .lcd-time { font-size: 18px; letter-spacing: 1.5px; }
+}
 
 /* CSS for AnalogClock / CountryClock / SlidingPuzzle (the v1 dashboard
  * puzzle + country-guess game) used to live here. Removed in the
@@ -10741,6 +10748,10 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 }
 .settings-v2-storage-total {
   font-weight: 700;
+  /* "172 B / 10 MB" is an LTR fragment — isolate it so RTL bidi
+     doesn't reorder it into "B / 10 MB 172". */
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 .settings-v2-storage-total.tone-ok { color: var(--lp-accent); }
 .settings-v2-storage-total.tone-warn { color: var(--lp-amber); }
@@ -15332,9 +15343,23 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 }
 .todos-v2-plus-btn:hover { transform: scale(1.06); }
 .todos-v2-hint {
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-size: .75rem;
   color: var(--muted);
-  margin: 0 4px 20px;
+  padding-inline-end: 6px;
+}
+.todos-v2-hint kbd {
+  font-family: inherit;
+  font-size: .7rem;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+}
+/* Keyboard hint is meaningless on touch — reclaim the space. */
+@media (max-width: 600px) {
+  .todos-v2-hint { display: none; }
 }
 .todos-v2-section { margin-bottom: 22px; }
 .todos-v2-section-head {
