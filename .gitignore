@@ -67,3 +67,6 @@ playwright/.cache/
 .claude/scheduled_tasks.lock
 .claude/local-agent-mode-sessions/
 .claude/settings.local.json
+
+# Claude Code worktrees — local scratch checkouts, never repo content
+.claude/worktrees/
