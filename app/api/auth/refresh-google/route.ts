@@ -35,6 +35,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { decryptToken } from '@/lib/server/token-crypto'
+import { supabaseAdmin, userIdFromJWT } from '@/lib/server/supabase-admin'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -107,7 +109,34 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'bad_json' }, { status: 400, headers: cors() })
   }
-  const refreshToken = body?.refresh_token?.trim()
+  let refreshToken = body?.refresh_token?.trim()
+
+  // JWT path: no refresh_token in the body but a Supabase JWT in the
+  // Authorization header → look up the server-stored encrypted copy
+  // (written by /api/auth/store-google-refresh). Lets a fresh device
+  // refresh without ever having held the refresh token locally.
+  if (!refreshToken) {
+    const authHeader = req.headers.get('authorization')
+    const jwt = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null
+    const userId = await userIdFromJWT(jwt)
+    if (userId) {
+      const admin = supabaseAdmin()
+      const { data } = await admin!
+        .from('user_google_tokens')
+        .select('ciphertext, iv')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (data?.ciphertext && data?.iv) {
+        try {
+          refreshToken = decryptToken(data.ciphertext, data.iv)
+        } catch (e) {
+          console.error('[auth/refresh-google] stored token decrypt failed:',
+            e instanceof Error ? e.message : String(e))
+        }
+      }
+    }
+  }
+
   if (!refreshToken) {
     return NextResponse.json(
       { error: 'missing_refresh_token' },

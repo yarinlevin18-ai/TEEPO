@@ -232,3 +232,17 @@ CREATE INDEX IF NOT EXISTS idx_notes_user ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_quizzes_user ON quizzes(user_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON quiz_attempts(user_id);
 CREATE INDEX IF NOT EXISTS idx_agent_convs_user ON agent_conversations(user_id, agent_type);
+
+-- ============================================================
+-- ENCRYPTED GOOGLE REFRESH TOKENS (migrate_006.sql)
+-- Service-role only: RLS enabled with NO policies on purpose.
+-- Ciphertext is AES-256-GCM, encrypted on Vercel (lib/server/token-crypto.ts).
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_google_tokens (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  ciphertext TEXT NOT NULL,
+  iv TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE user_google_tokens ENABLE ROW LEVEL SECURITY;
