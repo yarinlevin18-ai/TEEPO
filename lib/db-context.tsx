@@ -22,7 +22,7 @@ import {
 } from './drive-db'
 import { ensureCourseFolders, ensurePath, moveFolder, pathForCourse, sanitizeFolderName } from './drive-folders'
 import type {
-  Course, Lesson, StudyTask, Assignment, CourseNote, UserSettings,
+  Course, Lesson, StudyTask, Assignment, CourseNote, EventNote, UserSettings,
   Announcement,
 } from '@/types'
 import {
@@ -69,6 +69,11 @@ interface DBContextType {
   createNote: (courseId: string, input: Partial<CourseNote> & { title: string; content: string }) => Promise<CourseNote>
   updateNote: (id: string, patch: Partial<CourseNote>) => Promise<void>
   deleteNote: (id: string) => Promise<void>
+
+  // Event notes (dashboard day-board)
+  createEventNote: (input: { date: string; content: string; event_id?: string }) => Promise<EventNote>
+  updateEventNote: (id: string, patch: Partial<Pick<EventNote, 'content' | 'date' | 'event_id'>>) => Promise<void>
+  deleteEventNote: (id: string) => Promise<void>
 
   // Settings
   updateSettings: (patch: Partial<UserSettings>) => Promise<void>
@@ -481,6 +486,39 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     mutate(d => ({ ...d, notes: d.notes.filter(n => n.id !== id) }))
   }, [mutate])
 
+  // ── Event notes (dashboard day-board) ──────────────────────
+  const createEventNote = useCallback(async (
+    input: { date: string; content: string; event_id?: string },
+  ): Promise<EventNote> => {
+    const now = new Date().toISOString()
+    const note: EventNote = {
+      id: newId('evnote'),
+      date: input.date,
+      event_id: input.event_id,
+      content: input.content,
+      created_at: now,
+      updated_at: now,
+    }
+    mutate(d => ({ ...d, event_notes: [note, ...(d.event_notes ?? [])] }))
+    return note
+  }, [mutate])
+
+  const updateEventNote = useCallback(async (
+    id: string,
+    patch: Partial<Pick<EventNote, 'content' | 'date' | 'event_id'>>,
+  ) => {
+    mutate(d => ({
+      ...d,
+      event_notes: (d.event_notes ?? []).map(n =>
+        n.id === id ? { ...n, ...patch, updated_at: new Date().toISOString() } : n,
+      ),
+    }))
+  }, [mutate])
+
+  const deleteEventNote = useCallback(async (id: string) => {
+    mutate(d => ({ ...d, event_notes: (d.event_notes ?? []).filter(n => n.id !== id) }))
+  }, [mutate])
+
   // ── Settings ───────────────────────────────────────────────
   const updateSettings = useCallback(async (patch: Partial<UserSettings>) => {
     mutate(d => ({ ...d, settings: { ...(d.settings || {}), ...patch } }))
@@ -822,6 +860,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createTask, updateTask, deleteTask,
     createAssignment, updateAssignment, deleteAssignment,
     createNote, updateNote, deleteNote,
+    createEventNote, updateEventNote, deleteEventNote,
     updateSettings, replaceCourses,
     acknowledgeAnnouncement, acknowledgeAllAnnouncements,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,
@@ -833,6 +872,7 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
     createTask, updateTask, deleteTask,
     createAssignment, updateAssignment, deleteAssignment,
     createNote, updateNote, deleteNote,
+    createEventNote, updateEventNote, deleteEventNote,
     updateSettings, replaceCourses,
     acknowledgeAnnouncement, acknowledgeAllAnnouncements,
     setStudentProfile, upsertStudentCourse, upsertStudentCoursesBulk, removeStudentCourse,

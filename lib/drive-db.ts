@@ -18,6 +18,7 @@ import type {
   StudyTask,
   Assignment,
   CourseNote,
+  EventNote,
   UserSettings,
   StudentProfile,
   StudentCourse,
@@ -44,8 +45,9 @@ const DB_FILE_NAME = 'db.json'
  *      v1 data is structurally valid v2 — the migration just bumps the marker.
  * v3 — Assignment gained is_group_work/collaborators/drive_folder_url/
  *      grade_weight; Course gained course_average/meeting_location/
- *      lecturer_office_hours. All optional/additive — the migration just
- *      bumps the marker.
+ *      lecturer_office_hours; DriveDB gained the optional event_notes array
+ *      (dashboard day-board notes). All optional/additive — the migration
+ *      just bumps the marker (and seeds event_notes to []).
  */
 export const CURRENT_DB_VERSION = 3
 
@@ -80,6 +82,8 @@ export interface DriveDB {
    *  when newer arrive) — keeps db.json size bounded. Sorted by
    *  posted_at descending. Optional → undefined treated as []. */
   announcements?: Announcement[]
+  /** Day-board notes (v3). Optional → undefined treated as []. */
+  event_notes?: EventNote[]
 }
 
 export const EMPTY_DB: DriveDB = {
@@ -93,6 +97,7 @@ export const EMPTY_DB: DriveDB = {
   settings: {},
   student_courses: [],
   announcements: [],
+  event_notes: [],
 }
 
 // ── Migrations ────────────────────────────────────────────────
@@ -120,12 +125,13 @@ export function migrateDB(db: DriveDB): DriveDB {
  * v2 → v3.
  *
  * v3 only added optional Assignment fields (is_group_work, collaborators,
- * drive_folder_url, grade_weight) and optional Course fields (course_average,
- * meeting_location, lecturer_office_hours), so no existing data is reshaped —
- * just mark the DB as v3.
+ * drive_folder_url, grade_weight), optional Course fields (course_average,
+ * meeting_location, lecturer_office_hours), and the optional DriveDB
+ * event_notes array, so no existing data is reshaped — just mark the DB as
+ * v3 and seed event_notes.
  */
 function migrateV2ToV3(db: DriveDB): DriveDB {
-  return { ...db, version: 3 }
+  return { ...db, version: 3, event_notes: db.event_notes ?? [] }
 }
 
 /**

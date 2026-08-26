@@ -56,6 +56,26 @@ describe('migrateDB', () => {
     expect(v3.assignments).toEqual(v2.assignments)
   })
 
+  it('seeds event_notes to [] when upgrading a v2 DB missing it', () => {
+    const v2 = { ...EMPTY_DB, version: 2 } as DriveDB
+    delete (v2 as any).event_notes
+    const v3 = migrateDB(v2)
+    expect(v3.version).toBe(3)
+    expect(v3.event_notes).toEqual([])
+  })
+
+  it('preserves existing event_notes across migration', () => {
+    const note = {
+      id: 'evnote_1',
+      date: '2026-08-26',
+      content: 'להביא מחשבון',
+      created_at: '2026-08-26T08:00:00Z',
+    }
+    const v2: DriveDB = { ...EMPTY_DB, version: 2, event_notes: [note] }
+    const v3 = migrateDB(v2)
+    expect(v3.event_notes).toEqual([note])
+  })
+
   it('is idempotent — calling on a current-version DB keeps the version', () => {
     const current: DriveDB = { ...EMPTY_DB, version: CURRENT_DB_VERSION }
     const result = migrateDB(current)

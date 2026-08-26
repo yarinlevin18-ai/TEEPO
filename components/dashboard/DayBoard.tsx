@@ -29,13 +29,19 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ExternalLink, MapPin, CheckSquare } from 'lucide-react'
+import { ChevronLeft, ExternalLink, MapPin, CheckSquare, Plus, Trash2 } from 'lucide-react'
 import type { Course, Assignment } from '@/types'
 import type { WeekCalendarSlot } from '@/lib/use-week-calendar'
 import { matchCourseForEvent } from '@/lib/event-course-match'
+import { useDB } from '@/lib/db-context'
 
 function pad2(n: number): string {
   return n.toString().padStart(2, '0')
+}
+
+/** Local-time YYYY-MM-DD (NOT toISOString — Israel TZ would shift dates after 22:00). */
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
 /** Same palette the old dash-v2-class-card used so a single calendar
@@ -247,8 +253,8 @@ export default function DayBoard({
             </header>
             <div className="dp-body">
               {selected.type === 'courses'
-                ? <CoursePanelBody item={selected} assignments={assignments} />
-                : <NotesPanelBody item={selected} />}
+                ? <CoursePanelBody item={selected} assignments={assignments} date={localDateStr(now)} />
+                : <NotesPanelBody item={selected} date={localDateStr(now)} />}
             </div>
             <footer className="dp-actions">
               <PanelActions item={selected} />
@@ -266,7 +272,7 @@ export default function DayBoard({
 // list passed down from the parent.
 // ─────────────────────────────────────────────────────────────────────
 
-function CoursePanelBody({ item, assignments }: { item: DayBoardItem; assignments: Assignment[] }) {
+function CoursePanelBody({ item, assignments, date }: { item: DayBoardItem; assignments: Assignment[]; date: string }) {
   const c = item.course
   // Open assignments for this course = anything not submitted/graded.
   const openAssignments = useMemo(() => {
@@ -321,19 +327,20 @@ function CoursePanelBody({ item, assignments }: { item: DayBoardItem; assignment
           </ul>
         )}
       </section>
+
+      <EventNotesSection date={date} eventId={item.slot.id || undefined} />
     </>
   )
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Notes panel body — location, description, prep checklist.
+// Notes panel body — location, description, event notes.
 // `description` comes from Google Calendar (now exposed via the
-// extended WeekCalendarSlot). `prep_items` does NOT exist in the
-// schema today; we render an empty state until the proposed EventNote
-// model lands (see PR description).
+// extended WeekCalendarSlot). Notes are EventNote rows persisted to
+// the Drive DB (v3) via EventNotesSection below.
 // ─────────────────────────────────────────────────────────────────────
 
-function NotesPanelBody({ item }: { item: DayBoardItem }) {
+function NotesPanelBody({ item, date }: { item: DayBoardItem; date: string }) {
   return (
     <>
       <section className="dp-section">
@@ -356,13 +363,75 @@ function NotesPanelBody({ item }: { item: DayBoardItem }) {
         )}
       </section>
 
-      <section className="dp-section">
-        <span className="ds-label">הכן מראש</span>
-        <p className="ds-content ds-empty">
-          אין רשימת הכנה עדיין — תכונת הרשימה תגיע בקרוב.
-        </p>
-      </section>
+      <EventNotesSection date={date} eventId={item.slot.id || undefined} />
     </>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Event notes section — free-form notes persisted to the Drive DB
+// (DriveDB.event_notes, v3). Scoped to the selected event when the
+// calendar slot has an id; whole-day notes (no event_id) show on every
+// event of that day.
+// ─────────────────────────────────────────────────────────────────────
+
+function EventNotesSection({ date, eventId }: { date: string; eventId?: string }) {
+  const { db, createEventNote, deleteEventNote } = useDB()
+  const [draft, setDraft] = useState('')
+
+  const notes = useMemo(() => {
+    return (db.event_notes ?? [])
+      .filter(n => n.date === date && (n.event_id ? n.event_id === eventId : true))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+  }, [db.event_notes, date, eventId])
+
+  const submit = async () => {
+    const content = draft.trim()
+    if (!content) return
+    setDraft('')
+    await createEventNote({ date, content, event_id: eventId })
+  }
+
+  return (
+    <section className="dp-section">
+      <span className="ds-label">פתקים</span>
+      {notes.length === 0 ? (
+        <p className="ds-content ds-empty">אין פתקים ליום הזה עדיין.</p>
+      ) : (
+        <ul className="ds-list dp-note-list">
+          {notes.map(n => (
+            <li key={n.id}>
+              <span className="dp-note-text">{n.content}</span>
+              <button
+                type="button"
+                className="dp-note-del"
+                aria-label="מחק פתק"
+                onClick={() => deleteEventNote(n.id)}
+              >
+                <Trash2 size={13} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form
+        className="dp-note-form"
+        onSubmit={e => { e.preventDefault(); void submit() }}
+      >
+        <input
+          type="text"
+          className="dp-note-input"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          placeholder="פתק חדש…"
+          aria-label="פתק חדש"
+        />
+        <button type="submit" className="dp-btn" disabled={!draft.trim()}>
+          <Plus size={13} />
+          הוסף
+        </button>
+      </form>
+    </section>
   )
 }
 

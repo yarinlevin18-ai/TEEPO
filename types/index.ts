@@ -292,6 +292,18 @@ export interface CourseNote {
   updated_at: string
 }
 
+/** Free-form note attached to a calendar day/event for the dashboard day-board (v3). */
+export interface EventNote {
+  id: string
+  /** Local calendar date the note belongs to, YYYY-MM-DD. */
+  date: string
+  /** Optional calendar event id (WeekCalendarSlot.id) to scope the note to one event; absent = whole day. */
+  event_id?: string
+  content: string
+  created_at: string
+  updated_at?: string
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
