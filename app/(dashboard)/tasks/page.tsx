@@ -107,7 +107,7 @@ const PRIORITY_META: Record<Assignment['priority'], { label: string; cls: string
 type Tab = 'all' | 'deadline' | 'course'
 
 export default function TasksPage() {
-  const { db, ready, createAssignment } = useDB()
+  const { db, ready, loading, createAssignment } = useDB()
   const [tab, setTab] = useState<Tab>('all')
   const [addOpen, setAddOpen] = useState(false)
 
@@ -172,7 +172,11 @@ export default function TasksPage() {
     return rows
   }, [sortedAll, courseById])
 
-  if (!ready) {
+  // Skeleton only while the DB is actually loading. If loading finished
+  // without success (Drive error), render the page with empty data — the
+  // layout's DriveConnectionBanner explains the problem; an infinite
+  // skeleton explains nothing.
+  if (!ready && loading) {
     return (
       <div className="cream-page tasks-v2">
         <main className="t-main">
