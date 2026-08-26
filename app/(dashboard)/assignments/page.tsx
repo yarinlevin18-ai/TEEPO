@@ -26,13 +26,13 @@ import {
   CheckCircle2, Folder, Upload, AlertCircle, Loader2, GripVertical, Sparkles,
   User as UserIcon, Users as UsersIcon, List as ListIcon,
   Calendar as CalendarIcon, BookOpen as BookOpenIcon,
-  Flame, CalendarDays, CircleDashed, Hourglass, Sprout,
+  Flame, CalendarDays, CircleDashed, Hourglass, Sprout, Percent, X,
 } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
 import { useDriveFiles } from '@/lib/use-drive-files'
 import { api } from '@/lib/api-client'
 import SyncAllButton from '@/components/sync/SyncAllButton'
-import type { Assignment, AssignmentTask, Course } from '@/types'
+import type { Assignment, AssignmentCollaborator, AssignmentTask, Course } from '@/types'
 
 // Deterministic palette index — shared with /tasks + /summaries so a
 // course's color matches everywhere.
@@ -106,10 +106,15 @@ function isOpen(a: Assignment): boolean {
   return a.status === 'todo' || a.status === 'in_progress'
 }
 
-/** True iff the assignment hints at group work. We have no boolean on the
- *  model yet — looks for קבוצתי/group keywords in title or description.
- *  Conservative on false-positives. */
+/** Group-work status of an assignment. The explicit `is_group_work` field is
+ *  authoritative when set; for legacy data (undefined) we fall back to the
+ *  original keyword heuristic (קבוצתי/group in title or description),
+ *  conservative on false-positives. */
 function isGroupWork(a: Assignment): { group: boolean; collaborator?: string } {
+  if (a.is_group_work === true) {
+    return { group: true, collaborator: a.collaborators?.[0]?.name }
+  }
+  if (a.is_group_work === false) return { group: false }
   const hay = `${a.title} ${a.description ?? ''}`
   const group = /(קבוצת|זוגית|בזוגות|בקבוצה|group\b|pair\b)/i.test(hay)
   if (!group) return { group: false }
@@ -142,6 +147,17 @@ interface DeadlineBucket {
   items: Assignment[]
 }
 
+/** Clamp a grade-weight percentage to the valid 0-100 range. */
+function clampWeight(n: number): number | undefined {
+  if (Number.isNaN(n)) return undefined
+  return Math.min(100, Math.max(0, n))
+}
+
+/** Only render user-supplied Drive URLs that are actually https links. */
+function safeDriveUrl(url?: string): string | undefined {
+  return url && /^https:\/\//i.test(url.trim()) ? url.trim() : undefined
+}
+
 const LIST_STAGGER = 0.05
 const CARD_DURATION = 0.32
 
@@ -162,7 +178,13 @@ export default function AssignmentsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const [showAdd, setShowAdd] = useState(false)
-  const [addForm, setAddForm] = useState({ title: '', description: '', deadline: '', course_id: '' })
+  const [addForm, setAddForm] = useState({
+    title: '', description: '', deadline: '', course_id: '',
+    is_group_work: false,
+    collaborators: [] as AssignmentCollaborator[],
+    drive_folder_url: '',
+    grade_weight: '',
+  })
   const [adding, setAdding] = useState(false)
 
   const [editBuffer, setEditBuffer] = useState<Partial<Assignment> | null>(null)
@@ -249,6 +271,13 @@ export default function AssignmentsPage() {
       status: expanded.status,
       priority: expanded.priority,
       deadline: expanded.deadline,
+      // Seed raw values (undefined preserved) — the toggle UI derives its
+      // display from the heuristic but only persists once the user clicks,
+      // so legacy heuristic matches aren't silently overwritten on save.
+      is_group_work: expanded.is_group_work,
+      collaborators: expanded.collaborators ? expanded.collaborators.map(c => ({ ...c })) : undefined,
+      drive_folder_url: expanded.drive_folder_url,
+      grade_weight: expanded.grade_weight,
     })
   }, [expanded])
 
@@ -258,7 +287,11 @@ export default function AssignmentsPage() {
       ((editBuffer.description ?? '') !== (expanded.description ?? '')) ||
       (editBuffer.status !== expanded.status) ||
       (editBuffer.priority !== expanded.priority) ||
-      ((editBuffer.deadline ?? '') !== (expanded.deadline ?? ''))
+      ((editBuffer.deadline ?? '') !== (expanded.deadline ?? '')) ||
+      (editBuffer.is_group_work !== expanded.is_group_work) ||
+      (JSON.stringify(editBuffer.collaborators ?? []) !== JSON.stringify(expanded.collaborators ?? [])) ||
+      ((editBuffer.drive_folder_url ?? '') !== (expanded.drive_folder_url ?? '')) ||
+      (editBuffer.grade_weight !== expanded.grade_weight)
   }, [editBuffer, expanded])
 
   const onSaveExpanded = async () => {
@@ -269,6 +302,10 @@ export default function AssignmentsPage() {
       status: editBuffer.status as Assignment['status'],
       priority: editBuffer.priority as Assignment['priority'],
       deadline: editBuffer.deadline,
+      is_group_work: editBuffer.is_group_work,
+      collaborators: editBuffer.collaborators,
+      drive_folder_url: editBuffer.drive_folder_url?.trim() || undefined,
+      grade_weight: editBuffer.grade_weight,
     })
   }
   const onCancelEdit = () => {
@@ -279,6 +316,10 @@ export default function AssignmentsPage() {
       status: expanded.status,
       priority: expanded.priority,
       deadline: expanded.deadline,
+      is_group_work: expanded.is_group_work,
+      collaborators: expanded.collaborators ? expanded.collaborators.map(c => ({ ...c })) : undefined,
+      drive_folder_url: expanded.drive_folder_url,
+      grade_weight: expanded.grade_weight,
     })
   }
   const onDeleteExpanded = async () => {
@@ -336,9 +377,15 @@ export default function AssignmentsPage() {
         course_id: addForm.course_id || undefined,
         status: 'todo',
         priority: 'medium',
+        is_group_work: addForm.is_group_work,
+        collaborators: addForm.is_group_work
+          ? addForm.collaborators.map(c => ({ name: c.name.trim(), email: c.email?.trim() || undefined })).filter(c => c.name)
+          : undefined,
+        drive_folder_url: addForm.drive_folder_url.trim() || undefined,
+        grade_weight: addForm.grade_weight !== '' ? clampWeight(Number(addForm.grade_weight)) : undefined,
         assignment_tasks: subtasks,
       })
-      setAddForm({ title: '', description: '', deadline: '', course_id: '' })
+      setAddForm({ title: '', description: '', deadline: '', course_id: '', is_group_work: false, collaborators: [], drive_folder_url: '', grade_weight: '' })
       setShowAdd(false)
       setExpandedId(created.id)
     } finally {
@@ -543,6 +590,78 @@ export default function AssignmentsPage() {
                   placeholder="מה צריך לעשות? נשתמש בזה כדי לפרק לשלבים אוטומטית."
                 />
               </label>
+              <label className="tasks-v2-check-row">
+                <input
+                  type="checkbox"
+                  checked={addForm.is_group_work}
+                  onChange={e => setAddForm({ ...addForm, is_group_work: e.target.checked })}
+                />
+                <span><UsersIcon size={14} /> עבודה קבוצתית</span>
+              </label>
+              {addForm.is_group_work && (
+                <div className="tasks-v2-collab-editor">
+                  {addForm.collaborators.map((c, i) => (
+                    <div key={i} className="tasks-v2-collab-row">
+                      <input
+                        type="text"
+                        value={c.name}
+                        onChange={e => setAddForm({
+                          ...addForm,
+                          collaborators: addForm.collaborators.map((x, j) => j === i ? { ...x, name: e.target.value } : x),
+                        })}
+                        placeholder="שם השותף"
+                      />
+                      <input
+                        type="email"
+                        value={c.email ?? ''}
+                        onChange={e => setAddForm({
+                          ...addForm,
+                          collaborators: addForm.collaborators.map((x, j) => j === i ? { ...x, email: e.target.value } : x),
+                        })}
+                        placeholder="אימייל (אופציונלי)"
+                        dir="ltr"
+                      />
+                      <button
+                        type="button"
+                        className="tasks-v2-icon-btn"
+                        onClick={() => setAddForm({ ...addForm, collaborators: addForm.collaborators.filter((_, j) => j !== i) })}
+                        aria-label="הסר שותף"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="tasks-v2-sub-link"
+                    onClick={() => setAddForm({ ...addForm, collaborators: [...addForm.collaborators, { name: '' }] })}
+                  >
+                    + הוסף שותף
+                  </button>
+                </div>
+              )}
+              <label>
+                <span>קישור לתיקיית Drive</span>
+                <input
+                  type="url"
+                  value={addForm.drive_folder_url}
+                  onChange={e => setAddForm({ ...addForm, drive_folder_url: e.target.value })}
+                  placeholder="https://drive.google.com/drive/folders/…"
+                  dir="ltr"
+                />
+              </label>
+              <label>
+                <span>משקל בציון (%)</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={addForm.grade_weight}
+                  onChange={e => setAddForm({ ...addForm, grade_weight: e.target.value })}
+                  placeholder="לדוגמה: 15"
+                />
+              </label>
             </div>
             <footer className="tasks-v2-modal-foot">
               <button type="button" className="tasks-v2-btn-ghost" onClick={() => setShowAdd(false)}>
@@ -642,9 +761,9 @@ function FlatPanel(props: FlatPanelProps) {
           const grp = isGroupWork(a)
           const isExpanded = expandedId === a.id
           const driveFolderId = course?.drive_folder_ids?.assignments
-          const driveUrl = driveFolderId
-            ? `https://drive.google.com/drive/folders/${driveFolderId}`
-            : undefined
+          // Assignment-level Drive URL wins over the course-folder fallback.
+          const driveUrl = safeDriveUrl(a.drive_folder_url)
+            ?? (driveFolderId ? `https://drive.google.com/drive/folders/${driveFolderId}` : undefined)
 
           return (
             <motion.div
@@ -790,6 +909,13 @@ function ExpandedDetail({
   const hoursEst = subtasks.reduce((s, st) => s + (st.estimated_hours ?? 0), 0)
   const driveFolderId = course?.drive_folder_ids?.assignments
   const courseDisplayName = course?.title ?? 'ללא קורס'
+  // Display state: explicit field when the user set it in the buffer,
+  // otherwise the (heuristic-aware) derived value. Only clicks persist.
+  const grpOn = buffer.is_group_work ?? isGroupWork(assignment).group
+  const assignmentDriveUrl = safeDriveUrl(assignment.drive_folder_url)
+  // A Drive folder URL carries its folder id — extract it so we can show the
+  // real file listing instead of just an open-link button.
+  const assignmentFolderId = assignmentDriveUrl?.match(/\/folders\/([\w-]+)/)?.[1]
 
   return (
     <div className="tasks-v2-detail-inner">
@@ -833,6 +959,13 @@ function ExpandedDetail({
             {hoursEst > 0 ? `${hoursEst} שעות` : '—'}
           </div>
         </div>
+        <div className="tasks-v2-meta-card">
+          <div className="tasks-v2-meta-label">משקל בציון</div>
+          <div className="tasks-v2-meta-value">
+            <Percent size={14} />
+            {typeof assignment.grade_weight === 'number' ? `${assignment.grade_weight}%` : '—'}
+          </div>
+        </div>
       </div>
 
       <section className="tasks-v2-sub-section">
@@ -866,6 +999,82 @@ function ExpandedDetail({
               </button>
             ))}
           </div>
+          <div className="tasks-v2-picker-row">
+            <button
+              type="button"
+              className={`tasks-v2-status-opt ${grpOn ? 'on' : ''}`}
+              onClick={() => setBuffer({ is_group_work: true, collaborators: buffer.collaborators ?? [] })}
+            >
+              <UsersIcon size={13} />
+              עבודה קבוצתית
+            </button>
+            <button
+              type="button"
+              className={`tasks-v2-status-opt ${!grpOn ? 'on' : ''}`}
+              onClick={() => setBuffer({ is_group_work: false })}
+            >
+              <UserIcon size={13} />
+              עבודה יחידנית
+            </button>
+          </div>
+          {grpOn && (
+            <div className="tasks-v2-collab-editor">
+              {(buffer.collaborators ?? []).map((c, i) => (
+                <div key={i} className="tasks-v2-collab-row">
+                  <input
+                    type="text"
+                    value={c.name}
+                    onChange={e => setBuffer({
+                      collaborators: (buffer.collaborators ?? []).map((x, j) => j === i ? { ...x, name: e.target.value } : x),
+                    })}
+                    placeholder="שם השותף"
+                  />
+                  <input
+                    type="email"
+                    value={c.email ?? ''}
+                    onChange={e => setBuffer({
+                      collaborators: (buffer.collaborators ?? []).map((x, j) => j === i ? { ...x, email: e.target.value } : x),
+                    })}
+                    placeholder="אימייל (אופציונלי)"
+                    dir="ltr"
+                  />
+                  <button
+                    type="button"
+                    className="tasks-v2-icon-btn"
+                    onClick={() => setBuffer({ collaborators: (buffer.collaborators ?? []).filter((_, j) => j !== i) })}
+                    aria-label="הסר שותף"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="tasks-v2-sub-link"
+                onClick={() => setBuffer({ is_group_work: true, collaborators: [...(buffer.collaborators ?? []), { name: '' }] })}
+              >
+                + הוסף שותף
+              </button>
+            </div>
+          )}
+          <div className="tasks-v2-weight-row">
+            <label className="tasks-v2-weight-label">
+              <Percent size={14} />
+              <span>משקל בציון</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={buffer.grade_weight ?? ''}
+                onChange={e => setBuffer({
+                  grade_weight: e.target.value === '' ? undefined : clampWeight(Number(e.target.value)),
+                })}
+                placeholder="—"
+              />
+              <span aria-hidden>%</span>
+            </label>
+          </div>
         </div>
       </section>
 
@@ -886,7 +1095,32 @@ function ExpandedDetail({
         <header className="tasks-v2-sub-head">
           <h3><Folder size={16} /> תיקיית Drive מקושרת</h3>
         </header>
-        {driveFolderId ? (
+        {assignmentDriveUrl && (
+          <a
+            href={assignmentDriveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="tasks-v2-sub-link tasks-v2-drive-direct"
+          >
+            <ExternalLink size={14} />
+            פתח את תיקיית המטלה ב-Drive
+          </a>
+        )}
+        <label className="tasks-v2-drive-url-field">
+          <span>קישור לתיקיית Drive של המטלה</span>
+          <input
+            type="url"
+            value={buffer.drive_folder_url ?? ''}
+            onChange={e => setBuffer({ drive_folder_url: e.target.value })}
+            placeholder="https://drive.google.com/drive/folders/…"
+            dir="ltr"
+          />
+        </label>
+        {assignmentDriveUrl ? (
+          assignmentFolderId ? (
+            <DrivePanel folderId={assignmentFolderId} courseTitle={courseDisplayName} assignmentTitle={assignment.title} />
+          ) : null
+        ) : driveFolderId ? (
           <DrivePanel folderId={driveFolderId} courseTitle={courseDisplayName} assignmentTitle={assignment.title} />
         ) : (
           <div className="tasks-v2-drive-empty-cta">

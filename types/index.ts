@@ -226,6 +226,12 @@ export interface StudyTask {
   created_at: string
 }
 
+/** A partner on a group assignment. */
+export interface AssignmentCollaborator {
+  name: string
+  email?: string
+}
+
 export interface Assignment {
   id: string
   user_id: string
@@ -235,6 +241,17 @@ export interface Assignment {
   deadline?: string
   status: 'todo' | 'in_progress' | 'submitted' | 'graded'
   priority: 'low' | 'medium' | 'high'
+  /** True for group/pair work. When set, replaces the keyword heuristic
+   *  isGroupWork() on the assignments page; undefined = legacy data,
+   *  fall back to the heuristic. */
+  is_group_work?: boolean
+  /** Partners on a group assignment. Empty/undefined = none listed. */
+  collaborators?: AssignmentCollaborator[]
+  /** Direct Google Drive folder URL for THIS assignment (overrides the
+   *  course-level drive_folder_ids.assignments fallback). */
+  drive_folder_url?: string
+  /** Weight of this assignment in the final course grade, in percent (0-100). */
+  grade_weight?: number
   assignment_tasks?: AssignmentTask[]
 }
 

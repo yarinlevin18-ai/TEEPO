@@ -428,6 +428,10 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
       deadline: input.deadline,
       status: input.status || 'todo',
       priority: input.priority || 'medium',
+      is_group_work: input.is_group_work,
+      collaborators: input.collaborators,
+      drive_folder_url: input.drive_folder_url,
+      grade_weight: input.grade_weight,
       assignment_tasks: input.assignment_tasks || [],
     }
     mutate(d => ({ ...d, assignments: [a, ...d.assignments] }))
