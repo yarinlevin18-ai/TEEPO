@@ -387,7 +387,7 @@ export async function POST(req: NextRequest) {
  * Drive helpers via the existing imports).
  */
 const EMPTY_DB = {
-  version: 2,
+  version: 3,
   updated_at: new Date(0).toISOString(),
   courses: [],
   lessons: [],
@@ -396,6 +396,8 @@ const EMPTY_DB = {
   notes: [],
   settings: {},
   student_courses: [],
+  announcements: [],
+  event_notes: [],
 }
 
 /**
