@@ -26,6 +26,7 @@ import {
   CheckCircle2, Folder, Upload, AlertCircle, Loader2, GripVertical, Sparkles,
   User as UserIcon, Users as UsersIcon, List as ListIcon,
   Calendar as CalendarIcon, BookOpen as BookOpenIcon,
+  Flame, CalendarDays, CircleDashed, Hourglass, Sprout,
 } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
 import { useDriveFiles } from '@/lib/use-drive-files'
@@ -137,7 +138,7 @@ type TabKey = 'all' | 'deadline' | 'course'
 interface DeadlineBucket {
   key: 'week' | 'next' | 'later' | 'undated'
   label: string
-  icon: string
+  icon: React.ReactNode
   items: Assignment[]
 }
 
@@ -200,10 +201,10 @@ export default function AssignmentsPage() {
       else later.push(a)
     }
     const buckets: DeadlineBucket[] = []
-    if (week.length)    buckets.push({ key: 'week',  label: 'השבוע',     icon: '🔥', items: week })
-    if (next.length)    buckets.push({ key: 'next',  label: 'השבוע הבא', icon: '📅', items: next })
-    if (later.length)   buckets.push({ key: 'later', label: 'בהמשך',     icon: '💭', items: later })
-    if (undated.length) buckets.push({ key: 'undated', label: 'ללא תאריך', icon: '⏳', items: undated })
+    if (week.length)    buckets.push({ key: 'week',  label: 'השבוע',     icon: <Flame size={15} strokeWidth={2.2} />, items: week })
+    if (next.length)    buckets.push({ key: 'next',  label: 'השבוע הבא', icon: <CalendarDays size={15} strokeWidth={2.2} />, items: next })
+    if (later.length)   buckets.push({ key: 'later', label: 'בהמשך',     icon: <CircleDashed size={15} strokeWidth={2.2} />, items: later })
+    if (undated.length) buckets.push({ key: 'undated', label: 'ללא תאריך', icon: <Hourglass size={15} strokeWidth={2.2} />, items: undated })
     return buckets
   }, [sorted])
 
@@ -460,7 +461,7 @@ export default function AssignmentsPage() {
               return (
                 <section key={courseId} className="tasks-v2-section">
                   <div className="tasks-v2-sec-head">
-                    <span className="tasks-v2-sec-icon" aria-hidden style={{ color: pal.color }}>📘</span>
+                    <span className="tasks-v2-sec-icon" aria-hidden style={{ color: pal.color }}><BookOpenIcon size={15} strokeWidth={2.2} /></span>
                     <span className="tasks-v2-sec-label">{label}</span>
                     <span className="tasks-v2-sec-count">
                       {items.filter(isOpen).length} פתוחות · {items.length} סה״כ
@@ -595,7 +596,7 @@ function TabButton({
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="tasks-v2-empty">
-      <span className="em" aria-hidden>🌱</span>
+      <span className="em" aria-hidden><Sprout size={20} /></span>
       <p>אין מטלות פתוחות. סנכרן מ-Moodle או צור מטלה חדשה כדי להתחיל.</p>
       <button type="button" className="tasks-v2-btn-primary" onClick={onAdd}>
         <Plus size={14} /> מטלה חדשה

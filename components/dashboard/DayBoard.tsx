@@ -305,7 +305,7 @@ function CoursePanelBody({ item, assignments }: { item: DayBoardItem; assignment
           מטלות פתוחות {openAssignments.length > 0 && `(${openAssignments.length})`}
         </span>
         {openAssignments.length === 0 ? (
-          <p className="ds-content ds-empty">אין מטלות פתוחות 🎉</p>
+          <p className="ds-content ds-empty">אין מטלות פתוחות</p>
         ) : (
           <ul className="ds-list">
             {openAssignments.slice(0, 5).map(a => (

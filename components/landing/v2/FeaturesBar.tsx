@@ -5,19 +5,21 @@
  * Hebrew copy verbatim from the mockup. Each card uses an emoji icon with
  * the warm gradient tile background (matches the production design system).
  */
+import { FolderOpen, RefreshCw, GraduationCap } from 'lucide-react'
+
 const FEATURES = [
   {
-    icon: '🍃',
+    icon: <FolderOpen size={20} strokeWidth={2} />,
     title: 'הכל במקום אחד',
     body: 'מטלות, סיכומים, ולוח זמנים. בלי לחפש בעשרה אתרים שונים.',
   },
   {
-    icon: '🌳',
+    icon: <RefreshCw size={20} strokeWidth={2} />,
     title: 'סנכרון עם Google',
     body: 'הקבצים שלך ב-Drive, היומן שלך ב-Calendar. בלי כפילויות.',
   },
   {
-    icon: '🍂',
+    icon: <GraduationCap size={20} strokeWidth={2} />,
     title: 'בנוי לסטודנט',
     body: 'BGU ו-TAU. עברית RTL. עם הסמסטר שלך, לא נגדו.',
   },

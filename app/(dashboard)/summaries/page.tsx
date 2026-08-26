@@ -227,7 +227,7 @@ export default function SummariesPage() {
           <div className="sum-eyebrow">Google Drive</div>
           <h1 className="sum-h1">
             המוח. <span className="accent">הזיכרון השני שלי.</span>{' '}
-            <span className="brain-emoji" aria-hidden>🧠</span>
+            <span className="brain-emoji" aria-hidden><Brain size={30} strokeWidth={1.8} /></span>
           </h1>
           <p className="sum-sub">
             כל מקור, סילבוס, סיכום וקובץ — מסונכרן ומאורגן בתוך תיקיית

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, WifiOff, RefreshCw,
-  CheckCircle, Loader2, BookOpen, Calendar, ExternalLink, Puzzle,
+  CheckCircle, Loader2, BookOpen, Calendar, ExternalLink, Puzzle, Lock,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useDB } from '@/lib/db-context'
@@ -359,7 +359,7 @@ export default function UniversityConnectPage() {
               </ol>
 
               <div className="moodle-v2-note">
-                <span>🔒</span>
+                <span aria-hidden><Lock size={13} strokeWidth={2.2} /></span>
                 <span>הקבצים זורמים <strong>ישירות מהדפדפן ל-Drive שלך</strong> — לא דרך השרת של TEEPO.</span>
               </div>
             </div>
@@ -385,7 +385,7 @@ export default function UniversityConnectPage() {
                 </li>
               </ol>
               <div className="moodle-v2-note">
-                <span>🔒</span>
+                <span aria-hidden><Lock size={13} strokeWidth={2.2} /></span>
                 <span>הסיסמה שלך לא נוגעת באפליקציה — רק ה-session cookies מועברים</span>
               </div>
             </div>
@@ -556,7 +556,7 @@ function SiteCard({ site, name, description, url, externalUrl, connected, loginS
           >
             <form onSubmit={handleCredsSubmit} className="moodle-v2-creds">
               <div className="moodle-v2-creds-note">
-                <span>🔒</span>
+                <span aria-hidden><Lock size={13} strokeWidth={2.2} /></span>
                 <span>
                   הפרטים נשלחים ב-HTTPS לשרת, משמשים פעם אחת לכניסה ל-Moodle
                   ולא נשמרים. רק ה-session cookies שמורים בשרת.
