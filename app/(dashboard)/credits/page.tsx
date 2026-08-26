@@ -16,6 +16,7 @@ import Modal from '@/components/ui/Modal'
 import ErrorAlert from '@/components/ui/ErrorAlert'
 import PageSkeleton from '@/components/ui/PageSkeleton'
 import GradesList from '@/components/credits/GradesList'
+import type { SemesterCode } from '@/types'
 
 // ── Types ──────────────────────────────────────────────────────
 type Track = {
@@ -128,6 +129,7 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
   const [selectedTrack, setSelectedTrack] = useState<string>('')
   const [startYear, setStartYear] = useState(new Date().getFullYear())
   const [currentYear, setCurrentYear] = useState(1)
+  const [currentSemester, setCurrentSemester] = useState<SemesterCode | ''>('')
   const [saving, setSaving] = useState(false)
 
   const loadTracks = useCallback(async () => {
@@ -161,6 +163,7 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
         track_id: selectedTrack,
         start_year: startYear,
         current_year: currentYear,
+        ...(currentSemester ? { current_semester: currentSemester } : {}),
         expected_end: startYear + Math.ceil(totalSemesters / 2),
       })
 
@@ -361,6 +364,20 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                         ))}
                       </div>
                     </div>
+
+                    <div className="credits-v2-field">
+                      <label>סמסטר נוכחי</label>
+                      <select
+                        value={currentSemester}
+                        onChange={e => setCurrentSemester(e.target.value as SemesterCode | '')}
+                        className="credits-v2-select"
+                      >
+                        <option value="">אוטומטי (לפי הקורסים)</option>
+                        <option value="א">סמסטר א&apos;</option>
+                        <option value="ב">סמסטר ב&apos;</option>
+                        <option value="קיץ">סמסטר קיץ</option>
+                      </select>
+                    </div>
                   </div>
 
                   <div className="credits-v2-wizard-actions">
@@ -413,6 +430,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
   const [editTrackId, setEditTrackId] = useState(profile?.track_id ?? '')
   const [editStartYear, setEditStartYear] = useState<number>(profile?.start_year ?? new Date().getFullYear())
   const [editCurrentYear, setEditCurrentYear] = useState<number>(profile?.current_year ?? 1)
+  const [editCurrentSemester, setEditCurrentSemester] = useState<SemesterCode | ''>(profile?.current_semester ?? '')
   const [editSaving, setEditSaving] = useState(false)
 
   // Recompute credit summary whenever profile, track or courses change
@@ -430,6 +448,7 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
     setEditTrackId(profile?.track_id ?? '')
     setEditStartYear(profile?.start_year ?? new Date().getFullYear())
     setEditCurrentYear(profile?.current_year ?? 1)
+    setEditCurrentSemester(profile?.current_semester ?? '')
     setEditOpen(true)
     if (editTracks.length === 0) {
       try {
@@ -449,6 +468,9 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
         track_id: editTrackId,
         start_year: editStartYear,
         current_year: editCurrentYear,
+        // Empty select = clear the explicit value back to auto-derivation.
+        // The spread in setStudentProfile overwrites with undefined.
+        current_semester: editCurrentSemester || undefined,
         expected_end: editStartYear + Math.ceil(totalSemesters / 2),
       })
       setEditOpen(false)
@@ -910,6 +932,21 @@ function CreditsDashboard({ profile, track }: { profile: any; track: Track | nul
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Current semester (explicit override; empty = derive from courses) */}
+          <div className="credits-v2-field">
+            <label>סמסטר נוכחי</label>
+            <select
+              value={editCurrentSemester}
+              onChange={e => setEditCurrentSemester(e.target.value as SemesterCode | '')}
+              className="credits-v2-select"
+            >
+              <option value="">אוטומטי (לפי הקורסים)</option>
+              <option value="א">סמסטר א&apos;</option>
+              <option value="ב">סמסטר ב&apos;</option>
+              <option value="קיץ">סמסטר קיץ</option>
+            </select>
           </div>
         </div>
       </Modal>

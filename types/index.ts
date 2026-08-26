@@ -108,6 +108,11 @@ export interface TeachingAssistant {
   office_hours?: string
 }
 
+/** Canonical semester code used across the app (Course.semester,
+ *  StudentProfile.current_semester). Scraped StudentCourse.semester stays a
+ *  free string ("סמסטר א'", 'a', ...) and is matched by rank, not equality. */
+export type SemesterCode = 'א' | 'ב' | 'קיץ'
+
 /** Generic external link attached to a course (syllabus is its own field). */
 export interface CourseLink {
   label: string
@@ -127,7 +132,7 @@ export interface Course {
   started_at?: string
   completed_at?: string
   created_at: string
-  semester?: 'א' | 'ב' | 'קיץ'
+  semester?: SemesterCode
   /** Gregorian year the academic year starts in (e.g. "2024" for תשפ"ה = Oct 2024–Sep 2025) */
   academic_year?: string
   /** Year of study relative to the user's degree (1=א, 2=ב, 3=ג, 4=ד). Computed from academic_year + degree start. */
@@ -343,6 +348,9 @@ export interface StudentProfile {
   track_id: string
   start_year: number
   current_year: number
+  /** Explicit current semester. When set it wins over the in-progress-courses
+   *  derivation in use-academic-progress. Unset = derive automatically. */
+  current_semester?: SemesterCode
   expected_end?: number
   updated_at: string
 }
