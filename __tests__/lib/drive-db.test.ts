@@ -101,4 +101,30 @@ describe('migrateDB', () => {
     expect(result.version).toBe(3)
     expect(result.assignments[0].collaborators?.length).toBe(2)
   })
+
+  it('accepts courses carrying the v3 schema-gap fields (course_average 0 preserved)', () => {
+    const db: DriveDB = {
+      ...EMPTY_DB,
+      version: 2,
+      courses: [
+        {
+          id: 'c2',
+          user_id: 'u',
+          title: 'אינפי 1',
+          source: 'bgu',
+          progress_percentage: 0,
+          status: 'active',
+          created_at: '2026-01-01T00:00:00Z',
+          course_average: 0, // 0 is a valid grade — must survive migration
+          meeting_location: 'בניין 90 חדר 141',
+          lecturer_office_hours: "יום ג' 14:00-16:00, בניין 37 חדר 204",
+        },
+      ],
+    }
+    const result = migrateDB(db)
+    expect(result.version).toBe(3)
+    expect(result.courses[0].course_average).toBe(0)
+    expect(result.courses[0].meeting_location).toBe('בניין 90 חדר 141')
+    expect(result.courses[0].lecturer_office_hours).toContain('14:00-16:00')
+  })
 })

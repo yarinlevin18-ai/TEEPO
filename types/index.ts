@@ -177,6 +177,16 @@ export interface Course {
    *  the frontend treats it as read-only and just surfaces specific keys. */
   portal_metadata?: Record<string, unknown>
 
+  // ── schema-gap fields ──────────────────────────────────────────
+  /** Final/running course average grade (0-100). User-entered or portal-scraped.
+   *  0 is a valid value — render with `!= null` checks, never truthiness. */
+  course_average?: number
+  /** Where the class physically meets (e.g. "בניין 90 חדר 141").
+   *  Manual override; the calendar-derived location remains the fallback. */
+  meeting_location?: string
+  /** Lecturer's office hours, free-text (e.g. "יום ג' 14:00-16:00, בניין 37 חדר 204"). */
+  lecturer_office_hours?: string
+
   /** ISO-8601 timestamp of the last successful Moodle sync for this course.
    *  Used by POST /api/sync/all as the diff cutoff — only scraper hits
    *  newer than this are surfaced as "new" in the results modal.

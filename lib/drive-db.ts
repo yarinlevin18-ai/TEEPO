@@ -43,7 +43,9 @@ const DB_FILE_NAME = 'db.json'
  *      portal_metadata, UserSettings.university/theme). All optional, so
  *      v1 data is structurally valid v2 — the migration just bumps the marker.
  * v3 — Assignment gained is_group_work/collaborators/drive_folder_url/
- *      grade_weight. All optional/additive — the migration just bumps the marker.
+ *      grade_weight; Course gained course_average/meeting_location/
+ *      lecturer_office_hours. All optional/additive — the migration just
+ *      bumps the marker.
  */
 export const CURRENT_DB_VERSION = 3
 
@@ -118,8 +120,9 @@ export function migrateDB(db: DriveDB): DriveDB {
  * v2 → v3.
  *
  * v3 only added optional Assignment fields (is_group_work, collaborators,
- * drive_folder_url, grade_weight), so no existing data is reshaped — just
- * mark the DB as v3.
+ * drive_folder_url, grade_weight) and optional Course fields (course_average,
+ * meeting_location, lecturer_office_hours), so no existing data is reshaped —
+ * just mark the DB as v3.
  */
 function migrateV2ToV3(db: DriveDB): DriveDB {
   return { ...db, version: 3 }

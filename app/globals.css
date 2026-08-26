@@ -9692,6 +9692,61 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
   font-size: 12px;
   font-weight: 600;
 }
+/* Inline edit-in-place for schema-gap fields (location / average / office hours) */
+.course-v2-inline-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.course-v2-inline-edit input {
+  width: 130px;
+  max-width: 100%;
+  padding: 3px 8px;
+  font-size: 12.5px;
+  color: var(--lp-ink);
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--lp-line);
+  border-radius: 7px;
+  outline: none;
+}
+.course-v2-inline-edit input:focus {
+  border-color: var(--course-color, var(--accent));
+}
+.course-v2-inline-edit > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--lp-muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.course-v2-inline-edit > button:hover {
+  color: var(--lp-ink);
+  background: var(--course-soft, var(--lp-line));
+}
+.course-v2-inline-add {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: inherit;
+}
+.course-v2-inline-add:hover {
+  color: var(--lp-ink);
+  text-decoration: underline;
+}
+.course-v2-office-hours {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
 
 /* ── Stats strip ────────────────────────────────────────────────────── */
 .course-v2-stats {
