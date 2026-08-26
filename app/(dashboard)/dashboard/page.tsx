@@ -351,7 +351,7 @@ export default function DashboardPage() {
             </header>
             <div className="w-body">
               {openAssignments.length === 0 ? (
-                <div className="w-empty">אין מטלות פתוחות כרגע 🎉</div>
+                <div className="w-empty">אין מטלות פתוחות כרגע</div>
               ) : openAssignments.map(({ a, course, tone, dueLabel, chipLabel }) => (
                 <Link
                   key={a.id}

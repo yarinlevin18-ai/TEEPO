@@ -11,6 +11,7 @@
  * CTA routes to /auth — same OAuth entry point the rest of the app uses.
  */
 import Link from 'next/link'
+import { GraduationCap } from 'lucide-react'
 
 // Each Hebrew character of "חכמה" rendered in its own span so future
 // hover/wave per-letter effects work without re-clipping the gradient.
@@ -48,7 +49,7 @@ export default function HeroV2() {
       </Link>
 
       <div className="landing-v2-restriction">
-        <span aria-hidden>🎓</span>
+        <span aria-hidden><GraduationCap size={15} strokeWidth={2.2} /></span>
         <span>פתוח לסטודנטים של אונ&apos; בן-גוריון ואונ&apos; תל-אביב בלבד</span>
       </div>
     </main>
