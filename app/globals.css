@@ -15628,3 +15628,27 @@ html.dark .courses-error-body small { color: #fdba74 !important; }
 @media (prefers-reduced-motion: reduce) {
   .sum-pipeline-arrow .dot { animation: none; }
 }
+/* ── Icon alignment for the emoji→lucide swap ──────────────────────────
+   Section/empty-state icons are inline SVGs now (tinted via the existing
+   per-section currentColor rules); center them on the text baseline. */
+.todos-v2-section-icon,
+.tasks-v2-sec-icon,
+.t-sec-icon,
+.todos-v2-empty .em,
+.tasks-v2-empty .em,
+.t-empty .em,
+.summaries-page .sum-h1 .brain-emoji {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: -2px;
+}
+.todos-v2-section-icon { color: var(--ink-soft); }
+.todos-v2-section-today .todos-v2-section-icon { color: #e11d48; }
+.todos-v2-section-week  .todos-v2-section-icon { color: #d97706; }
+.todos-v2-section-later .todos-v2-section-icon { color: #6366f1; }
+.todos-v2-section-done  .todos-v2-section-icon { color: var(--accent); }
+.todos-v2-empty .em,
+.tasks-v2-empty .em,
+.t-empty .em { color: var(--faint); }
+.summaries-page .sum-h1 .brain-emoji { color: var(--accent); vertical-align: -4px; }
+.landing-v2-feature-icon { color: var(--accent-deep); }

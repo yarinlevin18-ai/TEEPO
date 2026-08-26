@@ -29,6 +29,7 @@ import Link from 'next/link'
 import {
   Plus, ListChecks, Calendar as CalendarIcon, Library,
   Clock, User, Users, FolderOpen, X, Loader2,
+  Flame, CalendarDays, CircleDashed, Inbox, BookOpen,
 } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
 import type { Assignment, Course } from '@/types'
@@ -37,16 +38,15 @@ import type { Assignment, Course } from '@/types'
 // Palette: same rotation we use on /summaries chips, so the visual
 // language stays consistent across the two pages.
 // ──────────────────────────────────────────────────────────────────────
-const COURSE_PALETTE: Array<{ color: string; soft: string; emoji: string }> = [
-  // emoji per-palette mirrors mockup_tasks_v2.html (📘 / 📕 / 📗 / 📙) —
-  // shown as the section icon on the "לפי קורס" tab so adjacent course
-  // groups read as visually distinct even without the color stripe.
-  { color: '#d97706', soft: '#fef3c7', emoji: '📘' },
-  { color: '#8b5cf6', soft: '#ede9fe', emoji: '📕' },
-  { color: '#0d9488', soft: '#ccfbf1', emoji: '📗' },
-  { color: '#e11d48', soft: '#fee2e2', emoji: '📙' },
-  { color: '#6366f1', soft: '#e0e7ff', emoji: '📘' },
-  { color: '#16a34a', soft: '#dcfce7', emoji: '📗' },
+const COURSE_PALETTE: Array<{ color: string; soft: string }> = [
+  // Section icon on the "לפי קורס" tab is a BookOpen tinted per palette
+  // color, so adjacent course groups read as visually distinct.
+  { color: '#d97706', soft: '#fef3c7' },
+  { color: '#8b5cf6', soft: '#ede9fe' },
+  { color: '#0d9488', soft: '#ccfbf1' },
+  { color: '#e11d48', soft: '#fee2e2' },
+  { color: '#6366f1', soft: '#e0e7ff' },
+  { color: '#16a34a', soft: '#dcfce7' },
 ]
 
 /** Deterministic palette index from any string (course.id or "uncategorized"). */
@@ -107,7 +107,7 @@ const PRIORITY_META: Record<Assignment['priority'], { label: string; cls: string
 type Tab = 'all' | 'deadline' | 'course'
 
 export default function TasksPage() {
-  const { db, ready, createAssignment } = useDB()
+  const { db, ready, loading, createAssignment } = useDB()
   const [tab, setTab] = useState<Tab>('all')
   const [addOpen, setAddOpen] = useState(false)
 
@@ -172,7 +172,11 @@ export default function TasksPage() {
     return rows
   }, [sortedAll, courseById])
 
-  if (!ready) {
+  // Skeleton only while the DB is actually loading. If loading finished
+  // without success (Drive error), render the page with empty data — the
+  // layout's DriveConnectionBanner explains the problem; an infinite
+  // skeleton explains nothing.
+  if (!ready && loading) {
     return (
       <div className="cream-page tasks-v2">
         <main className="t-main">
@@ -258,21 +262,21 @@ export default function TasksPage() {
               <>
                 <DeadlineSection
                   title="השבוע"
-                  emoji="🔥"
+                  icon={<Flame size={15} strokeWidth={2.2} />}
                   modifier="urgent"
                   items={byDeadline.week}
                   courseById={courseById}
                 />
                 <DeadlineSection
                   title="השבוע הבא"
-                  emoji="📅"
+                  icon={<CalendarDays size={15} strokeWidth={2.2} />}
                   modifier="week"
                   items={byDeadline.nextWeek}
                   courseById={courseById}
                 />
                 <DeadlineSection
                   title="בהמשך"
-                  emoji="💭"
+                  icon={<CircleDashed size={15} strokeWidth={2.2} />}
                   modifier="later"
                   items={byDeadline.later}
                   courseById={courseById}
@@ -318,10 +322,10 @@ export default function TasksPage() {
 // ── Sub-components ─────────────────────────────────────────────────────
 
 function DeadlineSection({
-  title, emoji, modifier, items, courseById,
+  title, icon, modifier, items, courseById,
 }: {
   title: string
-  emoji: string
+  icon: React.ReactNode
   modifier: 'urgent' | 'week' | 'later'
   items: Assignment[]
   courseById: Map<string, Course>
@@ -330,7 +334,7 @@ function DeadlineSection({
   return (
     <section className={`t-section ${modifier}`}>
       <div className="t-sec-head">
-        <span className="t-sec-icon" aria-hidden>{emoji}</span>
+        <span className="t-sec-icon" aria-hidden>{icon}</span>
         <span className="t-sec-label">{title}</span>
         <span className="t-sec-count">{items.length} {items.length === 1 ? 'מטלה' : 'מטלות'}</span>
       </div>
@@ -359,7 +363,7 @@ function CourseSection({
   return (
     <section className="t-section">
       <div className="t-sec-head">
-        <span className="t-sec-icon" style={{ color: p.color }} aria-hidden>{p.emoji}</span>
+        <span className="t-sec-icon" style={{ color: p.color }} aria-hidden><BookOpen size={15} strokeWidth={2.2} /></span>
         <span className="t-sec-label">{course?.title ?? 'ללא קורס'}</span>
         <span className="t-sec-count">{list.length} פתוחות</span>
       </div>
@@ -434,8 +438,8 @@ function TaskCard({ assignment, course }: { assignment: Assignment; course: Cour
 function EmptyState() {
   return (
     <div className="t-empty">
-      <span className="em" aria-hidden>📭</span>
-      אין מטלות פתוחות כרגע. כל הכבוד! 🎉
+      <span className="em" aria-hidden><Inbox size={18} /></span>
+      אין מטלות פתוחות כרגע. כל הכבוד!
     </div>
   )
 }

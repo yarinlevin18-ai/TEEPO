@@ -24,7 +24,7 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Plus, Check, X } from 'lucide-react'
+import { Plus, Check, X, Flame, CalendarDays, CircleDashed, CheckCircle2, Timer, Inbox } from 'lucide-react'
 import { useDB } from '@/lib/db-context'
 import type { Course, StudyTask } from '@/types'
 
@@ -108,7 +108,7 @@ function dueLabelFor(task: StudyTask, bucket: Bucket): { label: string; tone: 'u
 function metaPiecesFor(task: StudyTask): string[] {
   const out: string[] = []
   if (task.duration_minutes && task.duration_minutes > 0) {
-    out.push(`⏱ ${task.duration_minutes} דק׳`)
+    out.push(`${task.duration_minutes} דק׳`)
   }
   if (task.description && task.description.trim()) {
     out.push(task.description.trim())
@@ -117,11 +117,11 @@ function metaPiecesFor(task: StudyTask): string[] {
 }
 
 /** Section meta — icon + label, mirrors the mockup's 4-section structure. */
-const SECTIONS: Array<{ key: Bucket; label: string; icon: string }> = [
-  { key: 'today', label: 'להיום',       icon: '🔥' },
-  { key: 'week',  label: 'השבוע',       icon: '📅' },
-  { key: 'later', label: 'בהמשך',       icon: '💭' },
-  { key: 'done',  label: 'הושלמו היום', icon: '✅' },
+const SECTIONS: Array<{ key: Bucket; label: string; icon: React.ReactNode }> = [
+  { key: 'today', label: 'להיום',       icon: <Flame size={15} strokeWidth={2.2} /> },
+  { key: 'week',  label: 'השבוע',       icon: <CalendarDays size={15} strokeWidth={2.2} /> },
+  { key: 'later', label: 'בהמשך',       icon: <CircleDashed size={15} strokeWidth={2.2} /> },
+  { key: 'done',  label: 'הושלמו היום', icon: <CheckCircle2 size={15} strokeWidth={2.2} /> },
 ]
 
 export default function TodosPage() {
@@ -242,7 +242,7 @@ export default function TodosPage() {
               </div>
               {items.length === 0 ? (
                 <div className="todos-v2-empty">
-                  <span className="em" aria-hidden>📭</span>
+                  <span className="em" aria-hidden><Inbox size={16} /></span>
                   אין משימות כאן
                 </div>
               ) : (
