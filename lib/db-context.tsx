@@ -14,6 +14,7 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react'
 import { useAuth } from './auth-context'
+import { isDevAuthBypassEnabled } from './dev-auth-bypass'
 import {
   DriveDB, DriveDBHandle, EMPTY_DB, loadDB, newId, saveDB,
   saveDBDebounced, flushPendingSave, hasPendingSave, probeTokenScopes,
@@ -167,6 +168,18 @@ export function DBProvider({ children }: { children: React.ReactNode }) {
   // Load DB on mount / when token becomes available
   const reload = useCallback(async () => {
     if (!user) return
+    // Dev bypass: the fake token can't reach real Drive, which left
+    // `ready` false forever (pages gated on it — /tasks — never rendered).
+    // Run fully in-memory instead: empty DB, ready immediately, mutations
+    // work optimistically for the session and are simply not persisted.
+    if (isDevAuthBypassEnabled()) {
+      setDb({ ...EMPTY_DB, updated_at: new Date().toISOString() })
+      setHandle(null)
+      setReady(true)
+      setLoading(false)
+      setError(null)
+      return
+    }
     setLoading(true)
     setError(null)
     try {
