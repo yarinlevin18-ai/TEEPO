@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import PipelineDemo from '@/components/summaries/PipelineDemo'
 import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import {
@@ -447,10 +448,7 @@ export default function SummariesPage() {
             onPickCourse={pickCourse}
           />
         ) : (
-          <div className="sum-empty">
-            <Folder />
-            <h3>בחר סמסטר כדי להתחיל</h3>
-          </div>
+          <PipelineDemo />
         )}
 
         <p className="subtle-hint">
