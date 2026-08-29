@@ -14,10 +14,6 @@
  * corresponding chip/section renders a clean empty state and the user
  * sees the rest of the card without invented numbers.
  *
- * Schema additions still pending (proposed in PR description):
- *   - StudentProfile.current_semester (resolves the ambiguous-semester
- *     edge case the inline derivation has to work around today).
- *
  * The mockup's literal sample values — 78/120, 91.4, 92.8, +18, +1.4
  * — are NEVER hardcoded; they were placeholders only.
  */

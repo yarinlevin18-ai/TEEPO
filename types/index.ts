@@ -108,6 +108,11 @@ export interface TeachingAssistant {
   office_hours?: string
 }
 
+/** Canonical semester code used across the app (Course.semester,
+ *  StudentProfile.current_semester). Scraped StudentCourse.semester stays a
+ *  free string ("סמסטר א'", 'a', ...) and is matched by rank, not equality. */
+export type SemesterCode = 'א' | 'ב' | 'קיץ'
+
 /** Generic external link attached to a course (syllabus is its own field). */
 export interface CourseLink {
   label: string
@@ -127,7 +132,7 @@ export interface Course {
   started_at?: string
   completed_at?: string
   created_at: string
-  semester?: 'א' | 'ב' | 'קיץ'
+  semester?: SemesterCode
   /** Gregorian year the academic year starts in (e.g. "2024" for תשפ"ה = Oct 2024–Sep 2025) */
   academic_year?: string
   /** Year of study relative to the user's degree (1=א, 2=ב, 3=ג, 4=ד). Computed from academic_year + degree start. */
@@ -176,6 +181,16 @@ export interface Course {
   /** Opaque snapshot from the university Portal scraper. Schema is per-university;
    *  the frontend treats it as read-only and just surfaces specific keys. */
   portal_metadata?: Record<string, unknown>
+
+  // ── schema-gap fields ──────────────────────────────────────────
+  /** Final/running course average grade (0-100). User-entered or portal-scraped.
+   *  0 is a valid value — render with `!= null` checks, never truthiness. */
+  course_average?: number
+  /** Where the class physically meets (e.g. "בניין 90 חדר 141").
+   *  Manual override; the calendar-derived location remains the fallback. */
+  meeting_location?: string
+  /** Lecturer's office hours, free-text (e.g. "יום ג' 14:00-16:00, בניין 37 חדר 204"). */
+  lecturer_office_hours?: string
 
   /** ISO-8601 timestamp of the last successful Moodle sync for this course.
    *  Used by POST /api/sync/all as the diff cutoff — only scraper hits
@@ -226,6 +241,12 @@ export interface StudyTask {
   created_at: string
 }
 
+/** A partner on a group assignment. */
+export interface AssignmentCollaborator {
+  name: string
+  email?: string
+}
+
 export interface Assignment {
   id: string
   user_id: string
@@ -235,6 +256,17 @@ export interface Assignment {
   deadline?: string
   status: 'todo' | 'in_progress' | 'submitted' | 'graded'
   priority: 'low' | 'medium' | 'high'
+  /** True for group/pair work. When set, replaces the keyword heuristic
+   *  isGroupWork() on the assignments page; undefined = legacy data,
+   *  fall back to the heuristic. */
+  is_group_work?: boolean
+  /** Partners on a group assignment. Empty/undefined = none listed. */
+  collaborators?: AssignmentCollaborator[]
+  /** Direct Google Drive folder URL for THIS assignment (overrides the
+   *  course-level drive_folder_ids.assignments fallback). */
+  drive_folder_url?: string
+  /** Weight of this assignment in the final course grade, in percent (0-100). */
+  grade_weight?: number
   assignment_tasks?: AssignmentTask[]
 }
 
@@ -258,6 +290,18 @@ export interface CourseNote {
   file_name?: string
   created_at: string
   updated_at: string
+}
+
+/** Free-form note attached to a calendar day/event for the dashboard day-board (v3). */
+export interface EventNote {
+  id: string
+  /** Local calendar date the note belongs to, YYYY-MM-DD. */
+  date: string
+  /** Optional calendar event id (WeekCalendarSlot.id) to scope the note to one event; absent = whole day. */
+  event_id?: string
+  content: string
+  created_at: string
+  updated_at?: string
 }
 
 export interface ChatMessage {
@@ -316,6 +360,9 @@ export interface StudentProfile {
   track_id: string
   start_year: number
   current_year: number
+  /** Explicit current semester. When set it wins over the in-progress-courses
+   *  derivation in use-academic-progress. Unset = derive automatically. */
+  current_semester?: SemesterCode
   expected_end?: number
   updated_at: string
 }

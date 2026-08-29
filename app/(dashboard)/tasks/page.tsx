@@ -386,9 +386,14 @@ function TaskCard({ assignment, course }: { assignment: Assignment; course: Cour
   const p = COURSE_PALETTE[paletteIdx(paletteKey)]
   const priority = PRIORITY_META[assignment.priority]
   const driveAssignmentsId = (course?.drive_folder_ids as any)?.assignments as string | undefined
-  const driveHref = driveAssignmentsId
-    ? `https://drive.google.com/drive/folders/${driveAssignmentsId}`
-    : 'https://drive.google.com/drive/my-drive'
+  // Assignment-level Drive URL wins; then course folder; then Drive root.
+  const ownDriveUrl = assignment.drive_folder_url && /^https:\/\//i.test(assignment.drive_folder_url.trim())
+    ? assignment.drive_folder_url.trim()
+    : undefined
+  const driveHref = ownDriveUrl
+    ?? (driveAssignmentsId
+      ? `https://drive.google.com/drive/folders/${driveAssignmentsId}`
+      : 'https://drive.google.com/drive/my-drive')
 
   return (
     <Link
@@ -407,12 +412,17 @@ function TaskCard({ assignment, course }: { assignment: Assignment; course: Cour
             <Clock size={12} />
             {due.label}
           </span>
-          {/* Solo/group hint isn't in the Assignment shape yet — show a
-              neutral "יחיד" label so the row reads complete. */}
-          <span className="t-meta-item solo">
-            <User size={12} />
-            יחיד
-          </span>
+          {assignment.is_group_work ? (
+            <span className="t-meta-item group">
+              <Users size={12} />
+              {assignment.collaborators?.[0]?.name ? `קבוצתי · ${assignment.collaborators[0].name}` : 'קבוצתי'}
+            </span>
+          ) : (
+            <span className="t-meta-item solo">
+              <User size={12} />
+              יחיד
+            </span>
+          )}
         </div>
       </div>
       <div className="t-card-right">
@@ -457,6 +467,11 @@ function NewAssignmentModal({
   const [courseId, setCourseId] = useState('')
   const [deadline, setDeadline] = useState('')
   const [priority, setPriority] = useState<Assignment['priority']>('medium')
+  const [isGroup, setIsGroup] = useState(false)
+  const [collabName, setCollabName] = useState('')
+  const [collabEmail, setCollabEmail] = useState('')
+  const [driveFolderUrl, setDriveFolderUrl] = useState('')
+  const [gradeWeight, setGradeWeight] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -474,6 +489,14 @@ function NewAssignmentModal({
         deadline: deadline || undefined,
         priority,
         status: 'todo',
+        is_group_work: isGroup,
+        collaborators: isGroup && collabName.trim()
+          ? [{ name: collabName.trim(), email: collabEmail.trim() || undefined }]
+          : undefined,
+        drive_folder_url: driveFolderUrl.trim() || undefined,
+        grade_weight: gradeWeight !== '' && !Number.isNaN(Number(gradeWeight))
+          ? Math.min(100, Math.max(0, Number(gradeWeight)))
+          : undefined,
       })
     } catch (err) {
       setError((err as Error)?.message ?? 'שגיאה ביצירת המטלה')
@@ -544,6 +567,63 @@ function NewAssignmentModal({
               </select>
             </label>
           </div>
+
+          <div className="t-field-row">
+            <label className="t-field">
+              <span>סוג עבודה</span>
+              <select value={isGroup ? 'group' : 'solo'} onChange={(e) => setIsGroup(e.target.value === 'group')}>
+                <option value="solo">יחיד</option>
+                <option value="group">קבוצתי</option>
+              </select>
+            </label>
+            <label className="t-field">
+              <span>משקל בציון (%)</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={gradeWeight}
+                onChange={(e) => setGradeWeight(e.target.value)}
+                placeholder="לדוגמה: 15"
+              />
+            </label>
+          </div>
+
+          {isGroup && (
+            <div className="t-field-row">
+              <label className="t-field">
+                <span>שם השותף</span>
+                <input
+                  type="text"
+                  value={collabName}
+                  onChange={(e) => setCollabName(e.target.value)}
+                  placeholder="עם מי עובדים?"
+                />
+              </label>
+              <label className="t-field">
+                <span>אימייל השותף</span>
+                <input
+                  type="email"
+                  value={collabEmail}
+                  onChange={(e) => setCollabEmail(e.target.value)}
+                  placeholder="אופציונלי"
+                  dir="ltr"
+                />
+              </label>
+            </div>
+          )}
+
+          <label className="t-field">
+            <span>קישור לתיקיית Drive</span>
+            <input
+              type="url"
+              value={driveFolderUrl}
+              onChange={(e) => setDriveFolderUrl(e.target.value)}
+              placeholder="https://drive.google.com/drive/folders/…"
+              dir="ltr"
+            />
+          </label>
 
           {error && <div className="t-modal-error">{error}</div>}
         </div>

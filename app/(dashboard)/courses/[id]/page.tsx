@@ -34,7 +34,7 @@ import {
   ArrowRight, CheckCircle2, Check, X, Mail, Trash2,
   RefreshCw, Loader2, Plus, MapPin, Calendar as CalendarIcon,
   User as UserIcon, FileText, ExternalLink, Folder, Link as LinkIcon,
-  BookOpen, ClipboardCheck, NotebookPen,
+  BookOpen, ClipboardCheck, NotebookPen, Pencil, Clock, GraduationCap,
 } from 'lucide-react'
 import { useDB, useCourse } from '@/lib/db-context'
 import { FolderSection } from '@/components/summaries/CourseDrivePanel'
@@ -403,6 +403,13 @@ export default function CoursePage() {
                     <span>{course.credits} נק"ז</span>
                   </>
                 )}
+                {/* Shortname moved here from the meta grid (its slot now shows ממוצע). */}
+                {course.shortname && (
+                  <>
+                    <span>·</span>
+                    <span dir="ltr">{course.shortname}</span>
+                  </>
+                )}
               </div>
             </div>
             <div className="course-v2-hero-actions">
@@ -449,14 +456,30 @@ export default function CoursePage() {
                 : <span className="course-v2-meta-empty">אין שעות בלוח</span>}
             </MetaItem>
             <MetaItem icon={<MapPin size={16} />} label="מקום">
-              {courseSchedule?.meta
-                ? <strong>{courseSchedule.meta}</strong>
-                : <span className="course-v2-meta-empty">אין מיקום בלוח</span>}
+              {/* Manual meeting_location wins over the calendar-derived value. */}
+              <InlineEditableValue
+                value={course.meeting_location}
+                fallback={courseSchedule?.meta}
+                emptyLabel="אין מיקום בלוח"
+                placeholder='למשל "בניין 90 חדר 141"'
+                editLabel="ערוך מיקום"
+                onSave={(v) => updateCourse(course.id, { meeting_location: v || undefined })}
+              />
             </MetaItem>
-            <MetaItem icon={<BookOpen size={16} />} label="שם מקוצר">
-              {course.shortname
-                ? <strong dir="ltr">{course.shortname}</strong>
-                : <span className="course-v2-meta-empty">—</span>}
+            <MetaItem icon={<GraduationCap size={16} />} label="ממוצע">
+              {/* 0 is a valid average — parse, don't truthy-check. */}
+              <InlineEditableValue
+                value={course.course_average != null ? String(course.course_average) : undefined}
+                emptyLabel="אין ממוצע"
+                placeholder="0-100"
+                editLabel="ערוך ממוצע"
+                inputMode="decimal"
+                onSave={(v) => {
+                  const n = v === '' ? undefined : Number(v)
+                  if (n !== undefined && (!Number.isFinite(n) || n < 0 || n > 100)) return
+                  updateCourse(course.id, { course_average: n })
+                }}
+              />
             </MetaItem>
           </div>
         </section>
@@ -755,6 +778,8 @@ export default function CoursePage() {
               email={course.lecturer_email}
               dept={course.category_name}
               palette={palette}
+              officeHours={course.lecturer_office_hours}
+              onSaveOfficeHours={(v) => updateCourse(course.id, { lecturer_office_hours: v || undefined })}
             />
 
             {/* Next class */}
@@ -835,6 +860,86 @@ export default function CoursePage() {
 // Leaf components
 // ──────────────────────────────────────────────────────────────────────
 
+/**
+ * Tiny click-to-edit value used for the schema-gap fields (meeting_location,
+ * course_average, lecturer_office_hours). Display mode shows the manual
+ * `value` (or read-only `fallback`, or an empty-state CTA); edit mode is a
+ * small input with Check/X buttons. Saving calls `onSave` — persistence goes
+ * through updateCourse's optimistic mutate, so the UI updates instantly.
+ */
+function InlineEditableValue({
+  value, fallback, emptyLabel, placeholder, editLabel, inputMode, onSave,
+}: {
+  value?: string
+  /** Read-only derived value shown when no manual value is set (e.g. calendar location). */
+  fallback?: string
+  emptyLabel: string
+  placeholder: string
+  editLabel: string
+  inputMode?: 'decimal'
+  onSave: (value: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  const startEdit = () => {
+    setDraft(value ?? '')
+    setEditing(true)
+  }
+  const commit = () => {
+    onSave(draft.trim())
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <span className="course-v2-inline-edit">
+        <input
+          type="text"
+          value={draft}
+          inputMode={inputMode}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commit() }
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          placeholder={placeholder}
+          maxLength={120}
+          autoFocus
+        />
+        <button type="button" onClick={commit} aria-label="שמור"><Check size={13} /></button>
+        <button type="button" onClick={() => setEditing(false)} aria-label="בטל"><X size={13} /></button>
+      </span>
+    )
+  }
+
+  if (value) {
+    return (
+      <span className="course-v2-inline-edit">
+        <strong>{value}</strong>
+        <button type="button" onClick={startEdit} aria-label={editLabel} title={editLabel}>
+          <Pencil size={11} />
+        </button>
+      </span>
+    )
+  }
+  if (fallback) {
+    return (
+      <span className="course-v2-inline-edit">
+        <strong>{fallback}</strong>
+        <button type="button" onClick={startEdit} aria-label={editLabel} title={editLabel}>
+          <Pencil size={11} />
+        </button>
+      </span>
+    )
+  }
+  return (
+    <button type="button" className="course-v2-meta-empty course-v2-inline-add" onClick={startEdit}>
+      {emptyLabel}
+    </button>
+  )
+}
+
 function MetaItem({
   icon, label, children,
 }: {
@@ -900,12 +1005,14 @@ function NextClassPanel({ slot }: { slot: WeekCalendarSlot }) {
 }
 
 function LecturerSidebar({
-  name, email, dept, palette,
+  name, email, dept, palette, officeHours, onSaveOfficeHours,
 }: {
   name?: string
   email?: string
   dept?: string
   palette: { color: string; soft: string }
+  officeHours?: string
+  onSaveOfficeHours?: (value: string) => void
 }) {
   const display = name || email
   if (!display) {
@@ -940,6 +1047,18 @@ function LecturerSidebar({
           <a href={`mailto:${email}`} className="course-v2-btn">
             <Mail size={13} /> מייל
           </a>
+        </div>
+      )}
+      {onSaveOfficeHours && (
+        <div className="ta-office-hours course-v2-office-hours">
+          <Clock size={12} />
+          <InlineEditableValue
+            value={officeHours}
+            emptyLabel="+ הוסף שעות קבלה"
+            placeholder='למשל "יום ג׳ 14:00-16:00, בניין 37 חדר 204"'
+            editLabel="ערוך שעות קבלה"
+            onSave={onSaveOfficeHours}
+          />
         </div>
       )}
     </div>

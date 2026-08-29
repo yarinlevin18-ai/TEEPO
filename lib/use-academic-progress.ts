@@ -19,10 +19,13 @@
  *                                             (≥85 Cum Laude, ≥90 Magna,
  *                                             ≥95 Summa, else null)
  *
- * Schema gaps:
- *   - There is no canonical "current semester" field on student_profile.
- *     We approximate via student_courses[].status === 'in_progress'.
- *     If multiple semesters appear under in-progress (e.g. summer + fall),
+ * Current-semester resolution:
+ *   - If student_profile.current_semester is set explicitly, it wins: we
+ *     anchor on the latest academic_year that has course rows matching
+ *     that semester (matched by rank, so explicit 'א' matches scraped 'a').
+ *   - If it's unset — or no course rows match it — we fall back to the
+ *     derivation via student_courses[].status === 'in_progress'. If
+ *     multiple semesters appear under in-progress (e.g. summer + fall),
  *     we pick the one whose academic_year + semester sorts latest.
  *
  * No fake data: when a value can't be derived (no profile, no track, no
@@ -33,7 +36,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useDB } from './db-context'
 import { computeCreditSummary } from './catalog'
-import type { StudentCourse, StudentProfile, UniversityCode } from '@/types'
+import type { SemesterCode, StudentCourse, StudentProfile, UniversityCode } from '@/types'
 
 export type HonorsBadge = 'Cum Laude' | 'Magna Cum Laude' | 'Summa Cum Laude' | null
 
@@ -78,20 +81,25 @@ export interface AcademicProgress {
 /** Parse "תשפ"ה / 2024-25" + "א'/ב'/קיץ" into a sortable string so the
  *  most-recent semester sorts last lexicographically. We pad academic
  *  year to 7 chars and assign semester rank a=1, b=2, summer=3. */
-function semesterSortKey(c: { academic_year?: string; semester?: string }): string {
-  const year = (c.academic_year ?? '').padStart(7, '0')
-  const sem = c.semester ?? ''
-  const semRank = sem.includes("א") || sem.toLowerCase() === 'a' ? '1'
+/** Map a free-form semester string ('א', "סמסטר ב'", 'summer', 'a'…) to a
+ *  sortable rank: a=1, b=2, summer=3, unknown=4. Shared by semesterSortKey
+ *  and the explicit-semester matcher so both use identical semantics. */
+export function semesterRank(sem: string): '1' | '2' | '3' | '4' {
+  return sem.includes("א") || sem.toLowerCase() === 'a' ? '1'
     : sem.includes("ב") || sem.toLowerCase() === 'b' ? '2'
     : (sem.includes('קיץ') || sem.toLowerCase().includes('summer')) ? '3'
     : '4'
-  return `${year}-${semRank}`
+}
+
+export function semesterSortKey(c: { academic_year?: string; semester?: string }): string {
+  const year = (c.academic_year ?? '').padStart(7, '0')
+  return `${year}-${semesterRank(c.semester ?? '')}`
 }
 
 /** Pick the "current" semester key. Prefer in_progress courses; fall
  *  back to the most-recent completed semester. Returns null if there's
  *  nothing to anchor on. */
-function pickCurrentSemester(courses: StudentCourse[]): string | null {
+export function pickCurrentSemester(courses: StudentCourse[]): string | null {
   const inProgress = courses.filter(c => c.status === 'in_progress' && c.semester)
   const pool = inProgress.length > 0
     ? inProgress
@@ -102,6 +110,31 @@ function pickCurrentSemester(courses: StudentCourse[]): string | null {
     if (semesterSortKey(c) > semesterSortKey(best)) best = c
   }
   return semesterSortKey(best)
+}
+
+/** Resolve the current-semester key, honoring an explicit
+ *  StudentProfile.current_semester when it can anchor to data:
+ *  courses matching the explicit semester (by rank) are found and the
+ *  latest academic_year among them wins. When nothing matches — or no
+ *  explicit value is set — falls back to pickCurrentSemester(). */
+export function resolveCurrentSemesterKey(
+  courses: StudentCourse[],
+  explicit: SemesterCode | null | undefined,
+): string | null {
+  if (explicit) {
+    const rank = semesterRank(explicit)
+    const matching = courses.filter(
+      c => c.semester && semesterRank(c.semester) === rank,
+    )
+    if (matching.length > 0) {
+      let best = matching[0]
+      for (const c of matching) {
+        if (semesterSortKey(c) > semesterSortKey(best)) best = c
+      }
+      return semesterSortKey(best)
+    }
+  }
+  return pickCurrentSemester(courses)
 }
 
 /** Compute the credit-weighted average across a list of graded courses.
@@ -138,6 +171,7 @@ export function useAcademicProgress(): AcademicProgress {
   const university = (db?.settings?.university ?? null) as UniversityCode | null
   const trackId = profile?.track_id ?? null
   const currentYear = profile?.current_year
+  const explicitSemester = profile?.current_semester ?? null
 
   // ── Credits summary (async — uses the catalog) ────────────────────
   const [summary, setSummary] = useState<{
@@ -180,7 +214,7 @@ export function useAcademicProgress(): AcademicProgress {
 
   // ── Per-semester averages (derived inline, no async) ──────────────
   const { semesterGPA, lastSemesterGPA, earnedThisSemester } = useMemo(() => {
-    const currentKey = pickCurrentSemester(courses)
+    const currentKey = resolveCurrentSemesterKey(courses, explicitSemester)
     if (!currentKey) {
       return { semesterGPA: null, lastSemesterGPA: null, earnedThisSemester: null }
     }
@@ -205,7 +239,7 @@ export function useAcademicProgress(): AcademicProgress {
       lastSemesterGPA: lastGPA,
       earnedThisSemester: earned > 0 ? earned : null,
     }
-  }, [courses])
+  }, [courses, explicitSemester])
 
   const semesterDelta = (semesterGPA != null && lastSemesterGPA != null)
     ? Math.round((semesterGPA - lastSemesterGPA) * 100) / 100

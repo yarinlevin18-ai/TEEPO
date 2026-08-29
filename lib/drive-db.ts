@@ -18,6 +18,7 @@ import type {
   StudyTask,
   Assignment,
   CourseNote,
+  EventNote,
   UserSettings,
   StudentProfile,
   StudentCourse,
@@ -42,8 +43,13 @@ const DB_FILE_NAME = 'db.json'
  *      Course.lecturer_email/syllabus_url/teaching_assistants/course_links/
  *      portal_metadata, UserSettings.university/theme). All optional, so
  *      v1 data is structurally valid v2 — the migration just bumps the marker.
+ * v3 — Assignment gained is_group_work/collaborators/drive_folder_url/
+ *      grade_weight; Course gained course_average/meeting_location/
+ *      lecturer_office_hours; DriveDB gained the optional event_notes array
+ *      (dashboard day-board notes). All optional/additive — the migration
+ *      just bumps the marker (and seeds event_notes to []).
  */
-export const CURRENT_DB_VERSION = 2
+export const CURRENT_DB_VERSION = 3
 
 /** How long to wait after the last edit before persisting to Drive. */
 export const SAVE_DEBOUNCE_MS = 30_000
@@ -76,6 +82,8 @@ export interface DriveDB {
    *  when newer arrive) — keeps db.json size bounded. Sorted by
    *  posted_at descending. Optional → undefined treated as []. */
   announcements?: Announcement[]
+  /** Day-board notes (v3). Optional → undefined treated as []. */
+  event_notes?: EventNote[]
 }
 
 export const EMPTY_DB: DriveDB = {
@@ -89,13 +97,14 @@ export const EMPTY_DB: DriveDB = {
   settings: {},
   student_courses: [],
   announcements: [],
+  event_notes: [],
 }
 
 // ── Migrations ────────────────────────────────────────────────
 
 /**
  * Upgrade an older DriveDB to the current shape. Idempotent — calling on a
- * v2 DB returns the same DB (just spread, no mutation).
+ * current-version DB returns the same DB (just spread, no mutation).
  *
  * Returning a NEW object (even when no fields change) lets callers compare
  * by reference to know whether to persist the migrated version.
@@ -105,8 +114,24 @@ export function migrateDB(db: DriveDB): DriveDB {
   if ((next.version ?? 1) < 2) {
     next = migrateV1ToV2(next)
   }
-  // Future migrations: if (next.version < 3) next = migrateV2ToV3(next)
+  if (next.version < 3) {
+    next = migrateV2ToV3(next)
+  }
+  // Future migrations: if (next.version < 4) next = migrateV3ToV4(next)
   return next
+}
+
+/**
+ * v2 → v3.
+ *
+ * v3 only added optional Assignment fields (is_group_work, collaborators,
+ * drive_folder_url, grade_weight), optional Course fields (course_average,
+ * meeting_location, lecturer_office_hours), and the optional DriveDB
+ * event_notes array, so no existing data is reshaped — just mark the DB as
+ * v3 and seed event_notes.
+ */
+function migrateV2ToV3(db: DriveDB): DriveDB {
+  return { ...db, version: 3, event_notes: db.event_notes ?? [] }
 }
 
 /**
